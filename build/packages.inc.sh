@@ -212,7 +212,7 @@ stage_luci() {
 	install -d "$i/www/luci-static/resources/view/zirgozar" \
 	           "$i/www/luci-static/resources/zirgozar" \
 	           "$i/usr/share/luci/menu.d" "$i/usr/share/rpcd/acl.d"
-	for v in settings nodes subscribe other update traffic geoview acl log; do
+	for v in settings nodes node subscribe other update traffic geoview acl log; do
 		install -m 0644 "$l/www/luci-static/resources/view/zirgozar/$v.js" \
 			"$i/www/luci-static/resources/view/zirgozar/$v.js"
 	done

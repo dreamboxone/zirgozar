@@ -248,7 +248,7 @@ jobs:
           for base in verifyl/apk verifyl/ipk/data; do
             test -s "$base/usr/share/luci/menu.d/luci-app-zirgozar.json"
             test -s "$base/usr/share/rpcd/acl.d/luci-app-zirgozar.json"
-            for v in settings nodes subscribe other update traffic geoview acl log; do
+            for v in settings nodes node subscribe other update traffic geoview acl log; do
               test -s "$base/www/luci-static/resources/view/zirgozar/$v.js"
             done
           done

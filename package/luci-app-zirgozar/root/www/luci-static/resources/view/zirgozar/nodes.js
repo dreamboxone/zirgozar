@@ -545,7 +545,7 @@ return view.extend({
 		   is not in the file yet, so it still gets the window: a link pasted
 		   in there, and the page has something to take apart. */
 		s.renderMoreOptionsModal = function(section_id, ev) {
-			if (this.addedSection == section_id)
+			if (this.map.addedSection == section_id || !uci.get('zirgozar', section_id, 'link'))
 				return form.GridSection.prototype.renderMoreOptionsModal.apply(this, [ section_id, ev ]);
 			window.location.href = L.url('admin', 'services', 'zirgozar', 'node') + '?sid=' + encodeURIComponent(section_id);
 			return Promise.resolve();
