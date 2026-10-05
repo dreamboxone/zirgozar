@@ -313,6 +313,16 @@ method_geoview() {
 	json_dump
 }
 
+# The nodes of every subscription, for the node choice in Basic Settings.
+method_subnodes() {
+	"$NODES" subnodes 2>/dev/null | awk -F'\t' 'BEGIN { printf "{\"nodes\":["; n = 0 }
+		NF >= 6 {
+			for (i = 1; i <= NF; i++) { gsub(/\\/, "\\\\", $i); gsub(/"/, "\\\"", $i) }
+			printf "%s{\"sub\":\"%s\",\"subname\":\"%s\",\"protocol\":\"%s\",\"host\":\"%s\",\"port\":%d,\"label\":\"%s\"}", (n++ ? "," : ""), $1, $2, $3, $4, $5, $6
+		}
+		END { printf "]}\n" }'
+}
+
 method_subs() {
 	awk -F'\t' 'BEGIN { printf "{\"subs\":["; n = 0 }
 		{
@@ -667,6 +677,7 @@ case "$1" in
 		json_add_object "traffic"; json_close_object
 		json_add_object "nodes";   json_close_object
 		json_add_object "subs";    json_close_object
+		json_add_object "subnodes"; json_close_object
 		json_add_object "tests";   json_close_object
 		json_add_object "inuse";   json_close_object
 		json_add_object "log";     json_close_object
@@ -692,6 +703,7 @@ case "$1" in
 			traffic) method_traffic ;;
 			nodes)   method_nodes ;;
 			subs)    method_subs ;;
+			subnodes) method_subnodes ;;
 			tests)   method_tests ;;
 			inuse)   method_inuse ;;
 			log)     method_log ;;

@@ -816,7 +816,7 @@ return view.extend({
 				E('div', { 'class': 'mk-row', 'style': 'margin:0 0 10px;align-items:center' }, [
 					E('span', { 'id': 'pwp-nodecount', 'style': 'font-size:13px;color:var(--muted)' }, ''),
 					E('span', { 'style': 'flex:1 1 auto' }),
-					pui.btn(_('Check every node'), 'soft-blue mk-small', function(ev) {
+					pui.btn(_('Check all'), 'soft-blue mk-small', function(ev) {
 						var b = ev.currentTarget;
 						return callAction('measure_all', '').then(function() {
 							pui.note(b, _('Knocking on every node once. The TCPing column will fill in as answers come back.'), 'info');

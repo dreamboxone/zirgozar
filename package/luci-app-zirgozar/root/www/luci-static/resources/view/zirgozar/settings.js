@@ -20,7 +20,10 @@
 'require uci';
 'require zirgozar.i18n as i18n';
 'require zirgozar.ui as pui';
+'require rpc';
 'require zirgozar.status as status';
+
+var callSubNodes = rpc.declare({ object: 'luci.zirgozar', method: 'subnodes', expect: { '': {} } });
 
 /* Our own strings, in the language the setting names. The global _()
    is shadowed for this file only: LuCI translates through .lmo
@@ -149,7 +152,8 @@ return view.extend({
 	load: function() {
 		return Promise.all([
 			uci.load('zirgozar').catch(function() { return null; }),
-			status.load()
+			status.load(),
+			callSubNodes().catch(function() { return {}; })
 		]);
 	},
 
@@ -158,14 +162,30 @@ return view.extend({
 
 		var m, s, o, i;
 
-		/* The nodes added by hand, which are the only ones that stay put long
-		   enough to be named in a setting: a subscription is re-read every
-		   quarter of an hour and its nodes numbered afresh. */
+		/* The nodes added by hand, for every node choice on the page. */
 		var manual = uci.sections('zirgozar', 'node');
 		function nodeChoices(opt) {
 			manual.forEach(function(n) {
 				opt.value(n['.name'], n.name || n['.name']);
 			});
+		}
+		/* And for the tunnel's own node, the nodes of the subscriptions too, as
+		   PassWall2 offers them. A subscription's nodes are read afresh every
+		   time, so one is kept by what it is - subscription, protocol, address,
+		   port and name - and found again in each new list. */
+		var subNodes = (data[2] && data[2].nodes) || [];
+		function subChoices(opt) {
+			subNodes.forEach(function(n) {
+				opt.value('sub:' + n.sub + ':' + [ n.protocol, n.host, n.port, n.label ].join('|'),
+					n.subname + ' › ' + (n.label || (n.host + ':' + n.port)));
+			});
+			/* A choice whose node has left the list is still the choice, and is
+			   found again by the router; it keeps a name here. */
+			var cur = uci.get('zirgozar', 'config', 'node') || '';
+			if (cur.indexOf('sub:') == 0 && opt.keylist.indexOf(cur) < 0) {
+				var k = cur.split(':').slice(2).join(':').split('|');
+				opt.value(cur, (k[3] || k[1] || cur));
+			}
 		}
 
 		/* The tiles and the status card for the top of the page, and the
@@ -197,9 +217,10 @@ return view.extend({
 		o.rmempty = false;
 
 		o = s.taboption('main', form.ListValue, 'node', _('Choose node'),
-			_('Auto measures the nodes and uses the fastest. A node added by hand is used as it is, and nothing is measured.'));
+			_('Auto measures the nodes and uses the fastest. A node chosen here - added by hand or from a subscription - is used as it is, and nothing is measured. A subscription’s node is found again each time its list is read, as PassWall2 does.'));
 		o.value('', _('Auto (fastest)'));
 		nodeChoices(o);
+		subChoices(o);
 
 		o = s.taboption('main', form.Flag, 'preproxy_enabled', _('Preproxy'),
 			_('Every node the tunnel may choose dials out through this node first — PassWall2’s pre-proxy. For a node that cannot be reached from here directly, or to hide which nodes are being used. With it on, the first-pass handshake is skipped, because no node is reached directly.'));

@@ -984,10 +984,104 @@ cmd_group() {
 	return 0
 }
 
+# ------------------------------------------------- a subscription's node by name
+#
+# PassWall2 keeps every subscription node as a section of its own, so any of
+# them can be the node in Basic Settings, and after each read of the list it
+# finds the chosen one again among the new ones. Here the nodes of a
+# subscription are not sections - they are read from its list every time - so
+# the choice is kept as a reference to what the node is:
+#
+#   sub:<subscription>:<protocol>|<address>|<port>|<name>
+#
+# and found again the way PassWall2 finds it: everything the same; then
+# protocol, address and port; address and port; address; name - all within
+# the same subscription. When none of them is there any more, its first node,
+# and the log says so.
+
+# The parsed list of one subscription, as records.
+sub_parsed() {
+	sub_restore "$1"
+	[ -s "$SUBS_DIR/$1.links" ] || return 1
+	LC_ALL=C awk -v LIMIT="$(cfg max_nodes 300)" -f "$PARSE" < "$SUBS_DIR/$1.links" 2>/dev/null
+}
+
+# zgz-nodes subnodes: every node of every subscription that is switched on,
+# for the page - subscription, its name, protocol, address, port, node name.
+subnodes_one() {
+	local name enabled
+	config_get name "$1" name "$1"
+	config_get_bool enabled "$1" enabled 1
+	[ "$enabled" = "1" ] || return 0
+	sub_parsed "$1" | awk -F'\t' -v s="$1" -v n="$name" \
+		'NF >= 5 { printf "%s\t%s\t%s\t%s\t%s\t%s\n", s, n, $3, $4, $5, $2 }'
+	return 0
+}
+
+cmd_subnodes() {
+	config_load zirgozar
+	config_foreach subnodes_one subscription
+	return 0
+}
+
+# zgz-nodes resolve <sub:...>: the record that reference names now, with the
+# subscription's pre-proxy if it has one. Prints nothing when the subscription
+# has no nodes at all.
+cmd_resolve() {
+	_rr="${1#sub:}"
+	_rs="${_rr%%:*}"
+	_rk="${_rr#*:}"
+	[ -n "$_rs" ] && [ "$_rs" != "$_rr" ] || return 1
+	_rec="$(sub_parsed "$_rs" | awk -F'\t' -v key="$_rk" '
+		BEGIN {
+			n = split(key, k, "|")
+			P = k[1]; H = k[2]; O = k[3]; L = k[4]
+			for (i = 5; i <= n; i++) L = L "|" k[i]
+		}
+		NF >= 6 { r[++c] = $0; l[c] = $2; p[c] = $3; h[c] = $4; o[c] = $5 }
+		END {
+			for (i = 1; i <= c && !b; i++) if (p[i] == P && h[i] == H && o[i] == O && l[i] == L) { b = i; how = "same" }
+			for (i = 1; i <= c && !b; i++) if (p[i] == P && h[i] == H && o[i] == O) { b = i; how = "protocol, address and port" }
+			for (i = 1; i <= c && !b; i++) if (h[i] == H && o[i] == O) { b = i; how = "address and port" }
+			for (i = 1; i <= c && !b; i++) if (h[i] == H) { b = i; how = "address" }
+			for (i = 1; i <= c && !b; i++) if (l[i] == L) { b = i; how = "name" }
+			if (!b && c > 0) { b = 1; how = "first" }
+			if (b) { print how > "/dev/stderr"; print r[b] }
+		}' 2>"$ZGZ_RUN/resolve.how")"
+	[ -n "$_rec" ] || return 1
+	_how="$(cat "$ZGZ_RUN/resolve.how" 2>/dev/null)"
+	rm -f "$ZGZ_RUN/resolve.how"
+	case "$_how" in
+		same) : ;;
+		first) log "the chosen node of subscription $_rs is no longer on its list - using its first node, $(printf '%s' "$_rec" | cut -f2)" ;;
+		*) log "the chosen node of subscription $_rs was found again by $_how: $(printf '%s' "$_rec" | cut -f2)" ;;
+	esac
+	# The subscription's pre-proxy, as its nodes are used everywhere else.
+	_rp="$(uci -q get "zirgozar.$_rs.preproxy_node")" || _rp=""
+	if [ "$(uci -q get "zirgozar.$_rs.chain_proxy")" = "1" ] && [ -n "$_rp" ] &&
+	   uci -q get "zirgozar.$_rp.link" >/dev/null 2>&1; then
+		printf '%s\n' "$_rec" | set_dialer "chain-$_rp"
+	else
+		printf '%s\n' "$_rec"
+	fi
+	return 0
+}
+
 case "${1:-update}" in
+	subnodes) cmd_subnodes ;;
+	resolve) cmd_resolve "${2:-}" ;;
 	fetch)  cmd_fetch "${2:-}" ;;
 	build)  cmd_build ;;
-	update) cmd_fetch "${2:-}" || true; cmd_build ;;
+	update)
+		cmd_fetch "${2:-}" || true
+		cmd_build
+		# The node chosen in Basic Settings may be one of a subscription that
+		# was just read again: the tunnel finds it again in the new list now,
+		# as PassWall2 does, rather than at its next start.
+		case "$(cfg node '')" in
+			sub:*) /etc/init.d/zirgozar reload >/dev/null 2>&1 || true ;;
+		esac
+		;;
 	forget) cmd_forget "${2:-}"; cmd_build || true ;;
 	status) cmd_status ;;
 	inuse)  cmd_inuse ;;

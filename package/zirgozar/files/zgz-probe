@@ -523,7 +523,12 @@ select_tag() {
 # measured. Its record is made here from the section - the candidate list may
 # not have been built since it was added - with its own chain if it has one.
 cmd_use() {
-	_row="$(node_records "$1" 1 2>/dev/null | head -1)"
+	# A subscription's node, kept by what it is rather than where it was -
+	# see zgz-nodes resolve.
+	case "$1" in
+		sub:*) _row="$("$ZGZ_LIB/zgz-nodes" resolve "$1" 2>/dev/null | head -1)" ;;
+		*)     _row="$(node_records "$1" 1 2>/dev/null | head -1)" ;;
+	esac
 	[ -n "$_row" ] || { warn "the node chosen in Basic Settings is not there or cannot be read"; return 1; }
 	log "using the node chosen in Basic Settings: $(printf '%s' "$_row" | cut -f2)"
 	# Nothing is measured to choose it, but the status page still wants its

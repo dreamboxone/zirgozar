@@ -108,7 +108,7 @@ var FA = {
 	'Read the subscriptions now': 'همین حالا اشتراک‌ها را بخوان',
 	'Knocking on every node once. The TCPing column will fill in as answers come back.':
 		'همه کانفیگ‌ها یک بار آزمایش سریع می‌شوند و ستون TCPing پر می‌شود.',
-	'Check every node': 'همه کانفیگ‌ها را بررسی کن',
+	'Check all': 'بررسی همه',
 	'“TCPing” is the handshake every node is checked with first, so it is filled in for all of them. “URL Test” is a complete request through the node, which is only run on the ones that answered and only until a fast enough one is found — so most of that column is empty by design. Both are the same measurements the buttons above take, done for the whole list at once.':
 		'ستون TCPing برای همه کانفیگ‌ها پر می‌شود. ستون تست URL فقط برای کانفیگ‌هایی پر می‌شود که در انتخاب خودکار آزمایش شده‌اند، پس خالی بودن بیشتر آن طبیعی است.',
 
@@ -331,6 +331,7 @@ var FA = {
 	'Sing-Box-LX App Path': 'مسیر برنامه Sing-Box-LX',
 	'The sing-box build that speaks xhttp. Empty means this program’s own copy in the folder above.': 'نسخه‌ای از sing-box که xhttp را می‌فهمد. خالی یعنی نسخه خود این برنامه در پوشه بالا.',
 	'Active core': 'هسته فعال',
+	'Auto measures the nodes and uses the fastest. A node chosen here - added by hand or from a subscription - is used as it is, and nothing is measured. A subscription’s node is found again each time its list is read, as PassWall2 does.': 'خودکار کانفیگ‌ها را می‌سنجد و سریع‌ترین را برمی‌دارد. کانفیگی که اینجا انتخاب شود - دستی یا از اشتراک - همان‌طور استفاده می‌شود و سنجیده نمی‌شود. کانفیگ اشتراک هر بار که فهرستش دوباره خوانده می‌شود، مثل پسوال۲ دوباره پیدا می‌شود.',
 	'Nodes to use was set to manually added configs only, so the subscriptions could not be used. It is now set to all configs.': 'گزینه «کانفیگ‌هایی که استفاده شوند» روی «فقط کانفیگ‌های دستی» بود و اشتراک‌ها استفاده نمی‌شدند. حالا روی «همه کانفیگ‌ها» گذاشته شد.',
 	'Traffic statistics': 'آمار ترافیک',
 	'Counts what goes through the tunnel and shows it on the status page. Off, nothing is counted or written to storage and the card is gone; what was counted before is kept.': 'ترافیک عبوری از تونل را می‌شمارد و در صفحه وضعیت نشان می‌دهد. خاموش باشد، چیزی شمرده یا روی حافظه نوشته نمی‌شود و کارت از صفحه برداشته می‌شود؛ آمار قبلی می‌ماند.',

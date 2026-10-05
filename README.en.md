@@ -194,7 +194,7 @@ The form below has four tabs, in PassWall2's order.
 |---|---|---|---|
 | **Main switch** | `enabled` | off | The tunnel on or off. Save and apply for it to take effect; it holds across a reboot |
 | **Active core** | `core_engine` | Xray | `Xray`, `sing-box` or `sing-box-lx`. sing-box is given the same configuration, translated: same inbounds, rules, DNS and Iran split; hysteria2 and tuic nodes are dialled directly, with no helper program. Not carried over: mux, noise, FakeDNS, mKCP and the poisoned-address inbound; traffic statistics are counted by polling and run a little low. The official sing-box has no xhttp; [sing-box-lx](https://github.com/Leadaxe/sing-box-lx) does, and is installed from the Cores list on this page with one press (its path is **Sing-Box-LX App Path**). If the chosen sing-box is missing or cannot run the tunnel, Xray takes over and the page says so |
-| **Node** | `node` | Auto (fastest) | Auto measures the configs and uses the fastest. A config added by hand is used as it is, and nothing is measured |
+| **Node** | `node` | Auto (fastest) | Auto measures the configs and uses the fastest. A config chosen here - one added by hand or one from a subscription - is used as it is, and nothing is measured. A subscription's config is kept by what it is, and each time the list is read it is found again as PassWall2 finds it: the same config; then protocol, address and port; address and port; address; name. When none is left, the subscription's first config, and the log says so |
 | **Preproxy** | `preproxy_enabled` | off | Every config the tunnel may choose dials out through a config of yours first — PassWall2's pre-proxy. For configs that cannot be reached from here directly, or to hide which ones are being used. With it on, the first-pass handshake is skipped, because no config is reached directly |
 | **Preproxy Node** | `preproxy_node` | — | The config dialled first. Only configs added by hand on Configs |
 | **Localhost Proxy** | `localhost_proxy` | on | The router's own traffic goes through the tunnel too — its downloads, its clock, its package manager, and so the routing data and the cores from GitHub. While a config is being measured or a subscription read it goes direct, so the router can always repair its own tunnel. On by default, as in PassWall2 |
@@ -359,7 +359,7 @@ settings.
 **The list at the bottom** — every config the router knows about, measured
 first. **TCPing** is filled in for all of them; **URL Test** only for those that
 answered, and only until one fast enough was found, so most of that column is
-empty by design. **Check every node** runs the handshake for the whole list
+empty by design. **Check all** runs the handshake for the whole list
 without disturbing a tunnel that is carrying traffic; **Use** beside a row
 connects through that config.
 
