@@ -30,7 +30,7 @@
 - 🌐 **Every device on the network** — phone, laptop, TV, console — goes through the tunnel with nothing installed on it
 - ⚡ **Picks the fastest working config** by itself, and moves to the next one when a config stops working
 - 🔗 **Subscriptions** on schedules of their own; the default free list is refreshed every quarter of an hour
-- 🇮🇷 **Iranian traffic direct** — Iranian sites skip the tunnel and cost the config nothing
+- 🇮🇷 **Direct pass for Iranian traffic** — Iranian sites skip the tunnel and cost the config nothing
 - 🧭 **Shunt rules** as in PassWall2: any site or service through a config of your choice, direct, or blocked
 - 📊 **Traffic used** today, this week and this month
 - 🔄 **One-button update**, from the program's own page
@@ -155,6 +155,9 @@ The tabs across the top are PassWall2's, in PassWall2's order: **Basic
 Settings, Configs, Node Subscribe, Other Settings, App Update, Rule Manage,
 Locator, Access Control, Runtime Logs**.
 
+The pages' language, English or Persian, is switched with the language button
+at the top and kept in `lang`.
+
 Every option is also a line in `/etc/config/zirgozar`, an ordinary UCI
 file; the name in backticks is its name there. Anything a page does can be done
 by editing the file, and the other way round.
@@ -203,7 +206,6 @@ The form below has four tabs, in PassWall2's order.
 | **Node Socks Bind Local** | `node_socks_bind_local` | on | That SOCKS server answers the router itself only |
 | **Socks Main switch** | `socks_enabled` | off | More SOCKS ports, each through a config of its own — the **Socks Config** table under it |
 | **Restore defaults** | `factory_reset` | off | Tick it and save: the tunnel comes down, every config and subscription is deleted and every setting goes back to how it was installed (an untouched copy lives in `/usr/share/zirgozar`). The routing data, the downloaded cores and the traffic history are kept. It asks before it is ticked, and there is no undo |
-| **Language** | `lang` | English | English or Persian. The language button in the banner does the same without a save |
 
 **Socks Config** (a `config socks` section per row):
 
@@ -347,6 +349,35 @@ Beside **Edit** and **Delete** on each row: **To Top** moves it to the top,
 **Use** makes it the Node in Basic Settings and reconnects if the tunnel is on,
 **Copy** makes a copy under it.
 
+**The edit page.** **Edit** on a config opens a page of its own, PassWall2's
+Node Config. A vless, vmess, trojan, shadowsocks, socks, http, hysteria2 or
+tuic link is shown there field by field: protocol, address, port, ID or
+password, flow, security (TLS or REALITY, with SNI, alpn, fingerprint, public
+key, Short Id and Spider X) and transport (RAW, WebSocket, gRPC, HTTP/2,
+HTTPUpgrade, XHTTP with its Extra, mKCP with its Seed). Saving builds the link
+again from the fields; parameters the page has no field for are kept as they
+were. A WireGuard or OpenVPN file, or several links in one config, is edited as
+the text it is. What a link has no place for is at the bottom of the same page,
+and applies to configs Xray carries:
+
+| Field | In the file | What it does |
+|---|---|---|
+| **TLS Chain Fingerprint (SHA256)** | `tls_pin` | Connects only when the server's chain fingerprint matches |
+| **TLS Certificate Name (CertName)** | `cert_name` | The server's certificate name is checked against this |
+| **TLS Certificate (PEM)** | `tls_pem` | The server's chain is checked against this certificate instead of the usual ones |
+| **ECH** | `ech` | An ECH configuration, or a domain and the DNS that publishes it |
+| **Cipher Suites** | `cipher_suites` | The cipher suites allowed, separated by colons |
+| **User-Agent** | `user_agent` | For WebSocket, HTTPUpgrade, XHTTP and gRPC |
+| **FinalMask** | `finalmask` | This config's own finalmask as JSON; the fragment and noise of the Xray tab are still added unless it has its own |
+| **TCP Fast Open** / **tcpMptcp** | `tcp_fast_open` / `tcp_mptcp` | The server has to support it too |
+| **Domain DNS Resolve** | `dns_resolver` | When the config's address is a domain, it is looked up directly through this DNS (such as `udp://1.1.1.1` or `https://1.1.1.1/dns-query`) |
+| **Domain Strategy** | `domain_strategy` | Whether a domain is turned into an IP before connecting, and which IP version |
+| **Happy Eyeballs** | `happy_eyeballs` | IPv4 and IPv6 are tried together and the faster one is used |
+
+With the sing-box core, ECH, the cipher suites, the PEM certificate, TCP Fast
+Open, MPTCP and Domain Strategy are translated too; sing-box has no chain
+fingerprint or CertName, and those are left out.
+
 **WireGuard.** `PrivateKey`, `Address`, `MTU`, `Reserved`, `PublicKey`,
 `PresharedKey`, `Endpoint` and `PersistentKeepalive` are read. `AllowedIPs` and
 `DNS` are deliberately ignored: routing and name lookups are Zirgozar's own
@@ -356,7 +387,7 @@ settings.
 
 **AmneziaWG.** A WireGuard `.conf` that carries any of the AmneziaWG lines - `Jc`, `Jmin`, `Jmax`, `S1` to `S4`, `H1` to `H4` (a number or a range) and the decoy packets `I1` to `I5` - is an AmneziaWG node, version 2 or 3. Xray cannot speak it, and neither can the official sing-box: it is carried by [sing-box-lx](https://github.com/Leadaxe/sing-box-lx). With Xray as the engine a helper sing-box-lx runs it as a local SOCKS port; with the sing-box-lx engine it is dialled directly. Without sing-box-lx installed the page says so. Chosen by hand, like hysteria2 and OpenVPN.
 
-**The list at the bottom** — every config the router knows about, measured
+**All configs** — the list at the bottom: every config the router knows about, measured
 first. **TCPing** is filled in for all of them; **URL Test** only for those that
 answered, and only until one fast enough was found, so most of that column is
 empty by design. **Check all** runs the handshake for the whole list
@@ -432,10 +463,10 @@ switch is on.
 
 | Option | In the file | Default | What it does |
 |---|---|---|---|
-| **TCP ports not forwarded (do not forward these TCP ports)** | `tcp_no_redir_ports` | none | TCP ports that never go through the tunnel — before everything else |
-| **UDP ports not forwarded (do not forward these UDP ports)** | `udp_no_redir_ports` | none | The same for UDP |
-| **TCP ports forwarded (forward these TCP ports)** | `tcp_redir_ports` | All | The TCP ports that do: all, common ones, or only web (80, 443) |
-| **UDP ports forwarded (forward these UDP ports)** | `udp_redir_ports` | All | The same for UDP |
+| **Do not forward these TCP ports** | `tcp_no_redir_ports` | none | TCP ports that never go through the tunnel — before everything else |
+| **Do not forward these UDP ports** | `udp_no_redir_ports` | none | The same for UDP |
+| **Forward these TCP ports** | `tcp_redir_ports` | All | The TCP ports that do: all, common ones, or only web (80, 443) |
+| **Forward these UDP ports** | `udp_redir_ports` | All | The same for UDP |
 | **Prefer firewall tools** | `firewall_backend` | Auto | nftables or iptables. Auto is right unless the router has both and the wrong one is picked |
 | **TCP Proxy Way** | `tcp_proxy_way` | TPROXY | TPROXY carries TCP and UDP on one port. REDIRECT sends TCP to a port of its own, for a kernel whose TPROXY misbehaves with TCP; UDP is always TPROXY |
 | **Hijacking ICMP (PING)** | `accept_icmp` | off | A tunnel carries no ICMP, so a ping to a tunnelled address never comes back. With this on, the router answers it |
@@ -530,7 +561,7 @@ The shunt rules are in the **Shunt Rule** tab of Basic Settings.
 
 | Option | In the file | Default | What it does |
 |---|---|---|---|
-| **Send Iranian traffic direct** | `route_ir` | off | Iranian sites and addresses skip the tunnel. Needs the routing data above — until then it does nothing, because a core asked for a geo file it has not got refuses to start |
+| **Direct pass for Iranian traffic** | `route_ir` | off | Iranian sites and addresses skip the tunnel. Needs the routing data above — until then it does nothing, because a core asked for a geo file it has not got refuses to start |
 | **Block advertising** | `block_ads` | off | For every device. The names come from `category-ads-all` in the same routing data |
 | **Block BitTorrent** | `block_torrent` | on | BitTorrent gets a VPN server blocked and your config cut off for good |
 | **Refuse QUIC** | `block_quic` | off | When the config cannot carry UDP, browsers are made to use TCP. Off by default: where UDP works, QUIC is faster |
@@ -566,7 +597,7 @@ A `config acl_rule` section per row:
 | Main | **Source** | `sources` | The devices: a MAC address, an IP, a range (`192.168.1.50-192.168.1.60`), a network, or `ipset:` and a set's name. Your router's known devices are offered |
 | Main | **Mode** | `mode` | *No Proxy*: never through the tunnel. *Proxy* through one config. *Proxy* through the config the tunnel is using |
 | Main | **Node** | `node` | For Proxy through one config: one of your configs. A hysteria2 or tuic one cannot have a rule of its own; such a rule uses the tunnel's config |
-| Proxy | **TCP / UDP ports not forwarded (do not forward these UDP ports)**, **TCP / UDP ports forwarded (forward these UDP ports)** | `tcp_no_redir_ports` … `udp_redir_ports` | The same as Forwarding Settings, for these devices only |
+| Proxy | **Do not forward these TCP / UDP ports**, **Forward these TCP / UDP ports** | `tcp_no_redir_ports` … `udp_redir_ports` | The same as Forwarding Settings, for these devices only |
 
 ### 📜 4.9 Runtime Logs
 

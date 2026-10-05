@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '2.0.37-1';
+var BUILD = '2.1.0-1';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -341,6 +341,7 @@ var PAGES = [
 function tabs() {
 	var here = (L.env.dispatchpath || [])[3] || 'settings';
 	if (here === 'overview') here = 'settings';
+	if (here === 'node') here = 'nodes';
 	return E('nav', { 'class': 'mk-tabs', 'role': 'tablist' }, PAGES.map(function(p) {
 		return E('a', {
 			'class': 'mk-tab' + (p[0] === here ? ' mk-tab-on' : ''),

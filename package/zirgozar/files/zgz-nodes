@@ -551,6 +551,16 @@ add_node() {
 			;;
 	esac
 
+	# The same for a node that is a whole file - a WireGuard .conf, an
+	# OpenVPN profile - which cannot be poured into one list of links with the
+	# others, and for one with settings of its own from its edit page, which
+	# hold for its links and no one else's.
+	if [ -n "$(node_extras "$_sec")" ] ||
+	   printf '%s\n' "$link" | grep -qiE '^[[:space:]]*(\[(interface|peer)\]|client[[:space:]]*$|remote[[:space:]]+[^[:space:]]+|<ca>)'; then
+		node_records "$_sec" "$(cfg max_nodes 300)" >> "$CHAIN_TSV" 2>/dev/null || true
+		return 0
+	fi
+
 	# One section may hold several links pasted at once, separated by spaces
 	# or by newlines. Splitting on every space - which is what this did - cuts
 	# a name in half: a link ending "#سرور خانه" became "#سرور" plus a stray

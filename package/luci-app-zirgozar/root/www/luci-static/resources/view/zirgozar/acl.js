@@ -165,7 +165,7 @@ return view.extend({
 		});
 
 		/* ------------------------------------------------------------ proxy */
-		o = s.taboption('proxy', form.Value, 'tcp_no_redir_ports', _('TCP ports not forwarded (do not forward these TCP ports)'));
+		o = s.taboption('proxy', form.Value, 'tcp_no_redir_ports', _('Do not forward these TCP ports'));
 		o.modalonly = true;
 		o.value('', _('No patterns are used'));
 		o.value('1:65535', _('All'));
@@ -173,7 +173,7 @@ return view.extend({
 		o.depends('mode', '2');
 		o.validate = portValidate;
 
-		o = s.taboption('proxy', form.Value, 'udp_no_redir_ports', _('UDP ports not forwarded (do not forward these UDP ports)'));
+		o = s.taboption('proxy', form.Value, 'udp_no_redir_ports', _('Do not forward these UDP ports'));
 		o.modalonly = true;
 		o.value('', _('No patterns are used'));
 		o.value('1:65535', _('All'));
@@ -181,7 +181,7 @@ return view.extend({
 		o.depends('mode', '2');
 		o.validate = portValidate;
 
-		o = s.taboption('proxy', form.Value, 'tcp_redir_ports', _('TCP ports forwarded (forward these TCP ports)'));
+		o = s.taboption('proxy', form.Value, 'tcp_redir_ports', _('Forward these TCP ports'));
 		o.modalonly = true;
 		o.value('1:65535', _('All'));
 		o.value('22,25,53,80,143,443,465,587,853,873,993,995,5222,8080,8443,9418', _('Common Use'));
@@ -191,7 +191,7 @@ return view.extend({
 		o.depends('mode', '2');
 		o.validate = portValidate;
 
-		o = s.taboption('proxy', form.Value, 'udp_redir_ports', _('UDP ports forwarded (forward these UDP ports)'));
+		o = s.taboption('proxy', form.Value, 'udp_redir_ports', _('Forward these UDP ports'));
 		o.modalonly = true;
 		o.value('1:65535', _('All'));
 		o.default = '1:65535';

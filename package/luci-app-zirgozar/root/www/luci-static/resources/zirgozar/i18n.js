@@ -173,7 +173,7 @@ var FA = {
 	'Persian': 'فارسی',
 
 	'Routing data': 'داده مسیریابی',
-	'Send Iranian traffic direct': 'ترافیک ایران مستقیم برود',
+	'Direct pass for Iranian traffic': 'عبور مستقیم ترافیک ایران',
 	'Iranian sites and addresses skip the tunnel. Needs the routing data below — until that is downloaded this does nothing, because a core asked for a geo file it has not got refuses to start rather than carrying on without it.':
 		'سایت‌ها و آدرس‌های ایرانی از تونل رد نمی‌شوند. به داده مسیریابی پایین نیاز دارد — تا وقتی آن دانلود نشده این گزینه هیچ کاری نمی‌کند، چون هسته‌ای که از آن فایل geo خواسته شده و ندارد اصلا بالا نمی‌آید و بی‌خیالش هم نمی‌شود.',
 	'Geoip source': 'منبع Geoip',
@@ -334,7 +334,7 @@ var FA = {
 	'Auto measures the nodes and uses the fastest. A node chosen here - added by hand or from a subscription - is used as it is, and nothing is measured. A subscription’s node is found again each time its list is read, as PassWall2 does.': 'خودکار کانفیگ‌ها را می‌سنجد و سریع‌ترین را برمی‌دارد. کانفیگی که اینجا انتخاب شود - دستی یا از اشتراک - همان‌طور استفاده می‌شود و سنجیده نمی‌شود. کانفیگ اشتراک هر بار که فهرستش دوباره خوانده می‌شود، مثل پسوال۲ دوباره پیدا می‌شود.',
 	'Nodes to use was set to manually added configs only, so the subscriptions could not be used. It is now set to all configs.': 'گزینه «کانفیگ‌هایی که استفاده شوند» روی «فقط کانفیگ‌های دستی» بود و اشتراک‌ها استفاده نمی‌شدند. حالا روی «همه کانفیگ‌ها» گذاشته شد.',
 	'Traffic statistics': 'آمار ترافیک',
-	'Counts what goes through the tunnel and shows it on the status page. Off, nothing is counted or written to storage and the card is gone; what was counted before is kept.': 'ترافیک عبوری از تونل را می‌شمارد و در صفحه وضعیت نشان می‌دهد. خاموش باشد، چیزی شمرده یا روی حافظه نوشته نمی‌شود و کارت از صفحه برداشته می‌شود؛ آمار قبلی می‌ماند.',
+	'Shows the tunnel traffic.': 'ترافیک فیلترشکن را نشان می‌دهد.',
 	'AmneziaWG needs sing-box-lx, the build that has it. Install it on the App Update page.': 'AmneziaWG به sing-box-lx نیاز دارد، همان نسخه‌ای که آن را دارد. از صفحه «به‌روزرسانی» نصبش کنید.',
 	'OpenVPN user name': 'نام کاربری OpenVPN',
 	'Only for an OpenVPN profile that asks for a user name and password.': 'فقط برای پروفایل OpenVPN که نام کاربری و رمز می‌خواهد.',
@@ -380,10 +380,10 @@ var FA = {
 	'the node the tunnel is using': 'کانفیگی که تونل از آن استفاده می‌کند',
 	'Nodes added by hand on the Configs page. A hysteria2 or tuic node cannot be given a rule of its own; such a rule uses the node the tunnel is using instead.':
 		'فقط کانفیگ‌های دستی صفحه «کانفیگ‌ها». کانفیگ‌های hysteria2 و tuic اینجا قابل استفاده نیستند و به جای آن‌ها کانفیگ اصلی تونل استفاده می‌شود.',
-	'TCP ports not forwarded (do not forward these TCP ports)': 'پورت‌های TCP بدون انتقال بشود (عدم فوروارد این پورت‌های TCP)',
-	'UDP ports not forwarded (do not forward these UDP ports)': 'پورت‌های UDP بدون انتقال بشود (عدم فوروارد این پورت‌های UDP)',
-	'TCP ports forwarded (forward these TCP ports)': 'پورت‌های TCP انتقالی بشود (فوروارد این پورت‌های TCP)',
-	'UDP ports forwarded (forward these UDP ports)': 'پورت‌های UDP انتقالی بشود (فوروارد این پورت‌های UDP)',
+	'Do not forward these TCP ports': 'عدم فوروارد این پورت‌های TCP',
+	'Do not forward these UDP ports': 'عدم فوروارد این پورت‌های UDP',
+	'Forward these TCP ports': 'فوروارد این پورت‌های TCP',
+	'Forward these UDP ports': 'فوروارد این پورت‌های UDP',
 	'No patterns are used': 'استفاده نشود',
 	'Common Use': 'پرکاربرد',
 	'The port settings support single ports and ranges. Separate multiple ports with commas (,). Example: 21,80,443,1000:2000.':
@@ -874,6 +874,67 @@ var FA = {
 	'The sing-box download could not be unpacked.': 'فایل دانلودشده sing-box باز نشد.',
 	'sing-box publishes no build for this router\'s processor.': 'sing-box برای پردازنده این روتر نسخه‌ای منتشر نمی‌کند.',
 	'hysteria publishes no build for this router\'s processor.': 'hysteria برای پردازنده این روتر نسخه‌ای منتشر نمی‌کند.',
+
+	/* -------------------------------------------- the page of one node */
+	'This config is not there any more.': 'این کانفیگ دیگر وجود ندارد.',
+	'Back to configs': 'بازگشت به کانفیگ‌ها',
+	'Node Config': 'تنظیمات نود',
+	'Node Remarks': 'نام نود',
+	'A share link, several of them one per line, a whole WireGuard .conf file or an OpenVPN .ovpn profile.':
+		'یک لینک اشتراک‌گذاری، چند لینک هر کدام در یک خط، یک فایل کامل WireGuard ‏.conf یا یک پروفایل OpenVPN ‏.ovpn.',
+	'Address (Support Domain Name)': 'آدرس (دامنه هم قبول است)',
+	'ID': 'شناسه (UUID)',
+	'Username': 'نام کاربری',
+	'Password': 'رمز عبور',
+	'Encrypt Method (encryption)': 'روش رمزنگاری (encryption)',
+	'flow': 'flow',
+	'Encrypt Method': 'روش رمزنگاری',
+	'Security': 'امنیت',
+	'None': 'هیچ',
+	'SNI Domain': 'دامنه SNI',
+	'Finger Print': 'اثر انگشت (Fingerprint)',
+	'Public Key': 'کلید عمومی',
+	'Short Id': 'Short Id',
+	'Spider X': 'Spider X',
+	'allowInsecure': 'allowInsecure (پذیرفتن گواهی نامعتبر)',
+	'Obfuscation': 'مبهم‌سازی (obfs)',
+	'Obfuscation password': 'رمز مبهم‌سازی',
+	'Congestion control': 'کنترل ازدحام',
+	'Transport': 'انتقال (Transport)',
+	'Camouflage Type': 'نوع استتار',
+	'Service Name': 'نام سرویس (serviceName)',
+	'Transfer mode': 'حالت انتقال',
+	'XHTTP Mode': 'حالت XHTTP',
+	'XHTTP Extra': 'XHTTP Extra',
+	'An XHttpObject in JSON format, used for sharing.': 'یک XHttpObject به شکل JSON، همان که در لینک می‌آید.',
+	'Must be JSON text!': 'باید متن JSON باشد!',
+	'mKCP Seed': 'Seed برای mKCP',
+	'TLS Chain Fingerprint (SHA256)': 'اثر انگشت زنجیره TLS ‏(SHA256)',
+	'Once set, connects only when the server’s chain fingerprint matches.':
+		'اگر پر شود، فقط وقتی وصل می‌شود که اثر انگشت زنجیره گواهی سرور با آن یکی باشد.',
+	'TLS Certificate Name (CertName)': 'نام گواهی TLS ‏(CertName)',
+	'TLS is used to verify the leaf certificate name.': 'نام گواهی سرور با این نام سنجیده می‌شود.',
+	'TLS Certificate (PEM)': 'گواهی TLS ‏(PEM)',
+	'A certificate the server’s chain is checked against, in place of the usual ones.':
+		'گواهی‌ای که زنجیره سرور به‌جای گواهی‌های معمول با آن سنجیده می‌شود.',
+	'An ECH configuration, or a domain and the DNS that publishes it, such as cloudflare-ech.com+https://1.1.1.1/dns-query.':
+		'یک پیکربندی ECH، یا یک دامنه و DNS‌ای که آن را منتشر می‌کند، مثل cloudflare-ech.com+https://1.1.1.1/dns-query.',
+	'Cipher Suites': 'مجموعه رمزها (Cipher Suites)',
+	'Configures the list of supported cipher suites, separated by colons.': 'فهرست مجموعه رمزهای مجاز، جداشده با دونقطه.',
+	'Xray’s finalmask for this node, as a JSON object. The fragment and noise of the Xray tab are still added, unless this has its own.':
+		'finalmask مخصوص این نود در Xray، به شکل یک شیء JSON. fragment و noise برگه Xray همچنان اضافه می‌شوند، مگر این‌که این‌جا خودش داشته باشد.',
+	'TCP Fast Open': 'TCP Fast Open',
+	'Need node support required': 'سرور هم باید پشتیبانی کند',
+	'Enable Multipath TCP, need to be enabled in both server and client configuration.':
+		'Multipath TCP را روشن می‌کند؛ باید هم در سرور و هم این‌جا روشن باشد.',
+	'Domain DNS Resolve': 'DNS برای دامنه نود',
+	'If the node address is a domain name, this DNS will be used for resolution.':
+		'اگر آدرس نود دامنه باشد، با این DNS به IP تبدیل می‌شود.',
+	'If is domain name, The requested domain name will be resolved to IP before connect.':
+		'اگر مقصد دامنه باشد، پیش از اتصال به IP تبدیل می‌شود.',
+	'Enable Happy Eyeballs': 'روشن کردن Happy Eyeballs',
+	'Attempts IPv4 and IPv6 simultaneously; automatically uses the faster connection.':
+		'IPv4 و IPv6 را هم‌زمان امتحان می‌کند و اتصال سریع‌تر را به کار می‌گیرد.',
 
 	'yes': 'بله',
 	'no': 'خیر'

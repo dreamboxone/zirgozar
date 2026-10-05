@@ -296,10 +296,88 @@ function filtered(label) {
 	return 0
 }
 
+# --------------------------------------------------------- a node's own settings
+#
+# What the edit page of a node added by hand sets beyond its link - the ones
+# PassWall2 has on its node page and a share link has no place for. They
+# arrive as "#!zgz-x.<key>=<value>" lines in front of the node (see
+# node_extras in zgz-common.sh) and are put into every outbound made from it:
+#
+#   ech            tlsSettings.echConfigList
+#   tls_pin        tlsSettings.pinnedPeerCertSha256
+#   cert_name      tlsSettings.verifyPeerCertByName
+#   tls_pem        tlsSettings.certificates, to verify the server with
+#   cipher_suites  tlsSettings.cipherSuites
+#   user_agent     the User-Agent header of ws, httpupgrade, xhttp and the
+#                  HTTP-header TCP; grpcSettings.user_agent
+#   finalmask      streamSettings.finalmask, as written
+#   tcp_fast_open  sockopt.tcpFastOpen
+#   tcp_mptcp      sockopt.tcpMptcp
+#   domain_strategy sockopt.domainStrategy
+#   happy_eyeballs sockopt.happyEyeballs
+#
+# Only an outbound Xray knows - one with a "protocol". The nodes another core
+# carries have none of these.
+function node_extras(p,   ss, sec, t, sock, net, ws, k, v, pem, n, a, i, arr, h) {
+	if (substr(jtrim(p), 1, 1) != "{" || jstr(p, "protocol") == "") return p
+	ss = jraw(p, "streamSettings")
+	if (ss == "") ss = "{}"
+	sec = jstr(ss, "security")
+	if (sec == "tls") {
+		t = jraw(ss, "tlsSettings")
+		if (t == "") t = "{}"
+		if (NX["ech"] != "")           t = jset(t, "echConfigList", "\"" jesc(NX["ech"]) "\"")
+		if (NX["tls_pin"] != "")       t = jset(t, "pinnedPeerCertSha256", "\"" jesc(NX["tls_pin"]) "\"")
+		if (NX["cert_name"] != "")     t = jset(t, "verifyPeerCertByName", "\"" jesc(NX["cert_name"]) "\"")
+		if (NX["cipher_suites"] != "") t = jset(t, "cipherSuites", "\"" jesc(NX["cipher_suites"]) "\"")
+		if (NX["tls_pem"] != "") {
+			# A bar where each line of the certificate ended.
+			n = split(NX["tls_pem"], a, "|")
+			arr = ""
+			for (i = 1; i <= n; i++) {
+				gsub(/^[ \t\r]+|[ \t\r]+$/, "", a[i])
+				if (a[i] != "") arr = arr (arr != "" ? "," : "") "\"" jesc(a[i]) "\""
+			}
+			if (arr != "") t = jset(t, "certificates", "[{\"usage\":\"verify\",\"certificate\":[" arr "]}]")
+		}
+		ss = jset(ss, "tlsSettings", t)
+	}
+	if (NX["user_agent"] != "") {
+		net = tolower(jstr(ss, "network"))
+		v = "\"" jesc(NX["user_agent"]) "\""
+		if (net == "ws" || net == "httpupgrade" || net == "xhttp" || net == "splithttp") {
+			k = (net == "ws") ? "wsSettings" : ((net == "httpupgrade") ? "httpupgradeSettings" : "xhttpSettings")
+			ws = jraw(ss, k)
+			if (ws == "") ws = "{}"
+			h = jraw(ws, "headers")
+			if (h == "") h = "{}"
+			ws = jset(ws, "headers", jset(h, "User-Agent", v))
+			ss = jset(ss, k, ws)
+		} else if (net == "grpc") {
+			ws = jraw(ss, "grpcSettings")
+			if (ws == "") ws = "{}"
+			ss = jset(ss, "grpcSettings", jset(ws, "user_agent", v))
+		}
+	}
+	if (NX["finalmask"] ~ /^[ \t]*\{.*\}[ \t]*$/) ss = jset(ss, "finalmask", NX["finalmask"])
+	sock = jraw(ss, "sockopt")
+	if (sock == "") sock = "{}"
+	if (NX["tcp_fast_open"] == "1")  sock = jset(sock, "tcpFastOpen", "true")
+	if (NX["tcp_mptcp"] == "1")      sock = jset(sock, "tcpMptcp", "true")
+	if (NX["domain_strategy"] ~ /^(AsIs|UseIP|UseIPv4|UseIPv6|UseIPv4v6|UseIPv6v4|ForceIP|ForceIPv4|ForceIPv6|ForceIPv4v6|ForceIPv6v4)$/)
+		sock = jset(sock, "domainStrategy", "\"" NX["domain_strategy"] "\"")
+	if (NX["happy_eyeballs"] == "1")
+		sock = jset(sock, "happyEyeballs", "{\"tryDelayMs\":250,\"prioritizeIPv6\":false,\"interleave\":1,\"maxConcurrentTry\":4}")
+	if (sock != "{}") ss = jset(ss, "sockopt", sock)
+	if (ss != "{}") p = jset(p, "streamSettings", ss)
+	return p
+}
+
 # The same server turns up in two subscriptions more often than not. Testing
 # it twice costs a slot in a batch that another server could have used.
 function emit(label, proto, payload,   key, tag) {
 	if (HOST == "" || PORT + 0 <= 0) return
+	if (NXN > 0) payload = node_extras(payload)
 	if (label == "") label = HOST ":" PORT
 	if (filtered(label)) return
 	key = proto "|" HOST "|" PORT "|" payload
@@ -1298,6 +1376,16 @@ LANDING {
 !DECODE && !LANDING {
 	line = $0
 	gsub(/\r/, "", line)
+	# A node's own settings, for the node or nodes that follow - see
+	# node_extras. An empty "#!zgz-x" line ends them.
+	if (substr(line, 1, 7) == "#!zgz-x") {
+		if (line == "#!zgz-x") { split("", NX); NXN = 0; next }
+		if (substr(line, 1, 8) == "#!zgz-x.") {
+			_p = index(line, "=")
+			if (_p > 9) { NX[substr(line, 9, _p - 9)] = substr(line, _p + 1); NXN++ }
+		}
+		next
+	}
 	if (!probed) {
 		probe = line
 		sub(/^[ \t]+/, "", probe)

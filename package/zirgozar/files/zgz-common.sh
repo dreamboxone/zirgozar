@@ -1196,6 +1196,27 @@ node_domain_strategy() {
 	return 0
 }
 
+# The settings a node added by hand has beyond its link, set on its edit page,
+# as the lines zgz-parse reads them from: "#!zgz-x.<key>=<value>". A
+# certificate keeps its lines with a bar between them, a JSON object loses its
+# line breaks. Nothing at all for a node that has none.
+NODE_EXTRA_KEYS="ech tls_pin cert_name tls_pem cipher_suites user_agent finalmask tcp_fast_open tcp_mptcp domain_strategy happy_eyeballs"
+
+node_extras() {
+	for _nk in $NODE_EXTRA_KEYS; do
+		_nv="$(uci -q get "zirgozar.$1.$_nk" 2>/dev/null)" || _nv=""
+		[ -n "$_nv" ] || continue
+		case "$_nk" in
+			tcp_fast_open|tcp_mptcp|happy_eyeballs) [ "$_nv" = "1" ] || continue ;;
+		esac
+		_nv="$(printf '%s' "$_nv" | tr '\r' '\n' | awk -v k="$_nk" '
+			NF { sub(/^[ \t]+/, ""); sub(/[ \t]+$/, ""); out = out (n++ ? (k == "tls_pem" ? "|" : " ") : "") $0 }
+			END { print out }')"
+		printf '#!zgz-x.%s=%s\n' "$_nk" "$_nv"
+	done
+	return 0
+}
+
 # The links one hand-added section holds, one per line. A section may hold
 # several pasted at once; it is split only where a new link begins, because
 # names have spaces in them. A name typed on the page goes after the # of a
@@ -1204,6 +1225,8 @@ section_links() {
 	_sl_link="$(uci -q get "zirgozar.$1.link" 2>/dev/null)" || return 1
 	[ -n "$_sl_link" ] || return 1
 	_sl_name="$(uci -q get "zirgozar.$1.name" 2>/dev/null)" || _sl_name=""
+	# The node's own settings first; they hold for everything that follows.
+	node_extras "$1"
 	# A whole WireGuard .conf is one document, not a list of links: cutting it
 	# into lines and hanging the name on each of them would turn every key in
 	# it into something else. The name goes in as the comment the parser

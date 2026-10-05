@@ -304,11 +304,6 @@ return view.extend({
 			}
 		};
 
-		o = s.taboption('main', form.ListValue, 'lang', _('Language'));
-		o.value('en', _('English'));
-		o.value('fa', _('Persian'));
-		o.default = 'en';
-
 		/* ---------------------------------------------------- shunt rule
 		   PassWall2's Shunt Rule tab, with the rules themselves in it too:
 		   which traffic each rule is about, and where it goes. */

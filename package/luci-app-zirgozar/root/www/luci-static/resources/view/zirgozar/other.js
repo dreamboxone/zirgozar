@@ -103,26 +103,26 @@ return view.extend({
 		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Forwarding Settings'));
 		s.anonymous = true;
 
-		o = s.option(form.Value, 'tcp_no_redir_ports', _('TCP ports not forwarded (do not forward these TCP ports)'));
+		o = s.option(form.Value, 'tcp_no_redir_ports', _('Do not forward these TCP ports'));
 		o.value('', _('No patterns are used'));
 		o.value('1:65535', _('All'));
 		o.validate = portValidate;
 
-		o = s.option(form.Value, 'udp_no_redir_ports', _('UDP ports not forwarded (do not forward these UDP ports)'),
+		o = s.option(form.Value, 'udp_no_redir_ports', _('Do not forward these UDP ports'),
 			E('span', { 'style': 'color:#ef4444' },
 				_('Fill in the ports you don\'t want to be forwarded by the agent, with the highest priority.')));
 		o.value('', _('No patterns are used'));
 		o.value('1:65535', _('All'));
 		o.validate = portValidate;
 
-		o = s.option(form.Value, 'tcp_redir_ports', _('TCP ports forwarded (forward these TCP ports)'));
+		o = s.option(form.Value, 'tcp_redir_ports', _('Forward these TCP ports'));
 		o.value('1:65535', _('All'));
 		o.value('22,25,53,80,143,443,465,587,853,873,993,995,5222,8080,8443,9418', _('Common Use'));
 		o.value('80,443', _('Only Web'));
 		o.default = '1:65535';
 		o.validate = portValidate;
 
-		o = s.option(form.Value, 'udp_redir_ports', _('UDP ports forwarded (forward these UDP ports)'));
+		o = s.option(form.Value, 'udp_redir_ports', _('Forward these UDP ports'));
 		o.value('1:65535', _('All'));
 		o.default = '1:65535';
 		o.validate = portValidate;
@@ -274,7 +274,7 @@ return view.extend({
 		s.anonymous = true;
 
 		o = s.option(form.Flag, 'stats_enabled', _('Traffic statistics'),
-			_('Counts what goes through the tunnel and shows it on the status page. Off, nothing is counted or written to storage and the card is gone; what was counted before is kept.'));
+			_('Shows the tunnel traffic.'));
 		o.default = '1';
 		o.rmempty = false;
 

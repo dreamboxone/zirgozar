@@ -43,6 +43,12 @@ for a in "$@"; do
 		zirgozar.*.*) _key="${a#zirgozar.}" ;;
 	esac
 done
+# A show lists the sections a node is written into, as the real one does.
+case " $* " in
+	*" show "*)
+		sed -n 's/^\([A-Za-z0-9_]*\)\.link=.*/zirgozar.\1=node/p' "${ZGZ_TEST_UCI:-/dev/null}" 2>/dev/null
+		exit 0 ;;
+esac
 if [ -n "$_get" ] && [ -n "$_key" ]; then
 	_v="$(awk -v k="$_key" 'index($0, k "=") == 1 { print substr($0, length(k) + 2); exit }' "${ZGZ_TEST_UCI:-/dev/null}" 2>/dev/null)"
 	[ -n "$_v" ] || exit 1

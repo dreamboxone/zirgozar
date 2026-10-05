@@ -53,6 +53,43 @@ function sources(what) {
 	];
 }
 
+/* An address typed in stays in the list as an entry of its own, and LuCI's
+   list has no way to take it out again. A Remove button beside the field, for
+   as long as what it holds is not one of the addresses above: it goes back to
+   the first of them, and the typed one leaves the list. */
+function removableCustom(o, list) {
+	var known = {};
+	list.forEach(function(v) { known[v[0]] = true; });
+	o.renderWidget = function(section_id, option_index, cfgvalue) {
+		var self = this;
+		var w = form.Value.prototype.renderWidget.apply(this, [ section_id, option_index, cfgvalue ]);
+		var rm = E('button', {
+			'type': 'button',
+			'class': 'btn cbi-button cbi-button-remove',
+			'style': 'margin:6px 0',
+			'click': function(ev) {
+				ev.preventDefault();
+				var el = self.getUIElement(section_id);
+				if (el) el.setValue(list[0][0]);
+				var sb = w.querySelector('.cbi-dropdown') || w;
+				sb.querySelectorAll('ul > li[data-value]').forEach(function(li) {
+					if (!known[li.getAttribute('data-value')]) li.parentNode.removeChild(li);
+				});
+				show();
+			}
+		}, _('Remove'));
+		function show() {
+			var el = self.getUIElement(section_id);
+			var v = el ? el.getValue() : cfgvalue;
+			rm.style.display = (v && !known[v]) ? '' : 'none';
+		}
+		w.addEventListener('cbi-dropdown-change', function() { window.setTimeout(show, 0); });
+		window.setTimeout(show, 0);
+		rm.style.display = (cfgvalue && !known[cfgvalue]) ? '' : 'none';
+		return E('div', {}, [ w, rm ]);
+	};
+}
+
 function when(t) {
 	return t ? new Date(t * 1000).toLocaleString(i18n.get() === 'fa' ? 'fa-IR' : undefined) : _('date unknown');
 }
@@ -130,11 +167,13 @@ return view.extend({
 		sources('geoip').forEach(function(v) { o.value(v[0], v[1]); });
 		o.default = sources('geoip')[0][0];
 		o.rmempty = false;
+		removableCustom(o, sources('geoip'));
 
 		o = s.option(form.Value, 'geosite_url', _('Geosite Update URL'));
 		sources('geosite').forEach(function(v) { o.value(v[0], v[1]); });
 		o.default = sources('geosite')[0][0];
 		o.rmempty = false;
+		removableCustom(o, sources('geosite'));
 
 		o = s.option(form.Value, 'geo_dir', _('Location of Geo rule files'),
 			_('This variable specifies a directory where geoip.dat and geosite.dat files are. The full files are about 17 MB and 8 MB; on a router short of flash, point this at USB storage or choose the lite files above.'));
@@ -208,7 +247,7 @@ return view.extend({
 		s = m.section(form.NamedSection, 'config', 'zirgozar');
 		s.anonymous = true;
 
-		o = s.option(form.Flag, 'route_ir', _('Send Iranian traffic direct'),
+		o = s.option(form.Flag, 'route_ir', _('Direct pass for Iranian traffic'),
 			_('Iranian sites and addresses skip the tunnel. Needs the routing data above — until that is downloaded this does nothing, because a core asked for a geo file it has not got refuses to start rather than carrying on without it.'));
 		o.rmempty = false;
 

@@ -719,4 +719,72 @@ else
 fi
 rig_clear
 
+# ------------------------------------------------------- a node's own settings
+#
+# What the edit page of a node sets beyond its link, PassWall2's lower half,
+# carried into the outbound - and the node's own resolver into the DNS.
+echo "== a node's own settings"
+NX='vless://11111111-2222-3333-4444-555555555555@nx.example.com:443?encryption=none&security=tls&sni=nx.example.com&type=ws&path=%2Fw#NX'
+rig_clear
+rig_set cfgnx.link "$NX"
+rig_set cfgnx.ech "AEX+DQBBpQAgACCm6NzGiTKaZ4Yjjn7LEBPHw6OMV9b9qRbwrtPBuD24LgAEAAEAAQASY2xvdWRmbGFyZS1lY2guY29tAAA="
+rig_set cfgnx.tls_pin "e9b1bd5c09a1af9dcd2c1a4e9e8f2f6b7a1f0c2d3e4f5a6b7c8d9e0f1a2b3c4d"
+rig_set cfgnx.cert_name "nx.example.com"
+rig_set cfgnx.cipher_suites "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384"
+rig_set cfgnx.user_agent "Mozilla/5.0 Test"
+rig_set cfgnx.tcp_fast_open 1
+rig_set cfgnx.tcp_mptcp 1
+rig_set cfgnx.domain_strategy UseIPv4
+rig_set cfgnx.happy_eyeballs 1
+rig_set cfgnx.dns_resolver "udp://1.1.1.1"
+NXREC="$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; node_records cfgnx' | head -1)"
+NXOUT="$(printf '%s' "$NXREC" | cut -f6- | tr -d ' ')"
+for want in \
+	'"echConfigList":"AEX+DQBB' \
+	'"pinnedPeerCertSha256":"e9b1bd5c' \
+	'"verifyPeerCertByName":"nx.example.com"' \
+	'"cipherSuites":"TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384"' \
+	'"User-Agent":"Mozilla/5.0Test"' \
+	'"tcpFastOpen":true' \
+	'"tcpMptcp":true' \
+	'"domainStrategy":"UseIPv4"' \
+	'"happyEyeballs":{'; do
+	if printf '%s' "$NXOUT" | grep -qF "$want"; then
+		ok "into the outbound: $want"
+	else
+		bad "into the outbound: $want"
+	fi
+done
+NXPLAIN="$(printf '%s\n' "$NX" | LC_ALL=C awk -f "$RIG/lib/zgz-parse" | head -1 | cut -f6- | tr -d ' ')"
+if printf '%s' "$NXPLAIN" | grep -qF 'echConfigList'; then
+	bad "a node without them has none of it"
+else
+	ok "a node without them has none of it"
+fi
+
+printf '%s' "$NXREC" | cut -f6 > "$RIG/etc/best.json"
+printf 'tag=n0\nlabel=NX\nprotocol=vless\nhost=nx.example.com\nport=443\n' > "$RIG/etc/best.meta"
+rig_set direct_dns_protocol udp
+rig_set direct_dns 178.22.122.100
+sh "$RIG/lib/zgz-mkconfig" > "$WORK/nx.json" 2>"$WORK/nx.err" || bad "mkconfig failed: $(cat "$WORK/nx.err")"
+NXCONF="$(tr -d ' \n' < "$WORK/nx.json")"
+if printf '%s' "$NXCONF" | grep -qF '"tag":"dns-node1","address":"1.1.1.1","port":53,"domains":["full:nx.example.com"]'; then
+	ok "the node's name is looked up through its own resolver"
+else
+	bad "the node's name is looked up through its own resolver"
+fi
+if printf '%s' "$NXCONF" | grep -qF '"inboundTag":["dns-node1"],"outboundTag":"direct"'; then
+	ok "and that resolver is asked directly"
+else
+	bad "and that resolver is asked directly"
+fi
+if [ -x "$RIG/core/xray" ]; then
+	if "$RIG/core/xray" run -test -config "$WORK/nx.json" >"$WORK/nx.test" 2>&1; then
+		ok "the core accepts all of it"
+	else
+		bad "the core accepts all of it: $(grep -i 'fail\|error' "$WORK/nx.test" | head -2)"
+	fi
+fi
+rig_clear
+
 rig_report

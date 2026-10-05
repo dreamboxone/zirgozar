@@ -28,6 +28,13 @@
 		}
 	},
 
+	"admin/services/zirgozar/node": {
+		"action": {
+			"type": "view",
+			"path": "zirgozar/node"
+		}
+	},
+
 	"admin/services/zirgozar/subscribe": {
 		"title": "Node Subscribe",
 		"order": 30,

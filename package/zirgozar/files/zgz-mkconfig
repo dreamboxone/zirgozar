@@ -750,8 +750,41 @@ else
 	direct_server="\"address\":\"$dd_addr\",\"port\":$dd_port"
 fi
 dns_servers=""
+
+# A node added by hand may name the resolver its own server name is looked up
+# with - PassWall2's Domain DNS Resolve. Each such name gets a server of its
+# own, ahead of the direct one so that it is the one asked, and its queries go
+# straight out like the direct resolver's. "udp://ip[:port]", "tcp://..." and
+# "https://..." as Xray reads them; a bare address is UDP.
+node_dns_one() {
+	local res host
+	res="$(uci -q get "zirgozar.$1.dns_resolver" 2>/dev/null)" || res=""
+	[ -n "$res" ] || return 0
+	host="$(section_links "$1" 2>/dev/null | LC_ALL=C awk -v LIMIT=1 -f "$ZGZ_LIB/zgz-parse" 2>/dev/null | head -1 | cut -f4)"
+	case "$host" in *[a-zA-Z]*) : ;; *) return 0 ;; esac
+	case "$host" in *:*) return 0 ;; esac
+	node_dns_n=$((node_dns_n + 1))
+	case "$res" in
+		udp://*)
+			_nr="${res#udp://}"
+			_np=53
+			case "$_nr" in *:*) _np="${_nr##*:}"; _nr="${_nr%:*}" ;; esac
+			_ns="\"address\":\"$(json_escape "$_nr")\",\"port\":$_np"
+			;;
+		*://*) _ns="\"address\":\"$(json_escape "$res")\"" ;;
+		*) _ns="\"address\":\"$(json_escape "$res")\",\"port\":53" ;;
+	esac
+	dns_servers="${dns_servers:+$dns_servers,}{\"tag\":\"dns-node$node_dns_n\",$_ns,\"domains\":[\"full:$(json_escape "$host")\"],\"skipFallback\":true,\"finalQuery\":true,\"queryStrategy\":\"$direct_qs\"}"
+	rules="{\"type\":\"field\",\"inboundTag\":[\"dns-node$node_dns_n\"],\"outboundTag\":\"direct\"}${rules:+,$rules}"
+	return 0
+}
+node_dns_n=0
+for _nsid in $(uci -q -X show zirgozar 2>/dev/null | sed -n 's/^zirgozar\.\([A-Za-z0-9_]*\)=node$/\1/p'); do
+	node_dns_one "$_nsid"
+done
+
 if [ -n "$direct_names" ]; then
-	dns_servers="{\"tag\":\"dns-direct\",$direct_server,\"domains\":[$direct_names],\"skipFallback\":true,\"finalQuery\":true,\"queryStrategy\":\"$direct_qs\"}"
+	dns_servers="${dns_servers:+$dns_servers,}{\"tag\":\"dns-direct\",$direct_server,\"domains\":[$direct_names],\"skipFallback\":true,\"finalQuery\":true,\"queryStrategy\":\"$direct_qs\"}"
 fi
 if [ -n "$shunt_fake_names" ]; then
 	dns_servers="${dns_servers:+$dns_servers,}{\"tag\":\"dns-shunt-fake\",\"address\":\"fakedns\",\"domains\":[$shunt_fake_names]}"

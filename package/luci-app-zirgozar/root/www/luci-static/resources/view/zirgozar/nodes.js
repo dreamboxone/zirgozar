@@ -540,6 +540,16 @@ return view.extend({
 		s.handleAdd = function(ev) {
 			return form.GridSection.prototype.handleAdd.apply(this, [ ev, sectionName('n') ]);
 		};
+		/* Edit opens PassWall2's Node Config page, with every field of the
+		   link and the settings a link has no place for. A node being added
+		   is not in the file yet, so it still gets the window: a link pasted
+		   in there, and the page has something to take apart. */
+		s.renderMoreOptionsModal = function(section_id, ev) {
+			if (this.addedSection == section_id)
+				return form.GridSection.prototype.renderMoreOptionsModal.apply(this, [ section_id, ev ]);
+			window.location.href = L.url('admin', 'services', 'zirgozar', 'node') + '?sid=' + encodeURIComponent(section_id);
+			return Promise.resolve();
+		};
 
 		/* A tick box on every row, for the buttons above the table. */
 		o = s.option(form.DummyValue, '_select', ' ');
@@ -812,7 +822,7 @@ return view.extend({
 			var table = grid && grid.querySelector('.cbi-section-table');
 			if (table) table.parentNode.insertBefore(toolbar(), table);
 
-			var list = pui.card(_('Nodes'), 'list', '#6366f1', E('div', {}, [
+			var list = pui.card(_('All configs'), 'list', '#6366f1', E('div', {}, [
 				E('div', { 'class': 'mk-row', 'style': 'margin:0 0 10px;align-items:center' }, [
 					E('span', { 'id': 'pwp-nodecount', 'style': 'font-size:13px;color:var(--muted)' }, ''),
 					E('span', { 'style': 'flex:1 1 auto' }),

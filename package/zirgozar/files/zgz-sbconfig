@@ -292,6 +292,24 @@ function tls_of(ss) {
 	} else if (fp) {
 		t.utls = { enabled: true, fingerprint: fp };
 	}
+	// What a node's edit page adds. ECH: sing-box finds the configuration
+	// itself through DNS when given none, which is what a "domain+resolver"
+	// value asks Xray to do; one given whole is passed on as it is.
+	if (st.echConfigList) {
+		t.ech = { enabled: true };
+		// base64 has a "+" of its own; only an address with "://" is a resolver.
+		if (!match(st.echConfigList, /:\/\//))
+			t.ech.config = [ '-----BEGIN ECH CONFIGS-----', st.echConfigList, '-----END ECH CONFIGS-----' ];
+	}
+	if (st.cipherSuites)
+		t.cipher_suites = split(st.cipherSuites, /[:, ]+/);
+	for (let c in arr(st.certificates))
+		if (c.usage == 'verify' && c.certificate)
+			t.certificate = [ join('\n', arr(c.certificate)) ];
+	if (st.pinnedPeerCertSha256)
+		warn('the certificate pin has no sing-box equivalent and is left off');
+	if (st.verifyPeerCertByName)
+		warn('the certificate name to verify has no sing-box equivalent and is left off');
 	for (let m in arr(ss.finalmask?.tcp)) {
 		if (m.type == 'fragment') {
 			t.fragment = true;
@@ -344,6 +362,8 @@ function transport_of(ss, tag) {
 		let t = { type: 'httpupgrade', path: h.path ?? '/' };
 		if (h.host)
 			t.host = h.host;
+		if (h.headers)
+			t.headers = h.headers;
 		return t;
 	}
 	case 'xhttp':
@@ -523,6 +543,16 @@ function conv_outbound(o) {
 	if (sock.dialerProxy)
 		r.detour = sock.dialerProxy;
 	r.routing_mark = sock.mark ?? MARK;
+	if (sock.tcpFastOpen)
+		r.tcp_fast_open = true;
+	if (sock.tcpMptcp)
+		r.tcp_multi_path = true;
+	// How the server's own name is looked up, once the resolver it is looked
+	// up with is known - see below.
+	let ds = { UseIPv4: 'ipv4_only', ForceIPv4: 'ipv4_only', UseIPv6: 'ipv6_only', ForceIPv6: 'ipv6_only',
+	           UseIPv4v6: 'prefer_ipv4', ForceIPv4v6: 'prefer_ipv4', UseIPv6v4: 'prefer_ipv6', ForceIPv6v4: 'prefer_ipv6' }[sock.domainStrategy];
+	if (ds)
+		r._strategy = ds;
 	push(outbounds, r);
 	out_tags[tag] = true;
 }
@@ -828,6 +858,11 @@ let route = {
 };
 if (length(keys(rule_sets)))
 	route.rule_set = map(keys(rule_sets), (t) => ({ tag: t, type: 'local', format: 'binary', path: rule_sets[t] }));
+for (let o in [ ...outbounds ]) {
+	if (o._strategy && have_direct_dns)
+		o.domain_resolver = { server: 'dns-direct', strategy: o._strategy };
+	delete o._strategy;
+}
 if (have_direct_dns)
 	route.default_domain_resolver = { server: 'dns-direct', strategy: 'ipv4_only' };
 
