@@ -390,11 +390,11 @@ body.pwp-fa #modal_overlay>.modal textarea,body.pwp-fa #modal_overlay>.modal inp
    a switch there reads as turning the node on or off. A box, as in PassWall2. */
 /* Under the same :is() as the switch, which carries an id's weight, so that
    these win over it. */
-:is(.mk,#modal_overlay>.modal) input[type=checkbox].pwp-sel{width:20px!important;height:20px!important;border-radius:6px!important;border:2px solid #94a3b8!important;background:transparent!important;margin:0!important}
-:is(.mk,#modal_overlay>.modal) input[type=checkbox].pwp-sel::after,:is(.mk,#modal_overlay>.modal) input[type=checkbox].pwp-sel:checked::after{top:1px!important;left:5px!important;width:6px!important;height:11px!important;border-radius:0!important;
+:is(.mk,#modal_overlay>.modal) input[type=checkbox].pwp-sel,:is(.mk,#modal_overlay>.modal) input[type=checkbox].zgz-tick{width:20px!important;height:20px!important;border-radius:6px!important;border:2px solid #94a3b8!important;background:transparent!important;margin:0!important}
+:is(.mk,#modal_overlay>.modal) input[type=checkbox].pwp-sel::after,:is(.mk,#modal_overlay>.modal) input[type=checkbox].pwp-sel:checked::after,:is(.mk,#modal_overlay>.modal) input[type=checkbox].zgz-tick::after,:is(.mk,#modal_overlay>.modal) input[type=checkbox].zgz-tick:checked::after{top:1px!important;left:5px!important;width:6px!important;height:11px!important;border-radius:0!important;
 	background:transparent!important;border:solid #fff;border-width:0 2.5px 2.5px 0;box-shadow:none!important;transform:rotate(45deg)!important;opacity:0}
-:is(.mk,#modal_overlay>.modal) input[type=checkbox].pwp-sel:checked{background:linear-gradient(135deg,#10b981,#059669)!important;border-color:#059669!important}
-:is(.mk,#modal_overlay>.modal) input[type=checkbox].pwp-sel:checked::after{opacity:1}
+:is(.mk,#modal_overlay>.modal) input[type=checkbox].pwp-sel:checked,:is(.mk,#modal_overlay>.modal) input[type=checkbox].zgz-tick:checked{background:linear-gradient(135deg,#10b981,#059669)!important;border-color:#059669!important}
+:is(.mk,#modal_overlay>.modal) input[type=checkbox].pwp-sel:checked::after,:is(.mk,#modal_overlay>.modal) input[type=checkbox].zgz-tick:checked::after{opacity:1}
 
 /* Buttons: LuCI's, in Makhzan's colours */
 :is(.mk,#modal_overlay>.modal,.cbi-page-actions) :is(.cbi-button,.btn){

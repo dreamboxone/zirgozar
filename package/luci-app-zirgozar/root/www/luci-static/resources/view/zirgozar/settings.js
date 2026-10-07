@@ -290,6 +290,14 @@ return view.extend({
 			_('Tick and save to delete every config and subscription and put every setting back as it was when the program was installed. The routing data, the downloaded cores and the traffic history are kept. There is no undo.'));
 		o.default = '0';
 		o.rmempty = true;
+		/* A tick box rather than the switch every other setting is: this is
+		   something done once, not something left on. */
+		o.renderWidget = function(section_id, option_index, cfgvalue) {
+			var w = form.Flag.prototype.renderWidget.apply(this, [ section_id, option_index, cfgvalue ]);
+			var cb = w.querySelector ? w.querySelector('input[type=checkbox]') : null;
+			if (cb) cb.classList.add('zgz-tick');
+			return w;
+		};
 		o.onchange = function(ev, section_id, value) {
 			if (value == '1' && !window.confirm(_('Every config, every subscription and every setting will be deleted when you save. Continue?'))) {
 				var cb = ev && ev.target;
