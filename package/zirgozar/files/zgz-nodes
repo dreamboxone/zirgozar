@@ -1023,8 +1023,18 @@ subnodes_one() {
 	config_get name "$1" name "$1"
 	config_get_bool enabled "$1" enabled 1
 	[ "$enabled" = "1" ] || return 0
-	sub_parsed "$1" | awk -F'\t' -v s="$1" -v n="$name" \
-		'NF >= 5 { printf "%s\t%s\t%s\t%s\t%s\t%s\n", s, n, $3, $4, $5, $2 }'
+	# Asked every time Basic Settings opens, and parsing a whole list to
+	# answer it took most of a second. What the parser said is kept beside
+	# the list and used again until the list itself is newer.
+	sub_restore "$1"
+	_sn_links="$SUBS_DIR/$1.links" _sn_cache="$SUBS_DIR/$1.subnodes"
+	[ -s "$_sn_links" ] || return 0
+	if [ ! -f "$_sn_cache" ] || [ "$_sn_links" -nt "$_sn_cache" ]; then
+		sub_parsed "$1" | awk -F'\t' 'NF >= 5 { printf "%s\t%s\t%s\t%s\n", $3, $4, $5, $2 }' \
+			> "$_sn_cache.new" 2>/dev/null && mv -f "$_sn_cache.new" "$_sn_cache"
+	fi
+	awk -F'\t' -v s="$1" -v n="$name" \
+		'NF >= 4 { printf "%s\t%s\t%s\t%s\t%s\t%s\n", s, n, $1, $2, $3, $4 }' "$_sn_cache" 2>/dev/null
 	return 0
 }
 
