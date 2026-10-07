@@ -644,7 +644,7 @@ cmd_list() {
 	_pub="$(latest_of zirgozar)"
 	printf ',"app":{"version":"%s","latest":"%s","update":%s}}\n' \
 		"$(json_escape "$_mine")" "$(json_escape "${_pub#v}")" \
-		"$([ -n "$_pub" ] && [ "${_pub#v}" != "$_mine" ] && echo true || echo false)"
+		"$([ -n "$_pub" ] && ver_newer "${_pub#v}" "$_mine" && echo true || echo false)"
 	return 0
 }
 
