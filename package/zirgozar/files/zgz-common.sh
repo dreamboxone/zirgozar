@@ -227,9 +227,21 @@ xray_paths() {
 	return 0
 }
 
+# The Xray the settings insist on: the path on the Update page, or
+# patterniha's build when the Active core names it - and then whichever is
+# newest only if it is not there.
+xray_preferred() {
+	_xp="$(cfg core_xray '')"
+	if [ -z "$_xp" ] && [ "$(cfg core_engine xray)" = "xray-patterniha" ]; then
+		_xp="$(core_dir)/xray-patterniha"
+	fi
+	echo "$_xp"
+	return 0
+}
+
 find_xray() {
 	_cfg="$1"
-	_pref="$(cfg core_xray '')"
+	_pref="$(xray_preferred)"
 	# The configuration is offered to the core exactly as the service will run
 	# it, and that includes telling it where geoip.dat and geosite.dat are.
 	#
@@ -626,7 +638,7 @@ xray_by_version() {
 # Which Xray a page should talk about, without starting any of them to find
 # out: the one the settings insist on, or the newest there is.
 xray_installed() {
-	for _xi in $(cfg core_xray '') $(xray_by_version); do
+	for _xi in $(xray_preferred) $(xray_by_version); do
 		[ -x "$_xi" ] && { echo "$_xi"; return 0; }
 	done
 	return 1

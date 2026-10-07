@@ -297,11 +297,26 @@ cmd_dnsmove() {
 	return 0
 }
 
+# Once: QUIC from off, which was the default, to automatic - refused while the
+# node in use is one through a CDN, as PattN refuses it. Turned on by hand is
+# left on.
+cmd_quicmove() {
+	[ "$(cfg quic_moved 0)" = "1" ] && return 0
+	command -v uci >/dev/null 2>&1 || return 0
+	case "$(uci -q get zirgozar.config.block_quic)" in
+		''|0) uci -q set zirgozar.config.block_quic='auto' ;;
+	esac
+	uci -q set zirgozar.config.quic_moved='1'
+	uci -q commit zirgozar
+	return 0
+}
+
 case "${1:-}" in
 	reset)    cmd_reset ;;
 	rebind)   cmd_rebind ;;
 	dnsmove)  cmd_dnsmove ;;
+	quicmove) cmd_quicmove ;;
 	clock)    cmd_clock ;;
 	schedule) cmd_schedule "${2:-}" "${3:-}" ;;
-	*) echo "usage: $0 reset|rebind|dnsmove|clock|schedule sync|stop|start|restart|geo|sub <section>" >&2; exit 1 ;;
+	*) echo "usage: $0 reset|rebind|dnsmove|quicmove|clock|schedule sync|stop|start|restart|geo|sub <section>" >&2; exit 1 ;;
 esac

@@ -205,12 +205,14 @@ var FA = {
 	'Refuse it while connected (recommended)': 'تا وقتی وصل است رد شود (پیشنهادی)',
 	'Leave it alone': 'دست نزن',
 	'Refuse QUIC': 'رد کردن QUIC',
-	'Makes browsers fall back to TCP. Worth turning on when the chosen node carries UDP badly; off by default, because where UDP works QUIC is faster.':
-		'فعال‌سازی این گزینه، زمانی‌که کانفیگ امکان عبور ترافیک از طریق پروتکل UDP را ندارد، موجب می‌گردد مرورگرها به اجبار از TCP استفاده کنند. به‌طور پیش‌فرض خاموش است، چون هر جا UDP کار کند QUIC سریع‌تر است.',
+	'Makes browsers fall back to TCP. Automatic refuses it while the node in use goes through a CDN (WebSocket, XHTTP, gRPC) - a Cloudflare Worker cannot carry UDP at all - and lets it through otherwise, where QUIC is faster.':
+		'مرورگرها را به TCP برمی‌گرداند. حالت خودکار وقتی کانفیگ فعلی از CDN رد می‌شود (WebSocket، XHTTP، gRPC) QUIC را می‌بندد، چون ورکر کلودفلر اصلاً UDP را جابه‌جا نمی‌کند. در بقیهٔ حالت‌ها QUIC باز می‌ماند چون سریع‌تر است.',
 	'Firewall': 'فایروال',
 	'Automatic is right unless this router has both and the wrong one is being picked.':
 		'روی خودکار بماند، مگر روتر هم nftables و هم iptables داشته باشد و اشتباه انتخاب شده باشد.',
 	'Auto': 'خودکار',
+	'Never': 'هرگز',
+	'Always': 'همیشه',
 	'Interfaces to tunnel': 'اینترفیس‌هایی که تونل شوند',
 	'Read from this router. Left unset — which is how it ships — every LAN interface is tunnelled, which is what almost everyone wants. Choose one to pick traffic up from that interface only.':
 		'اگر خالی بماند (پیشنهادی)، همه شبکه‌های داخلی از فیلترشکن استفاده می‌کنند. اگر یکی را انتخاب کنید فقط همان شبکه؛ مثلا فقط وای‌فای مهمان.',
@@ -348,8 +350,8 @@ var FA = {
 	'There is no OpenVPN profile to run.': 'پروفایل OpenVPN برای اجرا وجود ندارد.',
 	'The core refused the new settings, so the tunnel was left running as it was. Check the Runtime Logs page.': 'هسته تنظیمات جدید را نپذیرفت، پس تونل همان‌طور که بود روشن ماند. دلیلش را در صفحه «گزارش اجرا» ببینید.',
 	'sing-box could not run this tunnel, so Xray is carrying it. The Runtime Logs page says why. The official sing-box has no xhttp: install sing-box-lx on the App Update page and choose it under Active core in Basic Settings, or choose Xray there.': 'sing-box نتوانست این تونل را اجرا کند و Xray آن را می‌برد. دلیلش را صفحه «گزارش اجرا» می‌گوید. sing-box رسمی xhttp ندارد: sing-box-lx را از صفحه «به‌روزرسانی» نصب کنید و در تنظیمات پایه زیر «هسته فعال» آن را انتخاب کنید، یا همان‌جا Xray را انتخاب کنید.',
-	'Auto: Xray, and sing-box for a config Xray cannot run. sing-box or sing-box-lx: every config through it; if it cannot start, Xray takes over.':
-		'خودکار: Xray، و برای کانفیگی که Xray اجرا نمی‌کند sing-box. با sing-box یا sing-box-lx همه کانفیگ‌ها با آن اجرا می‌شوند؛ اگر راه نیفتد، Xray جایش را می‌گیرد.',
+	'Auto: Xray, and sing-box for a config Xray cannot run. Xray (patterniha): his build first, with QUIC refused as PattN does. sing-box or sing-box-lx: every config through it; if it cannot start, Xray takes over.':
+		'خودکار: Xray، و برای کانفیگی که Xray اجرا نمی‌کند sing-box. Xray (patterniha): اول هستهٔ پترنیها، و QUIC مثل PattN بسته می‌شود. با sing-box یا sing-box-lx همه کانفیگ‌ها با آن اجرا می‌شوند؛ اگر راه نیفتد، Xray جایش را می‌گیرد.',
 	'Direct addresses and domains': 'آدرس‌ها و دامنه‌های مستقیم',
 	'These sites always go straight out, never through the tunnel. A name covers everything under it: example.com also covers www.example.com. Xray’s own forms — full:, regexp:, keyword: — are accepted as written.':
 		'این سایت‌ها همیشه مستقیم می‌روند و هیچ‌وقت از تونل رد نمی‌شوند. هر دامنه زیردامنه‌هایش را هم شامل می‌شود: ‎example.com‎ شامل ‎www.example.com‎ هم هست. شکل‌های خود Xray — ‎full:‎، ‎regexp:‎، ‎keyword:‎ — همان‌طور که نوشته شوند پذیرفته می‌شوند.',

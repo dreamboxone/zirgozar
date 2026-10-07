@@ -383,7 +383,37 @@ cmd_run() {
 	return 0
 }
 
+# zgz-test first: of the nodes on stdin (tag<TAB>label<TAB>proto<TAB>host<TAB>
+# port<TAB>payload), the first that carries a request - or, when none does,
+# the first of them. How the node chosen from a subscription is found again
+# when the list no longer holds it and several look the same: on a list such
+# as patterniha's every node shares one address, and the one taken by its
+# address alone may be the one that does not work here.
+cmd_first() {
+	_ff="$ZGZ_RUN/first.$$"
+	cat > "$_ff"
+	_fw=""
+	while IFS= read -r _fr; do
+		[ -n "$_fr" ] || continue
+		case "$(printf '%s' "$_fr" | cut -f3)" in
+			vless|vmess|trojan|shadowsocks|socks|http|wireguard) : ;;
+			*) continue ;;
+		esac
+		if url_ms "$(printf '%s' "$_fr" | cut -f6-)" "$(printf '%s' "$_fr" | cut -f4)" \
+			"$(printf '%s' "$_fr" | cut -f5)" >/dev/null 2>&1; then
+			_fw="$_fr"
+			break
+		fi
+	done < "$_ff"
+	[ -n "$_fw" ] || _fw="$(head -1 "$_ff")"
+	rm -f "$_ff"
+	[ -n "$_fw" ] || return 1
+	printf '%s\n' "$_fw"
+	return 0
+}
+
 case "${1:-json}" in
+	first) cmd_first ;;
 	ping|tcp|url)
 		[ -n "${2:-}" ] || { echo "usage: $0 $1 <id>" >&2; exit 1; }
 		cmd_run "$1" "$2"

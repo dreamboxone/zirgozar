@@ -156,4 +156,24 @@ else
 fi
 rig_set client_proxy 1
 
+echo "== QUIC on automatic"
+# Refused while the node in use goes through a CDN transport - a Cloudflare
+# Worker carries no UDP - and with patterniha's Xray chosen, as PattN does.
+rig_set block_quic auto
+quic_auto() {
+	printf '%s' "$2" > "$ZGZ_ETC/best.json"
+	sh "$RIG/lib/zgz-rules" dump > "$WORK/rules.nft"
+	if grep -q 'udp th dport 443 counter drop' "$WORK/rules.nft"; then _q=1; else _q=0; fi
+	if [ "$_q" = "$3" ]; then ok "$1"; else bad "$1"; fi
+}
+quic_auto "a node over WebSocket: QUIC refused" '{"protocol":"vless","streamSettings":{"network":"ws"}}' 1
+quic_auto "a node over XHTTP: QUIC refused" '{"protocol":"vless","streamSettings":{"network":"xhttp"}}' 1
+quic_auto "a node over plain TCP: QUIC let through" '{"protocol":"vless","streamSettings":{"network":"tcp"}}' 0
+rig_set core_engine xray-patterniha
+quic_auto "patterniha's Xray chosen: QUIC refused" '{"protocol":"vless","streamSettings":{"network":"tcp"}}' 1
+rig_set core_engine xray
+rig_set block_quic 0
+quic_auto "off is off, whatever the node" '{"protocol":"vless","streamSettings":{"network":"ws"}}' 0
+rm -f "$ZGZ_ETC/best.json"
+
 rig_report

@@ -221,8 +221,9 @@ return view.extend({
 		o.rmempty = false;
 
 		o = s.taboption('main', form.ListValue, 'core_engine', _('Active core'),
-			_('Auto: Xray, and sing-box for a config Xray cannot run. sing-box or sing-box-lx: every config through it; if it cannot start, Xray takes over.'));
+			_('Auto: Xray, and sing-box for a config Xray cannot run. Xray (patterniha): his build first, with QUIC refused as PattN does. sing-box or sing-box-lx: every config through it; if it cannot start, Xray takes over.'));
 		o.value('xray', _('Auto'));
+		o.value('xray-patterniha', 'Xray (patterniha)');
 		o.value('singbox', 'sing-box');
 		o.value('singbox-lx', 'sing-box-lx');
 		o.default = 'xray';

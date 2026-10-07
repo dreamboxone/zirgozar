@@ -54,7 +54,23 @@ RESERVED_V4="0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.1
 tproxy_port="$(cfg tproxy_port 1082)"
 dns_port="$(cfg dns_port 1053)"
 ipv6_mode="$(cfg ipv6 block)"
-block_quic="$(cfg_bool block_quic 0)"
+block_quic="$(cfg block_quic auto)"
+case "$block_quic" in
+	1|on|true|yes) block_quic=1 ;;
+	auto)
+		# Refused when the node in use reaches its server through a CDN
+		# transport - a Cloudflare Worker cannot carry UDP at all, and QUIC
+		# through any of these only waits to fail before the browser falls
+		# back to TCP. PattN refuses UDP 443 for the same reason.
+		block_quic=0
+		# With patterniha's Xray chosen, always - as PattN itself does.
+		[ "$(cfg core_engine xray)" = "xray-patterniha" ] && block_quic=1
+		case "$(cat "$ZGZ_BEST" 2>/dev/null)" in
+			*'"network":"ws"'*|*'"network":"xhttp"'*|*'"network":"splithttp"'*|*'"network":"httpupgrade"'*|*'"network":"grpc"'*) block_quic=1 ;;
+		esac
+		;;
+	*) block_quic=0 ;;
+esac
 dns_hijack="$(cfg_bool dns_hijack 1)"
 
 # PassWall2's Basic Settings and Forwarding Settings.

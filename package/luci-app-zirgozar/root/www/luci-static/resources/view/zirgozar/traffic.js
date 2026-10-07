@@ -264,8 +264,12 @@ return view.extend({
 		o.default = '1';
 		o.rmempty = false;
 
-		o = s.option(form.Flag, 'block_quic', _('Refuse QUIC'),
-			_('Makes browsers fall back to TCP. Worth turning on when the chosen node carries UDP badly; off by default, because where UDP works QUIC is faster.'));
+		o = s.option(form.ListValue, 'block_quic', _('Refuse QUIC'),
+			_('Makes browsers fall back to TCP. Automatic refuses it while the node in use goes through a CDN (WebSocket, XHTTP, gRPC) - a Cloudflare Worker cannot carry UDP at all - and lets it through otherwise, where QUIC is faster.'));
+		o.value('auto', _('Auto'));
+		o.value('1', _('Always'));
+		o.value('0', _('Never'));
+		o.default = 'auto';
 		o.rmempty = false;
 
 		/* ------------------------------------------------------ rebind */

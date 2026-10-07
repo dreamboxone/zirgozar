@@ -1094,20 +1094,43 @@ cmd_resolve() {
 		NF >= 6 { r[++c] = $0; l[c] = $2; p[c] = $3; h[c] = $4; o[c] = $5; if (F != "") f[c] = fp(payload($0)) }
 		END {
 			if (F != "") for (i = 1; i <= c && !b; i++) if (f[i] == F) { b = i; how = "same" }
-			for (i = 1; i <= c && !b; i++) if (p[i] == P && h[i] == H && o[i] == O && l[i] == L) { b = i; how = (F != "" ? "protocol, address, port and name" : "same") }
-			for (i = 1; i <= c && !b; i++) if (p[i] == P && h[i] == H && o[i] == O) { b = i; how = "protocol, address and port" }
-			for (i = 1; i <= c && !b; i++) if (h[i] == H && o[i] == O) { b = i; how = "address and port" }
-			for (i = 1; i <= c && !b; i++) if (h[i] == H) { b = i; how = "address" }
-			for (i = 1; i <= c && !b; i++) if (l[i] == L) { b = i; how = "name" }
-			if (!b && c > 0) { b = 1; how = "first" }
-			if (b) { print how > "/dev/stderr"; print r[b] }
+			if (b) { print how > "/dev/stderr"; print r[b]; exit }
+			# Otherwise every node that matches as well as the best one does:
+			# when several do, the one that works is taken.
+			for (t = 1; t <= 6 && !m; t++) {
+				for (i = 1; i <= c; i++) {
+					if (t == 1) ok = (p[i] == P && h[i] == H && o[i] == O && l[i] == L)
+					else if (t == 2) ok = (p[i] == P && l[i] == L)
+					else if (t == 3) ok = (p[i] == P && h[i] == H && o[i] == O)
+					else if (t == 4) ok = (h[i] == H && o[i] == O)
+					else if (t == 5) ok = (h[i] == H || l[i] == L)
+					else ok = 1
+					if (ok && m < 6) w[++m] = i
+				}
+				if (m) how = (t == 1 ? (F != "" ? "protocol, address, port and name" : "same") : t == 2 ? "protocol and name" : t == 3 ? "protocol, address and port" : t == 4 ? "address and port" : t == 5 ? "address or name" : "first")
+			}
+			if (m) { print how > "/dev/stderr"; for (i = 1; i <= m; i++) print r[w[i]] }
 		}' 2>"$ZGZ_RUN/resolve.how")"
 	[ -n "$_rec" ] || return 1
 	_how="$(cat "$ZGZ_RUN/resolve.how" 2>/dev/null)"
 	rm -f "$ZGZ_RUN/resolve.how"
+	# Several alike: the first of them that carries a request - asked once
+	# for one list, not at every start that reads the reference again.
+	if [ "$(printf '%s\n' "$_rec" | wc -l)" -gt 1 ]; then
+		_rkey="$1 $(printf '%s\n' "$_rec" | md5sum | cut -c1-32)"
+		_rcache="$ZGZ_RUN/resolve.cache"
+		if [ "$(head -1 "$_rcache" 2>/dev/null)" = "$_rkey" ]; then
+			_rec="$(sed -n 2p "$_rcache")"
+		else
+			_rec="$(printf '%s\n' "$_rec" | "$ZGZ_LIB/zgz-test" first 2>/dev/null)" ||
+				_rec="$(printf '%s\n' "$_rec" | head -1)"
+			[ -n "$_rec" ] && printf '%s\n%s\n' "$_rkey" "$_rec" > "$_rcache"
+		fi
+		[ -n "$_rec" ] || return 1
+	fi
 	case "$_how" in
 		same) : ;;
-		first) log "the chosen node of subscription $_rs is no longer on its list - using its first node, $(printf '%s' "$_rec" | cut -f2)" ;;
+		first) log "the chosen node of subscription $_rs is no longer on its list - using one of its nodes that works, $(printf '%s' "$_rec" | cut -f2)" ;;
 		*) log "the chosen node of subscription $_rs was found again by $_how: $(printf '%s' "$_rec" | cut -f2)" ;;
 	esac
 	# The subscription's pre-proxy, as its nodes are used everywhere else.

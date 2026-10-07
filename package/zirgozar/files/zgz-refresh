@@ -106,6 +106,9 @@ if tunnel_running; then
 
 	log "the tunnel is up but has carried nothing twice running - choosing again"
 	rm -f "$ZGZ_RUN/health.fail"
+	# A subscription's node found again by testing its look-alikes is tested
+	# again: the one that worked then may be the one that does not now.
+	rm -f "$ZGZ_RUN/resolve.cache"
 	exec "$CONNECT" force
 fi
 
