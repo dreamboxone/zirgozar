@@ -127,8 +127,13 @@ method_state() {
 		cmp -s "$ZGZ_BEST_META" "$_ex.meta" 2>/dev/null || _ex=""
 	fi
 
+	# A fingerprint of the web pages as they are on the router, for the pages
+	# themselves to notice that the copy the browser kept is not this one -
+	# after an update, and after a file was replaced by hand alike.
+	_ui="$(ls -ln --full-time /www/luci-static/resources/view/zirgozar /www/luci-static/resources/zirgozar 2>/dev/null | md5sum 2>/dev/null | cut -c1-12)"
+
 	uci -q show zirgozar.config 2>/dev/null | LC_ALL=C awk \
-		-v exitf="$_ex" \
+		-v exitf="$_ex" -v uistamp="$_ui" \
 		-v running="$running" -v connected="$connected" -v autostart="$autostart" \
 		-v backend="$backend" -v geo="$geo" -v pw="$pw" -v bridge_on="$bridge_on" -v cpath="$cpath" \
 		-v vfile="$ZGZ_VERSION_FILE" -v sfile="$ZGZ_STATUS" -v mfile="$ZGZ_MESSAGE" -v jfile="$JOB" \
@@ -177,7 +182,7 @@ method_state() {
 			bool("running", running); bool("connected", connected); bool("enabled", en); bool("autostart", autostart)
 			str("status", whole(sfile)); str("message", whole(mfile)); str("job", whole(jfile))
 			str("server", M["label"]); str("protocol", M["protocol"]); str("host", M["host"]); int_("latency_ms", M["latency_ms"])
-			str("exit_cc", X["cc"]); str("exit_ip", X["ip"])
+			str("exit_cc", X["cc"]); str("exit_ip", X["ip"]); str("ui", uistamp)
 			str("phase", P["phase"]); int_("total", P["total"]); int_("done", P["done"]); int_("alive", P["alive"]); int_("tested", P["tested"])
 			str("core_path", ("path" in C && C["path"] != "") ? C["path"] : cpath)
 			str("core_name", (C["name"] != "") ? C["name"] : "xray")

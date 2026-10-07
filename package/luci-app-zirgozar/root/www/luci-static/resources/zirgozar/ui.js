@@ -96,15 +96,27 @@ var OWN_FILES = [ 'zirgozar/ui', 'zirgozar/i18n', 'zirgozar/status', 'zirgozar/q
 	'view/zirgozar/update', 'view/zirgozar/traffic', 'view/zirgozar/geoview', 'view/zirgozar/acl',
 	'view/zirgozar/log' ];
 
-function freshen(installed) {
+/* The version is not enough on its own: a file replaced on the router without
+   a new version - a fix put in place by hand - left the browser with the old
+   one for days. So the router also gives a fingerprint of the files as they
+   are, and a fingerprint this browser has not seen is a reason to fetch them
+   again too. */
+function freshen(installed, stamp) {
 	var have = String(BUILD).replace(/-\d+$/, ''), want = String(installed).replace(/-r\d+$/, '');
-	if (!want || have == want) return;
-	var key = 'zirgozar-freshened-' + want;
-	try { if (window.sessionStorage.getItem(key)) return; window.sessionStorage.setItem(key, '1'); } catch (e) { return; }
+	var seen = null;
+	try { seen = window.localStorage.getItem('zirgozar-ui'); } catch (e) {}
+	var stale = (want && have != want) || (stamp && seen != stamp);
+	if (!stale) return;
+	var key = 'zirgozar-freshened-' + want + '-' + (stamp || '');
+	try {
+		if (window.sessionStorage.getItem(key)) return;
+		window.sessionStorage.setItem(key, '1');
+		if (stamp) window.localStorage.setItem('zirgozar-ui', stamp);
+	} catch (e) { return; }
 	var v = L.env.resource_version ? '?v=' + L.env.resource_version : '';
 	Promise.all(OWN_FILES.map(function(f) {
 		return fetch(L.env.base_url + '/' + f + '.js' + v, { cache: 'reload' }).catch(function() {});
-	})).then(function() { location.reload(); });
+	}).concat([ fetch(L.resource('zirgozar/theme.css') + '?v=' + BUILD, { cache: 'reload' }).catch(function() {}) ])).then(function() { location.reload(); });
 }
 
 function btn(text, tone, fn, ico) {
@@ -308,7 +320,7 @@ function hero(root, version) {
 	callState().then(function(st) {
 		if (!st || !st.version) return;
 		if (!version) ver.textContent = versionText(st.version);
-		freshen(st.version);
+		freshen(st.version, st.ui);
 	}).catch(function() {});
 
 	var heroLogo = logoImg('logo-light.png', 60);
