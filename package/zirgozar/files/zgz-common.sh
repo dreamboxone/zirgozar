@@ -284,11 +284,27 @@ core_engine() {
 	return 0
 }
 
+# The engine that is to carry the tunnel: the one in the settings - except
+# that a node Xray cannot speak at all (OpenVPN, AmneziaWG, hysteria2, tuic)
+# is carried by sing-box from end to end, when there is a sing-box that can.
+# Xray stands aside rather than sending everything through sing-box as a
+# SOCKS port beside it: one core, doing the whole job, as PassWall2 does with
+# a node whose type is sing-box. Only when there is no such sing-box does the
+# old arrangement - Xray, with sing-box as a helper - remain.
+wanted_engine() {
+	_we="$(core_engine)"
+	if [ "$_we" = "xray" ] && [ -s "$ZGZ_ETC/bridge.json" ] && [ -x "$(engine_singbox_path)" ]; then
+		_we=singbox
+	fi
+	echo "$_we"
+	return 0
+}
+
 active_engine() {
 	case "$(sed -n 's/^name=//p' "$ZGZ_RUN/core.info" 2>/dev/null | tail -1)" in
 		sing-box|sing-box-lx) echo singbox ;;
 		xray) echo xray ;;
-		*) core_engine ;;
+		*) wanted_engine ;;
 	esac
 	return 0
 }
@@ -297,7 +313,7 @@ active_engine() {
 # the log.
 core_label() {
 	if [ "$1" = "singbox" ]; then
-		if [ "$(cfg core_engine xray)" = "singbox-lx" ]; then echo sing-box-lx; else echo sing-box; fi
+		case "$(engine_singbox_path)" in *-lx) echo sing-box-lx ;; *) echo sing-box ;; esac
 	else
 		echo xray
 	fi
@@ -357,12 +373,24 @@ core_accepts() {
 # The sing-box to run: the file the settings name, or this program's own copy.
 # Never another package's - see core_dir below. Which of the two sing-box
 # files it is depends on the setting: the official one, or sing-box-lx.
+#
+# With Xray in the settings, it is the sing-box for a node Xray cannot speak:
+# sing-box-lx for AmneziaWG, whose obfuscation only it has, and otherwise the
+# official one, or sing-box-lx when that is the only one there is.
 engine_singbox_path() {
-	if [ "$(cfg core_engine xray)" = "singbox-lx" ]; then
-		singbox_lx_path
-	else
-		singbox_path
-	fi
+	case "$(cfg core_engine xray)" in
+		singbox-lx) singbox_lx_path ;;
+		singbox|sing-box) singbox_path ;;
+		*)
+			if grep -q '"type"[ 	]*:[ 	]*"amneziawg"' "$ZGZ_ETC/bridge.json" 2>/dev/null; then
+				singbox_lx_path
+			elif [ -x "$(singbox_path)" ] || [ ! -x "$(singbox_lx_path)" ]; then
+				singbox_path
+			else
+				singbox_lx_path
+			fi
+			;;
+	esac
 	return 0
 }
 

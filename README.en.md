@@ -177,7 +177,6 @@ At the top, PassWall2's row of tiles:
 | Tile | What it shows |
 |---|---|
 | **Core Xray** | The core's name beside the word, and under it **RUNNING** in green or **NOT RUNNING** in red. Rest the pointer on it for its version |
-| **Helper core** | Only while a config needs sing-box or hysteria as a helper |
 | **Cloudflare / Google / GitHub Connection** | Press one: a single request is made through whatever the router's traffic goes through, and the time it took is shown — green under a second, amber under two, red above, or *Problem detected!* |
 
 Under them the **Status** card: whether the tunnel is connected, which config
@@ -390,9 +389,9 @@ fingerprint or CertName, and those are left out.
 `DNS` are deliberately ignored: routing and name lookups are Zirgozar's own
 settings.
 
-**OpenVPN.** A whole `.ovpn` profile can be added by hand: the servers, `proto`, the certificates in `<ca>`, `<cert>` and `<key>`, `tls-crypt`, `tls-crypt-v2` and `tls-auth`, `verify-x509-name`, the ciphers and `auth`, compression, and a user name and password inside `<auth-user-pass>`. A profile that wants a user name and password without carrying them, or whose private key has a pass phrase, gets those in the edit window of its config - the pass phrase needs `openssl-util`, which *Router requirements* installs. sing-box carries it, so it needs a sing-box on the router: with Xray as the engine a helper runs it as a local SOCKS port, with a sing-box engine it is dialled directly. Scripts, pushed routes and DNS in the profile are ignored, and a profile with no certificate authority (a static key) is not read. Like hysteria2 it is chosen by hand: the automatic ranking does not measure it.
+**OpenVPN.** A whole `.ovpn` profile can be added by hand: the servers, `proto`, the certificates in `<ca>`, `<cert>` and `<key>`, `tls-crypt`, `tls-crypt-v2` and `tls-auth`, `verify-x509-name`, the ciphers and `auth`, compression, and a user name and password inside `<auth-user-pass>`. A profile that wants a user name and password without carrying them, or whose private key has a pass phrase, gets those in the edit window of its config - the pass phrase needs `openssl-util`, which *Router requirements* installs. sing-box carries it, so it needs a sing-box on the router: while this config is chosen, sing-box carries the whole tunnel by itself and Xray stands aside, even with Xray as the active core. Scripts, pushed routes and DNS in the profile are ignored, and a profile with no certificate authority (a static key) is not read. Like hysteria2 it is chosen by hand: the automatic ranking does not measure it.
 
-**AmneziaWG.** A WireGuard `.conf` that carries any of the AmneziaWG lines - `Jc`, `Jmin`, `Jmax`, `S1` to `S4`, `H1` to `H4` (a number or a range) and the decoy packets `I1` to `I5` - is an AmneziaWG node, version 2 or 3. Xray cannot speak it, and neither can the official sing-box: it is carried by [sing-box-lx](https://github.com/Leadaxe/sing-box-lx). With Xray as the engine a helper sing-box-lx runs it as a local SOCKS port; with the sing-box-lx engine it is dialled directly. Without sing-box-lx installed the page says so. Chosen by hand, like hysteria2 and OpenVPN.
+**AmneziaWG.** A WireGuard `.conf` that carries any of the AmneziaWG lines - `Jc`, `Jmin`, `Jmax`, `S1` to `S4`, `H1` to `H4` (a number or a range) and the decoy packets `I1` to `I5` - is an AmneziaWG node, version 2 or 3. Xray cannot speak it, and neither can the official sing-box: it is carried by [sing-box-lx](https://github.com/Leadaxe/sing-box-lx). While this config is chosen, sing-box-lx carries the whole tunnel by itself and Xray stands aside. Without sing-box-lx installed the page says so. Chosen by hand, like hysteria2 and OpenVPN.
 
 **All configs** — the list at the bottom: every config the router knows about, measured
 first. **TCPing** is filled in for all of them; **URL Test** only for those that
@@ -761,7 +760,7 @@ happens again.
 | … answered a handshake, but none could complete a request | The configs are there, the traffic is not getting through | Choose again, or another list |
 | Nothing in the list could be read as a node | The subscription's format was not recognised | Check the subscription |
 | There is no node list yet | No subscription read and no config of your own | Add one on Configs |
-| The chosen node speaks hysteria2/tuic, which Xray cannot | A helper core is needed | Install sing-box or hysteria on App Update |
+| The chosen node speaks hysteria2, tuic, OpenVPN or AmneziaWG, which Xray cannot | sing-box is needed to carry the whole tunnel | Install sing-box (sing-box-lx for AmneziaWG) on App Update |
 | The helper for this node's protocol would not start | The helper core did not run | Check Runtime Logs, or pick another config |
 | The tunnel process started but never accepted connections | The core ran and never listened | Look at Runtime Logs |
 | The node chosen in Basic Settings cannot be read | The config set as Node is broken or gone | Choose another, or set it back to Auto |

@@ -93,7 +93,8 @@ start_service() {
 	# Which engine: what the settings say, unless that cannot run this - no
 	# sing-box on the router, or a node it cannot speak - in which case Xray,
 	# because a tunnel on the other engine beats no tunnel.
-	ENGINE="$(core_engine)"
+	ENGINE="$(wanted_engine)"
+	[ "$ENGINE" != "$(core_engine)" ] && log_step "This node is not one Xray speaks - $(core_title singbox) carries the tunnel by itself"
 	if [ "$ENGINE" = "singbox" ]; then
 		if core_config singbox > "$ZGZ_CONFIG_JSON" 2>"$ZGZ_RUN/sbconfig.err" &&
 		   PROG="$(find_engine_singbox "$ZGZ_CONFIG_JSON")"; then
@@ -366,7 +367,7 @@ reload_service() {
 	# running core reads the other format, so it goes the whole way round.
 	if [ "$(cfg_bool enabled 0)" != "1" ] || [ ! -f "$STARTED_FLAG" ] ||
 	   ! tunnel_running || { [ "$(active_engine)" = "xray" ] && "$BRIDGE" needed 2>/dev/null; } ||
-	   [ "$(core_engine)" != "$(active_engine)" ]; then
+	   [ "$(wanted_engine)" != "$(active_engine)" ]; then
 		restart
 		return
 	fi

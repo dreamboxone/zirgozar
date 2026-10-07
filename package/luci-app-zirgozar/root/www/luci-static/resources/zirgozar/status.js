@@ -302,12 +302,6 @@ function renderState(st) {
 	   one line, and under it whether it is running, in green or in red. The
 	   version is there when the pointer rests on the tile. */
 	coreTile('pwp-core', _('Core'), coreName(st.core_name), st.core_version, st.core_running);
-	var bridge = byId('pwp-bridge');
-	if (bridge) {
-		bridge.style.display = st.bridge ? '' : 'none';
-		if (st.bridge)
-			coreTile('pwp-bridge', _('Helper core'), coreName(st.bridge), st.bridge_version, st.bridge_running);
-	}
 
 	/* Anything the user has to act on - and only that. The cross puts it away:
 	   a stored message is cleared, and one worked out fresh each time is
@@ -424,7 +418,6 @@ return baseclass.extend({
 
 		var tiles = E('div', { 'class': 'mk-grid mk-metrics', 'style': 'margin-bottom:18px' }, [
 			tile('pwp-core', pui.icon('cpu'), '#3b82f6', _('Core'), '-'),
-			tile('pwp-bridge', pui.icon('layers'), '#8b5cf6', _('Helper core'), '-'),
 			tile('pwp-chk-cf', brand('cloudflare'), '#f59e0b', _('Cloudflare Connection'), _('Touch Check'),
 				function() { check('pwp-chk-cf', 'https://www.cloudflare.com/cdn-cgi/trace'); }),
 			tile('pwp-chk-google', brand('google'), '#10b981', _('Google Connection'), _('Touch Check'),
@@ -432,8 +425,6 @@ return baseclass.extend({
 			tile('pwp-chk-github', brand('github'), '#6366f1', _('GitHub Connection'), _('Touch Check'),
 				function() { check('pwp-chk-github', 'https://github.com'); })
 		]);
-		/* The helper core only has a tile while a node needs one. */
-		tiles.querySelector('#pwp-bridge').style.display = 'none';
 
 		var status = pui.card(_('Status'), 'pulse', '#10b981', E('div', {}, [
 			E('div', { 'class': 'mk-row', 'style': 'justify-content:space-between;margin:0 0 12px' }, [
