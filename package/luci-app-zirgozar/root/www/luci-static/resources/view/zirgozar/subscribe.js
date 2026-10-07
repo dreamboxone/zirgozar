@@ -22,7 +22,6 @@
 var _ = i18n.tr;
 
 var callSubs   = rpc.declare({ object: 'luci.zirgozar', method: 'subs', expect: { '': {} } });
-var callState = rpc.declare({ object: 'luci.zirgozar', method: 'state', expect: { '': {} } });
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
 
@@ -158,32 +157,6 @@ function filterModes(o, withGlobal) {
 function done(b, r, ok) {
 	if (r && r.error) pui.note(b, _(r.error), 'error');
 	else pui.note(b, ok, 'ok');
-}
-
-/* The button's own arrow turns for as long as the router is reading, in
-   place of a sentence saying it is. Reading is a job on the router: it is
-   waited for to start - a few seconds at most - and then to end, and the
-   counts are drawn again when it has. Five minutes is the most it waits. */
-function spinUntilRead(b) {
-	var started = Date.now(), seen = false;
-	b.classList.add('mk-running');
-	b.disabled = true;
-	function stop() {
-		b.classList.remove('mk-running');
-		b.disabled = false;
-		return callSubs().then(renderInfo).catch(function() {});
-	}
-	function check() {
-		return callState().then(function(st) {
-			var busy = !!(st && st.job);
-			if (busy) seen = true;
-			var waited = Date.now() - started;
-			if ((!busy && (seen || waited > 5000)) || waited > 300000)
-				return stop();
-			window.setTimeout(check, 1500);
-		}, function() { window.setTimeout(check, 3000); });
-	}
-	window.setTimeout(check, 700);
 }
 
 return view.extend({
@@ -391,7 +364,7 @@ return view.extend({
 				var b = ev.currentTarget;
 				return callAction('refresh_nodes', sid).then(function(r) {
 					if (r && r.error) pui.note(b, _(r.error), 'error');
-					else spinUntilRead(b);
+					else pui.spinWhileBusy(b, function() { return callSubs().then(renderInfo); });
 				});
 			}, 'refresh');
 		});
@@ -430,7 +403,7 @@ return view.extend({
 						var b = ev.currentTarget;
 						return callAction('refresh_nodes', '').then(function(r) {
 							if (r && r.error) pui.note(b, _(r.error), 'error');
-							else spinUntilRead(b);
+							else pui.spinWhileBusy(b, function() { return callSubs().then(renderInfo); });
 						});
 					}, 'refresh'),
 					pui.btn(_('Delete All Subscribe Node'), 'danger mk-small', function(ev) {

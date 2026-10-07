@@ -1012,8 +1012,9 @@ return view.extend({
 					E('span', { 'style': 'flex:1 1 auto' }),
 					pui.btn(_('Check all'), 'soft-blue mk-small', function(ev) {
 						var b = ev.currentTarget;
-						return callAction('measure_all', '').then(function() {
-							pui.note(b, _('Knocking on every node once. The TCPing column will fill in as answers come back.'), 'info');
+						return callAction('measure_all', '').then(function(r) {
+							if (r && r.error) pui.note(b, _(r.error), 'error');
+							else pui.spinWhileBusy(b, function() { return callNodes().then(renderNodes); });
 						});
 					}, 'refresh')
 				]),

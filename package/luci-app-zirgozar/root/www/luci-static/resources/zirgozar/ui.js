@@ -415,7 +415,34 @@ function page(children, opts) {
 	return root;
 }
 
+/* A button whose own arrow turns for as long as a job it started runs on the
+   router, in place of a sentence saying it is running. The job is waited for
+   to start - a few seconds at most - and then to end; five minutes is the
+   most it waits. done() runs once it has. */
+function spinWhileBusy(b, done) {
+	var started = Date.now(), seen = false;
+	b.classList.add('mk-running');
+	b.disabled = true;
+	function stop() {
+		b.classList.remove('mk-running');
+		b.disabled = false;
+		if (done) return Promise.resolve(done()).catch(function() {});
+	}
+	function check() {
+		return callState().then(function(st) {
+			var busy = !!(st && st.job);
+			if (busy) seen = true;
+			var waited = Date.now() - started;
+			if ((!busy && (seen || waited > 5000)) || waited > 300000)
+				return stop();
+			window.setTimeout(check, 1500);
+		}, function() { window.setTimeout(check, 3000); });
+	}
+	window.setTimeout(check, 700);
+}
+
 return baseclass.extend({
+	spinWhileBusy: spinWhileBusy,
 	icon: icon,
 	btn: btn,
 	card: card,
