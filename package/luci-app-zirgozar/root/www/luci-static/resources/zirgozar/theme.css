@@ -54,6 +54,10 @@
 .mk-btn:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
 .mk-btn:disabled{opacity:.55;cursor:not-allowed}
 .mk-btn.mk-running .mk-ico{animation:mk-spin 1s linear infinite}
+/* LuCI's own busy spinner, should anything still put it on one of these: the
+   icon turning is the sign here, not a second circle beside the label. */
+.mk-btn.spinning{padding-left:revert!important}
+.mk-btn.spinning::before,.mk-btn.spinning::after{display:none!important}
 @keyframes mk-spin{to{transform:rotate(360deg)}}
 .mk-btn.primary{background:linear-gradient(135deg,#3b82f6,#6366f1)}
 .mk-btn.success{background:linear-gradient(135deg,#10b981,#059669)}

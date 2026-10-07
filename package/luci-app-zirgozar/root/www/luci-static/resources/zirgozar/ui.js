@@ -119,11 +119,29 @@ function freshen(installed, stamp) {
 	}).concat([ fetch(L.resource('zirgozar/theme.css') + '?v=' + BUILD, { cache: 'reload' }).catch(function() {}) ])).then(function() { location.reload(); });
 }
 
+/* Not ui.createHandlerFn: that marks a busy button with LuCI's own spinner,
+   a second circle turning beside the label. Here a busy button turns its own
+   icon instead, and is not pressed twice. A job it starts on the router keeps
+   it turning past this - see spinWhileBusy, which owns the button meanwhile. */
 function btn(text, tone, fn, ico) {
 	return E('button', {
 		'type': 'button',
 		'class': 'mk-btn ' + (tone || 'primary'),
-		'click': ui.createHandlerFn(null, fn)
+		'click': function(ev) {
+			var b = ev.currentTarget;
+			if (b.disabled) return;
+			var r;
+			try { r = fn(ev); } catch (e) { return; }
+			if (!r || typeof r.then != 'function') return;
+			b.classList.add('mk-running');
+			b.disabled = true;
+			var end = function() {
+				if (b.zgzBusy) return;
+				b.classList.remove('mk-running');
+				b.disabled = false;
+			};
+			r.then(end, end);
+		}
 	}, [ ico ? icon(ico) : '', E('span', {}, text) ]);
 }
 
@@ -421,9 +439,11 @@ function page(children, opts) {
    most it waits. done() runs once it has. */
 function spinWhileBusy(b, done) {
 	var started = Date.now(), seen = false;
+	b.zgzBusy = true;
 	b.classList.add('mk-running');
 	b.disabled = true;
 	function stop() {
+		b.zgzBusy = false;
 		b.classList.remove('mk-running');
 		b.disabled = false;
 		if (done) return Promise.resolve(done()).catch(function() {});
