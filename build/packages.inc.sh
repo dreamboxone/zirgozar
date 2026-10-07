@@ -7,7 +7,7 @@
 # packages.inc.sh - what goes into a package, shared by the .apk and .ipk
 # builders so the two formats can never drift apart.
 
-VERSION=2.1.0
+VERSION=2.2.0
 RELEASE=1
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
@@ -46,7 +46,7 @@ LUCI_DESC="Web interface for Zirgozar: connect, servers and subscriptions, traff
 CRON_LIST='*/15 * * * * /usr/libexec/zgz-refresh >/dev/null 2>&1'
 CRON_STATS='*/5 * * * * /usr/libexec/zgz-stats sample >/dev/null 2>&1'
 
-ZGZ_SCRIPTS="zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-stats zgz-test zgz-geo zgz-cores zgz-deps zgz-bridge zgz-router zgz-sbconfig zgz-sbstats zgz-ovpnkey"
+ZGZ_SCRIPTS="zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-stats zgz-test zgz-geo zgz-cores zgz-deps zgz-bridge zgz-router zgz-sbconfig zgz-sbstats zgz-ovpnkey zgz-server"
 
 # stage_zgz <staging-root> <source-root> <xray-binary>
 stage_zgz() {
@@ -62,11 +62,13 @@ stage_zgz() {
 	           "$i/usr/libexec/rpcd" "$i/etc/zirgozar" "$i/etc/zirgozar/geo"
 	install -m 0755 "$core"            "$i/usr/libexec/zirgozar/xray"
 	install -m 0644 "$f/zirgozar.config"   "$i/etc/config/zirgozar"
+	install -m 0644 "$f/zirgozar_server.config" "$i/etc/config/zirgozar_server"
 	# An untouched copy, for Restore defaults in Basic Settings: the one in
 	# /etc/config is the reader's from the first save on.
 	install -d "$i/usr/share/zirgozar"
 	install -m 0644 "$f/zirgozar.config"   "$i/usr/share/zirgozar/zirgozar.config"
 	install -m 0755 "$f/zirgozar.init"     "$i/etc/init.d/zirgozar"
+	install -m 0755 "$f/zirgozar-server.init" "$i/etc/init.d/zirgozar-server"
 	install -m 0644 "$f/zgz-common.sh" "$i/usr/libexec/zgz-common.sh"
 	install -m 0755 "$f/luci.zirgozar"     "$i/usr/libexec/rpcd/luci.zirgozar"
 
@@ -83,7 +85,7 @@ stage_zgz() {
 	ver="$(dirname "$core")/xray-version.txt"
 	[ -s "$ver" ] && install -m 0644 "$ver" "$i/etc/zirgozar/xray-version"
 
-	echo "/etc/config/zirgozar" > "$work/zirgozar.conffiles"
+	printf '%s\n' /etc/config/zirgozar /etc/config/zirgozar_server > "$work/zirgozar.conffiles"
 
 	cat > "$work/zirgozar.postinst" <<EOF
 # 'timeout' is not on every OpenWrt image - a stock 25.12 does not have it,
@@ -183,6 +185,7 @@ if ! ubus list 2>/dev/null | grep -q '^luci.zirgozar\$'; then
 fi
 # Always in the boot sequence; the main switch decides whether it runs.
 bounded 15 /etc/init.d/zirgozar enable >/dev/null 2>&1 || true
+bounded 15 /etc/init.d/zirgozar-server enable >/dev/null 2>&1 || true
 exit 0
 EOF
 
@@ -195,6 +198,8 @@ EOF
 bounded() {
 	if timeout 5 true >/dev/null 2>&1; then timeout "$@"; else shift; "$@"; fi
 }
+bounded 20 /etc/init.d/zirgozar-server stop >/dev/null 2>&1 || true
+bounded 15 /etc/init.d/zirgozar-server disable >/dev/null 2>&1 || true
 bounded 20 /etc/init.d/zirgozar stop >/dev/null 2>&1 || true
 bounded 15 /etc/init.d/zirgozar disable >/dev/null 2>&1 || true
 sed -i '\|/usr/libexec/zgz-|d' /etc/crontabs/root 2>/dev/null
@@ -212,7 +217,7 @@ stage_luci() {
 	install -d "$i/www/luci-static/resources/view/zirgozar" \
 	           "$i/www/luci-static/resources/zirgozar" \
 	           "$i/usr/share/luci/menu.d" "$i/usr/share/rpcd/acl.d"
-	for v in settings nodes node subscribe other update traffic geoview acl log; do
+	for v in settings nodes node subscribe other server update traffic geoview acl log; do
 		install -m 0644 "$l/www/luci-static/resources/view/zirgozar/$v.js" \
 			"$i/www/luci-static/resources/view/zirgozar/$v.js"
 	done
@@ -226,6 +231,9 @@ stage_luci() {
 		"$i/www/luci-static/resources/zirgozar/ui.js"
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/status.js" \
 		"$i/www/luci-static/resources/zirgozar/status.js"
+	# The QR code of a node's link, drawn in the browser - no CDN to reach.
+	install -m 0644 "$l/www/luci-static/resources/zirgozar/qr.js" \
+		"$i/www/luci-static/resources/zirgozar/qr.js"
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/theme.css" \
 		"$i/www/luci-static/resources/zirgozar/theme.css"
 	# The logo drawn light, for the dark banner every page opens with.

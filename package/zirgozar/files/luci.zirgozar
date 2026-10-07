@@ -62,90 +62,107 @@ run_job() {
 # --------------------------------------------------------------------- state
 
 method_state() {
-	local running=0 connected=0 enabled autostart rules backend
+	local running=0 connected=0 active=0 autostart=0 backend geo=0 pw=0 bridge_on=0 cpath=""
 
+	# Asked three times a minute while a page is open, on routers where every
+	# process started costs ten or twenty milliseconds. So the few questions
+	# that need a program are asked once each, and everything that is only a
+	# file - the chosen node, the progress, the core - is read by one awk that
+	# writes the answer, rather than by a sed and a tail per field and a shell
+	# JSON library on top: that came to three quarters of a second.
 	tunnel_running && running=1
 
-	# Asked once. This runs every few seconds while the page is open, and each
-	# call is a process and a trip into the kernel's ruleset.
-	rules="$("$RULES" status 2>/dev/null)"
-	backend="$(printf '%s\n' "$rules" | sed -n 's/^backend:[ \t]*//p' | head -1)"
+	backend="$(firewall_backend)"
+	case "$backend" in
+		nft) nft list table inet zirgozar >/dev/null 2>&1 && active=1 ;;
+		ipt) iptables -t mangle -S ZGZ_PRE >/dev/null 2>&1 && active=1 ;;
+	esac
 
 	# Connected has to mean traffic is going through the tunnel, not merely
 	# that a process is alive. The core can be running perfectly with no rules
 	# in front of it, and then every byte leaves exactly as it did before while
 	# the page reports a connection - which is the most misleading thing this
 	# page could possibly do.
-	if [ "$running" = "1" ] && [ -s "$ZGZ_BEST" ] &&
-	   printf '%s\n' "$rules" | grep -q '^active:[ \t]*yes'; then
-		connected=1
-	fi
-
-	enabled="$(cfg enabled 0)"
-	[ "$enabled" = "1" ] && enabled=1 || enabled=0
+	[ "$running" = "1" ] && [ -s "$ZGZ_BEST" ] && [ "$active" = "1" ] && connected=1
 
 	# what `/etc/init.d/zirgozar enabled` tests, done inline so that a busy procd
 	# can never hold this request open
-	autostart=0
 	for l in /etc/rc.d/S??zirgozar; do
 		[ -L "$l" ] && autostart=1
 	done
 
-	json_init
-	json_add_string "version" "$(zgz_version)"
-	json_add_boolean "running" "$running"
-	json_add_boolean "connected" "$connected"
-	json_add_boolean "enabled" "$enabled"
-	json_add_boolean "autostart" "$autostart"
-	json_add_string "status" "$(cat "$ZGZ_STATUS" 2>/dev/null)"
-	json_add_string "message" "$(cat "$ZGZ_MESSAGE" 2>/dev/null)"
-	json_add_string "job" "$(cat "$JOB" 2>/dev/null)"
-
-	# The chosen server. Shown as soon as there is one, not only once it is
-	# carrying traffic: the measurement runs when the page opens precisely so
-	# the reader can see what they are about to connect to.
-	json_add_string "server" "$(meta_get label)"
-	json_add_string "protocol" "$(meta_get protocol)"
-	json_add_string "host" "$(meta_get host)"
-	json_add_int "latency_ms" "$(num "$(meta_get latency_ms)")"
-
-	# Live progress, so the page can show what is actually happening rather
-	# than a timer that guesses.
-	json_add_string "phase" "$(prog_get phase)"
-	json_add_int "total" "$(num "$(prog_get total)")"
-	json_add_int "done" "$(num "$(prog_get done)")"
-	json_add_int "alive" "$(num "$(prog_get alive)")"
-	json_add_int "tested" "$(num "$(prog_get tested)")"
-
-	# The core, as PassWall2 shows it at the top of its page: which one, which
-	# version, and whether it is running. Read from what the service wrote
-	# when it started it rather than by asking the binary, which would mean
-	# starting a core every few seconds to learn its version number.
-	_ci="$ZGZ_RUN/core.info"
-	_cpath="$(sed -n 's/^path=//p' "$_ci" 2>/dev/null | tail -1)"
-	if [ -z "$_cpath" ]; then
+	geo_dir >/dev/null 2>&1 && geo=1
+	passwall_running && pw=1
+	# The core, as PassWall2 shows it at the top of its page, read from what
+	# the service wrote when it started it - not by starting a core every few
+	# seconds to learn its version number. Before any has run, the one that
+	# would be.
+	if [ ! -s "$ZGZ_RUN/core.info" ]; then
 		for _x in $(cfg core_xray '') $(xray_paths); do
-			[ -x "$_x" ] && { _cpath="$_x"; break; }
+			[ -x "$_x" ] && { cpath="$_x"; break; }
 		done
 	fi
-	json_add_string "core_path" "$_cpath"
-	# Which core it is, as the start wrote it down; Xray until one has run.
-	_cname="$(sed -n 's/^name=//p' "$_ci" 2>/dev/null | tail -1)"
-	json_add_string "core_name" "${_cname:-xray}"
-	json_add_string "core_version" "$(sed -n 's/^version=//p' "$_ci" 2>/dev/null | tail -1)"
-	json_add_boolean "core_running" "$running"
-	_bbin="$(sed -n 's/^bridge=//p' "$_ci" 2>/dev/null | tail -1)"
-	json_add_string "bridge" "$(basename "${_bbin:-}" 2>/dev/null)"
-	json_add_string "bridge_version" "$(sed -n 's/^bridge_version=//p' "$_ci" 2>/dev/null | tail -1)"
-	json_add_boolean "bridge_running" "$([ -n "$_bbin" ] && pgrep -f "$ZGZ_BRIDGE_JSON" >/dev/null 2>&1 && echo 1 || echo 0)"
+	if [ -s "$ZGZ_RUN/core.info" ] && grep -q '^bridge=' "$ZGZ_RUN/core.info" 2>/dev/null; then
+		pgrep -f "$ZGZ_BRIDGE_JSON" >/dev/null 2>&1 && bridge_on=1
+	fi
 
-	json_add_string "backend" "$backend"
-	json_add_boolean "route_ir" "$(cfg_bool route_ir 0)"
-	json_add_boolean "stats_enabled" "$(cfg_bool stats_enabled 1)"
-	json_add_boolean "geo_ready" "$(geo_dir >/dev/null 2>&1 && echo 1 || echo 0)"
-	json_add_boolean "passwall" "$(passwall_running && echo 1 || echo 0)"
-	json_add_int "now" "$(date +%s)"
-	json_dump
+	uci -q show zirgozar.config 2>/dev/null | LC_ALL=C awk \
+		-v running="$running" -v connected="$connected" -v autostart="$autostart" \
+		-v backend="$backend" -v geo="$geo" -v pw="$pw" -v bridge_on="$bridge_on" -v cpath="$cpath" \
+		-v vfile="$ZGZ_VERSION_FILE" -v sfile="$ZGZ_STATUS" -v mfile="$ZGZ_MESSAGE" -v jfile="$JOB" \
+		-v meta="$ZGZ_BEST_META" -v prog="$ZGZ_PROGRESS" -v cinfo="$ZGZ_RUN/core.info" '
+		function esc(s) {
+			gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s)
+			gsub(/\n/, "\\n", s); gsub(/\r/, "\\r", s); gsub(/\t/, "\\t", s)
+			return s
+		}
+		function whole(f,   l, out, n) {
+			out = ""; n = 0
+			while ((getline l < f) > 0) out = out (n++ ? "\n" : "") l
+			close(f)
+			return out
+		}
+		# key=value files: the last value of a key wins, as with sed | tail -1.
+		function kv(f, arr,   l, i) {
+			while ((getline l < f) > 0) {
+				i = index(l, "=")
+				if (i > 1) arr[substr(l, 1, i - 1)] = substr(l, i + 1)
+			}
+			close(f)
+		}
+		function num(v) { return (v ~ /^[0-9]+$/) ? v + 0 : 0 }
+		function b(v) { return (v == "1") ? "true" : "false" }
+		function str(k, v) { printf ",\"%s\":\"%s\"", k, esc(v) }
+		function int_(k, v) { printf ",\"%s\":%d", k, num(v) }
+		function bool(k, v) { printf ",\"%s\":%s", k, b(v) }
+		{
+			# zirgozar.config.key='\''value'\''
+			l = $0; sub(/^zirgozar\.config\./, "", l)
+			i = index(l, "=")
+			if (i > 1) { v = substr(l, i + 1); gsub(/^'\''|'\''$/, "", v); cfg[substr(l, 1, i - 1)] = v }
+		}
+		END {
+			kv(meta, M); kv(prog, P); kv(cinfo, C)
+			ver = whole(vfile); if (ver == "") ver = "unknown"
+			en = cfg["enabled"]; en = (en == "1" || en == "on" || en == "true" || en == "yes" || en == "enabled") ? "1" : "0"
+			ri = cfg["route_ir"]; ri = (ri == "1" || ri == "on" || ri == "true" || ri == "yes" || ri == "enabled") ? "1" : "0"
+			se = ("stats_enabled" in cfg) ? cfg["stats_enabled"] : "1"
+			se = (se == "1" || se == "on" || se == "true" || se == "yes" || se == "enabled") ? "1" : "0"
+			bb = C["bridge"]; sub(/.*\//, "", bb)
+			"date +%s" | getline now; close("date +%s")
+			printf "{\"version\":\"%s\"", esc(ver)
+			bool("running", running); bool("connected", connected); bool("enabled", en); bool("autostart", autostart)
+			str("status", whole(sfile)); str("message", whole(mfile)); str("job", whole(jfile))
+			str("server", M["label"]); str("protocol", M["protocol"]); str("host", M["host"]); int_("latency_ms", M["latency_ms"])
+			str("phase", P["phase"]); int_("total", P["total"]); int_("done", P["done"]); int_("alive", P["alive"]); int_("tested", P["tested"])
+			str("core_path", ("path" in C && C["path"] != "") ? C["path"] : cpath)
+			str("core_name", (C["name"] != "") ? C["name"] : "xray")
+			str("core_version", C["version"]); bool("core_running", running)
+			str("bridge", bb); str("bridge_version", C["bridge_version"]); bool("bridge_running", bridge_on)
+			str("backend", backend); bool("route_ir", ri); bool("stats_enabled", se)
+			bool("geo_ready", geo); bool("passwall", pw); int_("now", now)
+			print "}"
+		}'
 }
 
 # ------------------------------------------------------------------- traffic
@@ -289,6 +306,48 @@ method_check() {
 method_lan() {
 	printf '{"interfaces":%s}
 ' "$(interfaces_json)"
+}
+
+# PassWall2's Export Config File: one hand-added node as a whole Xray client
+# configuration, to be run somewhere else - a SOCKS port on 1080 and an HTTP
+# port on 1081 in front of it. The node as saved, with its own chain and the
+# Xray tab, but without what belongs to this router: the firewall's mark and
+# the way the tunnel resolves a server's name.
+method_nodeconfig() {
+	local input sid rec proto out chains ZGZ_OUT_MARK=""
+	read -r input
+	[ -n "$input" ] || input='{}'
+	json_load "$input" 2>/dev/null
+	json_get_var sid sid
+	case "$sid" in
+		''|*[!A-Za-z0-9_]*) fail "no node given"; return ;;
+	esac
+	rec="$(node_records "$sid" 1 2>/dev/null | head -1)"
+	[ -n "$rec" ] || { fail "unreadable"; return; }
+	proto="$(printf '%s' "$rec" | cut -f3)"
+	case "$proto" in
+		hysteria2|hysteria|tuic|openvpn|amneziawg) fail "not xray"; return ;;
+	esac
+	out="$(printf '%s\n' "$rec" | DOMSTRAT="" decorate | cut -f6- | sed 's/^{/{"tag":"proxy",/')"
+	chains="$(chain_outbounds "$out" | while read -r _co; do [ -n "$_co" ] && printf ',%s' "$_co"; done)"
+	json_init
+	json_add_boolean "ok" 1
+	json_add_string "config" "$(printf '{"log":{"loglevel":"warning"},"inbounds":[{"tag":"socks","listen":"127.0.0.1","port":1080,"protocol":"socks","settings":{"udp":true},"sniffing":{"enabled":true,"destOverride":["http","tls","quic"]}},{"tag":"http","listen":"127.0.0.1","port":1081,"protocol":"http"}],"outbounds":[%s%s,{"tag":"direct","protocol":"freedom"},{"tag":"block","protocol":"blackhole"}]}' "$out" "$chains")"
+	json_dump
+}
+
+# The Server-Side page's status line: which of the two cores is running its
+# servers, and why one is not.
+method_server() {
+	_si="$ZGZ_RUN/server.info"
+	json_init
+	json_add_boolean "enabled" "$([ "$(uci -q get zirgozar_server.global.enable)" = "1" ] && echo 1 || echo 0)"
+	json_add_boolean "xray" "$(pgrep -f 'zirgozar-server.json' >/dev/null 2>&1 && echo 1 || echo 0)"
+	json_add_boolean "singbox" "$(pgrep -f 'zirgozar-server-sb.json' >/dev/null 2>&1 && echo 1 || echo 0)"
+	json_add_string "xray_error" "$(sed -n 's/^xray_error=//p' "$_si" 2>/dev/null | tail -1)"
+	json_add_string "singbox_error" "$(sed -n 's/^singbox_error=//p' "$_si" 2>/dev/null | tail -1)"
+	json_add_string "ports" "$("$ZGZ_LIB/zgz-server" ports 2>/dev/null | tr '\n' ' ')"
+	json_dump
 }
 
 # The Geo View page's two questions, answered by zgz-geo with Geoview.
@@ -630,6 +689,17 @@ method_action() {
 			json_dump
 			return
 			;;
+		server_keys)
+			# A REALITY key pair for a server on the Server-Side page.
+			_k="$("$ZGZ_LIB/zgz-server" keys 2>/dev/null)" || _k=""
+			[ -n "$_k" ] || { fail "Xray could not make a key pair."; return; }
+			json_init
+			json_add_boolean "ok" 1
+			json_add_string "private" "${_k%% *}"
+			json_add_string "public" "${_k#* }"
+			json_dump
+			return
+			;;
 		set_lang)
 			# The language button in the page header. A plain uci commit
 			# rather than a LuCI save, which would restart the tunnel for
@@ -687,6 +757,10 @@ case "$1" in
 		json_close_object
 		json_add_object "system";  json_close_object
 		json_add_object "geo";     json_close_object
+		json_add_object "server";  json_close_object
+		json_add_object "nodeconfig"
+			json_add_string "sid" ""
+		json_close_object
 		json_add_object "geoview"
 		json_add_string "action" "lookup"
 		json_add_string "value" ""
@@ -712,6 +786,8 @@ case "$1" in
 			system)  method_system ;;
 			geo)     "$GEO" status 2>/dev/null || echo '{}' ;;
 			geoview) method_geoview ;;
+			nodeconfig) method_nodeconfig ;;
+			server)  method_server ;;
 			action)  method_action ;;
 		esac
 		;;

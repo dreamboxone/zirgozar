@@ -323,6 +323,7 @@ PassWall2's buttons:
 
 | Button | What it does |
 |---|---|
+| **Add** | A new config, in a window where its link or file is pasted |
 | **Add the node via the link** | Paste share links, one per line; each becomes a config of its own, named the way its link names it |
 | **Select all / DeSelect all** | Ticks or clears the box on every row |
 | **Delete select nodes** | Deletes the ticked configs — never the one the tunnel is using right now |
@@ -357,7 +358,13 @@ key, Short Id and Spider X) and transport (RAW, WebSocket, gRPC, HTTP/2,
 HTTPUpgrade, XHTTP with its Extra, mKCP with its Seed). Saving builds the link
 again from the fields; parameters the page has no field for are kept as they
 were. A WireGuard or OpenVPN file, or several links in one config, is edited as
-the text it is. What a link has no place for is at the bottom of the same page,
+the text it is. Above the fields are PassWall2's four buttons: **From Share URL** puts a new
+link or file in place of this config (Save & Apply keeps it), **Build Share
+URL** shows the link the fields make now, ready to copy, **Generate QRCode**
+shows that link as a QR code (drawn in the browser, no internet needed), and
+**Export Config File** downloads the saved config as a whole Xray client
+configuration, with a SOCKS port on 1080 and an HTTP port on 1081 at
+127.0.0.1. What a link has no place for is at the bottom of the same page,
 and applies to configs Xray carries:
 
 | Field | In the file | What it does |
@@ -608,6 +615,31 @@ seconds. The lines are never translated: it is the router's own log.
 
 ---
 
+### 🖥️ 4.10 Server-Side
+
+PassWall2's Server-Side: the router becomes a proxy server, and a phone or
+laptop away from home connects to it - to reach the home network, to use the
+router's tunnel from anywhere, or as a relay. It has a service and a settings
+file of its own (`/etc/init.d/zirgozar-server`, `/etc/config/zirgozar_server`),
+so saving a server never restarts the tunnel, and the servers run whether or
+not the tunnel does.
+
+| Option | In the file | What it does |
+|---|---|---|
+| **Enable** | `global.enable` | The switch for all the servers |
+| **Protocol** | `protocol` | VLESS, VMess, Trojan, Shadowsocks, Socks and HTTP through Xray; Hysteria2 and TUIC through sing-box, which has to be installed on App Update |
+| **Listen Port** / **Bind Local** | `port` / `bind_local` | Each server's port is opened in the firewall while it runs, unless it listens on the router only |
+| **ID / Password** | `uuid` | One per user |
+| **Security** | `security` | None, TLS (certificate and key as files on the router) or REALITY. REALITY needs no certificate and no domain; **Generate** makes its key pair |
+| **Transport** | `transport` | RAW, WebSocket, gRPC, HTTPUpgrade, XHTTP, mKCP |
+| **Outbound** | `outbound` | Where the traffic of whoever connects leaves from: directly, through the Zirgozar tunnel, through a SOCKS server, or through one of the configs added by hand |
+| **Accept LAN Access** | `accept_lan` | Off, the private ranges - the home network and the router itself - are refused |
+| **Address in the share link** | `link_address` | The router's public address or domain for the link; empty is the address the page was opened at |
+
+**Share link** beside each server shows its link and QR code, ready for
+v2rayNG, NekoBox and the like. To connect from outside, the router has to be
+reachable from the internet: a public IP, or a port forward on the modem.
+
 ## 🎯 5. How a config is chosen
 
 You do not need to know this, but if you are curious: choosing happens in **two
@@ -752,6 +784,7 @@ Support and contact: [t.me/routekernel1](https://t.me/routekernel1)
 ## 🗑️ 8. Uninstall
 
 ```sh
+/etc/init.d/zirgozar-server stop
 /etc/init.d/zirgozar stop
 apk del luci-app-zirgozar zirgozar
 ```
@@ -764,7 +797,7 @@ To erase those too, including the routing data, the kept subscriptions and the
 traffic history:
 
 ```sh
-rm -rf /etc/config/zirgozar /etc/zirgozar
+rm -rf /etc/config/zirgozar /etc/config/zirgozar_server /etc/zirgozar
 ```
 
 Nothing else is touched: no firewall zone, no other package's configuration.

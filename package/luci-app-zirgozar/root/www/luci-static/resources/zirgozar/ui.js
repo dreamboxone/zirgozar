@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '2.1.0-1';
+var BUILD = '2.2.0-1';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -51,6 +51,7 @@ var ICONS = {
 	check:    '<path d="M5 12l5 5 9-10"/>',
 	alert:    '<path d="M12 3 2 21h20z"/><path d="M12 10v5M12 18h.01"/>',
 	pulse:    '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+	plus:     '<path d="M12 5v14M5 12h14"/>',
 	link:     '<path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>',
 	code:     '<path d="M8 6l-6 6 6 6M16 6l6 6-6 6"/>',
 	chart:    '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
@@ -89,8 +90,8 @@ function logoImg(file, height, cls) {
    removed. When the router says another version than the one these pages
    were built for, each file is fetched again past the cache and the page
    reloaded, once. */
-var OWN_FILES = [ 'zirgozar/ui', 'zirgozar/i18n', 'zirgozar/status',
-	'view/zirgozar/settings', 'view/zirgozar/nodes', 'view/zirgozar/subscribe', 'view/zirgozar/other',
+var OWN_FILES = [ 'zirgozar/ui', 'zirgozar/i18n', 'zirgozar/status', 'zirgozar/qr',
+	'view/zirgozar/settings', 'view/zirgozar/nodes', 'view/zirgozar/node', 'view/zirgozar/server', 'view/zirgozar/subscribe', 'view/zirgozar/other',
 	'view/zirgozar/update', 'view/zirgozar/traffic', 'view/zirgozar/geoview', 'view/zirgozar/acl',
 	'view/zirgozar/log' ];
 
@@ -334,6 +335,7 @@ var PAGES = [
 	[ 'update',    'download', 'App Update' ],
 	[ 'traffic',   'shield',   'Rule Manage' ],
 	[ 'geoview',   'globe',    'Locator' ],
+	[ 'server',    'cpu',      'Server-Side' ],
 	[ 'acl',      'users',    'Access Control' ],
 	[ 'log',      'book',     'Runtime Logs' ]
 ];

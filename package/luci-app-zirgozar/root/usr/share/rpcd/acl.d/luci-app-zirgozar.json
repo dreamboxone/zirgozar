@@ -3,16 +3,16 @@
 		"description": "Grant access to Zirgozar",
 		"read": {
 			"ubus": {
-				"luci.zirgozar": [ "state", "traffic", "nodes", "subs", "subnodes", "system", "tests", "inuse", "log", "lan", "check", "geo", "geoview" ],
+				"luci.zirgozar": [ "state", "traffic", "nodes", "subs", "subnodes", "system", "tests", "inuse", "log", "lan", "check", "geo", "geoview", "nodeconfig", "server" ],
 				"luci-rpc": [ "getHostHints" ]
 			},
-			"uci": [ "zirgozar" ]
+			"uci": [ "zirgozar", "zirgozar_server" ]
 		},
 		"write": {
 			"ubus": {
 				"luci.zirgozar": [ "action" ]
 			},
-			"uci": [ "zirgozar" ]
+			"uci": [ "zirgozar", "zirgozar_server" ]
 		}
 	}
 }

@@ -14,16 +14,25 @@
  *
  * A node that is a whole file - a WireGuard or AmneziaWG .conf, an OpenVPN
  * profile - or several links pasted into one, is edited as the text it is.
+ *
+ * Above the fields, PassWall2's four buttons: a link to replace this one, the
+ * link the fields now make, that link as a QR code, and the node as a whole
+ * Xray configuration to download.
  */
 'use strict';
 'require view';
 'require form';
 'require uci';
 'require ui';
+'require rpc';
 'require zirgozar.i18n as i18n';
+'require zirgozar.qr as qr';
 'require zirgozar.ui as pui';
 
 var _ = i18n.tr;
+
+var callNodeConfig = rpc.declare({ object: 'luci.zirgozar', method: 'nodeconfig',
+                                   params: [ 'sid' ], expect: { '': {} } });
 
 /* --------------------------------------------------------- the link, apart */
 
@@ -226,6 +235,43 @@ function buildLink(f, name) {
 		return 'tuic://' + enc(f.uuid) + ':' + enc(f.password) + '@' + hp + (qs4 ? '?' + qs4 : '') + frag;
 	}
 	return '';
+}
+
+/* ------------------------------------------------------------ the buttons */
+
+function closeBtn() {
+	return E('button', { 'class': 'btn cbi-button cbi-button-neutral', 'click': ui.hideModal }, _('Close window'));
+}
+
+function linkBox(value, readonly) {
+	return E('textarea', {
+		'rows': 6, 'readonly': readonly ? '' : null,
+		'style': 'width:100%;direction:ltr;text-align:left;font-family:monospace;word-break:break-all',
+		'placeholder': readonly ? null : 'vless://…\nvmess://…'
+	}, value || '');
+}
+
+function copyText(box, b) {
+	box.select();
+	var done = function() { pui.note(b, _('Copied'), 'ok'); };
+	var byHand = function() {
+		try { if (document.execCommand('copy')) return done(); } catch (e) {}
+		pui.note(b, _('Select the text and copy it by hand.'), 'warn');
+	};
+	/* The clipboard API is only there on https; a router is mostly http. */
+	if (navigator.clipboard && window.isSecureContext)
+		navigator.clipboard.writeText(box.value).then(done, byHand);
+	else
+		byHand();
+}
+
+function download(name, text) {
+	var url = URL.createObjectURL(new Blob([ text ], { type: 'application/json' }));
+	var a = E('a', { 'href': url, 'download': name, 'style': 'display:none' });
+	document.body.appendChild(a);
+	a.click();
+	document.body.removeChild(a);
+	window.setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
 }
 
 /* --------------------------------------------------------------- the page */
@@ -530,7 +576,120 @@ return view.extend({
 			};
 		}
 
+		/* The link as the fields now stand, saved or not: the form is read
+		   into the page's copy of the configuration, which is what Save would
+		   send, and the link is put back together from it. */
+		function currentLink(b) {
+			return m.parse().then(function() {
+				var l = String(uci.get('zirgozar', sid, 'link') || '').trim();
+				if (!l) pui.note(b, _('There is no link yet.'), 'warn');
+				return l;
+			}, function() {
+				pui.note(b, _('Some fields are not filled in correctly.'), 'error');
+				return '';
+			});
+		}
+
+		function fromShareUrl() {
+			var box = linkBox('', false);
+			ui.showModal(_('From Share URL'), [
+				E('p', {}, _('The link, or the whole file, takes the place of what this config has now. Press Save & Apply afterwards to keep it.')),
+				box,
+				E('div', { 'class': 'right' }, [
+					closeBtn(), ' ',
+					E('button', {
+						'class': 'btn cbi-button cbi-button-positive',
+						'click': ui.createHandlerFn(null, function(ev) {
+							var b = ev.currentTarget, v = box.value.trim();
+							if (!/:\/\//.test(v) && !/^\s*(\[(interface|peer)\]|client\s*$|remote\s+\S+|<ca>)/im.test(v)) {
+								pui.note(b, _('Please enter the correct link.'), 'error');
+								return;
+							}
+							var p = parseLink(v);
+							uci.set('zirgozar', sid, 'link', v);
+							if (p && p.name) uci.set('zirgozar', sid, 'name', p.name);
+							/* Kept among the unsaved changes, and the page drawn
+							   again from them: the fields are now the new link's. */
+							return uci.save().then(function() {
+								ui.hideModal();
+								location.reload();
+							});
+						})
+					}, _('Import'))
+				])
+			]);
+		}
+
+		function buildShareUrl(ev) {
+			var b = ev.currentTarget;
+			return currentLink(b).then(function(l) {
+				if (!l) return;
+				var box = linkBox(l, true);
+				ui.showModal(_('Build Share URL'), [
+					box,
+					E('div', { 'class': 'right' }, [
+						closeBtn(), ' ',
+						E('button', {
+							'class': 'btn cbi-button cbi-button-action',
+							'click': function(e) { copyText(box, e.currentTarget); }
+						}, _('Copy'))
+					])
+				]);
+			});
+		}
+
+		function generateQr(ev) {
+			var b = ev.currentTarget;
+			return currentLink(b).then(function(l) {
+				if (!l) return;
+				var code = qr.svg(l, 300);
+				if (!code) {
+					pui.note(b, _('This config is too long for a QR code.'), 'error');
+					return;
+				}
+				ui.showModal(_('Generate QRCode'), [
+					E('div', { 'style': 'text-align:center;margin:8px 0 12px' }, [ code ]),
+					E('div', { 'class': 'right' }, [ closeBtn() ])
+				]);
+			});
+		}
+
+		/* The node as saved: the configuration is made on the router, from
+		   what is there. */
+		function exportConfig(ev) {
+			var b = ev.currentTarget;
+			return callNodeConfig(sid).then(function(r) {
+				if (!r || !r.ok || !r.config) {
+					pui.note(b, (r && r.error == 'not xray')
+						? _('Xray does not speak this protocol, so there is no Xray config file for it.')
+						: _('This config could not be read.'), 'error');
+					return;
+				}
+				var text = r.config;
+				try { text = JSON.stringify(JSON.parse(text), null, 2); } catch (e) {}
+				var name = String(uci.get('zirgozar', sid, 'name') || (f && f.name) || sid)
+					.replace(/[\\\/:*?"<>|\s]+/g, '_');
+				download(name + '.json', text + '\n');
+			});
+		}
+
+		function tool(title, fn) {
+			return E('button', { 'class': 'btn cbi-button cbi-button-action', 'click': ui.createHandlerFn(null, fn) }, title);
+		}
+		var tools = E('div', {
+			'style': 'display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin:0 0 14px'
+		}, [
+			tool(_('From Share URL'), fromShareUrl),
+			tool(_('Build Share URL'), buildShareUrl),
+			tool(_('Generate QRCode'), generateQr),
+			tool(_('Export Config File'), exportConfig)
+		]);
+
 		return m.render().then(function(mapEl) {
+			/* Under the page's title, as in PassWall2. */
+			var head = mapEl.querySelector('.cbi-section > h3, .cbi-section > legend');
+			if (head) head.parentNode.insertBefore(tools, head.nextSibling);
+			else mapEl.insertBefore(tools, mapEl.firstChild);
 			return pui.page([
 				E('div', { 'style': 'margin-bottom:12px' }, [
 					E('a', { 'class': 'btn cbi-button', 'href': back }, _('Back to configs'))

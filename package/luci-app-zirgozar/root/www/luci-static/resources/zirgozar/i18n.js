@@ -145,7 +145,7 @@ var FA = {
 		'تفکیک ایران روشن است، ولی داده مسیریابی نیست',
 	'Everything goes through the tunnel': 'همه‌چیز از تونل می‌رود',
 	'PassWall2 is also redirecting traffic — turn one of them off.':
-		'PassWall2 هم دارد ترافیک را منحرف می‌کند — یکی از این دو را خاموش کنید.',
+		'پسوال هم در روتر شما فعال است. پسوال را خاموش نمایید.',
 	'Checking which of %d nodes answer at all — %d so far':
 		'بررسی اینکه از %d کانفیگ کدام‌ها اصلا جواب می‌دهند — تا اینجا %d',
 	'Measuring the %d that answered, best first — %d done':
@@ -766,7 +766,7 @@ var FA = {
 		'همه کانفیگ‌های این اشتراک از طریق کانفیگی که اینجا انتخاب می‌شود وصل می‌شوند.',
 	'Traffic goes through a node of this subscription first and leaves from the one chosen here.':
 		'ترافیک اول از یک کانفیگ این اشتراک عبور می‌کند و از کانفیگی که اینجا انتخاب می‌شود خارج می‌شود.',
-	'Add the node via the link': 'افزودن کانفیگ با لینک',
+	'Add the node via the link': 'افزودن با لینک',
 	'Enter share links, one per line. Subscription links are not supported!': 'لینک‌های کانفیگ را وارد کنید، هر خط یک لینک. لینک اشتراک پذیرفته نمی‌شود!',
 	'Please enter the correct link.': 'لطفا لینک درست وارد کنید.',
 	'None of those could be read as a node.': 'هیچ‌کدام از این‌ها به‌عنوان کانفیگ خوانده نشد.',
@@ -818,7 +818,7 @@ var FA = {
 		'برای همه سایت‌هایی که از فیلترشکن می‌روند آدرس ساختگی داده می‌شود. فقط وقتی کار می‌کند که در برگه DNS، «روش پیدا کردن دامنه‌ها» روی «مستقیم داخل تونل» باشد.',
 	'When the Default row goes to a hand-added node, it is reached through this node first.':
 		'اگر ردیف پیش‌فرض به یک کانفیگ دستی می‌رود، اتصال اول از این کانفیگ رد می‌شود.',
-	'Delete the subscribed node': 'حذف کانفیگ‌های این اشتراک',
+	'Delete the subscribed node': 'حذف کانفیگ‌ها',
 	'Manual subscription': 'به‌روزرسانی دستی',
 	'Reading it now. The count will change when it is done.': 'در حال خواندن. پس از پایان، تعداد به‌روز می‌شود.',
 	'Cloudflare Connection': 'اتصال کلادفلر',
@@ -878,8 +878,23 @@ var FA = {
 	/* -------------------------------------------- the page of one node */
 	'This config is not there any more.': 'این کانفیگ دیگر وجود ندارد.',
 	'Back to configs': 'بازگشت به کانفیگ‌ها',
-	'Node Config': 'تنظیمات نود',
-	'Node Remarks': 'نام نود',
+	'Node Config': 'ویرایش کانفیگ',
+	'From Share URL': 'از لینک اشتراک‌گذاری',
+	'Build Share URL': 'ساخت لینک اشتراک‌گذاری',
+	'Generate QRCode': 'ساخت QR کد',
+	'Export Config File': 'خروجی فایل کانفیگ',
+	'The link, or the whole file, takes the place of what this config has now. Press Save & Apply afterwards to keep it.':
+		'این لینک، یا کل فایل، جای آنچه این کانفیگ الان دارد را می‌گیرد. برای ماندگار شدن، بعد از آن «ذخیره و اعمال» را بزنید.',
+	'Import': 'وارد کردن',
+	'Copied': 'کپی شد',
+	'Select the text and copy it by hand.': 'متن را انتخاب کنید و خودتان کپی کنید.',
+	'There is no link yet.': 'هنوز لینکی نیست.',
+	'Some fields are not filled in correctly.': 'بعضی از فیلدها درست پر نشده‌اند.',
+	'This config is too long for a QR code.': 'این کانفیگ برای QR کد بیش از حد طولانی است.',
+	'Xray does not speak this protocol, so there is no Xray config file for it.':
+		'Xray این پروتکل را پشتیبانی نمی‌کند، پس فایل کانفیگ Xray برای آن ساخته نمی‌شود.',
+	'This config could not be read.': 'این کانفیگ خوانده نشد.',
+	'Node Remarks': 'نام کانفیگ',
 	'A share link, several of them one per line, a whole WireGuard .conf file or an OpenVPN .ovpn profile.':
 		'یک لینک اشتراک‌گذاری، چند لینک هر کدام در یک خط، یک فایل کامل WireGuard ‏.conf یا یک پروفایل OpenVPN ‏.ovpn.',
 	'Address (Support Domain Name)': 'آدرس (دامنه هم قبول است)',
@@ -900,7 +915,7 @@ var FA = {
 	'Obfuscation': 'مبهم‌سازی (obfs)',
 	'Obfuscation password': 'رمز مبهم‌سازی',
 	'Congestion control': 'کنترل ازدحام',
-	'Transport': 'انتقال (Transport)',
+	'Transport': 'روش انتقال (Transport)',
 	'Camouflage Type': 'نوع استتار',
 	'Service Name': 'نام سرویس (serviceName)',
 	'Transfer mode': 'حالت انتقال',
@@ -935,6 +950,57 @@ var FA = {
 	'Enable Happy Eyeballs': 'روشن کردن Happy Eyeballs',
 	'Attempts IPv4 and IPv6 simultaneously; automatically uses the faster connection.':
 		'IPv4 و IPv6 را هم‌زمان امتحان می‌کند و اتصال سریع‌تر را به کار می‌گیرد.',
+
+	/* -------------------------------------------------- Server-Side */
+	'Server-Side': 'سمت سرور',
+	'The address in the link is the one this page was opened at, unless Address in the share link says otherwise. A phone away from home needs the router’s public address or domain.':
+		'آدرس داخل لینک همان آدرسی است که این صفحه با آن باز شده، مگر این‌که «آدرس در لینک اشتراک» چیز دیگری بگوید. گوشی‌ای که بیرون از خانه است به آدرس عمومی روتر یا یک دامنه نیاز دارد.',
+	'Server-Side is off.': 'سمت سرور خاموش است.',
+	'Could not start: %s': 'اجرا نشد: %s',
+	'No server is running. Add one below and press Save & Apply.': 'هیچ سروری در حال اجرا نیست. پایین یکی اضافه کنید و «ذخیره و اعمال» را بزنید.',
+	'Running (%s), listening on %s.': 'در حال اجرا (%s)، روی پورت‌های %s.',
+	'The router as a proxy server: phones and laptops away from home connect to it. A server that listens beyond the router has its port opened in the firewall while it runs.':
+		'روتر به‌عنوان سرور پروکسی: گوشی و لپ‌تاپ بیرون از خانه به آن وصل می‌شوند. پورت سرورهایی که فقط روی خود روتر نیستند، تا وقتی اجرا می‌شوند در فایروال باز می‌شود.',
+	'Log level': 'سطح لاگ',
+	'Users Manager': 'مدیریت کاربران',
+	'Outbound': 'خروجی',
+	'Listen Port': 'پورت شنود',
+	'Bind Local': 'فقط روی خود روتر',
+	'Listen on the router itself only; the port is not opened in the firewall.': 'فقط روی خود روتر گوش می‌دهد و پورت در فایروال باز نمی‌شود.',
+	'ID / Password': 'شناسه / رمز',
+	'One per user. VLESS and VMess take a UUID, Trojan a password.': 'برای هر کاربر یکی. VLESS و VMess شناسه UUID می‌گیرند و Trojan رمز.',
+	'Auth': 'احراز هویت',
+	'A 2022 Shadowsocks method needs a base64 key of its own length: 16 bytes for aes-128, 32 for the others.':
+		'روش‌های ۲۰۲۲ شدوساکس کلید base64 با طول مشخص می‌خواهند: ۱۶ بایت برای aes-128 و ۳۲ بایت برای بقیه.',
+	'salamander. Empty is no obfuscation.': 'salamander. خالی یعنی بدون مبهم‌سازی.',
+	'Max upload Mbps': 'حداکثر آپلود (Mbps)',
+	'Max download Mbps': 'حداکثر دانلود (Mbps)',
+	'Address in the share link': 'آدرس در لینک اشتراک',
+	'The router’s public address or a domain that points to it. Empty is the address this page was opened at.':
+		'آدرس عمومی روتر یا دامنه‌ای که به آن اشاره می‌کند. خالی یعنی همان آدرسی که این صفحه با آن باز شده.',
+	'REALITY needs no certificate and no domain, and is the one to choose for VLESS. It works with VLESS and Trojan.':
+		'REALITY نه گواهی می‌خواهد نه دامنه، و برای VLESS بهترین انتخاب است. با VLESS و Trojan کار می‌کند.',
+	'REALITY works with VLESS and Trojan only.': 'REALITY فقط با VLESS و Trojan کار می‌کند.',
+	'Public key absolute path': 'مسیر کامل فایل گواهی',
+	'The certificate, as a file on the router. Hysteria2 and TUIC always need one.': 'گواهی، به شکل فایلی روی روتر. Hysteria2 و TUIC همیشه به آن نیاز دارند.',
+	'Private key absolute path': 'مسیر کامل فایل کلید خصوصی',
+	'In the share link only: for a self-signed certificate the client cannot check.': 'فقط در لینک اشتراک: برای گواهی خودامضا که کلاینت نمی‌تواند بررسی‌اش کند.',
+	'Private Key': 'کلید خصوصی',
+	'A new key pair. Save & Apply to use it.': 'یک جفت کلید تازه ساخته شد. برای استفاده «ذخیره و اعمال» را بزنید.',
+	'Generate': 'ساختن',
+	'The other half of the pair, for the share link. Generate fills both.': 'نیمه دیگر جفت کلید، برای لینک اشتراک. «ساختن» هر دو را پر می‌کند.',
+	'Handshake server': 'سرور دست‌دادن (dest)',
+	'A real site the handshake is borrowed from, as host:port.': 'یک سایت واقعی که دست‌دادن از آن قرض گرفته می‌شود، به شکل host:port.',
+	'Server names': 'نام‌های سرور (serverNames)',
+	'The names a client may ask for. Empty is the handshake server’s.': 'نام‌هایی که کلاینت می‌تواند بخواهد. خالی یعنی نام سرور دست‌دادن.',
+	'Where the traffic of whoever connects leaves from. Hysteria2 and TUIC servers can use the first three.':
+		'ترافیک کسی که وصل می‌شود از کجا بیرون برود. سرورهای Hysteria2 و TUIC فقط سه گزینه اول را دارند.',
+	'Through the Zirgozar tunnel': 'از داخل تونل زیرگذر',
+	'Custom SOCKS server': 'سرور SOCKS دلخواه',
+	'Accept LAN Access': 'اجازه دسترسی به شبکه محلی',
+	'Lets whoever connects reach the devices on this network and the router itself. Off, the private ranges are refused.':
+		'کسی که وصل می‌شود به دستگاه‌های این شبکه و خود روتر دسترسی دارد. خاموش باشد، آدرس‌های خصوصی بسته‌اند.',
+	'Xray could not make a key pair.': 'Xray نتوانست جفت کلید بسازد.',
 
 	'yes': 'بله',
 	'no': 'خیر'

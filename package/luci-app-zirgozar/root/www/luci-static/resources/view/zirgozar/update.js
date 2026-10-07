@@ -225,7 +225,7 @@ function render(d) {
 				   numbers written by three different projects are a way to be
 				   confidently wrong about which way round they go. */
 				if (c.update && c.latest)
-					value.push(chip('→ ' + c.latest, 'info'));
+					value.push(chip((i18n.dir() === 'rtl' ? '← ' : '→ ') + c.latest, 'info'));
 				else if (c.latest)
 					value.push(E('span', { 'style': 'color:var(--muted)' }, _('It is the latest version')));
 				value.push(E('code', { 'style': 'font-size:11.5px;color:var(--muted)' }, c.path));

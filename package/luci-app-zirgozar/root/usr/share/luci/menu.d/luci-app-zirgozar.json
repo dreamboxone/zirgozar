@@ -53,6 +53,15 @@
 		}
 	},
 
+	"admin/services/zirgozar/server": {
+		"title": "Server-Side",
+		"order": 75,
+		"action": {
+			"type": "view",
+			"path": "zirgozar/server"
+		}
+	},
+
 	"admin/services/zirgozar/update": {
 		"title": "App Update",
 		"order": 50,

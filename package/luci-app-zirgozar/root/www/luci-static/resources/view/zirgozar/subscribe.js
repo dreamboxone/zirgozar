@@ -234,7 +234,7 @@ return view.extend({
 		o.textvalue = function(section_id) {
 			var v = String(this.cfgvalue(section_id) || '');
 			if (!v) return uci.get('zirgozar', section_id, 'content') ? _('a file') : '-';
-			return E('span', { 'style': 'direction:ltr;display:inline-block;max-width:260px;overflow:hidden;' +
+			return E('span', { 'style': 'direction:ltr;display:inline-block;max-width:170px;overflow:hidden;' +
 			                            'text-overflow:ellipsis;white-space:nowrap;vertical-align:middle',
 			                   'title': v }, v);
 		};

@@ -1,0 +1,94 @@
+#!/bin/sh /etc/rc.common
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+# Part of Zirgozar - https://github.com/dreamboxone/zirgozar
+#
+# PassWall2's Server-Side, as a service of its own the way PassWall2 has it:
+# the servers run whether or not the tunnel does, and saving one never
+# restarts the tunnel. Its settings are /etc/config/zirgozar_server.
+
+START=99
+STOP=10
+USE_PROCD=1
+
+ZGZ_LIB=/usr/libexec
+. "$ZGZ_LIB/zgz-common.sh"
+
+SERVER="$ZGZ_LIB/zgz-server"
+XCONF=/var/etc/zirgozar-server.json
+SCONF=/var/etc/zirgozar-server-sb.json
+
+start_service() {
+	mkdir -p /var/etc "$ZGZ_RUN"
+	rm -f "$XCONF" "$SCONF" "$ZGZ_RUN/server.info"
+	[ "$(uci -q get zirgozar_server.global.enable)" = "1" ] || return 0
+
+	if "$SERVER" config xray > "$XCONF.new" 2>/dev/null; then
+		mv -f "$XCONF.new" "$XCONF"
+		chmod 600 "$XCONF"
+		if _x="$(find_xray "$XCONF")"; then
+			procd_open_instance xray
+			procd_set_param command "$_x" run -config "$XCONF"
+			procd_set_param env ZGZ_CONFIG_SUM="$(md5sum "$XCONF" | cut -c1-32)"
+			procd_set_param limits nofile="65535 65535"
+			procd_set_param respawn 3600 5 0
+			procd_set_param stdout 1
+			procd_set_param stderr 1
+			procd_close_instance
+			echo "xray=$_x" >> "$ZGZ_RUN/server.info"
+		else
+			_err="$(XRAY_LOCATION_ASSET="$(geo_dir)" "$(xray_paths | head -1)" run -test -config "$XCONF" 2>&1 | grep -i 'fail\|error' | tail -1)"
+			log "Server-Side: Xray refused the server configuration${_err:+ ($_err)}"
+			echo "xray_error=${_err:-refused}" >> "$ZGZ_RUN/server.info"
+		fi
+	else
+		rm -f "$XCONF.new"
+	fi
+
+	if "$SERVER" config singbox > "$SCONF.new" 2>/dev/null; then
+		mv -f "$SCONF.new" "$SCONF"
+		chmod 600 "$SCONF"
+		_sb="$(find_singbox)" || _sb="$(singbox_lx_path)"
+		if [ -x "$_sb" ] && "$_sb" check -c "$SCONF" >"$ZGZ_RUN/server-check.err" 2>&1; then
+			procd_open_instance singbox
+			procd_set_param command "$_sb" run -c "$SCONF"
+			procd_set_param env ZGZ_CONFIG_SUM="$(md5sum "$SCONF" | cut -c1-32)"
+			procd_set_param limits nofile="65535 65535"
+			procd_set_param respawn 3600 5 0
+			procd_set_param stdout 1
+			procd_set_param stderr 1
+			procd_close_instance
+			echo "singbox=$_sb" >> "$ZGZ_RUN/server.info"
+		else
+			_err="$(sed "s/$(printf '\033')\[[0-9;]*m//g" "$ZGZ_RUN/server-check.err" 2>/dev/null | grep -i 'fatal\|error' | tail -1)"
+			[ -x "$_sb" ] || _err="sing-box is not installed"
+			log "Server-Side: sing-box cannot run the hysteria2/tuic servers${_err:+ ($_err)}"
+			echo "singbox_error=${_err:-refused}" >> "$ZGZ_RUN/server.info"
+		fi
+	else
+		rm -f "$SCONF.new"
+	fi
+	return 0
+}
+
+service_started() {
+	"$SERVER" fw up >/dev/null 2>&1 || true
+	[ -s "$ZGZ_RUN/server.info" ] && log "Server-Side: listening on $("$SERVER" ports | tr '\n' ' ')"
+	return 0
+}
+
+stop_service() {
+	"$SERVER" fw down >/dev/null 2>&1 || true
+	rm -f "$XCONF" "$SCONF" "$ZGZ_RUN/server.info"
+	return 0
+}
+
+reload_service() {
+	stop
+	start
+}
+
+service_triggers() {
+	procd_add_reload_trigger "zirgozar_server"
+}

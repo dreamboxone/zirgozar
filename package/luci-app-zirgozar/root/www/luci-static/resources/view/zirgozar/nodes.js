@@ -296,6 +296,52 @@ function linkType(link) {
 	return /^\s*(client\s*$|remote\s+\S+|<ca>)/im.test(l) ? 'openvpn' : '-';
 }
 
+/* Where a node added by hand connects to, as "host:port", for PassWall2's
+   "Show server address and port". Read from the link here, in the browser:
+   the table is drawn from the configuration file, not from the parsed list. */
+function b64text(b) {
+	try {
+		b = String(b).replace(/-/g, '+').replace(/_/g, '/').replace(/\s+/g, '');
+		while (b.length % 4) b += '=';
+		var raw = atob(b), bytes = new Uint8Array(raw.length);
+		for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+		return new TextDecoder('utf-8').decode(bytes);
+	} catch (e) {
+		return '';
+	}
+}
+
+function linkAddress(link) {
+	var l = String(link || '').trim(), m;
+	if (/^\s*\[(interface|peer)\]/i.test(l)) {
+		m = l.match(/^\s*endpoint\s*=\s*(\S+)/im);
+		return m ? m[1] : '';
+	}
+	if (/^\s*(client\s*$|remote\s+\S+|<ca>)/im.test(l)) {
+		m = l.match(/^\s*remote\s+(\S+)(?:\s+(\d+))?/im);
+		if (!m) return '';
+		var pm = l.match(/^\s*port\s+(\d+)/im);
+		return m[1] + ':' + (m[2] || (pm && pm[1]) || '1194');
+	}
+	l = l.split(/\s+/)[0];
+	if (/^vmess:\/\//i.test(l)) {
+		try {
+			var o = JSON.parse(b64text(l.replace(/^vmess:\/\//i, '').replace(/[#?].*$/, '')));
+			return o.add ? o.add + ':' + o.port : '';
+		} catch (e) {
+			return '';
+		}
+	}
+	m = l.match(/^[a-z][a-z0-9+.-]*:\/\/([^#?\/]*)/i);
+	if (!m) return '';
+	var body = m[1];
+	/* An old shadowsocks link is the whole of method:password@host:port in
+	   base64. */
+	if (body.indexOf('@') < 0 && /^ss:\/\//i.test(l)) body = b64text(body);
+	body = body.slice(body.lastIndexOf('@') + 1);
+	return /:\d+$/.test(body) ? body : '';
+}
+
 function groups() {
 	var g = {};
 	uci.sections('zirgozar', 'node').forEach(function(n) {
@@ -371,9 +417,11 @@ function reassign(b) {
 	]);
 }
 
-function toolbar() {
+function toolbar(s) {
 	var all = false;
 	return E('div', { 'class': 'mk-row', 'style': 'gap:8px;flex-wrap:wrap;margin:0 0 12px' }, [
+		/* The table's own Add, moved up beside the rest. */
+		pui.btn(_('Add'), 'success mk-small', function(ev) { return s.handleAdd(ev); }, 'plus'),
 		pui.btn(_('Add the node via the link'), 'primary mk-small', addViaLinks, 'link'),
 		pui.btn(_('Select all'), 'soft-blue mk-small', function(ev) {
 			all = !all;
@@ -421,8 +469,22 @@ function sectionName(prefix) {
 	return n;
 }
 
-/* PassWall2's "Show server address and port". */
+/* PassWall2's "Show server address and port". Every address is drawn, and
+   shown or hidden with the switch, so that ticking it shows them at once
+   rather than after Save. */
 var showInfo = false;
+
+function address(text) {
+	return E('div', {
+		'class': 'pwp-addr',
+		'style': 'font-size:11px;opacity:.55;direction:ltr;unicode-bidi:isolate;white-space:nowrap' + (showInfo ? '' : ';display:none')
+	}, '%h'.format(text));
+}
+
+function showAddresses(on) {
+	showInfo = !!on;
+	document.querySelectorAll('.pwp-addr').forEach(function(el) { el.style.display = showInfo ? '' : 'none'; });
+}
 
 function renderNodes(d) {
 	var box = document.getElementById('pwp-nodelist');
@@ -464,9 +526,7 @@ function renderNodes(d) {
 					E('span', { 'style': n.current ? 'font-weight:700' : '' }, n.label || n.host),
 					n.current ? pill(_('in use'), '#10b981') : E('span')
 				]),
-				showInfo
-					? E('div', { 'style': 'font-size:11px;opacity:.55;direction:ltr;text-align:start' }, n.host + ':' + n.port)
-					: ''
+				address(n.host + ':' + n.port)
 			]),
 			E('td', { 'class': 'td' }, n.protocol),
 			E('td', { 'class': 'td' }, n.ms > 0 ? pui.ms(n.ms) : '—'),
@@ -540,6 +600,9 @@ return view.extend({
 		s.handleAdd = function(ev) {
 			return form.GridSection.prototype.handleAdd.apply(this, [ ev, sectionName('n') ]);
 		};
+		/* Add is in the row of buttons above the table, not under it. */
+		s.renderSectionAdd = function() { return E([]); };
+		var manual = s;
 		/* Edit opens PassWall2's Node Config page, with every field of the
 		   link and the settings a link has no place for. A node being added
 		   is not in the file yet, so it still gets the window: a link pasted
@@ -564,6 +627,16 @@ return view.extend({
 
 		o = s.option(form.Value, 'name', _('Name'));
 		o.placeholder = 'my server';
+		o.textvalue = function(section_id) {
+			var name = this.cfgvalue(section_id) || '';
+			var addr = linkAddress(uci.get('zirgozar', section_id, 'link'));
+			if (!addr) return '%h'.format(name);
+			/* One block, the address under the name: the cell lays its
+			   children out side by side. */
+			return E('div', { 'style': 'display:flex;flex-direction:column;align-items:flex-start;gap:2px' }, [
+				E('div', {}, '%h'.format(name)), address(addr)
+			]);
+		};
 
 		/* PassWall2's Type column: what the link is. */
 		o = s.option(form.DummyValue, '_type', _('Type'));
@@ -732,6 +805,9 @@ return view.extend({
 			];
 			for (var i = extra.length - 1; i >= 0; i--)
 				box.insertBefore(extra[i], box.firstChild);
+			/* The handle the row is dragged by goes last, after Delete. */
+			var handle = box.querySelector('.drag-handle');
+			if (handle) box.appendChild(handle);
 			return td;
 		};
 
@@ -758,6 +834,7 @@ return view.extend({
 		o = s.option(form.Flag, 'show_node_info', _('Show server address and port'));
 		o.default = '0';
 		o.rmempty = false;
+		o.onchange = function(ev, section_id, value) { showAddresses(value == '1'); };
 
 		o = s.option(form.Value, 'test_url', _('URL Test Address'),
 			_('What a real request through a node asks for, when a node is measured and when the URL Test column is pressed.'));
@@ -820,7 +897,7 @@ return view.extend({
 			/* PassWall2's buttons, above the table of nodes added by hand. */
 			var grid = mapEl.querySelector('#cbi-zirgozar-node');
 			var table = grid && grid.querySelector('.cbi-section-table');
-			if (table) table.parentNode.insertBefore(toolbar(), table);
+			if (table) table.parentNode.insertBefore(toolbar(manual), table);
 
 			var list = pui.card(_('All configs'), 'list', '#6366f1', E('div', {}, [
 				E('div', { 'class': 'mk-row', 'style': 'margin:0 0 10px;align-items:center' }, [

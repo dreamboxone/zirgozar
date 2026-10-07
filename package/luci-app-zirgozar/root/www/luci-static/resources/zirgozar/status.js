@@ -19,6 +19,7 @@
 'require rpc';
 'require poll';
 'require ui';
+'require uci';
 'require zirgozar.i18n as i18n';
 'require zirgozar.ui as pui';
 
@@ -405,20 +406,21 @@ function check(id, url) {
 }
 
 return baseclass.extend({
-	/* Asked for with the page, and a measurement started as it opens so that
-	   by the time the reader has turned the switch on the answer is there. */
+	/* A measurement started as the page opens, so that by the time the
+	   reader has turned the switch on the answer is there. The state and the
+	   traffic are not waited for: the page is drawn at once and they are
+	   filled in the moment they arrive - asking the router for its state takes
+	   most of a second on a small one, and a page that sat blank for that long
+	   on every visit felt slow for no reason of its own. */
 	load: function() {
 		callAction('prepare', '').catch(function() {});
-		return Promise.all([
-			callState().catch(function() { return {}; }),
-			callTraffic().catch(function() { return {}; })
-		]);
+		return Promise.resolve([ null, null ]);
 	},
 
 	/* Everything for the top of the page, and the traffic for its foot. */
 	render: function(data) {
-		var st = (data && data[0]) || {};
-		var tr = (data && data[1]) || {};
+		var st = (data && data[0]) || null;
+		var tr = (data && data[1]) || null;
 
 		var tiles = E('div', { 'class': 'mk-grid mk-metrics', 'style': 'margin-bottom:18px' }, [
 			tile('pwp-core', pui.icon('cpu'), '#3b82f6', _('Core'), '-'),
@@ -495,17 +497,31 @@ return baseclass.extend({
 
 		poll.add(refreshState, 3);
 		/* Traffic moves in five-minute steps. */
-		var statsOn = st.stats_enabled !== false;
+		var statsOn = st ? st.stats_enabled !== false : uci.get('zirgozar', 'config', 'stats_enabled') != '0';
 		if (statsOn) poll.add(function() {
 			return callTraffic().then(renderTraffic).catch(function() {});
 		}, 15);
 
 		/* Filled in now, in the pieces themselves. */
-		scope = [ tiles, status, traffic ];
-		renderState(st);
-		renderTraffic(tr);
-		scope = null;
+		if (st) {
+			scope = [ tiles, status, traffic ];
+			renderState(st);
+			renderTraffic(tr || {});
+			scope = null;
+		} else {
+			/* Asked for now; drawn once the pieces are in the document, where
+			   these find them - LuCI puts the page there a moment after this
+			   returns. */
+			var gotState = callState().catch(function() { return {}; });
+			var gotTraffic = statsOn ? callTraffic().catch(function() { return {}; }) : null;
+			var tries = 0;
+			(function whenShown() {
+				if (!byId('pwp-state') && tries++ < 100) { window.setTimeout(whenShown, 50); return; }
+				gotState.then(renderState);
+				if (gotTraffic) gotTraffic.then(renderTraffic);
+			})();
+		}
 
-		return { top: [ tiles, status ], bottom: statsOn ? [ traffic ] : [], version: st.version };
+		return { top: [ tiles, status ], bottom: statsOn ? [ traffic ] : [], version: st ? st.version : null };
 	}
 });

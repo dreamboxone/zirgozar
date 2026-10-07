@@ -5,7 +5,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zirgozar
-PKG_VERSION:=2.1.0
+PKG_VERSION:=2.2.0
 PKG_RELEASE:=1
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
@@ -16,7 +16,7 @@ include $(INCLUDE_DIR)/package.mk
 # Kept in step with build/packages.inc.sh, which is what the release builds
 # use. A helper that reaches one of them and not the other is a helper that
 # is missing on exactly half of the installations.
-ZGZ_SCRIPTS:=zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-stats zgz-test zgz-geo zgz-cores zgz-deps zgz-bridge zgz-router zgz-sbconfig zgz-sbstats zgz-ovpnkey
+ZGZ_SCRIPTS:=zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-stats zgz-test zgz-geo zgz-cores zgz-deps zgz-bridge zgz-router zgz-sbconfig zgz-sbstats zgz-ovpnkey zgz-server
 
 define Package/zirgozar
   SECTION:=net
@@ -36,6 +36,7 @@ endef
 
 define Package/zirgozar/conffiles
 /etc/config/zirgozar
+/etc/config/zirgozar_server
 endef
 
 define Build/Compile
@@ -47,11 +48,13 @@ define Package/zirgozar/install
 
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_DATA) ./files/zirgozar.config $(1)/etc/config/zirgozar
+	$(INSTALL_DATA) ./files/zirgozar_server.config $(1)/etc/config/zirgozar_server
 	$(INSTALL_DIR) $(1)/usr/share/zirgozar
 	$(INSTALL_DATA) ./files/zirgozar.config $(1)/usr/share/zirgozar/zirgozar.config
 
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/zirgozar.init $(1)/etc/init.d/zirgozar
+	$(INSTALL_BIN) ./files/zirgozar-server.init $(1)/etc/init.d/zirgozar-server
 
 	$(INSTALL_DIR) $(1)/usr/libexec
 	$(INSTALL_DATA) ./files/zgz-common.sh $(1)/usr/libexec/zgz-common.sh
@@ -143,12 +146,15 @@ if ! ubus list 2>/dev/null | grep -q '^luci.zirgozar$$'; then
 fi
 # Always in the boot sequence; the main switch decides whether it runs.
 /etc/init.d/zirgozar enable >/dev/null 2>&1
+/etc/init.d/zirgozar-server enable >/dev/null 2>&1
 exit 0
 endef
 
 define Package/zirgozar/prerm
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] && exit 0
+/etc/init.d/zirgozar-server stop >/dev/null 2>&1
+/etc/init.d/zirgozar-server disable >/dev/null 2>&1
 /etc/init.d/zirgozar stop >/dev/null 2>&1
 /etc/init.d/zirgozar disable >/dev/null 2>&1
 sed -i '\|/usr/libexec/zgz-|d' /etc/crontabs/root 2>/dev/null

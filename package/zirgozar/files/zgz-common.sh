@@ -931,7 +931,10 @@ passwall_running() {
 	# it had been switched off - which is a warning about the one thing the
 	# reader has already done. Ask whether anything in it is still taking
 	# traffic instead.
+	# The tables there are, asked once; only those are looked inside.
+	_pr_tabs="$(nft list tables 2>/dev/null)"
 	for _t in "inet passwall2" "inet passwall" "inet passwall-plus"; do
+		case "$_pr_tabs" in *"table $_t"*) : ;; *) continue ;; esac
 		# shellcheck disable=SC2086
 		nft list table $_t 2>/dev/null |
 			grep -q -e tproxy -e 'redirect to' -e ' dnat ' && return 0

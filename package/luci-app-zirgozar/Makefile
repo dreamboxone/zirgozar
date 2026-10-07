@@ -5,7 +5,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-zirgozar
-PKG_VERSION:=2.1.0
+PKG_VERSION:=2.2.0
 PKG_RELEASE:=1
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
@@ -51,6 +51,8 @@ define Package/luci-app-zirgozar/install
 		$(1)/www/luci-static/resources/view/zirgozar/update.js
 	$(INSTALL_DATA) ./root/www/luci-static/resources/view/zirgozar/other.js \
 		$(1)/www/luci-static/resources/view/zirgozar/other.js
+	$(INSTALL_DATA) ./root/www/luci-static/resources/view/zirgozar/server.js \
+		$(1)/www/luci-static/resources/view/zirgozar/server.js
 
 	$(INSTALL_DIR) $(1)/www/luci-static/resources/zirgozar
 	$(INSTALL_DATA) ./root/www/luci-static/resources/zirgozar/i18n.js \
@@ -59,6 +61,8 @@ define Package/luci-app-zirgozar/install
 		$(1)/www/luci-static/resources/zirgozar/ui.js
 	$(INSTALL_DATA) ./root/www/luci-static/resources/zirgozar/status.js \
 		$(1)/www/luci-static/resources/zirgozar/status.js
+	$(INSTALL_DATA) ./root/www/luci-static/resources/zirgozar/qr.js \
+		$(1)/www/luci-static/resources/zirgozar/qr.js
 	$(INSTALL_DATA) ./root/www/luci-static/resources/zirgozar/theme.css \
 		$(1)/www/luci-static/resources/zirgozar/theme.css
 	$(INSTALL_DATA) ./root/www/luci-static/resources/zirgozar/logo-light.png \

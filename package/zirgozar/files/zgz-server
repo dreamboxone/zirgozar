@@ -1,0 +1,359 @@
+#!/bin/sh
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+# Part of Zirgozar - https://github.com/dreamboxone/zirgozar
+#
+# zgz-server - PassWall2's Server-Side: the router as a proxy server that
+# phones and laptops away from home connect to.
+#
+#   zgz-server config xray      the Xray configuration for every server it speaks
+#   zgz-server config singbox   the sing-box one, for hysteria2 and tuic
+#   zgz-server fw up|down       open or close the servers' ports in the firewall
+#   zgz-server keys             a new REALITY key pair, as "private public"
+#
+# Its settings are /etc/config/zirgozar_server, a file of its own as
+# PassWall2's are, so that saving a server never touches the tunnel.
+#
+# Every server leaves through one of four ways: straight out, through this
+# program's tunnel (its SOCKS port), through a SOCKS server named on the
+# page, or through one of the configs added by hand. Unless it is told to
+# accept them, what arrives is kept away from the private ranges - a phone
+# that knows the link can reach the internet through the router, not the
+# devices behind it.
+
+. "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
+
+CONF=zirgozar_server
+NFT_INC=/usr/share/nftables.d/chain-pre/input/zirgozar-server.nft
+
+PRIVATE_CIDRS="0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 fc00::/7 fe80::/10 ::1/128"
+
+XRAY_PROTOS=" vless vmess trojan shadowsocks socks http "
+SB_PROTOS=" hysteria2 tuic "
+
+s_get() { uci -q get "$CONF.$1.$2" 2>/dev/null; }
+s_list() { uci -q get "$CONF.$1.$2" 2>/dev/null | tr ' ' '\n' | grep -v '^$'; }
+j() { json_escape "$1"; }
+
+# ["a","b"] from words on stdin.
+jarr() {
+	awk 'NF { gsub(/\\/, "\\\\"); gsub(/"/, "\\\""); printf "%s\"%s\"", (n++ ? "," : ""), $0 } END { }' |
+		{ printf '['; cat; printf ']'; }
+}
+
+private_json() { printf '%s\n' $PRIVATE_CIDRS | jarr; }
+
+# The servers that are switched on, one section name per line.
+users() {
+	[ "$(uci -q get "$CONF.global.enable" 2>/dev/null)" = "1" ] || return 0
+	uci -q show "$CONF" 2>/dev/null | sed -n "s/^$CONF\.\([A-Za-z0-9_]*\)=user$/\1/p" | while read -r _u; do
+		[ "$(s_get "$_u" enable)" = "0" ] && continue
+		case "$(s_get "$_u" port)" in ''|*[!0-9]*) continue ;; esac
+		echo "$_u"
+	done
+}
+
+port_of() { s_get "$1" port; }
+listen_of() { if [ "$(s_get "$1" bind_local)" = "1" ]; then echo 127.0.0.1; else echo "::"; fi; }
+
+# ------------------------------------------------------------ the way out
+
+# The outbound a server's traffic leaves by, tagged out-<section>, as Xray
+# writes it. A config that cannot be used goes straight out instead, and
+# says so in the log.
+xray_out() {
+	_u="$1"; _o="$(s_get "$_u" outbound)"
+	case "$_o" in
+		''|_direct)
+			printf '{"tag":"out-%s","protocol":"freedom","streamSettings":{"sockopt":{"mark":255}}}' "$_u"
+			;;
+		_tunnel)
+			printf '{"tag":"out-%s","protocol":"socks","settings":{"servers":[{"address":"127.0.0.1","port":%s}]}}' \
+				"$_u" "$(cfg node_socks_port 1070)"
+			;;
+		_socks)
+			_a="$(s_get "$_u" outbound_socks_address)"; _p="$(s_get "$_u" outbound_socks_port)"
+			_n="$(s_get "$_u" outbound_socks_username)"; _w="$(s_get "$_u" outbound_socks_password)"
+			_users=""
+			[ -n "$_n" ] && _users=",\"users\":[{\"user\":\"$(j "$_n")\",\"pass\":\"$(j "$_w")\"}]"
+			printf '{"tag":"out-%s","protocol":"socks","settings":{"servers":[{"address":"%s","port":%s%s}]},"streamSettings":{"sockopt":{"mark":255}}}' \
+				"$_u" "$(j "${_a:-127.0.0.1}")" "${_p:-1080}" "$_users"
+			;;
+		*)
+			_r="$(node_records "$_o" 1 2>/dev/null | head -1)"
+			case "$(printf '%s' "$_r" | cut -f3)" in
+				''|hysteria2|hysteria|tuic|openvpn|amneziawg)
+					warn "server $_u: the config '$_o' cannot be used as its way out - going out directly"
+					printf '{"tag":"out-%s","protocol":"freedom","streamSettings":{"sockopt":{"mark":255}}}' "$_u"
+					return 0
+					;;
+			esac
+			printf '%s\n' "$_r" | DOMSTRAT="" decorate | cut -f6- | sed "s/^{/{\"tag\":\"out-$_u\",/"
+			;;
+	esac
+	return 0
+}
+
+# --------------------------------------------------------------- Xray side
+
+xray_stream() {
+	_u="$1"; _proto="$2"
+	case "$_proto" in shadowsocks|socks|http) return 0 ;; esac
+	_net="$(s_get "$_u" transport)"; _net="${_net:-raw}"
+	_sec="$(s_get "$_u" security)"; _sec="${_sec:-none}"
+	[ "$_sec" = "reality" ] && case "$_proto" in vless|trojan) : ;; *) _sec=none ;; esac
+	_path="$(s_get "$_u" path)"; _host="$(s_get "$_u" host)"
+	_ss=""
+	case "$_net" in
+		ws) _ss="\"wsSettings\":{\"path\":\"$(j "${_path:-/}")\"$([ -n "$_host" ] && printf ',"host":"%s"' "$(j "$_host")")}" ;;
+		httpupgrade) _ss="\"httpupgradeSettings\":{\"path\":\"$(j "${_path:-/}")\"$([ -n "$_host" ] && printf ',"host":"%s"' "$(j "$_host")")}" ;;
+		grpc) _ss="\"grpcSettings\":{\"serviceName\":\"$(j "$(s_get "$_u" service_name)")\"}" ;;
+		xhttp)
+			_m="$(s_get "$_u" xhttp_mode)"
+			_ss="\"xhttpSettings\":{\"path\":\"$(j "${_path:-/}")\"$([ -n "$_host" ] && printf ',"host":"%s"' "$(j "$_host")"),\"mode\":\"${_m:-auto}\"}"
+			;;
+		kcp)
+			_seed="$(s_get "$_u" kcp_seed)"; _ht="$(s_get "$_u" header_type)"
+			_ss="\"kcpSettings\":{\"header\":{\"type\":\"${_ht:-none}\"}$([ -n "$_seed" ] && printf ',"seed":"%s"' "$(j "$_seed")")}"
+			;;
+		*) _net=raw ;;
+	esac
+	_sx=""
+	case "$_sec" in
+		tls)
+			_alpn="$(s_list "$_u" alpn | jarr)"
+			_sx="\"tlsSettings\":{\"certificates\":[{\"certificateFile\":\"$(j "$(s_get "$_u" tls_cert)")\",\"keyFile\":\"$(j "$(s_get "$_u" tls_key)")\"}]$([ "$_alpn" != "[]" ] && printf ',"alpn":%s' "$_alpn")}"
+			;;
+		reality)
+			_dest="$(s_get "$_u" reality_dest)"; _dest="${_dest:-www.microsoft.com:443}"
+			_names="$(s_list "$_u" reality_server_name | jarr)"
+			[ "$_names" = "[]" ] && _names="[\"$(j "${_dest%:*}")\"]"
+			_sids="$(s_list "$_u" reality_short_id | jarr)"
+			[ "$_sids" = "[]" ] && _sids='[""]'
+			_sx="\"realitySettings\":{\"show\":false,\"target\":\"$(j "$_dest")\",\"serverNames\":$_names,\"privateKey\":\"$(j "$(s_get "$_u" reality_private_key)")\",\"shortIds\":$_sids}"
+			;;
+	esac
+	printf ',"streamSettings":{"network":"%s","security":"%s"%s%s}' "$_net" "$_sec" "${_ss:+,$_ss}" "${_sx:+,$_sx}"
+	return 0
+}
+
+xray_inbound() {
+	_u="$1"; _proto="$(s_get "$_u" protocol)"
+	_set=""
+	case "$_proto" in
+		vless)
+			_flow="$(s_get "$_u" flow)"
+			# Vision only on raw TCP with TLS or REALITY; anywhere else Xray
+			# refuses the whole file.
+			case "$(s_get "$_u" transport):$(s_get "$_u" security)" in
+				:tls|:reality|raw:tls|raw:reality) : ;;
+				*) _flow="" ;;
+			esac
+			_cl="$(s_list "$_u" uuid | awk -v f="$_flow" '{ printf "%s{\"id\":\"%s\"%s}", (n++ ? "," : ""), $0, (f != "" ? ",\"flow\":\"" f "\"" : "") }')"
+			_set="{\"clients\":[$_cl],\"decryption\":\"none\"}"
+			;;
+		vmess)
+			_cl="$(s_list "$_u" uuid | awk '{ printf "%s{\"id\":\"%s\"}", (n++ ? "," : ""), $0 }')"
+			_set="{\"clients\":[$_cl]}"
+			;;
+		trojan)
+			_cl="$(s_list "$_u" uuid | awk '{ gsub(/\\/, "\\\\"); gsub(/"/, "\\\""); printf "%s{\"password\":\"%s\"}", (n++ ? "," : ""), $0 }')"
+			_set="{\"clients\":[$_cl]}"
+			;;
+		shadowsocks)
+			_m="$(s_get "$_u" method)"
+			_set="{\"method\":\"$(j "${_m:-aes-256-gcm}")\",\"password\":\"$(j "$(s_get "$_u" password)")\",\"network\":\"tcp,udp\"}"
+			;;
+		socks|http)
+			_acc=""
+			if [ "$(s_get "$_u" auth)" = "1" ]; then
+				_acc="\"accounts\":[{\"user\":\"$(j "$(s_get "$_u" username)")\",\"pass\":\"$(j "$(s_get "$_u" password)")\"}]"
+			fi
+			if [ "$_proto" = "socks" ]; then
+				_set="{\"auth\":\"$([ -n "$_acc" ] && echo password || echo noauth)\",\"udp\":true${_acc:+,$_acc}}"
+			else
+				_set="{${_acc}}"
+			fi
+			;;
+		*) return 1 ;;
+	esac
+	printf '{"tag":"in-%s","listen":"%s","port":%s,"protocol":"%s","settings":%s%s,"sniffing":{"enabled":true,"destOverride":["http","tls","quic"],"routeOnly":true}}' \
+		"$_u" "$(listen_of "$_u")" "$(port_of "$_u")" "$_proto" "$_set" "$(xray_stream "$_u" "$_proto")"
+	return 0
+}
+
+config_xray() {
+	_ins=""; _outs=""; _rules=""
+	for _u in $(users); do
+		case "$XRAY_PROTOS" in *" $(s_get "$_u" protocol) "*) : ;; *) continue ;; esac
+		_in="$(xray_inbound "$_u")" || continue
+		_ins="$_ins${_ins:+,}$_in"
+		_outs="$_outs${_outs:+,}$(xray_out "$_u")"
+		[ "$(s_get "$_u" accept_lan)" = "1" ] ||
+			_rules="$_rules${_rules:+,}{\"type\":\"field\",\"inboundTag\":[\"in-$_u\"],\"ip\":$(private_json),\"outboundTag\":\"block\"}"
+		_rules="$_rules${_rules:+,}{\"type\":\"field\",\"inboundTag\":[\"in-$_u\"],\"outboundTag\":\"out-$_u\"}"
+	done
+	[ -n "$_ins" ] || return 1
+	_chains="$(chain_outbounds "$_outs" | while read -r _co; do [ -n "$_co" ] && printf ',%s' "$_co"; done)"
+	_lvl="$(uci -q get "$CONF.global.loglevel" 2>/dev/null)"
+	printf '{"log":{"loglevel":"%s"},"inbounds":[%s],"outbounds":[%s%s,{"tag":"block","protocol":"blackhole"}],"routing":{"domainStrategy":"AsIs","rules":[%s]}}\n' \
+		"${_lvl:-warning}" "$_ins" "$_outs" "$_chains" "$_rules"
+	return 0
+}
+
+# ------------------------------------------------------------ sing-box side
+
+sb_out() {
+	_u="$1"
+	case "$(s_get "$_u" outbound)" in
+		_tunnel)
+			printf '{"type":"socks","tag":"out-%s","server":"127.0.0.1","server_port":%s,"version":"5"}' "$_u" "$(cfg node_socks_port 1070)"
+			;;
+		_socks)
+			_n="$(s_get "$_u" outbound_socks_username)"; _a="$(s_get "$_u" outbound_socks_address)"; _p="$(s_get "$_u" outbound_socks_port)"
+			printf '{"type":"socks","tag":"out-%s","server":"%s","server_port":%s,"version":"5"%s,"routing_mark":255}' \
+				"$_u" "$(j "${_a:-127.0.0.1}")" "${_p:-1080}" \
+				"$([ -n "$_n" ] && printf ',"username":"%s","password":"%s"' "$(j "$_n")" "$(j "$(s_get "$_u" outbound_socks_password)")")"
+			;;
+		''|_direct) printf '{"type":"direct","tag":"out-%s","routing_mark":255}' "$_u" ;;
+		*)
+			# A config added by hand is spoken in Xray's words; sing-box
+			# servers go straight out rather than guess at a translation.
+			warn "server $_u: hysteria2 and tuic servers can leave directly, through the tunnel or through a SOCKS server - going out directly"
+			printf '{"type":"direct","tag":"out-%s","routing_mark":255}' "$_u"
+			;;
+	esac
+}
+
+sb_inbound() {
+	_u="$1"; _proto="$(s_get "$_u" protocol)"
+	_alpn="$(s_list "$_u" alpn | jarr)"; [ "$_alpn" = "[]" ] && _alpn='["h3"]'
+	_tls="\"tls\":{\"enabled\":true,\"alpn\":$_alpn,\"certificate_path\":\"$(j "$(s_get "$_u" tls_cert)")\",\"key_path\":\"$(j "$(s_get "$_u" tls_key)")\"}"
+	_lst="::"; [ "$(s_get "$_u" bind_local)" = "1" ] && _lst="127.0.0.1"
+	case "$_proto" in
+		hysteria2)
+			_ob=""; _op="$(s_get "$_u" hy2_obfs_password)"
+			[ -n "$_op" ] && _ob=",\"obfs\":{\"type\":\"salamander\",\"password\":\"$(j "$_op")\"}"
+			_bw=""
+			_up="$(s_get "$_u" hy2_up_mbps)"; _dn="$(s_get "$_u" hy2_down_mbps)"
+			case "$_up" in ''|*[!0-9]*) : ;; *) _bw="$_bw,\"up_mbps\":$_up" ;; esac
+			case "$_dn" in ''|*[!0-9]*) : ;; *) _bw="$_bw,\"down_mbps\":$_dn" ;; esac
+			printf '{"type":"hysteria2","tag":"in-%s","listen":"%s","listen_port":%s,"users":[{"password":"%s"}]%s%s,%s}' \
+				"$_u" "$_lst" "$(port_of "$_u")" "$(j "$(s_get "$_u" password)")" "$_ob" "$_bw" "$_tls"
+			;;
+		tuic)
+			_cc="$(s_get "$_u" tuic_cc)"
+			_cl="$(s_list "$_u" uuid | awk -v p="$(j "$(s_get "$_u" password)")" '{ printf "%s{\"uuid\":\"%s\",\"password\":\"%s\"}", (n++ ? "," : ""), $0, p }')"
+			printf '{"type":"tuic","tag":"in-%s","listen":"%s","listen_port":%s,"users":[%s],"congestion_control":"%s",%s}' \
+				"$_u" "$_lst" "$(port_of "$_u")" "$_cl" "${_cc:-bbr}" "$_tls"
+			;;
+		*) return 1 ;;
+	esac
+	return 0
+}
+
+config_singbox() {
+	_ins=""; _outs=""; _rules=""
+	for _u in $(users); do
+		case "$SB_PROTOS" in *" $(s_get "$_u" protocol) "*) : ;; *) continue ;; esac
+		_in="$(sb_inbound "$_u")" || continue
+		_ins="$_ins${_ins:+,}$_in"
+		_outs="$_outs${_outs:+,}$(sb_out "$_u")"
+		[ "$(s_get "$_u" accept_lan)" = "1" ] ||
+			_rules="$_rules${_rules:+,}{\"inbound\":[\"in-$_u\"],\"ip_cidr\":$(private_json),\"action\":\"reject\"}"
+		_rules="$_rules${_rules:+,}{\"inbound\":[\"in-$_u\"],\"outbound\":\"out-$_u\"}"
+	done
+	[ -n "$_ins" ] || return 1
+	_lvl="$(uci -q get "$CONF.global.loglevel" 2>/dev/null)"
+	case "$_lvl" in warning) _lvl=warn ;; none) _lvl=panic ;; '') _lvl=warn ;; esac
+	printf '{"log":{"level":"%s","timestamp":false},"inbounds":[%s],"outbounds":[%s,{"type":"direct","tag":"direct","routing_mark":255}],"route":{"rules":[%s],"final":"direct"}}\n' \
+		"$_lvl" "$_ins" "$_outs" "$_rules"
+	return 0
+}
+
+# ---------------------------------------------------------------- firewall
+
+# The ports of the servers that listen beyond the router itself.
+open_ports() {
+	for _u in $(users); do
+		[ "$(s_get "$_u" bind_local)" = "1" ] && continue
+		port_of "$_u"
+	done | sort -un
+}
+
+fw_up() {
+	_ports="$(open_ports | awk 'NF { printf "%s%s", (n++ ? ", " : ""), $0 }')"
+	if [ -z "$_ports" ]; then
+		fw_down
+		return 0
+	fi
+	case "$(firewall_backend)" in
+		nft)
+			# fw4 reads this into its own input chain, ahead of the zones,
+			# every time it builds the firewall - so a firewall restart keeps
+			# the ports open while the servers run.
+			mkdir -p "${NFT_INC%/*}"
+			_new="$(printf 'meta l4proto { tcp, udp } th dport { %s } counter accept comment "!zirgozar: Server-Side"\n' "$_ports")"
+			if [ "$(cat "$NFT_INC" 2>/dev/null)" != "$_new" ]; then
+				printf '%s\n' "$_new" > "$NFT_INC"
+				fw4 -q reload >/dev/null 2>&1 || /etc/init.d/firewall reload >/dev/null 2>&1 || true
+			fi
+			;;
+		ipt)
+			iptables -w 2 -N ZGZ_SERVER >/dev/null 2>&1 || true
+			iptables -w 2 -F ZGZ_SERVER >/dev/null 2>&1 || true
+			for _p in $(open_ports); do
+				iptables -w 2 -A ZGZ_SERVER -p tcp --dport "$_p" -j ACCEPT >/dev/null 2>&1
+				iptables -w 2 -A ZGZ_SERVER -p udp --dport "$_p" -j ACCEPT >/dev/null 2>&1
+			done
+			iptables -w 2 -C INPUT -j ZGZ_SERVER >/dev/null 2>&1 ||
+				iptables -w 2 -I INPUT -j ZGZ_SERVER >/dev/null 2>&1
+			;;
+	esac
+	return 0
+}
+
+fw_down() {
+	if [ -f "$NFT_INC" ]; then
+		rm -f "$NFT_INC"
+		fw4 -q reload >/dev/null 2>&1 || /etc/init.d/firewall reload >/dev/null 2>&1 || true
+	fi
+	if command -v iptables >/dev/null 2>&1 && iptables -w 2 -S ZGZ_SERVER >/dev/null 2>&1; then
+		while iptables -w 2 -D INPUT -j ZGZ_SERVER >/dev/null 2>&1; do :; done
+		iptables -w 2 -F ZGZ_SERVER >/dev/null 2>&1
+		iptables -w 2 -X ZGZ_SERVER >/dev/null 2>&1
+	fi
+	return 0
+}
+
+# ------------------------------------------------------------------- keys
+
+keys() {
+	_x="$(find_xray)" || { echo "no xray" >&2; return 1; }
+	"$_x" x25519 2>/dev/null | awk -F': *' '
+		tolower($1) ~ /private/ { priv = $2 }
+		tolower($1) ~ /public|password/ { pub = $2 }
+		END { if (priv == "" || pub == "") exit 1; print priv, pub }'
+}
+
+case "$1" in
+	config)
+		case "$2" in
+			singbox) config_singbox ;;
+			*) config_xray ;;
+		esac
+		;;
+	fw)
+		case "$2" in
+			up) fw_up ;;
+			*) fw_down ;;
+		esac
+		;;
+	keys) keys ;;
+	ports) open_ports ;;
+	*)
+		echo "usage: $0 config xray|singbox | fw up|down | keys" >&2
+		exit 1
+		;;
+esac
