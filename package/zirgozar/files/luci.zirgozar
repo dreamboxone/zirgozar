@@ -572,7 +572,25 @@ method_action() {
 		pick)
 			# A server chosen by hand rather than by measurement.
 			[ -n "$arg" ] || { fail "no server given"; return; }
-			if "$PROBE" pick "$arg" >/dev/null 2>&1; then
+			case "$arg" in *[!A-Za-z0-9_]*) fail "unknown node"; return ;; esac
+			# It becomes the Node in Basic Settings, as Use beside a node
+			# added by hand does. Picked only as the measured choice, it was
+			# set aside at once whenever Basic Settings named a node of its
+			# own - which is when Use is pressed most.
+			_ref="$("$NODES" origin "$arg" 2>/dev/null | head -1)"
+			if [ -n "$_ref" ]; then
+				uci -q set zirgozar.config.node="$_ref"
+				uci -q set zirgozar.config.enabled='1'
+				uci -q commit zirgozar
+				rm -f "$ZGZ_RUN/schedule.stopped"
+				clear_message
+				say_status starting
+				detach /bin/sh -c ". $ZGZ_LIB/zgz-common.sh; bounded 180 /etc/init.d/zirgozar restart"
+			elif "$PROBE" pick "$arg" >/dev/null 2>&1; then
+				# Not traceable to a node or a subscription: the measured
+				# choice, with Basic Settings back on Auto so nothing sets it
+				# aside.
+				uci -q delete zirgozar.config.node
 				uci -q set zirgozar.config.enabled='1' && uci -q commit zirgozar
 				say_status starting
 				detach "$CONNECT" next
