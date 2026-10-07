@@ -139,6 +139,28 @@ function nameFromLink(text) {
 var TESTS = [ 'ping', 'tcp', 'url' ];
 var results = {};
 
+/* Tests asked for and not answered yet, by cell: what the cell said when it
+   was pressed, and when. The list of every node is drawn again every few
+   seconds, and without this a pressed cell went back to its old value at the
+   next drawing - before the router had answered - and looked as if pressing
+   it had done nothing. Answered means a value other than the one it had and
+   other than "running"; a minute is long enough to stop waiting. */
+var pending = {};
+
+function isPending(key) {
+	var p = pending[key];
+	if (!p) return false;
+	var v = results[key];
+	if (v == -1) p.ran = true;
+	/* Seen running and now finished counts too: a second test can come back
+	   with the very number the first one did. */
+	if ((v !== p.prev && v != -1) || (p.ran && v != -1) || Date.now() - p.at > 60000) {
+		delete pending[key];
+		return false;
+	}
+	return true;
+}
+
 function testTitle(kind) {
 	return kind == 'ping' ? _('Ping') : kind == 'tcp' ? _('TCPing') : _('URL Test');
 }
@@ -176,6 +198,7 @@ function testCell(sid, kind) {
 		'click': function(ev) {
 			ev.preventDefault();
 			ev.stopPropagation();
+			pending[key] = { prev: results[key], at: Date.now() };
 			out.textContent = '…';
 			out.setAttribute('style', 'cursor:pointer;user-select:none;white-space:nowrap');
 			callAction('node_test', kind + ':' + sid).catch(function() {});
@@ -256,6 +279,7 @@ function renderTests(d) {
 		/* A cell showing "…" for a test the router has not written anything
 		   about yet is a request in flight, not a stale value: leave it. */
 		if (!(k in results) && cells[i].textContent == '…') continue;
+		if (isPending(k)) { cells[i].textContent = '…'; continue; }
 		/* On the list of every node, a cell nobody has pressed shows what the
 		   last measurement found rather than "Test". */
 		var v = (k in results) ? results[k] : (cells[i].getAttribute('data-measured') > 0 ? +cells[i].getAttribute('data-measured') : undefined);
@@ -556,6 +580,11 @@ function showAddresses(on) {
    last measurement found, or "Test" when nothing has measured it yet. */
 function listTestCell(tag, kind, measured) {
 	var c = testCell(tag, kind), key = tag + '.' + kind;
+	if (isPending(key)) {
+		c.textContent = '…';
+		c.setAttribute('style', 'cursor:pointer;user-select:none;white-space:nowrap');
+		return c;
+	}
 	if (!(key in results) && measured > 0) {
 		c.setAttribute('data-measured', measured);
 		c.textContent = testText(measured);
