@@ -209,8 +209,8 @@ return view.extend({
 		o.rmempty = false;
 
 		o = s.taboption('main', form.ListValue, 'core_engine', _('Active core'),
-			_('Xray is the default. sing-box reads the same settings and carries the same rules and DNS, but not everything: mux, noise, FakeDNS and mKCP have no equivalent there, and statistics are counted a little differently. A node or setting it cannot use is named in the log, and if it cannot start at all Xray takes over. sing-box-lx, the build that speaks xhttp, is installed from App Update.'));
-		o.value('xray', 'Xray');
+			_('Auto runs Xray, and sing-box for a config Xray cannot run at all - OpenVPN, AmneziaWG, hysteria2 or tuic - so the Core tile names the one actually running. Choosing sing-box or sing-box-lx runs it for every config. sing-box reads the same settings and carries the same rules and DNS, but not everything: mux, noise, FakeDNS and mKCP have no equivalent there, and statistics are counted a little differently. A node or setting it cannot use is named in the log, and if it cannot start at all Xray takes over. sing-box-lx, the build that speaks xhttp and AmneziaWG, is installed from App Update.'));
+		o.value('xray', _('Auto: Xray, and sing-box where Xray cannot'));
 		o.value('singbox', 'sing-box');
 		o.value('singbox-lx', 'sing-box-lx');
 		o.default = 'xray';
