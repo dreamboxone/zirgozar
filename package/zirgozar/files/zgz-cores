@@ -7,9 +7,9 @@
 # zgz-cores - install, update and remove the proxy engines.
 #
 #   zgz-cores list
-#   zgz-cores install xray|sing-box|hysteria
+#   zgz-cores install xray|sing-box|hysteria|warp-plus
 #   zgz-cores install zirgozar       (this program, from its latest release)
-#   zgz-cores remove  sing-box|hysteria
+#   zgz-cores remove  sing-box|hysteria|warp-plus
 #
 # Xray is the engine. It is what the configuration generator writes for, what
 # the measurements run through, and what carries the traffic, and one copy of
@@ -42,11 +42,23 @@ SINGBOX_REPO=SagerNet/sing-box
 LX_REPO=Leadaxe/sing-box-lx
 HYSTERIA_REPO=apernet/hysteria
 GEOVIEW_REPO=snowie2000/geoview
+# Cloudflare WARP for a WARP node: registers its own account, scans for an
+# address that answers, and can put WARP or Psiphon behind it.
+WARPPLUS_REPO=bepass-org/warp-plus
+# warp-plus with more in it: WARP over MASQUE, and noize to disguise the
+# first packets. Carries the WARP nodes that ask for either.
+VWARP_REPO=voidr3aper-anon/Vwarp
+# Xray with one change, for Iran: VLESS and Trojan without TLS may go to a
+# public address, which the official build has refused since 26.7 - and that
+# is the shape of a config sent over Cloudflare's plain-HTTP ports, which
+# has no SNI for a filter to read. Kept beside the official one; whichever
+# accepts the configuration is the one run.
+PATTERNIHA_REPO=patterniha/Xray-core
 
 asset_for() {
 	_a="$(arch_assets)"
 	case "$1" in
-		xray)     echo "$_a" | awk '{print $1}' ;;
+		xray|xray-patterniha) echo "$_a" | awk '{print $1}' ;;
 		# The soft-float builds are the ones a MIPS router can run: the plain
 		# mips and mipsle archives are built for a hardware FPU that most of
 		# them do not have, and would not start.
@@ -61,6 +73,12 @@ asset_for() {
 		hysteria) echo "$_a" | awk '{print $3}' ;;
 		# Geoview names its builds the way sing-box does, but for "i386".
 		geoview)  echo "$_a" | awk '{ print ($2 == "386") ? "i386" : $2 }' ;;
+		# warp-plus: arm7 rather than armv7, soft-float MIPS spelled without a
+		# dash, and nothing for 32-bit x86 or ARM older than v7.
+		warp-plus|vwarp) echo "$_a" | awk '{ s = $2
+			if (s == "armv7") s = "arm7"
+			else if (s ~ /^mips/) s = s "softfloat"
+			print (s == "amd64" || s == "arm64" || s == "arm7" || s == "riscv64" || s ~ /^mips.*softfloat$/) ? s : "-" }' ;;
 	esac
 	return 0
 }
@@ -135,6 +153,48 @@ install_xray() {
 	fi
 	rm -f "$_zip"
 	install_binary "$ZGZ_RUN/xtract/xray" "$DIR/xray" xray
+	return $?
+}
+
+# patterniha's Xray, beside the official one in a file of its own, from its
+# newest release and checked against the checksum published with it. The
+# official build stays where it is: find_xray offers each configuration to
+# every Xray on the router and runs the first that accepts it, so a node that
+# only this build will take is carried by this build.
+install_xray_patterniha() {
+	_asset="$(asset_for xray-patterniha)"
+	[ "$_asset" != "-" ] && [ -n "$_asset" ] || {
+		say_message "Xray publishes no build for this router's processor ($(openwrt_arch)$(uname -m))."
+		return 1
+	}
+	command -v unzip >/dev/null 2>&1 || {
+		say_message "unzip is needed to install Xray and is not on this router. Press Install dependencies on the settings page."
+		return 1
+	}
+	_url="https://github.com/$PATTERNIHA_REPO/releases/latest/download/Xray-linux-$_asset.zip"
+	_zip="$DIR/xray-patterniha.zip"
+	_size="$(remote_size "$_url")"
+	need_room $((_size * 3)) || return 1
+	log "installing patterniha's Xray"
+	download_checked "$_url" "$_zip" "$_size" || return 1
+	_want="$(curl -fsSL --connect-timeout 15 --max-time 60 "$_url.dgst" 2>/dev/null |
+		sed -n 's/^SHA2-256=[[:space:]]*\([0-9a-fA-F]\{64\}\).*/\1/p' | head -1 | tr 'A-F' 'a-f')"
+	_got="$(sha256sum "$_zip" 2>/dev/null | awk '{ print $1 }')"
+	if [ -n "$_want" ] && [ "$_want" != "$_got" ]; then
+		rm -f "$_zip"
+		say_message "The Xray download does not match its published checksum - nothing was installed."
+		warn "xray-patterniha: SHA-256 $_got, the release says $_want"
+		return 1
+	fi
+	_bin="$DIR/xray-patterniha.part"
+	rm -f "$_bin"
+	if ! unzip -p "$_zip" xray > "$_bin" 2>/dev/null || [ ! -s "$_bin" ]; then
+		rm -f "$_zip" "$_bin"
+		say_message "The Xray download did not contain a program - the address or the release may have changed."
+		return 1
+	fi
+	rm -f "$_zip"
+	install_binary "$_bin" "$DIR/xray-patterniha" xray-patterniha
 	return $?
 }
 
@@ -232,6 +292,63 @@ install_geoview() {
 	need_room $((_size * 2)) "$(dirname "$(geoview_path)")" || return 1
 	download_checked "$_url" "$_bin" "$_size" || return 1
 	install_binary "$_bin" "$(geoview_path)" geoview
+	return $?
+}
+
+# --------------------------------------------------------------- warp-plus
+
+# A zip with the program in it, and beside it a .dgst file holding the zip's
+# SHA-256 - which is checked, because this program carries the router's
+# traffic.
+# install_warpplus [warp-plus|vwarp]: the two are built and published the same
+# way, a zip of one program with its checksum beside it.
+install_warpplus() {
+	_wk="${1:-warp-plus}"
+	if [ "$_wk" = "vwarp" ]; then
+		_wrepo="$VWARP_REPO"; _target="$(vwarp_path)"
+	else
+		_wrepo="$WARPPLUS_REPO"; _target="$(warpplus_path)"
+	fi
+	_asset="$(asset_for warp-plus)"
+	[ "$_asset" != "-" ] && [ -n "$_asset" ] || {
+		say_message "$_wk publishes no build for this router's processor."
+		return 1
+	}
+	command -v unzip >/dev/null 2>&1 || {
+		say_message "unzip is needed to install $_wk and is not on this router. Press Install dependencies on the settings page."
+		return 1
+	}
+	_url="https://github.com/$_wrepo/releases/latest/download/${_wk}_linux-$_asset.zip"
+	_zip="$(dirname "$_target")/$_wk.zip"
+	_size="$(remote_size "$_url")"
+	# The program is nearly three times the size of the zip it comes in.
+	need_room $((_size * 4)) "$(dirname "$_target")" || return 1
+	download_checked "$_url" "$_zip" "$_size" || return 1
+
+	_want="$(curl -fsSL --connect-timeout 15 --max-time 60 "$_url.dgst" 2>/dev/null |
+		sed -n 's/^SHA2-256=[[:space:]]*\([0-9a-fA-F]\{64\}\).*/\1/p' | head -1 | tr 'A-F' 'a-f')"
+	_got="$(sha256sum "$_zip" 2>/dev/null | awk '{ print $1 }')"
+	if [ -n "$_want" ] && [ "$_want" != "$_got" ]; then
+		rm -f "$_zip"
+		say_message "The $_wk download does not match its published checksum - nothing was installed."
+		warn "$_wk: SHA-256 $_got, the release says $_want"
+		return 1
+	fi
+	[ -n "$_want" ] || log "$_wk: the checksum file could not be read - installed on the size check alone"
+
+	rm -rf "$ZGZ_RUN/xtract"
+	mkdir -p "$ZGZ_RUN/xtract"
+	# Unpacked beside where it goes, not in memory: twenty megabytes of
+	# program in a RAM disk is more than a small router has.
+	_bin="$_target.part"
+	rm -f "$_bin"
+	if ! unzip -p "$_zip" "$_wk" > "$_bin" 2>/dev/null || [ ! -s "$_bin" ]; then
+		rm -f "$_zip" "$_bin"
+		say_message "The $_wk download did not contain a program - the address or the release may have changed."
+		return 1
+	fi
+	rm -f "$_zip"
+	install_binary "$_bin" "$_target" "$_wk"
 	return $?
 }
 
@@ -360,6 +477,9 @@ repo_of() {
 		sing-box-lx) echo "$LX_REPO" ;;
 		hysteria) echo "$HYSTERIA_REPO" ;;
 		geoview)  echo "$GEOVIEW_REPO" ;;
+		warp-plus) echo "$WARPPLUS_REPO" ;;
+		vwarp)    echo "$VWARP_REPO" ;;
+		xray-patterniha) echo "$PATTERNIHA_REPO" ;;
 		zirgozar) echo "dreamboxone/zirgozar" ;;
 	esac
 	return 0
@@ -431,7 +551,7 @@ cmd_latest() {
 		_old="$(latest_of xray)"
 		[ -n "$_old" ] && printf 'xray\t%s\n' "$_old" >> "$_tmp"
 	fi
-	for _c in sing-box sing-box-lx hysteria geoview zirgozar; do
+	for _c in xray-patterniha sing-box sing-box-lx hysteria geoview warp-plus vwarp zirgozar; do
 		_repo="$(repo_of "$_c")"
 		[ -n "$_repo" ] || continue
 		# The tag is all that is wanted, so this is a small request and a
@@ -472,7 +592,7 @@ one() {
 			"$(json_escape "$_have")" \
 			"$(json_escape "$_latest")" "$_new" \
 			"$(file_size "$_path")" \
-			"$(case "$_path" in "$DIR"/*|"$(singbox_path)"|"$(singbox_lx_path)"|"$(hysteria_path)"|"$(geoview_path)") echo true ;; *) echo false ;; esac)" \
+			"$(case "$_path" in "$DIR"/*|"$(singbox_path)"|"$(singbox_lx_path)"|"$(hysteria_path)"|"$(geoview_path)"|"$(warpplus_path)"|"$(vwarp_path)") echo true ;; *) echo false ;; esac)" \
 			"$([ "$(asset_for "$_name")" != "-" ] && echo true || echo false)"
 	else
 		printf '{"name":"%s","installed":false,"path":"","version":"","latest":"%s","update":false,"bytes":0,"ours":false,"arch_ok":%s}' \
@@ -490,14 +610,20 @@ cmd_list() {
 	_l="$(singbox_lx_path)"; [ -x "$_l" ] || _l=""
 	_h="$(hysteria_path)"; [ -x "$_h" ] || _h=""
 	_g="$(geoview_path)"; [ -x "$_g" ] || _g=""
+	_w="$(warpplus_path)"; [ -x "$_w" ] || _w=""
+	_v="$(vwarp_path)"; [ -x "$_v" ] || _v=""
+	_xp="$DIR/xray-patterniha"; [ -x "$_xp" ] || _xp=""
 	printf '{"dir":"%s","free":%s,"arch":"%s","cores":[' \
 		"$(json_escape "$DIR")" "$(free_bytes "$DIR")" \
 		"$(json_escape "$(openwrt_arch)")"
 	one xray "$_x"; printf ','
+	one xray-patterniha "$_xp"; printf ','
 	one sing-box "$_s"; printf ','
 	one sing-box-lx "$_l"; printf ','
 	one hysteria "$_h"; printf ','
-	one geoview "$_g"
+	one geoview "$_g"; printf ","
+	one warp-plus "$_w"; printf ","
+	one vwarp "$_v"
 	printf ']'
 	# This program itself, for the App Update page: what is installed and
 	# what has been published. It is updated by installing the new package,
@@ -638,7 +764,7 @@ install_self() {
 
 cmd_remove() {
 	case "$1" in
-		sing-box|sing-box-lx|hysteria|geoview)
+		sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|xray-patterniha)
 			# Only ever our own copy - the one at its App Path. Something
 			# else on this router installed anything else, and it is not
 			# ours to delete.
@@ -646,6 +772,9 @@ cmd_remove() {
 				sing-box) _rm="$(singbox_path)" ;;
 				sing-box-lx) _rm="$(singbox_lx_path)" ;;
 				hysteria) _rm="$(hysteria_path)" ;;
+				warp-plus) _rm="$(warpplus_path)" ;;
+				vwarp) _rm="$(vwarp_path)" ;;
+				xray-patterniha) _rm="$DIR/xray-patterniha" ;;
 				*)        _rm="$(geoview_path)" ;;
 			esac
 			if [ -e "$_rm" ]; then
@@ -657,7 +786,7 @@ cmd_remove() {
 			say_message "Xray is the engine and cannot be removed - it can only be updated."
 			return 1
 			;;
-		*) echo "usage: $0 remove sing-box|sing-box-lx|hysteria|geoview" >&2; return 1 ;;
+		*) echo "usage: $0 remove sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|xray-patterniha" >&2; return 1 ;;
 	esac
 	return 0
 }
@@ -671,10 +800,12 @@ case "${1:-list}" in
 			sing-box|sing-box-lx) install_singbox "$2" ;;
 			hysteria) install_hysteria ;;
 			geoview)  install_geoview ;;
+			warp-plus|vwarp) install_warpplus "$2" ;;
+			xray-patterniha) install_xray_patterniha ;;
 			# This file is among those the install replaces, so nothing
 			# after it may be read from here: it ends the script outright.
 			zirgozar) install_self; exit $? ;;
-			*) echo "usage: $0 install xray|sing-box|sing-box-lx|hysteria|geoview|zirgozar" >&2; exit 1 ;;
+			*) echo "usage: $0 install xray|xray-patterniha|sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|zirgozar" >&2; exit 1 ;;
 		esac
 		;;
 	remove) clear_message; cmd_remove "${2:-}" ;;

@@ -96,14 +96,22 @@ g_udp_r="$(port_list "$(cfg udp_redir_ports 1:65535)")"
 # Addresses the router reaches directly even with Localhost Proxy on: the
 # server of a node another core carries for us. Xray's own connections are
 # marked and pass by themselves; a bridge core's are not.
+#
+# warp-plus marks its WireGuard packets, but not the ones its scan sends, and
+# it scans again every time it starts again - so for a WARP node every WARP
+# address is reached directly, and for a WireGuard node it carries, that
+# node's server.
 local_exclusions() {
 	_lx_proto="$(sed -n 's/^protocol=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)"
 	case "$_lx_proto" in
-		hysteria2|hysteria|tuic|openvpn|amneziawg)
+		hysteria2|hysteria|tuic|openvpn|amneziawg|warp)
 			_lx_host="$(sed -n 's/^host=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)"
 			resolve_direct "$_lx_host" 2>/dev/null || true
 			;;
 	esac
+	if [ "$_lx_proto" = "warp" ]; then
+		for _lx_c in $ZGZ_WARP_V4; do echo "$_lx_c"; done
+	fi
 	return 0
 }
 

@@ -220,8 +220,10 @@ zgz_version() {
 # accepts wins. An older core that cannot read a modern REALITY or xhttp
 # stanza is exactly what a version check would wave through, and it would
 # then fail at the only moment that matters.
+# patterniha's build - see zgz-cores - is one more Xray among them, offered
+# every configuration like the others.
 xray_paths() {
-	echo "$ZGZ_OWN_DIR/xray /usr/bin/xray /usr/local/bin/xray"
+	echo "$ZGZ_OWN_DIR/xray /usr/bin/xray /usr/local/bin/xray $(core_dir)/xray-patterniha"
 	return 0
 }
 
@@ -291,13 +293,39 @@ core_engine() {
 # SOCKS port beside it: one core, doing the whole job, as PassWall2 does with
 # a node whose type is sing-box. Only when there is no such sing-box does the
 # old arrangement - Xray, with sing-box as a helper - remain.
+#
+# WARP is the exception: what warp-plus does - finding an address, a second
+# WARP behind the first, Psiphon - no sing-box can be told to do, so it stays
+# a program of its own beside whichever engine the settings name.
 wanted_engine() {
 	_we="$(core_engine)"
-	if [ "$_we" = "xray" ] && [ -s "$ZGZ_ETC/bridge.json" ] && [ -x "$(engine_singbox_path)" ]; then
+	if [ "$_we" = "xray" ] && [ -s "$ZGZ_ETC/bridge.json" ] && ! bridge_is_warp &&
+	   [ -x "$(engine_singbox_path)" ]; then
 		_we=singbox
 	fi
 	echo "$_we"
 	return 0
+}
+
+# What the chosen node is, when it is one a helper program carries.
+bridge_type() {
+	sed -n 's/^{"type":"\([^"]*\)".*/\1/p' "$ZGZ_ETC/bridge.json" 2>/dev/null | head -1
+	return 0
+}
+
+bridge_is_warp() {
+	[ "$(bridge_type)" = "warp" ] && return 0
+	return 1
+}
+
+# Does the tunnel need its helper program running? For a hysteria2, tuic,
+# OpenVPN or AmneziaWG node only while Xray is the engine - sing-box speaks
+# those itself. For WARP always.
+bridge_wanted() {
+	[ -s "$ZGZ_ETC/bridge.json" ] || return 1
+	bridge_is_warp && return 0
+	[ "${1:-$(active_engine)}" = "xray" ] && return 0
+	return 1
 }
 
 active_engine() {
@@ -443,6 +471,80 @@ hysteria_path() {
 	return 0
 }
 
+# warp-plus, which carries a WARP node: Cloudflare's WARP, with an address
+# found by scanning, WARP behind WARP, or Psiphon behind WARP.
+warpplus_path() {
+	_wp="$(cfg core_warpplus '')"
+	echo "${_wp:-$(core_dir)/warp-plus}"
+	return 0
+}
+
+find_warpplus() {
+	_fw="$(warpplus_path)"
+	[ -x "$_fw" ] && { echo "$_fw"; return 0; }
+	return 1
+}
+
+# Vwarp: warp-plus with more in it - WARP over MASQUE, and noize, a disguise
+# for the first packets of WireGuard or MASQUE. Its options are warp-plus's,
+# so it can carry any WARP node; it is what carries one that asks for either.
+vwarp_path() {
+	_vp="$(cfg core_vwarp '')"
+	echo "${_vp:-$(core_dir)/vwarp}"
+	return 0
+}
+
+find_vwarp() {
+	_fv="$(vwarp_path)"
+	[ -x "$_fv" ] && { echo "$_fv"; return 0; }
+	return 1
+}
+
+# Does this WARP node - its description, on stdin or as $1 - need Vwarp?
+# MASQUE and noize are Vwarp's. Anything else runs on warp-plus, or on Vwarp
+# when warp-plus is not there.
+warp_needs_vwarp() {
+	case "$1" in
+		*'"mode":"masque"'*) return 0 ;;
+		*'"noize":"'[a-z]*) return 0 ;;
+	esac
+	return 1
+}
+
+# The program that carries a WARP node, by its description: printed with
+# "vwarp" or "warp-plus" in front so the caller knows which language to speak.
+warp_program() {
+	if warp_needs_vwarp "$1"; then
+		_wpg="$(find_vwarp)" || return 1
+		echo "vwarp $_wpg"
+		return 0
+	fi
+	if _wpg="$(find_warpplus)"; then
+		echo "warp-plus $_wpg"
+		return 0
+	fi
+	# wgconf is warp-plus's own; Vwarp reads the same file.
+	_wpg="$(find_vwarp)" || return 1
+	echo "vwarp $_wpg"
+	return 0
+}
+
+# Where a WARP node keeps its account: one folder per node added by hand, so
+# that each has its own, and a licence on one is not applied to another.
+warp_dir() {
+	case "$1" in
+		''|*[!A-Za-z0-9_]*) echo "$ZGZ_ETC/warp/default" ;;
+		*) echo "$ZGZ_ETC/warp/$1" ;;
+	esac
+	return 0
+}
+
+# The addresses WARP is reached at - the ones warp-plus chooses among and
+# scans. The router reaches them directly even with Localhost Proxy on: a
+# scan sent into the tunnel would measure the tunnel, and while warp-plus is
+# starting again there is no tunnel to measure.
+ZGZ_WARP_V4="162.159.192.0/24 162.159.195.0/24 188.114.96.0/22 162.159.198.0/24"
+
 # Geoview, for the Geo View page - PassWall2's tool for reading the routing
 # data: which lists hold a name or an address, and what one list holds.
 geoview_path() {
@@ -536,6 +638,9 @@ core_version() {
 		*hysteria*) "$1" version 2>/dev/null | sed -n 's/^Version:[[:space:]]*//p' | head -1 ;;
 		*sing-box*) "$1" version 2>/dev/null | sed -n 's/^sing-box version //p' | head -1 ;;
 		*geoview*)  "$1" -version 2>/dev/null | awk 'NR == 1 && $1 == "Geoview" { print $2 }' ;;
+		# warp-plus says it on stderr, as the tag it was built from:
+		# "refs/tags/v1.2.6".
+		*warp-plus*|*vwarp*) "$1" version 2>&1 | head -1 | sed 's|^refs/tags/||' ;;
 		# Xray prints "Xray 26.9.9 (...)", a sing-box under any file name prints
 		# "sing-box version 1.14.2".
 		*)          "$1" version 2>/dev/null | head -1 | awk '$1 == "sing-box" { print $3; next } { print $2 }' ;;
@@ -1166,6 +1271,45 @@ decorate() {
 # rules already honour as "leave this alone".
 ZGZ_OUT_MARK=255
 
+# Records on stdin, written back with every WARP node that can be one as the
+# WireGuard outbound Xray carries itself, and every one that cannot left out.
+#
+# warp-plus is a program of its own with a socket of its own, so it can be the
+# tunnel's node and nothing more: not a pre-proxy, not a link in a landing
+# chain, not a shunt rule's or a SOCKS port's way out - each of those is an
+# outbound Xray has to hold. Plain WARP can be one: the account warp-plus
+# registered is a WireGuard peer like any other. WARP in WARP and Psiphon are
+# things only warp-plus does, and a WireGuard node carried by warp-plus is, for
+# Xray, the WireGuard node it always was.
+warp_natives() {
+	while IFS= read -r _wn; do
+		[ -n "$_wn" ] || continue
+		case "$(printf '%s' "$_wn" | cut -f3)" in
+			warp) : ;;
+			*) printf '%s\n' "$_wn"; continue ;;
+		esac
+		_wn_p="$(printf '%s' "$_wn" | cut -f6-)"
+		_wn_id="$(printf '%s' "$_wn_p" | sed -n 's/.*"id":"\([A-Za-z0-9_]*\)".*/\1/p')"
+		_wn_f="$(warp_dir "$_wn_id")/primary/wgcf-identity.json"
+		case "$_wn_p" in
+			*'"mode":"wgconf"'*) _wn_f=/dev/null ;;
+			*'"mode":"warp"'*)
+				if [ ! -s "$_wn_f" ]; then
+					warn "WARP node '$(printf '%s' "$_wn" | cut -f2)' has no account yet - press Register on its page, or connect through it once"
+					continue
+				fi
+				;;
+			*)
+				warn "WARP node '$(printf '%s' "$_wn" | cut -f2)': WARP in WARP and Psiphon run only as the tunnel's own node"
+				continue
+				;;
+		esac
+		PAYLOAD="$_wn_p" TAG="$(printf '%s' "$_wn" | cut -f1)" LABEL="$(printf '%s' "$_wn" | cut -f2)" \
+			LC_ALL=C awk -v WARPWG=1 -f "$ZGZ_LIB/zgz-parse" < "$_wn_f" 2>/dev/null || true
+	done
+	return 0
+}
+
 # The outbound of one hand-added node, tagged chain-<section>, for the
 # outbounds that name it as their dialer. Only the first link of the section
 # is used, and it is never itself given a dialer: a chain is one hop deep, so
@@ -1173,6 +1317,10 @@ ZGZ_OUT_MARK=255
 chain_outbound() {
 	_co_link="$(uci -q get "zirgozar.$1.link" 2>/dev/null)" || _co_link=""
 	if [ -n "$_co_link" ]; then
+		# A WARP node is read with its section, which names its account.
+		case "$_co_link" in
+			warp://*) _co_link="$(section_links "$1")" ;;
+		esac
 		_co="$(printf '%s\n' "$_co_link" | LC_ALL=C awk -v LIMIT=1 -f "$ZGZ_LIB/zgz-parse" 2>/dev/null | head -1)"
 	else
 		# Not a hand-added node: a subscription's own node that its landing
@@ -1182,6 +1330,8 @@ chain_outbound() {
 			$1 == id { sub(/^[^\t]*\t/, ""); printf "x\tx\tx\tx\t0\t%s\n", $0; exit }' \
 			"$ZGZ_RUN/chains.tsv" 2>/dev/null)"
 	fi
+	[ -n "$_co" ] || return 1
+	_co="$(printf '%s\n' "$_co" | warp_natives)"
 	[ -n "$_co" ] || return 1
 	case "$(printf '%s' "$_co" | cut -f3)" in
 		# A pre-proxy Xray cannot speak cannot be dialled through by Xray.
@@ -1231,14 +1381,14 @@ node_domain_strategy() {
 # as the lines zgz-parse reads them from: "#!zgz-x.<key>=<value>". A
 # certificate keeps its lines with a bar between them, a JSON object loses its
 # line breaks. Nothing at all for a node that has none.
-NODE_EXTRA_KEYS="ech tls_pin cert_name tls_pem cipher_suites user_agent finalmask tcp_fast_open tcp_mptcp domain_strategy happy_eyeballs"
+NODE_EXTRA_KEYS="ech tls_pin cert_name tls_pem cipher_suites user_agent finalmask tcp_fast_open tcp_mptcp domain_strategy happy_eyeballs warpplus"
 
 node_extras() {
 	for _nk in $NODE_EXTRA_KEYS; do
 		_nv="$(uci -q get "zirgozar.$1.$_nk" 2>/dev/null)" || _nv=""
 		[ -n "$_nv" ] || continue
 		case "$_nk" in
-			tcp_fast_open|tcp_mptcp|happy_eyeballs) [ "$_nv" = "1" ] || continue ;;
+			tcp_fast_open|tcp_mptcp|happy_eyeballs|warpplus) [ "$_nv" = "1" ] || continue ;;
 		esac
 		_nv="$(printf '%s' "$_nv" | tr '\r' '\n' | awk -v k="$_nk" '
 			NF { sub(/^[ \t]+/, ""); sub(/[ \t]+$/, ""); out = out (n++ ? (k == "tls_pem" ? "|" : " ") : "") $0 }
@@ -1279,6 +1429,10 @@ section_links() {
 		printf '%s\n' "$_sl_link"
 		return 0
 	fi
+	# A WARP node's account is its own, kept under its section's name.
+	case "$_sl_link" in
+		warp://*) printf '#!zgz-x.warp_id=%s\n' "$1" ;;
+	esac
 	printf '%s\n' "$_sl_link" | NAME="$_sl_name" LC_ALL=C awk '
 		{
 			gsub(/[ \t]+[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, "\n&")
@@ -1315,17 +1469,25 @@ node_records() {
 			_nd_pre="$(uci -q get "zirgozar.$1.preproxy_node" 2>/dev/null)" || _nd_pre=""
 			if [ -n "$_nd_pre" ] && [ "$_nd_pre" != "$1" ] &&
 			   uci -q get "zirgozar.$_nd_pre.link" >/dev/null 2>&1; then
-				printf '%s\n' "$_nd_recs" | set_dialer "chain-$_nd_pre"
-				return 0
+				# A WARP node reached through another is Xray's own WireGuard
+				# outbound: warp-plus cannot be told to dial through anything.
+				_nd_nat="$(printf '%s\n' "$_nd_recs" | warp_natives)"
+				if [ -n "$_nd_nat" ]; then
+					printf '%s\n' "$_nd_nat" | set_dialer "chain-$_nd_pre"
+					return 0
+				fi
 			fi
 			;;
 		2)
 			_nd_to="$(uci -q get "zirgozar.$1.to_node" 2>/dev/null)" || _nd_to=""
 			if [ -n "$_nd_to" ] && [ "$_nd_to" != "$1" ]; then
-				_nd_land="$(section_links "$_nd_to" | LC_ALL=C awk -v LIMIT=1 -f "$ZGZ_LIB/zgz-parse" 2>/dev/null | head -1)"
+				_nd_land="$(section_links "$_nd_to" | LC_ALL=C awk -v LIMIT=1 -f "$ZGZ_LIB/zgz-parse" 2>/dev/null | head -1 | warp_natives)"
 				_nd_first="$(printf '%s\n' "$_nd_recs" | head -1)"
 				case "$(printf '%s' "$_nd_first" | cut -f3)" in
 					hysteria2|hysteria|tuic|openvpn|amneziawg) _nd_land="" ;;
+					# The first hop is reached as chain-<this node>, which for
+					# WARP is its WireGuard outbound - when it has one.
+					warp) [ -n "$(printf '%s\n' "$_nd_first" | warp_natives)" ] || _nd_land="" ;;
 				esac
 				case "$(printf '%s' "$_nd_land" | cut -f3)" in
 					hysteria2|hysteria|tuic|openvpn|amneziawg|'') _nd_land="" ;;

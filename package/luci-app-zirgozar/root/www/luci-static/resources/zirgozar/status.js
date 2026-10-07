@@ -216,10 +216,49 @@ function protoLine() {
 		E('span', { 'style': 'flex:1 1 auto;font-weight:600;display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap' }, [
 			E('span', { 'id': 'pwp-proto' }, '-'),
 			E('span', { 'id': 'pwp-hostwrap', 'style': 'display:none;gap:6px;align-items:center' }, [
-				E('span', { 'style': 'color:var(--muted)' }, '·'), host, eye
+				E('span', { 'style': 'color:var(--muted)' }, '·'), host, eye,
+				E('span', { 'id': 'pwp-exit', 'style': 'display:none;gap:6px;align-items:center' })
 			])
 		])
 	]);
+}
+
+/* Where the tunnel comes out, beside the address: the country the rest of the
+   internet sees, as a flag and a name. Not hidden with the address - a
+   country gives nobody a server - and not the address's own country, which
+   for a server behind a CDN, or for WARP, is only where the CDN answered.
+
+   The flag is a picture rather than the flag emoji, which Windows draws as
+   two letters; if the picture cannot be had, the name says it alone. The
+   name is the browser's own for the code, in the page's language. */
+function countryName(cc) {
+	try {
+		var dn = new Intl.DisplayNames([ i18n.get() === 'fa' ? 'fa' : 'en' ], { type: 'region' });
+		return dn.of(cc) || cc;
+	} catch (e) {
+		return cc;
+	}
+}
+
+function renderExit(st) {
+	var box = byId('pwp-exit');
+	if (!box) return;
+	var cc = /^[A-Z]{2}$/.test(st.exit_cc || '') ? st.exit_cc : '';
+	var key = cc + '|' + (st.exit_ip || '');
+	if (box.getAttribute('data-k') === key) return;
+	box.setAttribute('data-k', key);
+	while (box.firstChild) box.removeChild(box.firstChild);
+	box.style.display = cc ? 'inline-flex' : 'none';
+	if (!cc) return;
+	box.setAttribute('title', _('Where the tunnel comes out') + (st.exit_ip ? ': ' + st.exit_ip : ''));
+	var img = E('img', {
+		'src': 'https://flagcdn.com/w40/' + cc.toLowerCase() + '.png',
+		'alt': '', 'width': '22', 'height': '15',
+		'style': 'border-radius:3px;box-shadow:0 0 0 1px #0002;object-fit:cover'
+	});
+	img.addEventListener('error', function() { if (img.parentNode) img.parentNode.removeChild(img); });
+	box.appendChild(img);
+	box.appendChild(E('span', {}, countryName(cc)));
 }
 
 function line(label, id) {
@@ -292,6 +331,7 @@ function renderState(st) {
 	setNode('pwp-host', st.host ? st.host : '');
 	var hw = byId('pwp-hostwrap');
 	if (hw) hw.style.display = st.host ? 'inline-flex' : 'none';
+	renderExit(st);
 	setNode('pwp-latency', st.latency_ms > 0 ? pui.ms(st.latency_ms) : '-');
 	setNode('pwp-route', st.route_ir
 		? (st.geo_ready ? _('Iran is Direct')

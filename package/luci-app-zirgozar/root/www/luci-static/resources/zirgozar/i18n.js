@@ -248,7 +248,7 @@ var FA = {
 	'Details': 'جزئیات',
 	'Restore defaults': 'بازگشت به حالت پیش‌فرض',
 	'Tick and save to delete every config and subscription and put every setting back as it was when the program was installed. The routing data, the downloaded cores and the traffic history are kept. There is no undo.':
-		'با تیک زدن و ذخیره، همه کانفیگ‌ها و اشتراک‌ها پاک می‌شوند و همه تنظیمات به حالت زمان نصب برمی‌گردند. داده‌های مسیریابی، هسته‌های دانلودشده و تاریخچه مصرف حفظ می‌شوند. این کار برگشت‌پذیر نیست.',
+		'کانفیگ‌ها و اشتراک‌ها حذف می‌شوند و تنظیمات به حالت زمان نصب برمی‌گردند. داده‌های مسیریابی، هسته‌های دانلودشده و تاریخچه مصرف حفظ می‌شوند. این کار برگشت‌پذیر نیست.',
 	'Every config, every subscription and every setting will be deleted when you save. Continue?':
 		'با ذخیره کردن، همه کانفیگ‌ها، اشتراک‌ها و تنظیمات پاک می‌شوند. ادامه می‌دهید؟',
 	'%s (pre-release)': '%s (پیش‌انتشار)',
@@ -350,7 +350,6 @@ var FA = {
 	'sing-box could not run this tunnel, so Xray is carrying it. The Runtime Logs page says why. The official sing-box has no xhttp: install sing-box-lx on the App Update page and choose it under Active core in Basic Settings, or choose Xray there.': 'sing-box نتوانست این تونل را اجرا کند و Xray آن را می‌برد. دلیلش را صفحه «گزارش اجرا» می‌گوید. sing-box رسمی xhttp ندارد: sing-box-lx را از صفحه «به‌روزرسانی» نصب کنید و در تنظیمات پایه زیر «هسته فعال» آن را انتخاب کنید، یا همان‌جا Xray را انتخاب کنید.',
 	'Auto runs Xray, and sing-box for a config Xray cannot run at all - OpenVPN, AmneziaWG, hysteria2 or tuic - so the Core tile names the one actually running. Choosing sing-box or sing-box-lx runs it for every config. sing-box reads the same settings and carries the same rules and DNS, but not everything: mux, noise, FakeDNS and mKCP have no equivalent there, and statistics are counted a little differently. A node or setting it cannot use is named in the log, and if it cannot start at all Xray takes over. sing-box-lx, the build that speaks xhttp and AmneziaWG, is installed from App Update.':
 		'«خودکار» Xray را اجرا می‌کند، و برای کانفیگی که Xray اصلاً نمی‌شناسد - OpenVPN، AmneziaWG، hysteria2 یا tuic - sing-box را؛ کارت «هسته» نام همانی را نشان می‌دهد که واقعاً در حال اجراست. با انتخاب sing-box یا sing-box-lx همه کانفیگ‌ها با آن اجرا می‌شوند. sing-box همان تنظیمات را می‌خواند و همان قوانین و DNS را اجرا می‌کند، ولی نه همه چیز را: mux، noise، FakeDNS و mKCP در آن معادل ندارند و آمار مصرف کمی متفاوت شمرده می‌شود. نود یا تنظیمی که نتواند به کار ببرد در گزارش اجرا نوشته می‌شود و اگر اصلاً راه نیفتد، Xray کار را به دست می‌گیرد. sing-box-lx، نسخه‌ای که xhttp و AmneziaWG را می‌فهمد، از صفحه «به‌روزرسانی» نصب می‌شود.',
-	'Auto: Xray, and sing-box where Xray cannot': 'خودکار: Xray، و هر جا Xray نتواند sing-box',
 	'Direct addresses and domains': 'آدرس‌ها و دامنه‌های مستقیم',
 	'These sites always go straight out, never through the tunnel. A name covers everything under it: example.com also covers www.example.com. Xray’s own forms — full:, regexp:, keyword: — are accepted as written.':
 		'این سایت‌ها همیشه مستقیم می‌روند و هیچ‌وقت از تونل رد نمی‌شوند. هر دامنه زیردامنه‌هایش را هم شامل می‌شود: ‎example.com‎ شامل ‎www.example.com‎ هم هست. شکل‌های خود Xray — ‎full:‎، ‎regexp:‎، ‎keyword:‎ — همان‌طور که نوشته شوند پذیرفته می‌شوند.',
@@ -1002,6 +1001,99 @@ var FA = {
 	'Lets whoever connects reach the devices on this network and the router itself. Off, the private ranges are refused.':
 		'کسی که وصل می‌شود به دستگاه‌های این شبکه و خود روتر دسترسی دارد. خاموش باشد، آدرس‌های خصوصی بسته‌اند.',
 	'Xray could not make a key pair.': 'Xray نتوانست جفت کلید بسازد.',
+
+	/* ---------------------------------------------------------------- WARP */
+	'WARP': 'وارپ',
+	'WARP in WARP': 'وارپ در وارپ',
+	'Psiphon behind WARP': 'سایفون پشت وارپ',
+	'Add WARP': 'افزودن وارپ',
+	'Exit country': 'کشور خروجی',
+	'Cloudflare WARP, carried by warp-plus. It makes a free account by itself and looks for a WARP address that answers from here. Everything else is on the config’s own page.':
+		'وارپ کلودفلر، با warp-plus. خودش یک اکانت رایگان می‌سازد و دنبال آدرسی از وارپ می‌گردد که از اینجا جواب بدهد. بقیه تنظیمات در صفحه خود کانفیگ است.',
+	'WARP+ licence (optional)': 'لایسنس WARP+ (اختیاری)',
+	'WARP+ licence': 'لایسنس WARP+',
+	'A WARP+ licence is letters, digits and dashes.': 'لایسنس WARP+ فقط حرف، عدد و خط تیره است.',
+	'WARP: Cloudflare’s own exit. WARP in WARP: a second WARP behind the first, for an exit address the first does not show. Psiphon behind WARP: an exit in the country chosen below.':
+		'وارپ: خروجی خود کلودفلر. وارپ در وارپ: یک وارپ دوم پشت اولی، برای یک IP خروجی دیگر. سایفون پشت وارپ: خروجی از کشوری که پایین‌تر انتخاب می‌کنید.',
+	'Endpoint': 'اندپوینت',
+	'A WARP address and port, such as 162.159.192.1:2408. Empty lets warp-plus choose one.':
+		'آدرس و پورت وارپ، مثل 162.159.192.1:2408. خالی بگذارید تا warp-plus خودش انتخاب کند.',
+	'An address and a port, such as 162.159.192.1:2408.': 'یک آدرس و یک پورت، مثل 162.159.192.1:2408.',
+	'Scan for an address': 'اسکن آدرس',
+	'Try the WARP addresses and use one that answers from here. Most of them are blocked in Iran, so leave this on.':
+		'آدرس‌های وارپ را امتحان می‌کند و یکی را که از اینجا جواب بدهد برمی‌دارد. بیشترشان در ایران بسته‌اند، پس روشن بماند.',
+	'Scan: slowest answer (ms)': 'اسکن: کندترین جواب (میلی‌ثانیه)',
+	'Addresses that answer more slowly than this are passed over.': 'آدرس‌هایی که دیرتر از این جواب بدهند کنار گذاشته می‌شوند.',
+	'IP version': 'نسخه IP',
+	'Which WARP addresses to use: IPv4 is the one most connections in Iran have.':
+		'از کدام آدرس‌های وارپ استفاده شود. بیشتر اینترنت‌های ایران فقط IPv4 دارند.',
+	'Both': 'هر دو',
+	'IPv4 only': 'فقط IPv4',
+	'IPv6 only': 'فقط IPv6',
+	'Optional. A licence from the 1.1.1.1 app turns the account into WARP+. One licence works on five devices.':
+		'اختیاری. لایسنسی از برنامه 1.1.1.1 اکانت را WARP+ می‌کند. هر لایسنس روی پنج دستگاه کار می‌کند.',
+	'DNS inside WARP': 'DNS داخل وارپ',
+	'Reserved': 'Reserved',
+	'Three numbers, such as 12,34,56. Empty uses the account’s own, which is right unless you were told otherwise.':
+		'سه عدد، مثل 12,34,56. خالی یعنی مقدار خود اکانت، که درست است مگر اینکه جای دیگری چیز دیگری گفته باشند.',
+	'Three numbers with commas between them.': 'سه عدد با ویرگول بینشان.',
+	'WARP account': 'اکانت وارپ',
+	'warp-plus is not installed. Install it on the App Update page.': 'warp-plus نصب نیست. از صفحه «به‌روزرسانی» نصبش کنید.',
+	'Free account': 'اکانت رایگان',
+	'licence': 'لایسنس',
+	'the second account is made on the first connection': 'اکانت دوم در اولین اتصال ساخته می‌شود',
+	'WARP+ data left: %s': 'حجم باقی‌مانده WARP+: %s',
+	'No account yet. warp-plus makes one the first time it connects, if Cloudflare answers from here; Register makes it now.':
+		'هنوز اکانتی نیست. warp-plus در اولین اتصال خودش می‌سازد، اگر کلودفلر از اینجا جواب بدهد. «ثبت‌نام» همین الان می‌سازد.',
+	'Registering… this can take a minute.': 'در حال ثبت‌نام… ممکن است یک دقیقه طول بکشد.',
+	'A new account replaces this one, and a WARP+ licence on it has to be applied again. Go ahead?':
+		'اکانت تازه جای این یکی را می‌گیرد و لایسنس WARP+ باید دوباره روی آن بنشیند. ادامه می‌دهید؟',
+	'New account': 'اکانت تازه',
+	'Register': 'ثبت‌نام',
+	'Registering a WARP account': 'در حال ثبت‌نام اکانت وارپ',
+	'Save and apply this config first': 'اول این کانفیگ را ذخیره و اعمال کنید',
+	'Carry with warp-plus': 'اجرا با warp-plus',
+	'warp-plus sends junk ahead of every WireGuard handshake, which gets it past a filter that drops WireGuard on sight. It needs warp-plus, from App Update. As a pre-proxy or a landing node, the config is still carried by Xray.':
+		'warp-plus قبل از هر هندشیک وایرگارد چند بسته بی‌معنی می‌فرستد و همین وایرگارد را از فیلتری که آن را می‌شناسد و می‌بندد رد می‌کند. warp-plus را از صفحه «به‌روزرسانی» نصب کنید. وقتی این کانفیگ «کانفیگ پیش‌پروکسی» یا «کانفیگ فرود» باشد، همچنان Xray آن را اجرا می‌کند.',
+	'warp-plus App Path': 'مسیر برنامه warp-plus',
+	'Only WARP nodes need it. Empty means this program’s own copy in the folder above.':
+		'فقط کانفیگ‌های وارپ لازمش دارند. خالی یعنی نسخه خود این برنامه در پوشه بالا.',
+	'warp-plus is only needed for WARP nodes: Cloudflare WARP, WARP in WARP, Psiphon behind WARP, and WireGuard nodes set to be carried by it.':
+		'warp-plus فقط برای کانفیگ‌های وارپ لازم است: وارپ کلودفلر، وارپ در وارپ، سایفون پشت وارپ، و کانفیگ‌های وایرگارد که روی «اجرا با warp-plus» گذاشته شده‌اند.',
+	'A WARP node needs warp-plus. Install it on the App Update page.': 'کانفیگ وارپ به warp-plus نیاز دارد. از صفحه «به‌روزرسانی» نصبش کنید.',
+	'WARP did not connect. The Runtime Logs page says how far it got. Without an account, press Register on the node\'s page while another node is connected; without an answer from WARP, turn Scan on or give another endpoint.':
+		'وارپ وصل نشد. صفحه «لاگ‌های اجرا» نشان می‌دهد تا کجا پیش رفت. اگر اکانت ندارد، وقتی کانفیگ دیگری وصل است در صفحه این کانفیگ «ثبت‌نام» را بزنید. اگر وارپ جواب نمی‌دهد، اسکن را روشن کنید یا اندپوینت دیگری بدهید.',
+	'warp-plus publishes no build for this router\'s processor.': 'warp-plus برای پردازنده این روتر نسخه‌ای منتشر نکرده است.',
+	'unzip is needed to install warp-plus and is not on this router. Press Install dependencies on the settings page.':
+		'برای نصب warp-plus برنامه unzip لازم است و روی این روتر نیست. در صفحه تنظیمات «نصب پیش‌نیازها» را بزنید.',
+	'The warp-plus download does not match its published checksum - nothing was installed.':
+		'فایل دانلودشده warp-plus با چک‌سام منتشرشده‌اش نمی‌خواند؛ چیزی نصب نشد.',
+	'The warp-plus download did not contain a program - the address or the release may have changed.':
+		'در فایل دانلودشده warp-plus برنامه‌ای نبود؛ شاید آدرس یا نسخه منتشرشده عوض شده باشد.',
+	'Cloudflare could not be reached to register a WARP account. Connect through another node first, with Localhost Proxy on, and press Register again.':
+		'برای ثبت‌نام اکانت وارپ به کلودفلر دسترسی نبود. اول با یک کانفیگ دیگر وصل شوید، با «پروکسی خود روتر» روشن، و دوباره «ثبت‌نام» را بزنید.',
+	'The WARP+ licence was not accepted, so the account is a free one. Check the licence, and that it is not already on five devices.':
+		'لایسنس WARP+ قبول نشد و اکانت رایگان ماند. لایسنس را بررسی کنید و اینکه روی پنج دستگاه دیگر فعال نباشد.',
+	'That node is not a WARP node.': 'این کانفیگ وارپ نیست.',
+	'Where the tunnel comes out': 'محل خروج تونل',
+	'WARP over MASQUE': 'وارپ با MASQUE',
+	'MASQUE account': 'اکانت MASQUE',
+	'WARP: Cloudflare’s own exit. WARP in WARP: a second WARP behind the first, for an exit address the first does not show. Psiphon behind WARP: an exit in the country chosen below. WARP over MASQUE: WARP reached over HTTP/3 on port 443 rather than WireGuard, for a connection that blocks WireGuard; it needs Vwarp.':
+		'وارپ: خروجی خود کلودفلر. وارپ در وارپ: یک وارپ دوم پشت اولی، برای یک IP خروجی دیگر. سایفون پشت وارپ: خروجی از کشوری که پایین‌تر انتخاب می‌کنید. وارپ با MASQUE: وارپ به‌جای وایرگارد از HTTP/3 روی پورت ۴۴۳، برای اینترنتی که وایرگارد را می‌بندد؛ به Vwarp نیاز دارد.',
+	'Disguise (noize)': 'پوشش (noize)',
+	'Junk and padding sent around the first packets, so that a filter does not recognise WireGuard or MASQUE. Heavier gets past more and connects more slowly. Anything but Off needs Vwarp.':
+		'بسته‌های بی‌معنی و پرکننده دور اولین بسته‌ها، تا فیلتر وایرگارد یا MASQUE را نشناسد. هرچه سنگین‌تر، از فیلترهای بیشتری رد می‌شود و دیرتر وصل می‌شود. هر گزینه‌ای جز «خاموش» به Vwarp نیاز دارد.',
+	'Off': 'خاموش',
+	'Vwarp App Path': 'مسیر برنامه Vwarp',
+	'Only WARP nodes over MASQUE or with noize need it. Empty means this program’s own copy in the folder above.':
+		'فقط کانفیگ‌های وارپ با MASQUE یا با پوشش لازمش دارند. خالی یعنی نسخه خود این برنامه در پوشه بالا.',
+	'Xray (patterniha)': 'Xray (پترنیها)',
+	'Vwarp is warp-plus with WARP over MASQUE and noize; WARP nodes that use either need it. Xray (patterniha) is Xray that also carries VLESS and Trojan without TLS to public addresses - configs over Cloudflare’s plain-HTTP ports - which the official Xray refuses; installed beside it, it is used for those configs.':
+		'Vwarp همان warp-plus است به‌علاوه MASQUE و پوشش (noize)؛ کانفیگ‌های وارپی که از این دو استفاده می‌کنند لازمش دارند. Xray (پترنیها) نسخه‌ای از Xray است که VLESS و Trojan بدون TLS را هم به آدرس عمومی وصل می‌کند - کانفیگ‌هایی که از پورت‌های HTTP ساده کلودفلر می‌روند - و Xray رسمی آن‌ها را رد می‌کند. کنار Xray رسمی نصب می‌شود و برای همین کانفیگ‌ها به کار می‌رود.',
+	'This WARP node uses MASQUE or noize, which need Vwarp. Install it on the App Update page.':
+		'این کانفیگ وارپ از MASQUE یا پوشش استفاده می‌کند که به Vwarp نیاز دارد. از صفحه «به‌روزرسانی» نصبش کنید.',
+	'The Xray download does not match its published checksum - nothing was installed.':
+		'فایل دانلودشده Xray با چک‌سام منتشرشده‌اش نمی‌خواند؛ چیزی نصب نشد.',
 
 	'yes': 'بله',
 	'no': 'خیر'

@@ -26,6 +26,7 @@
 - 🔗 **Subscriptions** on schedules of their own; the default free list is refreshed every quarter of an hour
 - 🇮🇷 **Direct pass for Iranian traffic** — Iranian sites skip the tunnel and cost the config nothing
 - 🧭 **Shunt rules** as in PassWall2: any site or service through a config of your choice, direct, or blocked
+- ☁️ **Cloudflare WARP** through warp-plus: a free account made by itself, a scan for a WARP address that works, WARP in WARP and Psiphon behind WARP
 - 📊 **Traffic used** today, this week and this month
 - 🔄 **One-button update**, from the program's own page
 - 💾 **Saving without dropping connections** — a change the tunnel does not use does not restart it
@@ -176,11 +177,11 @@ At the top, PassWall2's row of tiles:
 Under them the **Status** card: whether the tunnel is connected, which config
 it is using, its protocol, its latency, and how routing is set. The server's
 IP address is **blurred** so that it does not end up in a screenshot or a video;
-the **eye** beside it shows it, and the choice is remembered in that browser. A
+the **eye** beside it shows it, and the choice is remembered in that browser. Beside it are the flag and name of the country the tunnel comes out in - the country sites see you in - asked through the tunnel itself for each new config and every quarter of an hour. A
 config chosen by hand gets its latency from one handshake to its port. A
 progress bar appears while configs are being measured; **Choose again** throws away the
 current choice and measures afresh. A message the router needs you to act on
-appears here, with a cross to put it away.
+appears here, with a cross to put it away. Each time the tunnel starts again the old message goes; if the trouble is still there, that start says so again.
 
 The form below has four tabs, in PassWall2's order.
 
@@ -318,6 +319,7 @@ PassWall2's buttons:
 |---|---|
 | **Add** | A new config, in a window where its link or file is pasted |
 | **Add the node via the link** | Paste share links, one per line; each becomes a config of its own, named the way its link names it |
+| **Add WARP** | A Cloudflare WARP config - see WARP below |
 | **Select all / DeSelect all** | Ticks or clears the box on every row |
 | **Delete select nodes** | Deletes the ticked configs — never the one the tunnel is using right now |
 | **Reassign Group** | Puts the ticked configs in a group |
@@ -330,7 +332,7 @@ rather than left pointing at nothing.
 | Column / field | In the file | What it does |
 |---|---|---|
 | **Name** | `name` | Your name for it. Left empty, the name after the `#` in the link is used, Persian included |
-| **Type** | — | What the link is: vless, vmess, trojan, shadowsocks, socks, hysteria2, tuic, wireguard |
+| **Type** | — | What the link is: vless, vmess, trojan, shadowsocks, socks, hysteria2, tuic, wireguard, warp |
 | **Group Name** | `group` | For your own order; empty is the default group |
 | **Ping / TCPing / URL Test** | — | Three different questions: an ICMP round trip to the address (says nothing about the server behind it); a handshake to the port the tunnel will use; a whole request carried through the config — the only one that proves it works. Each says *Test* until pressed. `✕` is no answer, `—` a test that cannot be run on that config |
 | **On** | `enabled` | This config on or off |
@@ -365,10 +367,10 @@ and applies to configs Xray carries:
 | **TLS Chain Fingerprint (SHA256)** | `tls_pin` | Connects only when the server's chain fingerprint matches |
 | **TLS Certificate Name (CertName)** | `cert_name` | The server's certificate name is checked against this |
 | **TLS Certificate (PEM)** | `tls_pem` | The server's chain is checked against this certificate instead of the usual ones |
-| **ECH** | `ech` | An ECH configuration, or a domain and the DNS that publishes it |
-| **Cipher Suites** | `cipher_suites` | The cipher suites allowed, separated by colons |
+| **ECH** | `ech` | An ECH configuration, or a domain and the DNS that publishes it. A link with an `ech` parameter, as PattN writes them, brings its own; this field wins over it |
+| **Cipher Suites** | `cipher_suites` | The cipher suites allowed, separated by colons. Links made by [PattN](https://github.com/patterniha/PattN) carry them in `cs`, and they are read from there; with the `unsafe` fingerprint they change what the first packet of TLS looks like |
 | **User-Agent** | `user_agent` | For WebSocket, HTTPUpgrade, XHTTP and gRPC |
-| **FinalMask** | `finalmask` | This config's own finalmask as JSON; the fragment and noise of the Xray tab are still added unless it has its own |
+| **FinalMask** | `finalmask` | This config's own finalmask as JSON; the fragment and noise of the Xray tab are still added unless it has its own. A link with an `fm` parameter - PattN's fragment of the TLS hello - brings its own |
 | **TCP Fast Open** / **tcpMptcp** | `tcp_fast_open` / `tcp_mptcp` | The server has to support it too |
 | **Domain DNS Resolve** | `dns_resolver` | When the config's address is a domain, it is looked up directly through this DNS (such as `udp://1.1.1.1` or `https://1.1.1.1/dns-query`) |
 | **Domain Strategy** | `domain_strategy` | Whether a domain is turned into an IP before connecting, and which IP version |
@@ -386,6 +388,32 @@ settings.
 **OpenVPN.** A whole `.ovpn` profile can be added by hand: the servers, `proto`, the certificates in `<ca>`, `<cert>` and `<key>`, `tls-crypt`, `tls-crypt-v2` and `tls-auth`, `verify-x509-name`, the ciphers and `auth`, compression, and a user name and password inside `<auth-user-pass>`. A profile that wants a user name and password without carrying them, or whose private key has a pass phrase, gets those in the edit window of its config - the pass phrase needs `openssl-util`, which *Router requirements* installs. sing-box carries it, so it needs a sing-box on the router: while this config is chosen, sing-box carries the whole tunnel by itself and Xray stands aside, even with Xray as the active core. Scripts, pushed routes and DNS in the profile are ignored, and a profile with no certificate authority (a static key) is not read. Like hysteria2 it is chosen by hand: the automatic ranking does not measure it.
 
 **AmneziaWG.** A WireGuard `.conf` that carries any of the AmneziaWG lines - `Jc`, `Jmin`, `Jmax`, `S1` to `S4`, `H1` to `H4` (a number or a range) and the decoy packets `I1` to `I5` - is an AmneziaWG node, version 2 or 3. Xray cannot speak it, and neither can the official sing-box: it is carried by [sing-box-lx](https://github.com/Leadaxe/sing-box-lx). While this config is chosen, sing-box-lx carries the whole tunnel by itself and Xray stands aside. Without sing-box-lx installed the page says so. Chosen by hand, like hysteria2 and OpenVPN.
+
+**WARP.** Made with **Add WARP** above the table: a name, a mode, the exit country for Psiphon, and a WARP+ licence if you have one. It has no server of its own: [warp-plus](https://github.com/bepass-org/warp-plus) registers a free Cloudflare account by itself, finds a WARP address that answers from here, and hands the tunnel to Xray (or sing-box) as a SOCKS port on the router - so shunt rules, DNS, Access Control and the traffic figures work as with any other config. Install warp-plus on **App Update**. In the file it is a `warp://` link - `warp://[licence@]endpoint-or-auto?mode=…#name`, the shape Hiddify writes - and its edit page has these fields:
+
+| Field | In the link | What it does |
+|---|---|---|
+| **Mode** | `mode` | *WARP*: Cloudflare's own exit. *WARP in WARP*: a second WARP behind the first, for another exit address. *Psiphon behind WARP*: an exit in the country you choose |
+| **Exit country** | `country` | Psiphon only: one of the 31 countries warp-plus has |
+| **Endpoint** | before the `?` | A WARP address and port, such as `162.159.192.1:2408`. Empty lets warp-plus choose |
+| **Scan for an address** | `scan` | Tries the WARP addresses and takes one that answers. Most are blocked in Iran; leave it on. Only with no endpoint |
+| **Scan: slowest answer** | `rtt` | Addresses slower than this, in ms, are passed over. 1000 by default |
+| **IP version** | `ipv` | Both, IPv4 only or IPv6 only |
+| **WARP+ licence** | before the `@` | Optional; makes the account WARP+. One licence works on five devices |
+| **DNS inside WARP** | `dns` | `1.1.1.1` by default |
+| **Reserved** | `reserved` | Three numbers; empty is the account's own |
+
+**WARP account**, under those fields, says whether there is an account, free or WARP+, and how much WARP+ data is left. Each WARP config keeps its own account in `/etc/zirgozar/warp/<section>`, so a reboot does not register a new one. warp-plus registers one by itself the first time it connects, as long as Cloudflare's registration address opens from here - which in Iran it often does not. **Register** makes the account now, through whatever way the router's own traffic goes: with another config connected and **Localhost Proxy** on, through that config. **New account** throws the current one away and makes another.
+
+Connecting can take up to a minute (the scan, and for Psiphon finding a server), and the service waits two. Like OpenVPN it is chosen by hand: the automatic ranking does not measure it. Its **URL Test** runs a warp-plus of its own for the test and takes up to a minute; Ping and TCPing mean nothing for it.
+
+Plain WARP, once it has an account, also works where Xray has to hold the config itself: as a **Preproxy Node** or a **Landing Node** (vless and then out through WARP, for a site that refuses datacenter addresses), in a **shunt rule**, on **Access Control**, for a **SOCKS port** and as a **Server-Side** way out. There the same account is built as Xray's own WireGuard outbound, sent to the config's endpoint or `162.159.192.1:2408`. WARP in WARP and Psiphon are things only warp-plus does, and run only as the tunnel's own config. A WARP config that is the tunnel's config right now goes the tunnel's way in shunt rules and Access Control, rather than as a second session on the same account.
+
+**Carry with warp-plus.** The edit page of a plain WireGuard config (not AmneziaWG) has a tick box of that name. warp-plus sends junk ahead of every handshake, which gets WireGuard past a filter that drops it on sight. Ticked, the config runs the way WARP does; as a pre-proxy or a landing node Xray still carries it.
+
+**WARP over MASQUE.** A fourth mode for a WARP config: WARP reached over MASQUE (HTTP/3 on port 443) instead of WireGuard, for a connection that blocks WARP's WireGuard. It is carried by [Vwarp](https://github.com/voidr3aper-anon/Vwarp), installed on **App Update**. An empty endpoint is `162.159.198.1:443`; an address alone will do, on 443. Vwarp makes its own MASQUE account, and **Register** makes it through the tunnel that is up. In the link: `mode=masque`.
+
+**Disguise (noize).** A new field of a WARP config: junk and padding around the first packets of WireGuard or MASQUE, so that a filter does not recognise them - *Off*, `minimal`, `light`, `medium`, `heavy`, `stealth`, `gfw` or `firewall`. Heavier gets past more and connects more slowly. Anything but Off hands the config to Vwarp; MASQUE is `medium` unless told otherwise. In the link: `noize=…`.
 
 **All configs** — the list at the bottom: every config the router knows about, measured
 first. **TCPing** is filled in for all of them; **URL Test** only for those that
@@ -515,7 +543,7 @@ be made.
 | Card | What it shows |
 |---|---|
 | **App Update** | This program's version and whether a newer one is published. **Update to …** downloads the new version from GitHub, checks it against that release's checksums and installs it with the router's own package manager (apk or opkg); the settings are kept, the tunnel comes back if it was on, and the page reloads by itself |
-| **Cores** | Xray, sing-box, hysteria and Geoview: what is installed, what each project has published, **Check update**, **Install / Update to …**, **Remove**. An update is only offered for something actually newer. Beside Xray is a list of its recent releases, pre-releases included, with **Install this version**. Of the Xray cores on the router the **newest** is always used; to pin one, put its path in Xray App Path. sing-box and hysteria are only for configs that speak hysteria2 or tuic, which Xray does not; Geoview only for the Locator page |
+| **Cores** | Xray, Xray (patterniha), sing-box, hysteria, Geoview, warp-plus and Vwarp: what is installed, what each project has published, **Check update**, **Install / Update to …**, **Remove**. An update is only offered for something actually newer. Beside Xray is a list of its recent releases, pre-releases included, with **Install this version**. Of the Xray cores on the router the **newest** is always used; to pin one, put its path in Xray App Path. sing-box and hysteria are only for configs that speak hysteria2 or tuic, which Xray does not; Geoview only for the Locator page; warp-plus only for WARP configs, and its download is checked against the checksum its release publishes; Vwarp only for WARP over MASQUE or with noize. **Xray (patterniha)** is [patterniha/Xray-core](https://github.com/patterniha/Xray-core): since 26.7 the official Xray refuses VLESS and Trojan without TLS to a public address - the configs that go over Cloudflare's plain-HTTP ports such as 80 and 8080, with no SNI for a filter to read - and this build takes them. It is installed beside the official one; every configuration is offered to every Xray on the router, and the first that accepts it runs it |
 | **Router requirements** | One line: everything is ready, or how many things are missing. **Details** opens the questions put to the running system — transparent proxy, policy routing, HTTPS, the firewall in use, missing packages — with **Install them**. They open by themselves when something is missing |
 
 **App Path**
@@ -527,6 +555,8 @@ be made.
 | **Sing-Box App Path** | `core_singbox` | — | The file sing-box is installed, updated and run from. Empty is this program's own copy in the folder above |
 | **Hysteria App Path** | `core_hysteria` | — | The same for hysteria |
 | **Geoview App Path** | `core_geoview` | — | The same for Geoview |
+| **warp-plus App Path** | `core_warpplus` | — | The same for warp-plus |
+| **Vwarp App Path** | `core_vwarp` | — | The same for Vwarp |
 
 To run a core from memory, give a path beginning with `/tmp`, save and apply,
 and press Install beside it; it has to be installed again after every reboot.
@@ -756,6 +786,9 @@ happens again.
 | There is no node list yet | No subscription read and no config of your own | Add one on Configs |
 | The chosen node speaks hysteria2, tuic, OpenVPN or AmneziaWG, which Xray cannot | sing-box is needed to carry the whole tunnel | Install sing-box (sing-box-lx for AmneziaWG) on App Update |
 | The helper for this node's protocol would not start | The helper core did not run | Check Runtime Logs, or pick another config |
+| A WARP node needs warp-plus | warp-plus is not installed | Install it on App Update |
+| WARP did not connect | warp-plus did not open its port within two minutes: no account could be made, or no WARP address answered | Connect through another config and press Register; turn Scan on or give another endpoint |
+| Cloudflare could not be reached to register a WARP account | Cloudflare's registration address is blocked from here | Connect through another config with Localhost Proxy on, and press Register again |
 | The tunnel process started but never accepted connections | The core ran and never listened | Look at Runtime Logs |
 | The node chosen in Basic Settings cannot be read | The config set as Node is broken or gone | Choose another, or set it back to Auto |
 
@@ -818,7 +851,23 @@ The default config list is the **TOP 100** collection published by
 [@Raydikalx](https://t.me/raydikalx), gathered and kept current as free, public
 work. The Iranian routing data is
 [Chocolate4U/Iran-v2ray-rules](https://github.com/Chocolate4U/Iran-v2ray-rules).
-Locator uses [Geoview](https://github.com/snowie2000/geoview). This project
+Locator uses [Geoview](https://github.com/snowie2000/geoview). WARP configs are
+carried by [warp-plus](https://github.com/bepass-org/warp-plus). This project
 runs no servers of its own: it measures what those lists offer and picks
 whichever answers fastest from where you are. Without them there would be
 nothing here to measure. Thank you.
+
+---
+
+## 💚 11. Support
+
+If Zirgozar has been useful to you, you can support it with Tether:
+
+**USDT — BEP20 (BSC) network only**
+
+```
+0x56daaa6b76d88ee0c8dba8042121f4b77de0a813
+```
+
+> [!WARNING]
+> This address is for USDT on the BEP20 (BSC) network only. Any other coin, or USDT sent over any other network, is lost.

@@ -630,7 +630,7 @@ sub_records() {
 			config_get to "$_sec" to_node ""
 			_land=""
 			if [ -n "$to" ]; then
-				_land="$(section_links "$to" 2>/dev/null | LC_ALL=C awk -v LIMIT=1 -f "$PARSE" 2>/dev/null | head -1)"
+				_land="$(section_links "$to" 2>/dev/null | LC_ALL=C awk -v LIMIT=1 -f "$PARSE" 2>/dev/null | head -1 | warp_natives)"
 			fi
 			case "$(printf '%s' "$_land" | cut -f3)" in
 				hysteria2|hysteria|tuic|openvpn|amneziawg|'') _land="" ;;
@@ -930,6 +930,8 @@ cmd_delete() {
 	for _s in "$@"; do
 		is_node "$_s" || continue
 		forget_refs "$_s"
+		# A WARP node takes its account with it.
+		rm -rf "$ZGZ_ETC/warp/$_s"
 		uci -q delete "zirgozar.$_s" || true
 	done
 	uci -q commit zirgozar

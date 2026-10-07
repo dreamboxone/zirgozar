@@ -267,12 +267,16 @@ function render(d) {
 					return act('core:' + c.name, 'core_remove', c.name, _('%s removed.').format(c.name));
 				}, 'trash'));
 
-			cbox.appendChild(row({ xray: 'Xray', geoview: 'Geoview', 'sing-box-lx': 'sing-box-lx' }[c.name] || c.name, value, actions, 'core:' + c.name));
+			cbox.appendChild(row({ xray: 'Xray', geoview: 'Geoview', 'sing-box-lx': 'sing-box-lx', 'warp-plus': 'warp-plus', vwarp: 'Vwarp', 'xray-patterniha': _('Xray (patterniha)') }[c.name] || c.name, value, actions, 'core:' + c.name));
 		});
 		cbox.appendChild(row(_('Free space'),
 			[ E('span', {}, bytes(cores.free)), E('code', { 'style': 'font-size:11.5px;color:var(--muted)' }, cores.dir || '') ]));
 		cbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:8px 0 0' },
 			_('Xray carries the traffic. sing-box and hysteria are only needed for nodes that speak hysteria2 or tuic, which Xray does not — one of them is then run as a local helper for that one node, and everything else works exactly as before.')));
+		cbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:6px 0 0' },
+			_('warp-plus is only needed for WARP nodes: Cloudflare WARP, WARP in WARP, Psiphon behind WARP, and WireGuard nodes set to be carried by it.')));
+		cbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:6px 0 0' },
+			_('Vwarp is warp-plus with WARP over MASQUE and noize; WARP nodes that use either need it. Xray (patterniha) is Xray that also carries VLESS and Trojan without TLS to public addresses - configs over Cloudflare’s plain-HTTP ports - which the official Xray refuses; installed beside it, it is used for those configs.')));
 	}
 }
 
@@ -324,6 +328,14 @@ return view.extend({
 		o = s.option(form.Value, 'core_geoview', _('Geoview App Path'),
 			_('Only the Locator page needs it. Empty means this program’s own copy in the folder above.'));
 		o.placeholder = '/usr/libexec/zirgozar/geoview';
+
+		o = s.option(form.Value, 'core_warpplus', _('warp-plus App Path'),
+			_('Only WARP nodes need it. Empty means this program’s own copy in the folder above.'));
+		o.placeholder = '/usr/libexec/zirgozar/warp-plus';
+
+		o = s.option(form.Value, 'core_vwarp', _('Vwarp App Path'),
+			_('Only WARP nodes over MASQUE or with noize need it. Empty means this program’s own copy in the folder above.'));
+		o.placeholder = '/usr/libexec/zirgozar/vwarp';
 
 		o = s.option(form.DummyValue, '_path_tip');
 		o.render = function() {

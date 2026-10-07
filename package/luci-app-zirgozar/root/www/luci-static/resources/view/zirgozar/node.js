@@ -39,8 +39,19 @@ var callNodeConfig = rpc.declare({ object: 'luci.zirgozar', method: 'nodeconfig'
 var SCHEMES = {
 	vless: 'vless', vmess: 'vmess', trojan: 'trojan', ss: 'shadowsocks',
 	socks: 'socks', socks5: 'socks', http: 'http', https: 'http',
-	hysteria2: 'hysteria2', hy2: 'hysteria2', tuic: 'tuic'
+	hysteria2: 'hysteria2', hy2: 'hysteria2', tuic: 'tuic', warp: 'warp'
 };
+
+/* Vwarp's disguises for the first packets, lightest first. */
+var NOIZE = [ 'minimal', 'light', 'medium', 'heavy', 'stealth', 'gfw', 'firewall' ];
+
+var WARP_COUNTRIES = [ 'AT', 'AU', 'BE', 'BG', 'CA', 'CH', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GB', 'HR',
+	'HU', 'IE', 'IN', 'IT', 'JP', 'LV', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SG', 'SK', 'US' ];
+
+var callWarp = rpc.declare({ object: 'luci.zirgozar', method: 'warp',
+                             params: [ 'sid' ], expect: { '': {} } });
+var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
+                               params: [ 'name', 'arg' ], expect: { '': {} } });
 
 function b64dec(s) {
 	s = String(s || '').replace(/-/g, '+').replace(/_/g, '/').replace(/\s+/g, '');
@@ -124,6 +135,30 @@ function parseLink(link) {
 
 	var q = {}, qi = body.indexOf('?');
 	if (qi >= 0) { q = parseQuery(body.slice(qi + 1)); body = body.slice(0, qi); }
+
+	/* warp://[licence@]endpoint-or-auto?mode=…#name - see zgz-parse. */
+	if (proto == 'warp') {
+		var wat = body.indexOf('@'), wq = function(k) { var v = q[k]; delete q[k]; return v == null ? '' : v; };
+		f.warp_key = wat >= 0 ? dec(body.slice(0, wat)) : wq('key');
+		var ep = (wat >= 0 ? body.slice(wat + 1) : body).replace(/\/+$/, '');
+		f.warp_endpoint = (ep.toLowerCase() == 'auto') ? '' : ep;
+		var md = wq('mode').toLowerCase();
+		f.warp_mode = { '': 'warp', normal: 'warp', wiw: 'gool', 'warp-in-warp': 'gool', cfon: 'psiphon' }[md] || md;
+		f.warp_country = wq('country').toUpperCase() || 'AT';
+		var sc = wq('scan');
+		f.warp_scan = (sc === '' || sc == '1' || sc == 'true') ? '1' : '0';
+		f.warp_rtt = wq('rtt');
+		f.warp_ipv = wq('ipv');
+		f.warp_dns = wq('dns');
+		f.warp_reserved = wq('reserved');
+		/* MASQUE is disguised unless the link says off; WireGuard is not unless
+		   it says how. */
+		var nz = wq('noize').toLowerCase();
+		f.warp_noize = NOIZE.indexOf(nz) >= 0 ? nz : (f.warp_mode == 'masque' && nz != 'off' ? 'medium' : 'off');
+		f.rest = q;
+		return f;
+	}
+
 	var at = body.lastIndexOf('@'), cred = '', hp;
 	if (at >= 0) { cred = body.slice(0, at); hp = splitHostPort(body.slice(at + 1)); }
 	else if (proto == 'shadowsocks') {
@@ -194,6 +229,21 @@ function buildLink(f, name) {
 		if (f.type == 'grpc' && f.grpc_mode) j.mode = f.grpc_mode;
 		Object.keys(q).forEach(function(k) { j[k] = q[k]; });
 		return 'vmess://' + b64enc(JSON.stringify(j));
+	}
+
+	if (p == 'warp') {
+		q.mode = f.warp_mode || 'warp';
+		q.country = f.warp_mode == 'psiphon' ? (f.warp_country || 'AT') : '';
+		/* Scanning is only for warp-plus to choose an address; a given one is
+		   the one meant. */
+		q.scan = f.warp_endpoint ? '' : (f.warp_scan == '0' ? '0' : '1');
+		q.rtt = (!f.warp_endpoint && f.warp_scan != '0') ? f.warp_rtt : '';
+		q.ipv = f.warp_ipv; q.dns = f.warp_dns; q.reserved = f.warp_reserved;
+		if (f.warp_mode == 'masque') { q.scan = ''; q.rtt = ''; }
+		q.noize = (f.warp_noize && f.warp_noize != 'off') ? f.warp_noize : (f.warp_mode == 'masque' ? 'off' : '');
+		var wqs = buildQuery(q);
+		return 'warp://' + (f.warp_key ? enc(f.warp_key) + '@' : '') + (f.warp_endpoint || 'auto') +
+			(wqs ? '?' + wqs : '') + frag;
 	}
 
 	var hp = joinHostPort(f.address, f.port);
@@ -274,6 +324,80 @@ function download(name, text) {
 	window.setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
 }
 
+/* ------------------------------------------------------- the WARP account
+
+   What account the node has, read from the router, with the two things that
+   can be done to it. warp-plus makes one by itself the first time it starts,
+   but only if Cloudflare's registration address answers from here - which is
+   often exactly what does not. Register makes it now, through whatever way
+   the router's own traffic goes: with another node connected and Localhost
+   Proxy on, through that node. */
+function warpAccount(sid) {
+	var box = E('div', { 'class': 'cbi-value-field', 'style': 'display:flex;flex-direction:column;gap:8px' },
+		[ E('em', {}, _('Waiting for the router…')) ]);
+	var timer = null;
+
+	function show(r) {
+		var i = (r && r.info) || {}, busy = !!(r && r.job == 'Registering a WARP account'), lines = [];
+		if (!i.core)
+			lines.push(E('div', { 'style': 'color:#dc2626;font-weight:600' },
+				_('warp-plus is not installed. Install it on the App Update page.')));
+		if (i.registered) {
+			lines.push(E('div', {}, [
+				E('strong', {}, i.mode == 'masque' ? _('MASQUE account') : (i.plus ? 'WARP+' : _('Free account'))),
+				i.type ? ' · ' + i.type : '',
+				i.address ? ' · ' + i.address : '',
+				i.license ? ' · ' + _('licence') + ' ' + i.license : '',
+				(i.mode == 'gool' && !i.second) ? ' · ' + _('the second account is made on the first connection') : ''
+			]));
+			if (i.plus && i.premium)
+				lines.push(E('div', { 'style': 'color:var(--muted);font-size:12px' },
+					_('WARP+ data left: %s').format((i.premium / 1073741824).toFixed(1) + ' GB')));
+		} else {
+			lines.push(E('div', {}, _('No account yet. warp-plus makes one the first time it connects, if Cloudflare answers from here; Register makes it now.')));
+		}
+		if (busy)
+			lines.push(E('div', { 'style': 'color:var(--muted)' }, _('Registering… this can take a minute.')));
+		else if (r && r.message && /WARP|Cloudflare|warp-plus/.test(r.message))
+			lines.push(E('div', { 'style': 'color:#dc2626' }, _(r.message)));
+
+		var reg = E('button', {
+			'class': 'btn cbi-button cbi-button-action', 'disabled': (busy || !i.core) ? '' : null,
+			'click': ui.createHandlerFn(null, function(ev) {
+				var b = ev.currentTarget;
+				var go = function() {
+					return callAction('warp_register', sid).then(function(a) {
+						if (a && a.error) { pui.note(b, _(a.error), 'error'); return; }
+						refresh();
+					});
+				};
+				if (!i.registered) return go();
+				if (!window.confirm(_('A new account replaces this one, and a WARP+ licence on it has to be applied again. Go ahead?')))
+					return;
+				return callAction('warp_forget', sid).then(go);
+			})
+		}, i.registered ? _('New account') : _('Register'));
+
+		while (box.firstChild) box.removeChild(box.firstChild);
+		lines.forEach(function(l) { box.appendChild(l); });
+		box.appendChild(E('div', {}, [ reg ]));
+		if (busy) {
+			window.clearTimeout(timer);
+			timer = window.setTimeout(refresh, 3000);
+		}
+	}
+
+	function refresh() {
+		return callWarp(sid).then(show).catch(function() {});
+	}
+	refresh();
+
+	return E('div', { 'class': 'cbi-value' }, [
+		E('label', { 'class': 'cbi-value-title' }, _('WARP account')),
+		box
+	]);
+}
+
 /* --------------------------------------------------------------- the page */
 
 return view.extend({
@@ -330,6 +454,13 @@ return view.extend({
 			o.rows = 14;
 			o.rmempty = false;
 			o.monospace = true;
+			/* A plain WireGuard node - not AmneziaWG, which has its own
+			   disguise - can be handed to warp-plus instead of Xray. */
+			if ((/^\s*\[(interface|peer)\]/im.test(link) && !/^\s*(jc|jmin|jmax|s[1-4]|h[1-4]|i[1-5])\s*=/im.test(link)) ||
+			    /^\s*(wireguard|wg):\/\//i.test(link)) {
+				o = s.option(form.Flag, 'warpplus', _('Carry with warp-plus'),
+					_('warp-plus sends junk ahead of every WireGuard handshake, which gets it past a filter that drops WireGuard on sight. It needs warp-plus, from App Update. As a pre-proxy or a landing node, the config is still carried by Xray.'));
+			}
 			if (/^\s*(client\s*$|remote\s+\S+|<ca>)/im.test(link)) {
 				o = s.option(form.Value, 'ovpn_user', _('OpenVPN user name'));
 				o = s.option(form.Value, 'ovpn_pass', _('OpenVPN password'));
@@ -343,14 +474,94 @@ return view.extend({
 
 			o = field(form.ListValue, 'proto', _('Protocol'));
 			[ [ 'vless', 'VLESS' ], [ 'vmess', 'VMess' ], [ 'trojan', 'Trojan' ], [ 'shadowsocks', 'Shadowsocks' ],
-			  [ 'socks', 'Socks' ], [ 'http', 'HTTP' ], [ 'hysteria2', 'Hysteria2' ], [ 'tuic', 'TUIC' ] ]
+			  [ 'socks', 'Socks' ], [ 'http', 'HTTP' ], [ 'hysteria2', 'Hysteria2' ], [ 'tuic', 'TUIC' ], [ 'warp', 'WARP' ] ]
 				.forEach(function(v) { o.value(v[0], v[1]); });
 
+			/* Every protocol but WARP has a server of its own. */
+			var SERVERS = XR.concat([ 'hysteria2', 'tuic' ]);
 			o = field(form.Value, 'address', _('Address (Support Domain Name)'));
 			o.rmempty = false;
+			SERVERS.forEach(function(p) { o.depends('_proto', p); });
 			o = field(form.Value, 'port', _('Port'));
 			o.datatype = 'port';
 			o.rmempty = false;
+			SERVERS.forEach(function(p) { o.depends('_proto', p); });
+
+			/* ------------------------------------------------------ WARP */
+			o = field(form.ListValue, 'warp_mode', _('Mode'),
+				_('WARP: Cloudflare’s own exit. WARP in WARP: a second WARP behind the first, for an exit address the first does not show. Psiphon behind WARP: an exit in the country chosen below. WARP over MASQUE: WARP reached over HTTP/3 on port 443 rather than WireGuard, for a connection that blocks WireGuard; it needs Vwarp.'));
+			o.value('warp', _('WARP'));
+			o.value('gool', _('WARP in WARP'));
+			o.value('psiphon', _('Psiphon behind WARP'));
+			o.value('masque', _('WARP over MASQUE'));
+			o.depends('_proto', 'warp');
+
+			o = field(form.ListValue, 'warp_country', _('Exit country'));
+			WARP_COUNTRIES.forEach(function(c) { o.value(c); });
+			o.depends({ '_proto': 'warp', '_warp_mode': 'psiphon' });
+
+			o = field(form.Value, 'warp_endpoint', _('Endpoint'),
+				_('A WARP address and port, such as 162.159.192.1:2408. Empty lets warp-plus choose one.'));
+			o.placeholder = _('Auto');
+			o.depends('_proto', 'warp');
+			o.validate = function(section_id, value) {
+				if (!value || splitHostPort(value)) return true;
+				/* MASQUE is always on 443, so an address alone will do. */
+				if (this.section.formvalue(section_id, '_warp_mode') == 'masque' && /^[0-9A-Za-z.:-]+$/.test(value)) return true;
+				return _('An address and a port, such as 162.159.192.1:2408.');
+			};
+
+			o = field(form.Flag, 'warp_scan', _('Scan for an address'),
+				_('Try the WARP addresses and use one that answers from here. Most of them are blocked in Iran, so leave this on.'));
+			[ 'warp', 'gool', 'psiphon' ].forEach(function(md) {
+				o.depends({ '_proto': 'warp', '_warp_mode': md, '_warp_endpoint': '' });
+			});
+
+			o = field(form.Value, 'warp_rtt', _('Scan: slowest answer (ms)'),
+				_('Addresses that answer more slowly than this are passed over.'));
+			o.placeholder = '1000';
+			o.datatype = 'range(100,10000)';
+			[ 'warp', 'gool', 'psiphon' ].forEach(function(md) {
+				o.depends({ '_proto': 'warp', '_warp_mode': md, '_warp_endpoint': '', '_warp_scan': '1' });
+			});
+
+			o = field(form.ListValue, 'warp_ipv', _('IP version'),
+				_('Which WARP addresses to use: IPv4 is the one most connections in Iran have.'));
+			o.value('', _('Both'));
+			o.value('4', _('IPv4 only'));
+			o.value('6', _('IPv6 only'));
+			o.depends('_proto', 'warp');
+
+			o = field(form.ListValue, 'warp_noize', _('Disguise (noize)'),
+				_('Junk and padding sent around the first packets, so that a filter does not recognise WireGuard or MASQUE. Heavier gets past more and connects more slowly. Anything but Off needs Vwarp.'));
+			o.value('off', _('Off'));
+			NOIZE.forEach(function(v) { o.value(v); });
+			o.depends('_proto', 'warp');
+
+			o = field(form.Value, 'warp_key', _('WARP+ licence'),
+				_('Optional. A licence from the 1.1.1.1 app turns the account into WARP+. One licence works on five devices.'));
+			o.password = true;
+			o.depends('_proto', 'warp');
+			o.validate = function(section_id, value) {
+				return (!value || /^[A-Za-z0-9-]+$/.test(value)) ? true : _('A WARP+ licence is letters, digits and dashes.');
+			};
+
+			o = field(form.Value, 'warp_dns', _('DNS inside WARP'));
+			o.placeholder = '1.1.1.1';
+			o.datatype = 'ipaddr';
+			o.depends('_proto', 'warp');
+
+			o = field(form.Value, 'warp_reserved', _('Reserved'),
+				_('Three numbers, such as 12,34,56. Empty uses the account’s own, which is right unless you were told otherwise.'));
+			o.depends('_proto', 'warp');
+			o.validate = function(section_id, value) {
+				return (!value || /^\d{1,3},\d{1,3},\d{1,3}$/.test(value)) ? true : _('Three numbers with commas between them.');
+			};
+
+			if (f.proto == 'warp') {
+				o = s.option(form.DummyValue, '_warp_account', _('WARP account'));
+				o.render = function() { return warpAccount(sid); };
+			}
 
 			o = field(form.Value, 'uuid', _('ID'));
 			o.password = true;

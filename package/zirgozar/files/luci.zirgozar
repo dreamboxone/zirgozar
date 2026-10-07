@@ -104,9 +104,31 @@ method_state() {
 	fi
 	if [ -s "$ZGZ_RUN/core.info" ] && grep -q '^bridge=' "$ZGZ_RUN/core.info" 2>/dev/null; then
 		pgrep -f "$ZGZ_BRIDGE_JSON" >/dev/null 2>&1 && bridge_on=1
+		# Vwarp is given its options on the command line, not that file.
+		if [ "$bridge_on" = "0" ]; then
+			_bb="$(sed -n 's/^bridge=//p' "$ZGZ_RUN/core.info" 2>/dev/null | head -1)"
+			[ -n "$_bb" ] && pgrep -f "^$_bb --bind" >/dev/null 2>&1 && bridge_on=1
+		fi
+	fi
+
+	# Where the tunnel comes out, for the flag beside the address: asked again
+	# in the background when the node is not the one it was asked about, when
+	# the last answer was no answer, and every quarter of an hour - a node's
+	# way out can move. Only while connected, when there is a way out to ask.
+	_ex=""
+	if [ "$connected" = "1" ]; then
+		_ex="$ZGZ_RUN/exit"
+		if ! cmp -s "$ZGZ_BEST_META" "$_ex.meta" 2>/dev/null ||
+		   [ -n "$(find "$_ex" -mmin +15 2>/dev/null)" ] ||
+		   { ! grep -q '^cc=..$' "$_ex" 2>/dev/null && [ -n "$(find "$_ex" -mmin +1 2>/dev/null)" ]; }; then
+			[ -d "$_ex.lock" ] || detach "$TEST" exit
+		fi
+		# The answer about another node is not shown at all.
+		cmp -s "$ZGZ_BEST_META" "$_ex.meta" 2>/dev/null || _ex=""
 	fi
 
 	uci -q show zirgozar.config 2>/dev/null | LC_ALL=C awk \
+		-v exitf="$_ex" \
 		-v running="$running" -v connected="$connected" -v autostart="$autostart" \
 		-v backend="$backend" -v geo="$geo" -v pw="$pw" -v bridge_on="$bridge_on" -v cpath="$cpath" \
 		-v vfile="$ZGZ_VERSION_FILE" -v sfile="$ZGZ_STATUS" -v mfile="$ZGZ_MESSAGE" -v jfile="$JOB" \
@@ -143,6 +165,7 @@ method_state() {
 		}
 		END {
 			kv(meta, M); kv(prog, P); kv(cinfo, C)
+			if (exitf != "") kv(exitf, X)
 			ver = whole(vfile); if (ver == "") ver = "unknown"
 			en = cfg["enabled"]; en = (en == "1" || en == "on" || en == "true" || en == "yes" || en == "enabled") ? "1" : "0"
 			ri = cfg["route_ir"]; ri = (ri == "1" || ri == "on" || ri == "true" || ri == "yes" || ri == "enabled") ? "1" : "0"
@@ -154,6 +177,7 @@ method_state() {
 			bool("running", running); bool("connected", connected); bool("enabled", en); bool("autostart", autostart)
 			str("status", whole(sfile)); str("message", whole(mfile)); str("job", whole(jfile))
 			str("server", M["label"]); str("protocol", M["protocol"]); str("host", M["host"]); int_("latency_ms", M["latency_ms"])
+			str("exit_cc", X["cc"]); str("exit_ip", X["ip"])
 			str("phase", P["phase"]); int_("total", P["total"]); int_("done", P["done"]); int_("alive", P["alive"]); int_("tested", P["tested"])
 			str("core_path", ("path" in C && C["path"] != "") ? C["path"] : cpath)
 			str("core_name", (C["name"] != "") ? C["name"] : "xray")
@@ -324,9 +348,13 @@ method_nodeconfig() {
 	esac
 	rec="$(node_records "$sid" 1 2>/dev/null | head -1)"
 	[ -n "$rec" ] || { fail "unreadable"; return; }
+	# Plain WARP, once it has an account, is a WireGuard peer Xray can carry.
+	[ "$(printf '%s' "$rec" | cut -f3)" != "warp" ] ||
+		rec="$(printf '%s\n' "$rec" | warp_natives)"
+	[ -n "$rec" ] || { fail "not xray"; return; }
 	proto="$(printf '%s' "$rec" | cut -f3)"
 	case "$proto" in
-		hysteria2|hysteria|tuic|openvpn|amneziawg) fail "not xray"; return ;;
+		hysteria2|hysteria|tuic|openvpn|amneziawg|warp) fail "not xray"; return ;;
 	esac
 	out="$(printf '%s\n' "$rec" | DOMSTRAT="" decorate | cut -f6- | sed 's/^{/{"tag":"proxy",/')"
 	chains="$(chain_outbounds "$out" | while read -r _co; do [ -n "$_co" ] && printf ',%s' "$_co"; done)"
@@ -334,6 +362,25 @@ method_nodeconfig() {
 	json_add_boolean "ok" 1
 	json_add_string "config" "$(printf '{"log":{"loglevel":"warning"},"inbounds":[{"tag":"socks","listen":"127.0.0.1","port":1080,"protocol":"socks","settings":{"udp":true},"sniffing":{"enabled":true,"destOverride":["http","tls","quic"]}},{"tag":"http","listen":"127.0.0.1","port":1081,"protocol":"http"}],"outbounds":[%s%s,{"tag":"direct","protocol":"freedom"},{"tag":"block","protocol":"blackhole"}]}' "$out" "$chains")"
 	json_dump
+}
+
+# A WARP node's account, for its page: whether there is one, what kind, and
+# whether warp-plus is there to use it. Whether a job is still making it, and
+# the last thing said about it, come along so the page needs one call.
+method_warp() {
+	local input sid
+	read -r input
+	[ -n "$input" ] || input='{}'
+	json_load "$input" 2>/dev/null
+	json_get_var sid sid
+	case "$sid" in
+		''|*[!A-Za-z0-9_]*) fail "no node given"; return ;;
+	esac
+	_wi="$("$ZGZ_LIB/zgz-warp" info "$sid" 2>/dev/null)" || _wi=""
+	[ -n "$_wi" ] || _wi='{"warp":false}'
+	printf '{"info":%s,"job":"%s","message":"%s"}\n' "$_wi" \
+		"$(json_escape "$(cat "$JOB" 2>/dev/null)")" \
+		"$(json_escape "$(cat "$ZGZ_MESSAGE" 2>/dev/null)")"
 }
 
 # The Server-Side page's status line: which of the two cores is running its
@@ -594,7 +641,7 @@ method_action() {
 					uci -q set zirgozar.config.node="$_ids" && uci -q commit zirgozar
 					if [ "$(cfg_bool enabled 0)" = "1" ]; then
 						say_status starting
-						detach /bin/sh -c ". $ZGZ_LIB/zgz-common.sh; bounded 90 /etc/init.d/zirgozar restart"
+						detach /bin/sh -c ". $ZGZ_LIB/zgz-common.sh; bounded 180 /etc/init.d/zirgozar restart"
 					fi
 					;;
 			esac
@@ -632,7 +679,7 @@ method_action() {
 			;;
 		core_install)
 			case "$arg" in
-				xray|sing-box|sing-box-lx|hysteria|geoview) run_job "Installing $arg" "$CORES install $arg" ;;
+				xray|xray-patterniha|sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp) run_job "Installing $arg" "$CORES install $arg" ;;
 				# One particular Xray, picked from the list on the page.
 				xray@v[0-9]*)
 					_v="${arg#xray@}"
@@ -651,7 +698,7 @@ method_action() {
 			;;
 		core_remove)
 			case "$arg" in
-				sing-box|sing-box-lx|hysteria|geoview) "$CORES" remove "$arg" >/dev/null 2>&1 ;;
+				sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|xray-patterniha) "$CORES" remove "$arg" >/dev/null 2>&1 ;;
 				*) fail "unknown core"; return ;;
 			esac
 			;;
@@ -688,6 +735,20 @@ method_action() {
 			json_add_boolean "already" "$([ "$_r" = "already" ] && echo 1 || echo 0)"
 			json_dump
 			return
+			;;
+		warp_register|warp_forget)
+			# A WARP node's account, made now or thrown away. Making one takes
+			# Cloudflare most of a minute on a bad day, so it is a job.
+			case "$arg" in
+				''|*[!A-Za-z0-9_]*) fail "unknown node"; return ;;
+			esac
+			[ "$(uci -q get "zirgozar.$arg")" = "node" ] || { fail "Save and apply this config first"; return; }
+			if [ "$name" = "warp_register" ]; then
+				clear_message
+				run_job "Registering a WARP account" "$ZGZ_LIB/zgz-warp register $arg"
+			else
+				"$ZGZ_LIB/zgz-warp" forget "$arg" >/dev/null 2>&1
+			fi
 			;;
 		server_keys)
 			# A REALITY key pair for a server on the Server-Side page.
@@ -761,6 +822,9 @@ case "$1" in
 		json_add_object "nodeconfig"
 			json_add_string "sid" ""
 		json_close_object
+		json_add_object "warp"
+			json_add_string "sid" ""
+		json_close_object
 		json_add_object "geoview"
 		json_add_string "action" "lookup"
 		json_add_string "value" ""
@@ -787,6 +851,7 @@ case "$1" in
 			geo)     "$GEO" status 2>/dev/null || echo '{}' ;;
 			geoview) method_geoview ;;
 			nodeconfig) method_nodeconfig ;;
+			warp)    method_warp ;;
 			server)  method_server ;;
 			action)  method_action ;;
 		esac

@@ -236,11 +236,22 @@ acl_ports() {
 	return 0
 }
 
+# A WARP node that is also the tunnel's own is the tunnel's way out, not a
+# second WireGuard session on the same account: two at once from one router
+# would take the account's one peer address away from each other in turn.
+warp_in_use() {
+	if [ "$(cfg node '')" = "$1" ] && bridge_is_warp; then
+		return 0
+	fi
+	return 1
+}
+
 # The node's own outbound, with its own chain if it has one, and the Xray tab
 # applied - but not the tunnel's pre-proxy: a rule naming one node means that
 # node as it is set up, not as the tunnel's own choice would be.
 acl_outbound() {
-	node_records "$1" 1 2>/dev/null | head -1 |
+	warp_in_use "$1" && return 1
+	node_records "$1" 1 2>/dev/null | head -1 | warp_natives |
 		awk -F'\t' '$6 ~ /"protocol"/ { print; found = 1; exit } END { exit found ? 0 : 1 }' |
 		decorate | cut -f6-
 }
@@ -461,7 +472,8 @@ add_shunt() {
 # with the others that dial through something, from the dialer tag.
 shunt_outbound() {
 	if [ -n "$2" ] && [ "$2" != "$1" ] && uci -q get "zirgozar.$2.link" >/dev/null 2>&1; then
-		node_records "$1" 1 2>/dev/null | head -1 |
+		warp_in_use "$1" && return 1
+		node_records "$1" 1 2>/dev/null | head -1 | warp_natives |
 			awk -F'\t' '$6 ~ /"protocol"/ { print; found = 1; exit } END { exit found ? 0 : 1 }' |
 			decorate "chain-$2" | cut -f6-
 		return 0

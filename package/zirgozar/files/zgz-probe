@@ -156,7 +156,7 @@ sift_one() {
 	# them behind everything that did answer, and the second pass, which makes
 	# a real request, decides whether they work.
 	case "$_proto" in
-		wireguard|hysteria2|hysteria|tuic|openvpn|amneziawg)
+		wireguard|hysteria2|hysteria|tuic|openvpn|amneziawg|warp)
 			printf '%06d\t%s\n' 9000 "$_tag" >> "$ALIVE"
 			echo x >> "$ATTEMPTS"
 			return 0
@@ -533,7 +533,11 @@ cmd_use() {
 	log "using the node chosen in Basic Settings: $(printf '%s' "$_row" | cut -f2)"
 	# Nothing is measured to choose it, but the status page still wants its
 	# latency: one handshake to its port, the same figure the TCPing column
-	# shows. Zero - no answer - is shown as a dash, as before.
+	# shows. Zero - no answer - is shown as a dash, as before. WARP has no TCP
+	# port to knock on, and which address it uses is warp-plus's choice.
+	case "$(printf '%s' "$_row" | cut -f3)" in
+		warp) select_row "$_row" 0; return $? ;;
+	esac
 	select_row "$_row" "$(tcp_ms "$(printf '%s' "$_row" | cut -f4)" "$(printf '%s' "$_row" | cut -f5)")"
 }
 
@@ -550,7 +554,7 @@ select_row() {
 
 	_tmp="$ZGZ_RUN/best.new"
 	case "$_proto" in
-		hysteria2|tuic|openvpn|amneziawg)
+		hysteria2|tuic|openvpn|amneziawg|warp)
 			# Xray cannot speak these. zgz-bridge runs a core that can and
 			# offers it as a plain SOCKS port on loopback, so what Xray ends
 			# up holding is an ordinary socks outbound and nothing else in the

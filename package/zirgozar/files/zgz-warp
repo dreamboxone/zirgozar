@@ -1,0 +1,353 @@
+#!/bin/sh
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+# Part of Zirgozar - https://github.com/dreamboxone/zirgozar
+#
+# zgz-warp - the WARP accounts behind WARP nodes, and the URL test of one.
+#
+#   zgz-warp register <node>   make the node's account now
+#   zgz-warp forget <node>     delete it; the next start makes a new one
+#   zgz-warp info <node>       what the account is, as JSON
+#   zgz-warp test <node>       a whole request through it, in milliseconds
+#
+# warp-plus registers an account by itself the first time it starts, and keeps
+# it in the folder it is given. What it cannot do is register one without
+# then connecting, and on a connection where Cloudflare's registration
+# address is blocked the first start is exactly when it cannot. So Register
+# starts it just long enough to make the account - through whatever way the
+# router's own traffic goes, which with another node connected and Localhost
+# Proxy on is that node - and stops it as soon as the account is on flash.
+#
+# The same is done for the second account WARP in WARP needs, which warp-plus
+# would otherwise only register after the first one had connected.
+
+set -e
+
+. "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
+
+PARSE="$ZGZ_LIB/zgz-parse"
+REG_PORT=24911
+TEST_PORT=24910
+REG_LOG="$ZGZ_RUN/warp-register.log"
+ID_FILE=wgcf-identity.json
+
+# The node's record, as the tunnel would read it.
+warp_record() {
+	_wr="$(node_records "$1" 1 2>/dev/null | head -1)" || _wr=""
+	[ "$(printf '%s' "$_wr" | cut -f3)" = "warp" ] || return 1
+	printf '%s\n' "$_wr"
+	return 0
+}
+
+payload_get() {
+	printf '%s' "$1" | sed -n "s/.*\"$2\":\"\\([^\"]*\\)\".*/\\1/p" | head -1
+	return 0
+}
+
+# Is anything listening on this TCP port on loopback?
+port_open() {
+	_hex="$(printf %04X "$1" 2>/dev/null)" || return 1
+	grep -qi ":$_hex " /proc/net/tcp 2>/dev/null
+}
+
+# ---------------------------------------------------------------- register
+
+# One account, made in <dir>: the client pointed at an address nothing answers
+# on, so that it registers and goes no further, and stopped as soon as the
+# account is written - with the licence on it, when one was given. WireGuard's
+# account is <dir>/primary/wgcf-identity.json; MASQUE's, which Vwarp makes for
+# itself, is <dir>/masque_config.json. $WPK says which program $WP is.
+register_one() {
+	_rd="$1"; _rkey="$2"; _rmasque="${3:-0}"
+	mkdir -p "$_rd"
+	chmod 700 "$_rd" 2>/dev/null || true
+	_rcfg="$ZGZ_RUN/warp-register.json"
+	if [ "$_rmasque" = "1" ]; then
+		_rf="$_rd/masque_config.json"
+		"$WP" --bind "127.0.0.1:$REG_PORT" --cache-dir "$_rd" --masque --endpoint 127.0.0.1:443 \
+			--noize-preset= >> "$REG_LOG" 2>&1 &
+	elif [ "$WPK" = "vwarp" ]; then
+		_rf="$_rd/primary/$ID_FILE"
+		# shellcheck disable=SC2046
+		"$WP" --bind "127.0.0.1:$REG_PORT" --cache-dir "$_rd" --endpoint 127.0.0.1:9 \
+			$([ -n "$_rkey" ] && printf -- '--key %s' "$_rkey") --noize-preset= >> "$REG_LOG" 2>&1 &
+	else
+		_rf="$_rd/primary/$ID_FILE"
+		printf '{"bind":"127.0.0.1:%s","cache-dir":"%s","endpoint":"127.0.0.1:9"%s}\n' \
+			"$REG_PORT" "$_rd" "$([ -n "$_rkey" ] && printf ',"key":"%s"' "$_rkey")" > "$_rcfg"
+		"$WP" -c "$_rcfg" >> "$REG_LOG" 2>&1 &
+	fi
+	_rpid=$!
+	_n=0
+	_ok=1
+	while [ "$_n" -lt 90 ]; do
+		if [ -s "$_rf" ] && { [ "$_rmasque" = "1" ] || [ -z "$_rkey" ] || grep -q "\"license\": \"$_rkey\"" "$_rf" 2>/dev/null; }; then
+			_ok=0
+			break
+		fi
+		kill -0 "$_rpid" 2>/dev/null || break
+		sleep 1
+		_n=$((_n + 1))
+	done
+	kill "$_rpid" 2>/dev/null || true
+	wait "$_rpid" 2>/dev/null || true
+	rm -f "$_rcfg"
+	# A licence Cloudflare would not take still leaves an account: the free one.
+	if [ "$_ok" != "0" ] && [ -s "$_rf" ] && [ -n "$_rkey" ]; then
+		_ok=2
+	fi
+	return "$_ok"
+}
+
+# The program for a node, in WPK and WP: Vwarp for MASQUE, whichever there is
+# for the rest - see warp_program.
+pick_program() {
+	_pp="$(warp_program "$1")" || return 1
+	WPK="${_pp%% *}"
+	WP="${_pp#* }"
+	return 0
+}
+
+# Has this node every account it needs?
+has_account() {
+	_hd="$(warp_dir "$(payload_get "$1" id)")"
+	case "$(payload_get "$1" mode)" in
+		wgconf) return 0 ;;
+		masque) [ -s "$_hd/masque_config.json" ] && return 0; return 1 ;;
+		gool) [ -s "$_hd/primary/$ID_FILE" ] && [ -s "$_hd/secondary/$ID_FILE" ] && return 0; return 1 ;;
+	esac
+	[ -s "$_hd/primary/$ID_FILE" ] && return 0
+	return 1
+}
+
+register_node() {
+	_rec="$(warp_record "$1")" || { say_message "That node is not a WARP node."; return 1; }
+	_p="$(printf '%s' "$_rec" | cut -f6-)"
+	_mode="$(payload_get "$_p" mode)"
+	[ "$_mode" != "wgconf" ] || return 0
+	pick_program "$_p" || {
+		if warp_needs_vwarp "$_p"; then
+			say_message "This WARP node uses MASQUE or noize, which need Vwarp. Install it on the App Update page."
+		else
+			say_message "A WARP node needs warp-plus. Install it on the App Update page."
+		fi
+		return 1
+	}
+	_dir="$(warp_dir "$(payload_get "$_p" id)")"
+	_key="$(payload_get "$_p" key)"
+	mkdir -p "$ZGZ_ETC/warp"
+	chmod 700 "$ZGZ_ETC/warp" 2>/dev/null || true
+	: > "$REG_LOG"
+	log "WARP: registering an account for $(printf '%s' "$_rec" | cut -f2)"
+
+	_rc=0
+	if [ "$_mode" = "masque" ]; then
+		register_one "$_dir" "" 1 || _rc=$?
+	else
+		register_one "$_dir" "$_key" || _rc=$?
+	fi
+	if [ "$_rc" = "1" ]; then
+		_why="$(sed -n 's/.*level=ERROR msg=//p' "$REG_LOG" | tail -1 | sed -e 's/\\"/"/g' -e 's/^"//' -e 's/"$//')"
+		case "$_why" in
+			*DialTLS*|*Handshake*|*EOF*|*timeout*|*"failed to send request"*) _why="Cloudflare's registration address did not answer from here" ;;
+		esac
+		log "WARP: no account - ${_why:-Cloudflare did not answer}"
+		say_message "Cloudflare could not be reached to register a WARP account. Connect through another node first, with Localhost Proxy on, and press Register again."
+		return 1
+	fi
+	[ "$_rc" = "2" ] && say_message "The WARP+ licence was not accepted, so the account is a free one. Check the licence, and that it is not already on five devices."
+
+	# WARP in WARP: the second account, made beside the first and moved to
+	# where warp-plus looks for it.
+	if [ "$_mode" = "gool" ] && [ ! -s "$_dir/secondary/$ID_FILE" ]; then
+		rm -rf "$_dir/.second"
+		if register_one "$_dir/.second" ""; then
+			rm -rf "$_dir/secondary"
+			mv -f "$_dir/.second/primary" "$_dir/secondary"
+		else
+			log "WARP: the second account for WARP in WARP could not be made - warp-plus will try when it connects"
+		fi
+		rm -rf "$_dir/.second"
+	fi
+	chmod -R go-rwx "$_dir" 2>/dev/null || true
+	log "WARP: account ready ($(cmd_info "$1" | sed -n 's/.*"type":"\([^"]*\)".*/\1/p'))"
+	return 0
+}
+
+# The router's own traffic goes through the tunnel. When the tunnel is a WARP
+# node that is not carrying anything - this one, waiting for the very account
+# being made - that is a request sent into nothing, so for as long as it
+# takes the router goes straight out instead.
+cmd_register() {
+	_paused=0
+	if grep -qE '^bridge=.*(warp-plus|vwarp)' "$ZGZ_RUN/core.info" 2>/dev/null && ! port_open "$(cfg bridge_port 10808)" && [ "$(cfg_bool localhost_proxy 1)" = "1" ]; then
+		"$ZGZ_LIB/zgz-rules" local pause >/dev/null 2>&1 && _paused=1
+	fi
+	_rn=0
+	register_node "$1" || _rn=$?
+	if [ "$_paused" = "1" ]; then
+		"$ZGZ_LIB/zgz-rules" local resume >/dev/null 2>&1 || true
+	fi
+	return "$_rn"
+}
+
+# Before a WARP node takes the tunnel over: its account, if it has none yet,
+# made through the tunnel that is still up - see stop_service in the init
+# script. Nothing at all for any other node, or for one that has its account.
+cmd_prepare() {
+	_rec="$(warp_record "$1")" || return 0
+	_p="$(printf '%s' "$_rec" | cut -f6-)"
+	_mode="$(payload_get "$_p" mode)"
+	[ "$_mode" != "wgconf" ] || return 0
+	has_account "$_p" && return 0
+	warp_program "$_p" >/dev/null || return 0
+	log "WARP: $(printf '%s' "$_rec" | cut -f2) has no account yet - making it through the tunnel that is still up"
+	cmd_register "$1"
+}
+
+cmd_forget() {
+	_rec="$(warp_record "$1")" || return 1
+	_dir="$(warp_dir "$(payload_get "$(printf '%s' "$_rec" | cut -f6-)" id)")"
+	case "$_dir" in "$ZGZ_ETC"/warp/*) rm -rf "$_dir" ;; esac
+	log "WARP: the account of $(printf '%s' "$_rec" | cut -f2) was deleted"
+	return 0
+}
+
+# -------------------------------------------------------------------- info
+
+# Every value a member of this name has in the account file, wherever it is,
+# and however the file is laid out: a string or a number, one a line.
+ival() {
+	grep -o "\"$1\":[[:space:]]*\"\\{0,1\\}[^\",}]*" "$2" 2>/dev/null |
+		sed "s/^\"$1\":[[:space:]]*\"\\{0,1\\}//"
+	return 0
+}
+
+# The first of them: the account's own comes before any device's.
+ival1() {
+	ival "$@" | head -1
+	return 0
+}
+
+cmd_info() {
+	_rec="$(warp_record "$1")" || { echo '{"warp":false}'; return 0; }
+	_p="$(printf '%s' "$_rec" | cut -f6-)"
+	_mode="$(payload_get "$_p" mode)"
+	_dir="$(warp_dir "$(payload_get "$_p" id)")"
+	_f="$_dir/primary/$ID_FILE"
+	# MASQUE's account is Vwarp's own file, with nothing in it worth showing
+	# beyond its being there.
+	if [ "$_mode" = "masque" ]; then
+		printf '{"warp":true,"mode":"masque","registered":%s,"core":%s,"type":"MASQUE"}\n' \
+			"$([ -s "$_dir/masque_config.json" ] && echo true || echo false)" \
+			"$(warp_program "$_p" >/dev/null && echo true || echo false)"
+		return 0
+	fi
+	if [ "$_mode" = "wgconf" ] || [ ! -s "$_f" ]; then
+		printf '{"warp":true,"mode":"%s","registered":false,"core":%s}\n' "$_mode" \
+			"$(warp_program "$_p" >/dev/null && echo true || echo false)"
+		return 0
+	fi
+	_lic="$(ival1 license "$_f")"
+	# Only the end of a licence: the page is often on a screen someone else
+	# can see, and the whole of it is a thing that can be used elsewhere.
+	[ -z "$_lic" ] || _lic="…${_lic#"${_lic%????}"}"
+	printf '{"warp":true,"mode":"%s","registered":true,"core":%s,"type":"%s","plus":%s,"premium":%s,"quota":%s,"license":"%s","address":"%s","created":"%s","second":%s}\n' \
+		"$_mode" "$(warp_program "$_p" >/dev/null && echo true || echo false)" \
+		"$(json_escape "$(ival1 account_type "$_f")")" \
+		"$(case "$(ival1 account_type "$_f")" in ''|free) echo false ;; *) echo true ;; esac)" \
+		"$(ival1 premium_data "$_f" | tr -cd 0-9 | sed 's/^$/0/')" \
+		"$(ival1 quota "$_f" | tr -cd 0-9 | sed 's/^$/0/')" \
+		"$(json_escape "$_lic")" \
+		"$(json_escape "$(ival v4 "$_f" | grep -v : | head -1)")" \
+		"$(json_escape "$(ival1 created "$_f")")" \
+		"$([ -s "$_dir/secondary/$ID_FILE" ] && echo true || echo false)"
+	return 0
+}
+
+# -------------------------------------------------------------------- test
+
+# A whole request through the node, the way the URL Test column means it. When
+# it is the node the tunnel is on, through the warp-plus already running;
+# otherwise through one of its own, on a port of its own, for as long as the
+# test takes. Prints milliseconds, 0 for no answer.
+curl_ms() {
+	_t="$(curl -s -o /dev/null -x "socks5h://127.0.0.1:$1" --connect-timeout 10 --max-time 12 \
+		-w '%{time_total}' "$(cfg test_url 'http://www.gstatic.com/generate_204')" 2>/dev/null)" || _t=""
+	[ -n "$_t" ] || { echo 0; return 0; }
+	awk -v t="$_t" 'BEGIN { m = int(t * 1000 + 0.5); if (t > 0 && m < 1) m = 1; printf "%d", m }'
+	return 0
+}
+
+cmd_test() {
+	_rec="$(warp_record "$1")" || { echo -2; return 0; }
+	_p="$(printf '%s' "$_rec" | cut -f6-)"
+
+	_bp="$(cfg bridge_port 10808)"
+	if [ "$(cat "$ZGZ_ETC/bridge.json" 2>/dev/null)" = "$_p" ] && port_open "$_bp"; then
+		curl_ms "$_bp"
+		return 0
+	fi
+
+	pick_program "$_p" || { echo -2; return 0; }
+	_lock="$ZGZ_RUN/tests/.warp-lock"
+	mkdir -p "$ZGZ_RUN/tests"
+	_n=0
+	while ! mkdir "$_lock" 2>/dev/null; do
+		_n=$((_n + 1))
+		[ "$_n" -lt 150 ] || { rm -rf "$_lock"; mkdir "$_lock" 2>/dev/null || true; break; }
+		sleep 1
+	done
+
+	_dir="$(warp_dir "$(payload_get "$_p" id)")"
+	mkdir -p "$_dir"
+	chmod 700 "$_dir" 2>/dev/null || true
+	_cfg="$ZGZ_RUN/warp-test.json"
+	printf '%s\n' "$_p" | VWARP="$([ "$WPK" = vwarp ] && echo 1 || echo 0)" BIND="127.0.0.1:$TEST_PORT" CACHE="$_dir" MARK="$ZGZ_OUT_MARK" \
+		WGFILE="$ZGZ_RUN/warp-test.conf" LC_ALL=C awk -v WARPCONF=1 -f "$PARSE" > "$_cfg" 2>/dev/null || {
+		rm -rf "$_lock" "$_cfg" "$ZGZ_RUN/warp-test.conf"
+		echo -2
+		return 0
+	}
+
+	# The way the tunnel will reach WARP is straight out, so that is the way
+	# measured - not through whatever node the tunnel is on now.
+	_lp="$(cfg_bool localhost_proxy 1)"
+	[ "$_lp" = "1" ] && "$ZGZ_LIB/zgz-rules" local pause >/dev/null 2>&1 || true
+	if [ "$WPK" = "vwarp" ]; then
+		# shellcheck disable=SC2046
+		"$WP" $(cat "$_cfg") > "$ZGZ_RUN/warp-test.log" 2>&1 &
+	else
+		"$WP" -c "$_cfg" > "$ZGZ_RUN/warp-test.log" 2>&1 &
+	fi
+	_pid=$!
+	_n=0
+	while [ "$_n" -lt 90 ] && kill -0 "$_pid" 2>/dev/null && ! port_open "$TEST_PORT"; do
+		sleep 1
+		_n=$((_n + 1))
+	done
+	_ms=0
+	if port_open "$TEST_PORT"; then
+		# The first request pays for opening the way; the second is the
+		# round trip and nothing else.
+		_ms="$(curl_ms "$TEST_PORT")"
+		[ "$_ms" = "0" ] || _ms="$(curl_ms "$TEST_PORT")"
+	fi
+	kill "$_pid" 2>/dev/null || true
+	wait "$_pid" 2>/dev/null || true
+	[ "$_lp" = "1" ] && "$ZGZ_LIB/zgz-rules" local resume >/dev/null 2>&1 || true
+	rm -rf "$_lock" "$_cfg" "$ZGZ_RUN/warp-test.conf"
+	echo "${_ms:-0}"
+	return 0
+}
+
+case "${1:-}" in
+	register|forget|info|test|prepare)
+		case "${2:-}" in
+			''|*[!A-Za-z0-9_]*) echo "usage: $0 $1 <node>" >&2; exit 1 ;;
+		esac
+		"cmd_$1" "$2"
+		;;
+	*) echo "usage: $0 register|forget|info|test|prepare <node>" >&2; exit 1 ;;
+esac

@@ -583,6 +583,160 @@ for want in '"jc":5' '"h1":"1234-5678"' '"i1":"<b 0xc2><r 8>"' '"keepalive":25';
 	if printf '%s' "$AWOUT" | grep -qF "$want"; then ok "carried through: $want"; else bad "carried through: $want"; fi
 done
 
+# ------------------------------------------------------------------- WARP
+#
+# A WARP node is warp-plus's: the parser describes it, zgz-bridge writes the
+# configuration warp-plus reads, and where Xray has to hold the node itself -
+# a chain, a shunt rule - the account warp-plus registered becomes Xray's own
+# WireGuard outbound.
+echo "== WARP"
+WP1="$(printf 'warp://auto?mode=gool&ipv=4#Mine\n' | LC_ALL=C awk -f "$RIG/lib/zgz-parse")"
+check "$(printf '%s' "$WP1" | cut -f2-5 | tr '\t' ' ')" "Mine warp 162.159.192.1 2408" "a warp:// link is a WARP node"
+for want in '"mode":"gool"' '"scan":true' '"ipv":"4"' '"id":"default"'; do
+	if printf '%s' "$WP1" | grep -qF "$want"; then ok "carried through: $want"; else bad "carried through: $want"; fi
+done
+WP2="$(printf 'warp://LIC-123@162.159.195.5:878?mode=cfon&country=de#P\n' | LC_ALL=C awk -f "$RIG/lib/zgz-parse")"
+for want in '"mode":"psiphon"' '"country":"DE"' '"key":"LIC-123"' '"endpoint":"162.159.195.5:878"' '"scan":false'; do
+	if printf '%s' "$WP2" | grep -qF "$want"; then ok "Hiddify's shape, licence and endpoint: $want"; else bad "Hiddify's shape, licence and endpoint: $want"; fi
+done
+check "$(printf 'warp://auto?mode=nonsense\n' | LC_ALL=C awk -f "$RIG/lib/zgz-parse" | wc -l | tr -d ' ')" "0" "a mode warp-plus does not have is refused"
+
+WCONF="$(printf '%s' "$WP2" | cut -f6- | BIND=127.0.0.1:10808 CACHE=/etc/zirgozar/warp/x MARK=255 \
+	LC_ALL=C awk -v WARPCONF=1 -f "$RIG/lib/zgz-parse")"
+for want in '"bind":"127.0.0.1:10808"' '"fwmark":"255"' '"cfon":true' '"country":"DE"' '"key":"LIC-123"' '"endpoint":"162.159.195.5:878"'; do
+	if printf '%s' "$WCONF" | grep -qF "$want"; then ok "warp-plus is told: $want"; else bad "warp-plus is told: $want"; fi
+done
+if printf '%s' "$WCONF" | grep -q '"scan"\|"gool"\|"4"'; then
+	bad "and nothing it was not asked for"
+else
+	ok "and nothing it was not asked for"
+fi
+
+rig_clear
+rig_set cfgwg.link 'wireguard://cHJpdg%3D%3D@203.0.113.9:51820?publickey=UFVC&address=10.0.0.2/32&reserved=1,2,3#WG'
+rig_set cfgwg.warpplus 1
+WGR="$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; node_records cfgwg' | head -1)"
+check "$(printf '%s' "$WGR" | cut -f3-5 | tr '\t' ' ')" "warp 203.0.113.9 51820" "a WireGuard node carried by warp-plus is warp-plus's"
+printf '%s' "$WGR" | cut -f6- | BIND=127.0.0.1:1 CACHE=/x WGFILE="$WORK/wg.conf" LC_ALL=C awk -v WARPCONF=1 -f "$RIG/lib/zgz-parse" > "$WORK/wg.json"
+if grep -q '^Endpoint = 203.0.113.9:51820$' "$WORK/wg.conf" 2>/dev/null && grep -q '^Reserved = 1,2,3$' "$WORK/wg.conf" &&
+   grep -qF "\"wgconf\":\"$WORK/wg.conf\"" "$WORK/wg.json"; then
+	ok "and is handed to it as the .conf it reads"
+else
+	bad "and is handed to it as the .conf it reads"
+fi
+
+# An account, as warp-plus writes one.
+mkdir -p "$RIG/etc/warp/cfgwarp/primary"
+cat > "$RIG/etc/warp/cfgwarp/primary/wgcf-identity.json" <<'JSON'
+{
+  "private_key": "aGVsbG8gd29ybGQgaGVsbG8gd29ybGQgaGVsbG8gd28=",
+  "account": { "account_type": "free", "warp_plus": false, "license": "AbCd1234-wxyz" },
+  "config": {
+    "peers": [ { "public_key": "bmZFeT1PNtE6YIgKpo8YgWtdbX5f/yJ8GfJLA1z6gQo=", "endpoint": { "v4": "162.159.192.7:0", "v6": "[2606:4700:d0::a29f:c007]:0" } } ],
+    "interface": { "addresses": { "v4": "172.16.0.2", "v6": "2606:4700:110:8a36::1" } },
+    "client_id": "Ab+z"
+  }
+}
+JSON
+rig_set cfgwarp.link 'warp://auto#W'
+rig_set cfgpre.link 'vless://11111111-2222-3333-4444-555555555555@pre.example.com:443?encryption=none&security=tls&sni=pre.example.com&type=ws&path=%2Fp#PRE'
+rig_set cfgwarp.chain_proxy 1
+rig_set cfgwarp.preproxy_node cfgpre
+WREC="$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; node_records cfgwarp' | head -1)"
+check "$(printf '%s' "$WREC" | cut -f3)" "wireguard" "WARP reached through a pre-proxy is Xray's own WireGuard outbound"
+for want in '"dialerProxy":"chain-cfgpre"' '"address":["172.16.0.2/32","2606:4700:110:8a36::1/128"]' '"reserved":[1,191,179]' '"endpoint":"162.159.192.1:2408"'; do
+	if printf '%s' "$WREC" | grep -qF "$want"; then ok "from the account: $want"; else bad "from the account: $want"; fi
+done
+rig_set cfgwarp.chain_proxy ''
+rig_set cfgmain.link 'vless://11111111-2222-3333-4444-555555555555@main.example.com:443?encryption=none&security=tls&sni=main.example.com&type=ws&path=%2Fm#MAIN'
+rig_set cfgmain.chain_proxy 2
+rig_set cfgmain.to_node cfgwarp
+LREC="$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; node_records cfgmain' | head -1)"
+check "$(printf '%s' "$LREC" | cut -f3-4 | tr '\t' ' ')" "wireguard main.example.com" "WARP as a landing node: traffic leaves from WARP"
+if printf '%s' "$LREC" | grep -qF '"dialerProxy":"chain-cfgmain"'; then
+	ok "after the first hop"
+else
+	bad "after the first hop"
+fi
+rig_set cfgwarp.link 'warp://auto?mode=gool#W'
+check "$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; node_records cfgwarp | warp_natives' | wc -l | tr -d ' ')" "0" "WARP in WARP is never made into something it is not"
+rig_set cfgwarp.link 'warp://auto#W'
+
+# The bridge runs warp-plus with that configuration, and with Xray or
+# sing-box alike.
+printf '#!/bin/sh\necho refs/tags/v1.2.6 >&2\n' > "$RIG/core/warp-plus"
+chmod +x "$RIG/core/warp-plus"
+mkdir -p "$RIG/var/etc"
+sh -c '. "$ZGZ_LIB/zgz-common.sh"; node_records cfgwarp' | head -1 | cut -f6- > "$RIG/etc/bridge.json"
+BCMD="$(ZGZ_BRIDGE_JSON="$RIG/var/etc/zirgozar-bridge.json" sh "$RIG/lib/zgz-bridge" command 2>&1)"
+check "$BCMD" "$RIG/core/warp-plus -c $RIG/var/etc/zirgozar-bridge.json" "the bridge for a WARP node is warp-plus"
+if grep -qF "\"cache-dir\":\"$RIG/etc/warp/cfgwarp\"" "$RIG/var/etc/zirgozar-bridge.json" 2>/dev/null; then
+	ok "with the node's own account"
+else
+	bad "with the node's own account"
+fi
+check "$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; core_version "$ZGZ_OWN_DIR/warp-plus"')" "v1.2.6" "warp-plus's version is read from what it says"
+rig_set core_engine singbox
+check "$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; bridge_wanted singbox && echo yes || echo no')" "yes" "warp-plus runs under sing-box too"
+check "$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; wanted_engine')" "singbox" "and does not change the engine"
+rig_set core_engine xray
+check "$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; wanted_engine')" "xray" "nor move Xray aside for sing-box"
+WINFO="$(sh "$RIG/lib/zgz-warp" info cfgwarp)"
+for want in '"registered":true' '"type":"free"' '"license":"…wxyz"' '"address":"172.16.0.2"'; do
+	if printf '%s' "$WINFO" | grep -qF "$want"; then ok "the account, for its page: $want"; else bad "the account, for its page: $want"; fi
+done
+if [ -x "$RIG/core/xray" ]; then
+	printf '{"outbounds":[%s]}' "$(printf '%s' "$WREC" | cut -f6- | sed 's/^{/{"tag":"w",/')" > "$WORK/warp.json"
+	if "$RIG/core/xray" run -test -config "$WORK/warp.json" >"$WORK/warp.test" 2>&1; then
+		ok "the core accepts WARP's WireGuard outbound"
+	else
+		bad "the core accepts WARP's WireGuard outbound: $(grep -i 'fail\|error' "$WORK/warp.test" | head -2)"
+	fi
+fi
+
+# MASQUE, and noize: Vwarp's, given its options on the command line.
+WM="$(printf 'warp://auto?mode=masque#M\n' | LC_ALL=C awk -f "$RIG/lib/zgz-parse")"
+check "$(printf '%s' "$WM" | cut -f3-5 | tr '\t' ' ')" "warp 162.159.198.1 443" "WARP over MASQUE knocks on Cloudflare's MASQUE address"
+if printf '%s' "$WM" | grep -qF '"noize":"medium"'; then ok "and is disguised unless told otherwise"; else bad "and is disguised unless told otherwise"; fi
+WMA="$(printf '%s' "$WM" | cut -f6- | VWARP=1 BIND=127.0.0.1:10808 CACHE=/c MARK=255 LC_ALL=C awk -v WARPCONF=1 -f "$RIG/lib/zgz-parse")"
+check "$WMA" "--bind 127.0.0.1:10808 --cache-dir /c --fwmark 255 --dns 1.1.1.1 --masque --endpoint 162.159.198.1:443 --noize-preset medium" "Vwarp is told MASQUE, where, and how to disguise it"
+check "$(printf '%s' "$WM" | cut -f6- | BIND=x CACHE=y LC_ALL=C awk -v WARPCONF=1 -f "$RIG/lib/zgz-parse" 2>/dev/null | wc -l | tr -d ' ')" "0" "warp-plus is never handed MASQUE"
+check "$(printf 'warp://162.159.198.2?mode=masque&noize=off\n' | LC_ALL=C awk -f "$RIG/lib/zgz-parse" | cut -f6- | VWARP=1 BIND=b CACHE=c LC_ALL=C awk -v WARPCONF=1 -f "$RIG/lib/zgz-parse" | grep -o -- '--endpoint [^ ]*\|--noize-preset=$' | tr '\n' ' ')" "--endpoint 162.159.198.2:443 --noize-preset= " "an address alone is on 443, and off is off"
+printf '#!/bin/sh\necho refs/tags/v2.2.2 >&2\n' > "$RIG/core/vwarp"
+chmod +x "$RIG/core/vwarp"
+printf '#!/bin/sh\necho refs/tags/v1.2.6 >&2\n' > "$RIG/core/warp-plus"
+chmod +x "$RIG/core/warp-plus"
+check "$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; warp_program "$1"' x "$(printf '%s' "$WM" | cut -f6-)")" "vwarp $RIG/core/vwarp" "MASQUE is carried by Vwarp"
+check "$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; warp_program "{\"type\":\"warp\",\"mode\":\"warp\",\"noize\":\"\"}"')" "warp-plus $RIG/core/warp-plus" "plain WARP by warp-plus, when it is there"
+check "$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; warp_program "{\"type\":\"warp\",\"mode\":\"gool\",\"noize\":\"heavy\"}"')" "vwarp $RIG/core/vwarp" "and by Vwarp once it asks for noize"
+printf '%s' "$WM" | cut -f6- > "$RIG/etc/bridge.json"
+BV="$(ZGZ_BRIDGE_JSON="$RIG/var/etc/zirgozar-bridge.json" sh "$RIG/lib/zgz-bridge" command 2>&1)"
+case "$BV" in
+	"$RIG/core/vwarp --bind 127.0.0.1:10808 --cache-dir $RIG/etc/warp/default"*"--masque"*) ok "the bridge runs Vwarp with its options" ;;
+	*) bad "the bridge runs Vwarp with its options (got [$BV])" ;;
+esac
+check "$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; core_version "$ZGZ_OWN_DIR/vwarp"')" "v2.2.2" "Vwarp's version is read like warp-plus's"
+case " $(sh -c '. "$ZGZ_LIB/zgz-common.sh"; xray_paths') " in
+	*"/xray-patterniha "*) ok "patterniha's Xray is one of the Xrays offered every configuration" ;;
+	*) bad "patterniha's Xray is one of the Xrays offered every configuration" ;;
+esac
+
+# PattN's share links: the cipher suites in "cs", and a trojan that says it
+# has no TLS taken at its word.
+CSR="$(printf '%s\n' 'vless://11111111-2222-3333-4444-555555555555@a.example.com:443?encryption=none&security=tls&sni=a.example.com&fp=unsafe&cs=TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256&type=ws&path=%2F#CS' | LC_ALL=C awk -f "$RIG/lib/zgz-parse")"
+if printf '%s' "$CSR" | grep -qF '"cipherSuites":"TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256"' &&
+   printf '%s' "$CSR" | grep -qF '"fingerprint":"unsafe"'; then
+	ok "a link's cipher suites and the unsafe fingerprint reach the outbound"
+else
+	bad "a link's cipher suites and the unsafe fingerprint reach the outbound"
+fi
+check "$(printf 'trojan://pw@104.16.1.1:80?security=none&type=ws&path=%%2F#T\n' | LC_ALL=C awk -f "$RIG/lib/zgz-parse" | grep -o '"security":"[a-z]*"')" '"security":"none"' "a trojan that says none has no TLS"
+check "$(printf 'trojan://pw@1.2.3.4:443#T\n' | LC_ALL=C awk -f "$RIG/lib/zgz-parse" | grep -o '"security":"[a-z]*"')" '"security":"tls"' "and one that says nothing has TLS"
+
+rm -f "$RIG/etc/bridge.json" "$RIG/core/warp-plus" "$RIG/core/vwarp"
+rm -rf "$RIG/etc/warp"
+rig_clear
+
 # ------------------------------------------------------------ the Xray tab
 #
 # Pre-proxy, landing node, fragment, noise and mux, and the DNS tab - all of

@@ -22,6 +22,10 @@
 #
 # sing-box is preferred because it speaks both. The official hysteria client
 # is used when it is the only one installed and the server is hysteria2.
+#
+# A WARP node is warp-plus's, whichever engine carries the tunnel: it finds a
+# WARP address by scanning, puts a second WARP or Psiphon behind the first,
+# and sends junk ahead of a WireGuard handshake - none of which a core does.
 
 set -e
 
@@ -128,6 +132,38 @@ EOF
 	return 0
 }
 
+# --------------------------------------------------------------- warp-plus
+
+# A WARP node, or a WireGuard node it carries: warp-plus's own configuration
+# file, which its -c reads. The licence is in there rather than on the command
+# line, where anyone with a shell on the router could read it.
+#
+# Its account is kept on flash, beside the settings, so that a reboot does not
+# register a new one - and with nothing but its owner able to read it, because
+# the private key is in it.
+warp_config() {
+	[ "$(jget type)" = "warp" ] || return 1
+	# warp-plus reads a configuration file; Vwarp is given its options on the
+	# command line, kept in the same file so that the command can be read back.
+	_vw=0
+	[ "${1:-}" = "vwarp" ] && _vw=1
+	_wid="$(jget id)"
+	_wdir="$(warp_dir "$_wid")"
+	mkdir -p "$_wdir"
+	chmod 700 "$ZGZ_ETC/warp" "$_wdir" 2>/dev/null || true
+	_verbose=0
+	[ "$(cfg loglevel warning)" = "debug" ] && _verbose=1
+	VWARP="$_vw" BIND="127.0.0.1:$PORT" CACHE="$_wdir" MARK="$ZGZ_OUT_MARK" VERBOSE="$_verbose" \
+	WGFILE="$ZGZ_BRIDGE_JSON.conf" \
+		LC_ALL=C awk -v WARPCONF=1 -f "$ZGZ_LIB/zgz-parse" < "$NODE" > "$ZGZ_BRIDGE_JSON.new" 2>/dev/null || {
+		rm -f "$ZGZ_BRIDGE_JSON.new"
+		return 1
+	}
+	chmod 600 "$ZGZ_BRIDGE_JSON.new" "$ZGZ_BRIDGE_JSON.conf" 2>/dev/null || true
+	mv -f "$ZGZ_BRIDGE_JSON.new" "$ZGZ_BRIDGE_JSON"
+	return 0
+}
+
 # --------------------------------------------------------------- hysteria
 
 hysteria_config() {
@@ -158,6 +194,21 @@ hysteria_config() {
 cmd_config() {
 	cmd_needed || { echo "no bridge needed" >&2; return 1; }
 
+	if [ "$(jget type)" = "warp" ]; then
+		if ! _wpp="$(warp_program "$(cat "$NODE")")"; then
+			if warp_needs_vwarp "$(cat "$NODE")"; then
+				say_message "This WARP node uses MASQUE or noize, which need Vwarp. Install it on the App Update page."
+			else
+				say_message "A WARP node needs warp-plus. Install it on the App Update page."
+			fi
+			warn "no warp-plus or Vwarp installed to carry the WARP node"
+			return 1
+		fi
+		warp_config "${_wpp%% *}" || return 1
+		echo "$ZGZ_BRIDGE_JSON"
+		return 0
+	fi
+
 	if _sb="$(bridge_singbox)"; then
 		if singbox_config; then
 			echo "$ZGZ_BRIDGE_JSON"
@@ -185,6 +236,16 @@ cmd_config() {
 # is a procd instance like any other and gets its respawning for free.
 cmd_command() {
 	cmd_needed || return 1
+	if [ "$(jget type)" = "warp" ]; then
+		_wpp="$(warp_program "$(cat "$NODE")")" || return 1
+		warp_config "${_wpp%% *}" || return 1
+		if [ "${_wpp%% *}" = "vwarp" ]; then
+			echo "${_wpp#* } $(cat "$ZGZ_BRIDGE_JSON")"
+		else
+			echo "${_wpp#* } -c $ZGZ_BRIDGE_JSON"
+		fi
+		return 0
+	fi
 	if _sb="$(bridge_singbox)" && singbox_config; then
 		echo "$_sb run -c $ZGZ_BRIDGE_JSON"
 		return 0

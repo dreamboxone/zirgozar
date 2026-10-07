@@ -10,6 +10,7 @@
 #   zgz-test tcp  <id>    TCP handshake to the node's real port
 #   zgz-test url  <id>    a whole HTTP request carried by the node
 #   zgz-test current      can the node the tunnel is on carry a request?
+#   zgz-test exit         where the tunnel comes out: address and country
 #   zgz-test json         every answer collected so far
 #   zgz-test clear        forget them
 #
@@ -225,6 +226,19 @@ do_url() {
 	# running. Say so rather than reporting a working node as broken.
 	case "$_proto" in
 		hysteria2|hysteria|tuic|openvpn|amneziawg) echo -2 > "$_out"; return 0 ;;
+		# WARP is the exception: warp-plus is one small program and is stood
+		# up for the test, because without it the column could only ever
+		# say that it cannot say.
+		warp)
+			_wsec="${6:-}"
+			if [ -n "$_wsec" ] && command -v uci >/dev/null 2>&1 &&
+			   [ "$(uci -q get "zirgozar.$_wsec" 2>/dev/null)" = "node" ]; then
+				"$ZGZ_LIB/zgz-warp" test "$_wsec" > "$_out" 2>/dev/null || echo 0 > "$_out"
+			else
+				echo -2 > "$_out"
+			fi
+			return 0
+			;;
 	esac
 
 	url_ms "$_payload2" "$4" "$5" > "$_out" 2>/dev/null || true
@@ -253,6 +267,39 @@ cmd_current() {
 		"$(sed -n 's/^host=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)" \
 		"$(sed -n 's/^port=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)"
 	return $?
+}
+
+# ------------------------------------------------------------------ exit
+
+# Where the tunnel comes out: the address the rest of the internet sees and
+# its country, for the status card's flag. Asked of Cloudflare's trace page,
+# which every node can reach and which answers with both and nothing else,
+# through the node's own SOCKS port - so it is the tunnel's way out that is
+# asked about, whatever the router's own traffic is doing. The node the answer
+# is about is kept beside it, so that another node is asked about afresh.
+EXIT="$ZGZ_RUN/exit"
+
+cmd_exit() {
+	# A lock left by a run that was killed is not one anybody holds.
+	[ -z "$(find "$EXIT.lock" -maxdepth 0 -mmin +1 2>/dev/null)" ] || rmdir "$EXIT.lock" 2>/dev/null || true
+	mkdir "$EXIT.lock" 2>/dev/null || return 0
+	_sp="$(cfg node_socks_port 1070)"
+	_tr=""
+	case "$_sp" in
+		''|*[!0-9]*) : ;;
+		*) _tr="$(curl -s --connect-timeout 8 --max-time 12 --socks5-hostname "127.0.0.1:$_sp" \
+			https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null)" || _tr="" ;;
+	esac
+	# No SOCKS port: the router's own way out, which with Localhost Proxy on
+	# is the tunnel too.
+	[ -n "$_tr" ] || [ "$(cfg_bool localhost_proxy 1)" != "1" ] ||
+		_tr="$(curl -s --connect-timeout 8 --max-time 12 https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null)" || _tr=""
+	_cc="$(printf '%s\n' "$_tr" | sed -n 's/^loc=\([A-Z][A-Z]\)$/\1/p' | head -1)"
+	_ip="$(printf '%s\n' "$_tr" | sed -n 's/^ip=\([0-9A-Fa-f:.]*\)$/\1/p' | head -1)"
+	cp -f "$ZGZ_BEST_META" "$EXIT.meta" 2>/dev/null || : > "$EXIT.meta"
+	printf 'cc=%s\nip=%s\n' "$_cc" "$_ip" > "$EXIT"
+	rmdir "$EXIT.lock" 2>/dev/null || true
+	return 0
 }
 
 # ------------------------------------------------------------------ report
@@ -301,11 +348,18 @@ cmd_run() {
 			URL_REPEAT=1 url_ms "$_payload" "$_host" "$_port" > "$DIR/$_id.tcp" 2>/dev/null || true
 			return 0
 			;;
-		tcp:hysteria2|tcp:hysteria|tcp:tuic|tcp:openvpn|tcp:amneziawg)
+		tcp:hysteria2|tcp:hysteria|tcp:tuic|tcp:openvpn|tcp:amneziawg|tcp:warp)
 			# Not something Xray can carry, and the column has no other
 			# honest answer for them.
 			put "$_id.tcp" -2
 			return 0
+			;;
+		ping:warp)
+			# Which WARP address it uses is warp-plus's choice, unless the
+			# node names one - and then that one can be pinged.
+			case "$_payload" in
+				*'"endpoint":""'*) put "$_id.ping" -2; return 0 ;;
+			esac
 			;;
 	esac
 
@@ -323,7 +377,7 @@ cmd_run() {
 				"$ZGZ_LIB/zgz-rules" local resume >/dev/null 2>&1 || true
 			fi
 			;;
-		url)  do_url  "$_id" "$_proto" "$_payload" "$_host" "$_port" ;;
+		url)  do_url  "$_id" "$_proto" "$_payload" "$_host" "$_port" "$_id" ;;
 		*) echo "usage: $0 ping|tcp|url <id>" >&2; return 1 ;;
 	esac
 	return 0
@@ -335,7 +389,8 @@ case "${1:-json}" in
 		cmd_run "$1" "$2"
 		;;
 	current) cmd_current ;;
+	exit)    cmd_exit ;;
 	json)  cmd_json ;;
 	clear) rm -f "$DIR"/* 2>/dev/null || true ;;
-	*) echo "usage: $0 ping|tcp|url <id>|current|json|clear" >&2; exit 1 ;;
+	*) echo "usage: $0 ping|tcp|url <id>|current|exit|json|clear" >&2; exit 1 ;;
 esac

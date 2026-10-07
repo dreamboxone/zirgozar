@@ -13,9 +13,9 @@
 #     <tag> <label> <protocol> <host> <port> <payload>
 #
 # For everything Xray speaks natively the payload is the complete outbound
-# object, minus its tag. For hysteria2 and tuic - which Xray does not speak -
-# the payload is a small description that zgz-bridge turns into a local
-# SOCKS listener, and the tag names a socks outbound pointed at it.
+# object, minus its tag. For hysteria2, tuic and WARP - which Xray does not
+# speak - the payload is a small description that zgz-bridge turns into a
+# local SOCKS listener, and the tag names a socks outbound pointed at it.
 #
 # Host and port are their own columns because the first thing that happens to
 # a hundred candidates is a handshake to each, and re-parsing JSON in shell a
@@ -180,6 +180,20 @@ function stream(net, sec, host, path, sni, fp, alpn, pbk, sid, spx, svc, hdr, mo
 		# It looks like a mistake and is not one.)
 		if (fp ~ /^(chrome|firefox|safari|ios|android|edge|360|qq|random|randomized|randomizednoalpn|unsafe|hellogolang)$/)
 			t = t ",\"fingerprint\":\"" jesc(fp) "\""
+		# The cipher suites, as v2rayN's PattN writes them into a link -
+		# "cs", names joined by colons. Paired with the "unsafe" fingerprint
+		# they change what the first packet of TLS looks like, which is what
+		# gets it past a filter that knows the usual one. One link's are its
+		# own: they are forgotten once read.
+		if (sec == "tls" && XCS ~ /^[A-Za-z0-9_:]+$/)
+			t = t ",\"cipherSuites\":\"" XCS "\""
+		XCS = ""
+		# ECH as a link writes it, "ech" - a configuration, or a domain and the
+		# DNS that publishes it. The node's own ECH setting, if it has one,
+		# still wins.
+		if (sec == "tls" && XECH != "" && XECH !~ /[[:cntrl:]"\\]/)
+			t = t ",\"echConfigList\":\"" XECH "\""
+		XECH = ""
 		if (alpn != "") {
 			n = split(alpn, a, ",")
 			t = t ",\"alpn\":["
@@ -252,6 +266,12 @@ function stream(net, sec, host, path, sni, fp, alpn, pbk, sid, spx, svc, hdr, mo
 		if (path != "") s = s ",\"seed\":\"" jesc(path) "\""
 		s = s "}"
 	}
+	# Xray's finalmask as a link carries it, "fm": PattN's fragment of the TLS
+	# hello, cut where a filter is not looking. The Xray tab's own fragment is
+	# not added on top of a link that brings one - see decorate.
+	if (XFM ~ /^\{.*\}$/ && XFM !~ /[[:cntrl:]]/)
+		s = s ",\"finalmask\":" XFM
+	XFM = ""
 	return s
 }
 
@@ -415,6 +435,7 @@ function do_vmess(body,   j, k, v, o, label) {
 	HOST = o["add"]; PORT = o["port"] + 0
 	gsub(/^\[|\]$/, "", HOST)
 	label = clean_label(o["ps"])
+	XCS = o["cs"]
 
 	emit(label, "vmess", mk_vmess(o["id"], o["aid"], o["scy"], \
 		stream(o["net"], (o["tls"] != "" ? o["tls"] : "none"), o["host"], o["path"], \
@@ -437,6 +458,9 @@ function do_vless(body,   label, uuid, query, p, sec, flow, enc) {
 	flow = qs(query, "flow")
 	enc = qs(query, "encryption"); if (enc == "") enc = "none"
 	XEXTRA = qs(query, "extra")
+	XCS = qs(query, "cs")
+	XFM = qs(query, "fm")
+	XECH = qs(query, "ech")
 
 	emit(label, "vless", mk_vless(uuid, enc, flow, \
 		stream(qs(query, "type"), sec, qs(query, "host"), qs(query, "path"), \
@@ -457,9 +481,14 @@ function do_trojan(body,   label, pass, query, p, sec) {
 	pass = urldec(substr(body, 1, p - 1))
 	if (!hostport(substr(body, p + 1))) return
 
-	# trojan is TLS by definition; a link that does not say so still means it
-	sec = qs(query, "security"); if (sec == "" || sec == "none") sec = "tls"
+	# trojan is TLS by definition; a link that does not say still means it. One
+	# that says none means none: a trojan over Cloudflare's plain-HTTP ports,
+	# which patterniha's Xray carries and the official one refuses.
+	sec = qs(query, "security"); if (sec == "") sec = "tls"
 	XEXTRA = qs(query, "extra")
+	XCS = qs(query, "cs")
+	XFM = qs(query, "fm")
+	XECH = qs(query, "ech")
 
 	emit(label, "trojan", mk_trojan(pass, \
 		stream(qs(query, "type"), sec, qs(query, "host"), qs(query, "path"), \
@@ -577,6 +606,238 @@ function do_tuic(body,   label, cred, uuid, pass, query, p, q) {
 		",\"congestion_control\":\"" jesc(qs(query, "congestion_control")) "\"" \
 		",\"alpn\":\"" jesc(qs(query, "alpn")) "\"" \
 		",\"insecure\":" (qs(query, "allow_insecure") == "1" ? "true" : "false") "}")
+}
+
+# ------------------------------------------------------------------ warp://
+#
+# Cloudflare WARP, carried by warp-plus or Vwarp: a client that registers its
+# own free account, finds a WARP address that answers from here, and can put a
+# second WARP or Psiphon behind the first - or, with Vwarp, reach WARP over
+# MASQUE instead of WireGuard. Like hysteria2, the payload describes the node
+# and zgz-bridge runs the client as a SOCKS port on loopback.
+#
+#   warp://[KEY@]ENDPOINT?mode=warp|gool|psiphon|masque&country=AT&scan=1
+#          &rtt=1000&ipv=4|6&dns=1.1.1.1&reserved=1,2,3&noize=medium#name
+#
+# ENDPOINT is host:port, or "auto" - or nothing - for the client to choose. For
+# MASQUE it is an address on 443, the port MASQUE always uses, and "auto" is
+# Cloudflare's first MASQUE address. KEY is a WARP+ licence. Scanning is on
+# unless scan=0 says otherwise, and only for WireGuard with no endpoint given:
+# one that is given is the one meant. noize is Vwarp's disguise for the first
+# packets - minimal, light, medium, heavy, stealth, gfw or firewall - and asks
+# for Vwarp. Hiddify writes the same shape, licence and endpoint included, and
+# its own parameters are left alone.
+#
+# Which account the node uses is its id: the section of a node added by hand,
+# so that each has an account of its own, kept under /etc/zirgozar/warp.
+function do_warp(body,   label, query, p, key, ep, mode, country, scan, rtt, ipv, dns, res, id, noize) {
+	p = index(body, "#")
+	if (p > 0) { label = clean_label(substr(body, p + 1)); body = substr(body, 1, p - 1) }
+	p = index(body, "?")
+	if (p > 0) { query = substr(body, p + 1); body = substr(body, 1, p - 1) }
+	sub(/\/+$/, "", body)
+	p = index(body, "@")
+	if (p > 0) { key = urldec(substr(body, 1, p - 1)); body = substr(body, p + 1) }
+	if (key == "") key = qs(query, "key")
+	if (key !~ /^[A-Za-z0-9-]*$/) key = ""
+
+	mode = tolower(qs(query, "mode"))
+	if (mode == "" || mode == "normal") mode = "warp"
+	if (mode == "wiw" || mode == "warp-in-warp") mode = "gool"
+	if (mode == "cfon") mode = "psiphon"
+	if (mode !~ /^(warp|gool|psiphon|masque)$/) return
+
+	ep = ""
+	if (body != "" && tolower(body) != "auto") {
+		# MASQUE is always 443; an address on its own means that.
+		if (mode == "masque" && body !~ /:[0-9]+$/) body = body ":443"
+		if (!hostport(body)) return
+		ep = (index(HOST, ":") ? "[" HOST "]" : HOST) ":" PORT
+	} else if (mode == "masque") {
+		HOST = "162.159.198.1"; PORT = 443
+		ep = HOST ":" PORT
+	} else {
+		# Where to knock when the router has to say something about a node
+		# whose address warp-plus will choose: the first WARP address there is.
+		HOST = "162.159.192.1"; PORT = 2408
+	}
+
+	country = toupper(qs(query, "country"))
+	if (mode != "psiphon") country = ""
+	else if (country !~ /^[A-Z][A-Z]$/) country = "AT"
+
+	scan = qs(query, "scan")
+	scan = (ep != "") ? 0 : (scan == "" ? 1 : (scan == "1" || scan == "true"))
+	rtt = qs(query, "rtt") + 0
+	if (rtt < 100 || rtt > 10000) rtt = 1000
+	ipv = qs(query, "ipv")
+	if (ipv !~ /^[46]$/) ipv = ""
+	dns = qs(query, "dns")
+	if (dns !~ /^[0-9A-Fa-f:.]+$/) dns = "1.1.1.1"
+	res = wg_reserved(qs(query, "reserved"))
+	gsub(/[][]/, "", res)
+	noize = tolower(qs(query, "noize"))
+	if (noize !~ /^(minimal|light|medium|heavy|stealth|gfw|firewall)$/) noize = ""
+	# MASQUE is Vwarp's, and Vwarp disguises it unless told otherwise.
+	if (mode == "masque" && noize == "" && qs(query, "noize") != "off") noize = "medium"
+
+	id = NX["warp_id"]
+	if (id == "") id = qs(query, "id")
+	if (id !~ /^[A-Za-z0-9_]+$/) id = "default"
+	if (label == "") label = (mode == "gool") ? "WARP in WARP" : ((mode == "psiphon") ? "WARP + Psiphon " country : ((mode == "masque") ? "WARP MASQUE" : "WARP"))
+
+	emit(label, "warp", \
+		"{\"type\":\"warp\",\"mode\":\"" mode "\",\"id\":\"" id "\"" \
+		",\"endpoint\":\"" jesc(ep) "\",\"key\":\"" key "\"" \
+		",\"scan\":" (scan ? "true" : "false") ",\"rtt\":" rtt \
+		",\"ipv\":\"" ipv "\",\"country\":\"" country "\"" \
+		",\"dns\":\"" dns "\",\"reserved\":\"" res "\",\"noize\":\"" noize "\"}")
+}
+
+# A WireGuard node carried by warp-plus rather than by Xray - the node's own
+# "Carry with warp-plus" setting. warp-plus sends a burst of junk ahead of every
+# handshake, which is what gets WireGuard past a filter that drops it on
+# sight. The node goes to warp-plus as the .conf it reads, a bar where each
+# line ends, and keeps the outbound Xray would have used beside it, for when it
+# is a link in a chain - which warp-plus, with a socket of its own, cannot be.
+function mk_wpwg(secret, addrs, pubkey, psk, keepalive, mtu, reserved,   a, conf, xr) {
+	xr = mk_wg(secret, addrs, pubkey, psk, keepalive, mtu, reserved)
+	a = addrs
+	gsub(/[][" ]/, "", a)
+	gsub(/,/, ", ", a)
+	gsub(/[][ ]/, "", reserved)
+	conf = "[Interface]|PrivateKey = " secret "|Address = " a \
+	       (mtu + 0 > 0 ? "|MTU = " (mtu + 0) : "") \
+	       "|[Peer]|PublicKey = " pubkey \
+	       (psk != "" ? "|PresharedKey = " psk : "") \
+	       "|AllowedIPs = 0.0.0.0/0, ::/0" \
+	       "|Endpoint = " (index(HOST, ":") ? "[" HOST "]" : HOST) ":" PORT \
+	       (reserved != "" ? "|Reserved = " reserved : "")
+	return "{\"type\":\"warp\",\"mode\":\"wgconf\",\"id\":\"wg\"" \
+	       ",\"endpoint\":\"" jesc((index(HOST, ":") ? "[" HOST "]" : HOST) ":" PORT) "\"" \
+	       ",\"conf\":\"" jesc(conf) "\",\"xray\":" xr "}"
+}
+
+# warp-plus's configuration for one warp record - see WARPCONF below. Only
+# what is set is written: warp-plus refuses a country outside Psiphon's list
+# even when Psiphon is off, and refuses -4 and -6 together.
+function warp_conf(d,   mode, out, ep, key, f, n, lines, i, v) {
+	d = jtrim(d)
+	if (jstr(d, "type") != "warp") exit 1
+	mode = jstr(d, "mode")
+	out = "{\"bind\":\"" jesc(ENVIRON["BIND"]) "\",\"cache-dir\":\"" jesc(ENVIRON["CACHE"]) "\""
+	# Its own packets carry the mark the firewall lets past, so that with
+	# Localhost Proxy on they do not go round into the tunnel they are.
+	if (ENVIRON["MARK"] != "") out = out ",\"fwmark\":\"" (ENVIRON["MARK"] + 0) "\""
+	v = jstr(d, "dns")
+	out = out ",\"dns\":\"" (v ~ /^[0-9A-Fa-f:.]+$/ ? v : "1.1.1.1") "\""
+	if (ENVIRON["VERBOSE"] == "1") out = out ",\"verbose\":true"
+	if (mode == "wgconf") {
+		f = ENVIRON["WGFILE"]
+		if (f == "") exit 1
+		n = split(jstr(d, "conf"), lines, "|")
+		printf "" > f
+		for (i = 1; i <= n; i++) print lines[i] > f
+		close(f)
+		if (ENVIRON["VWARP"] == "1")
+			print "--bind " ENVIRON["BIND"] " --cache-dir " ENVIRON["CACHE"] \
+			      (ENVIRON["MARK"] != "" ? " --fwmark " (ENVIRON["MARK"] + 0) : "") " --wgconf " f " --noize-preset="
+		else
+			print out ",\"wgconf\":\"" jesc(f) "\"}"
+		return
+	}
+	if (mode !~ /^(warp|gool|psiphon|masque)$/) exit 1
+	if (ENVIRON["VWARP"] == "1") { vwarp_args(d, mode); return }
+	# MASQUE is Vwarp's alone.
+	if (mode == "masque") exit 1
+	ep = jstr(d, "endpoint")
+	key = jstr(d, "key")
+	if (ep != "") out = out ",\"endpoint\":\"" jesc(ep) "\""
+	if (key ~ /^[A-Za-z0-9-]+$/) out = out ",\"key\":\"" key "\""
+	if (mode == "gool") out = out ",\"gool\":true"
+	if (mode == "psiphon") {
+		v = jstr(d, "country")
+		out = out ",\"cfon\":true,\"country\":\"" (v ~ /^[A-Z][A-Z]$/ ? v : "AT") "\""
+	}
+	if (ep == "" && jbool(d, "scan")) {
+		v = jnum(d, "rtt")
+		out = out ",\"scan\":true,\"rtt\":\"" (v >= 100 ? v : 1000) "ms\""
+	}
+	v = jstr(d, "ipv")
+	if (v == "4" || v == "6") out = out ",\"" v "\":true"
+	v = jstr(d, "reserved")
+	if (v ~ /^[0-9]+,[0-9]+,[0-9]+$/) out = out ",\"reserved\":\"" v "\""
+	print out "}"
+}
+
+# The same for Vwarp, which reads its options from the command line: its
+# configuration file is another shape, and one with no noize in it switches
+# the disguise off rather than leaving it to the options. Every value is
+# checked to be one word, because the line is split on spaces to run it.
+function vwarp_args(d, mode,   out, v, ep) {
+	out = "--bind " ENVIRON["BIND"] " --cache-dir " ENVIRON["CACHE"]
+	if (ENVIRON["MARK"] != "") out = out " --fwmark " (ENVIRON["MARK"] + 0)
+	v = jstr(d, "dns")
+	out = out " --dns " (v ~ /^[0-9A-Fa-f:.]+$/ ? v : "1.1.1.1")
+	if (ENVIRON["VERBOSE"] == "1") out = out " --verbose"
+	ep = jstr(d, "endpoint")
+	if (ep !~ /^[][0-9A-Za-z:._-]*$/) ep = ""
+	if (mode == "masque") {
+		if (ep == "") ep = "162.159.198.1:443"
+		out = out " --masque --endpoint " ep
+	} else if (ep != "") {
+		out = out " --endpoint " ep
+	}
+	v = jstr(d, "key")
+	if (v ~ /^[A-Za-z0-9-]+$/) out = out " --key " v
+	if (mode == "gool") out = out " --gool"
+	if (mode == "psiphon") {
+		v = jstr(d, "country")
+		out = out " --cfon --country " (v ~ /^[A-Z][A-Z]$/ ? v : "AT")
+	}
+	if (mode != "masque" && ep == "" && jbool(d, "scan")) {
+		v = jnum(d, "rtt")
+		out = out " --scan --rtt " (v >= 100 ? v : 1000) "ms"
+	}
+	v = jstr(d, "ipv")
+	if (v == "4") out = out " --ipv4"
+	else if (v == "6") out = out " -6"
+	v = jstr(d, "reserved")
+	if (v ~ /^[0-9]+,[0-9]+,[0-9]+$/) out = out " --reserved " v
+	v = jstr(d, "noize")
+	out = out ((v ~ /^(minimal|light|medium|heavy|stealth|gfw|firewall)$/) ? " --noize-preset " v : " --noize-preset=")
+	print out
+}
+
+# A WARP account as Xray's own WireGuard outbound - see WARPWG below. Only
+# plain WARP has one: WARP in WARP and Psiphon are things warp-plus does, not
+# things a WireGuard peer can be told to do. The address it is sent to is the
+# node's endpoint, or the first WARP address there is; the reserved bytes are
+# the account's own unless the node names others.
+function warp_wg(d,   p, cfg, peer, ifc, v4, v6, pk, pub, ep, res) {
+	p = ENVIRON["PAYLOAD"]
+	if (jstr(p, "mode") == "wgconf") {
+		if (!hostport(jstr(p, "endpoint")) || jraw(p, "xray") == "") exit 1
+		printf "%s\t%s\twireguard\t%s\t%d\t%s\n", ENVIRON["TAG"], ENVIRON["LABEL"], HOST, PORT, jraw(p, "xray")
+		return
+	}
+	if (jstr(p, "mode") != "warp") exit 1
+	d = jtrim(d)
+	pk = jstr(d, "private_key")
+	cfg = jraw(d, "config")
+	peer = jfirst(jraw(cfg, "peers"))
+	pub = jstr(peer, "public_key")
+	ifc = jraw(jraw(cfg, "interface"), "addresses")
+	v4 = jstr(ifc, "v4")
+	v6 = jstr(ifc, "v6")
+	if (pk == "" || pub == "" || v4 == "") exit 1
+	ep = jstr(p, "endpoint")
+	if (ep == "") ep = "162.159.192.1:2408"
+	if (!hostport(ep)) exit 1
+	res = jstr(p, "reserved")
+	res = (res != "") ? wg_reserved(res) : wg_reserved(jstr(cfg, "client_id"))
+	printf "%s\t%s\twireguard\t%s\t%d\t%s\n", ENVIRON["TAG"], ENVIRON["LABEL"], HOST, PORT, \
+		mk_wg(pk, "[\"" v4 "/32\"" (v6 != "" ? ",\"" v6 "/128\"" : "") "]", pub, "", 5, 1280, res)
 }
 
 # ------------------------------------------------------------------- JSON
@@ -1349,7 +1610,7 @@ LANDING {
 	line = $0
 	gsub(/\r/, "", line)
 	if (line == "" || split(line, rec, "\t") < 6) next
-	if (rec[3] ~ /^(hysteria2|hysteria|tuic|openvpn|amneziawg)$/) next
+	if (rec[3] ~ /^(hysteria2|hysteria|tuic|openvpn|amneziawg|warp)$/) next
 	if (!lready) {
 		split(ENVIRON["LAND"], land, "\t")
 		lp = ENVIRON["LAND"]
@@ -1366,6 +1627,19 @@ LANDING {
 	LAND_DIALER = ""
 	next
 }
+
+# -v WARPCONF=1: a warp record's payload on stdin, warp-plus's own
+# configuration on stdout - the JSON its -c reads, so that a licence never
+# shows in the process list. Where it listens, where it keeps its account and
+# the mark its packets carry come from the environment: BIND, CACHE, MARK.
+# For a WireGuard node, the .conf it reads is written to WGFILE.
+WARPCONF { wdoc = wdoc $0; next }
+
+# -v WARPWG=1: a WARP account on stdin - the wgcf-identity.json warp-plus
+# keeps - and on stdout the same account as a WireGuard record Xray can carry
+# itself, for a WARP node that is a link in a chain, a shunt rule's way out or
+# a SOCKS port's. PAYLOAD is the node, TAG and LABEL the record's first fields.
+WARPWG { wdoc = wdoc $0 "\n"; next }
 
 # One link per line, unless the file turns out to be a configuration.
 #
@@ -1424,7 +1698,9 @@ LANDING {
 }
 
 END {
-	if (DECODE) printf "%s", b64(blob)
+	if (WARPCONF) warp_conf(wdoc)
+	else if (WARPWG) warp_wg(wdoc)
+	else if (DECODE) printf "%s", b64(blob)
 	else if (WGCONF) wg_conf(doc)
 	else if (OVPN) ovpn_conf(doc)
 	else if (YAMLDOC) yaml_doc(doc)
@@ -1451,6 +1727,7 @@ function do_line(line) {
 	else if (index(line, "tuic://")      == 1) do_tuic(substr(line, 8))
 	else if (index(line, "wireguard://") == 1) do_wireguard(substr(line, 13))
 	else if (index(line, "wg://")        == 1) do_wireguard(substr(line, 6))
+	else if (index(line, "warp://")      == 1) do_warp(substr(line, 8))
 }
 
 # ------------------------------------------------------------------- YAML
@@ -1960,6 +2237,10 @@ function wg_conf(doc,   lines, m, i, l, sect, k, v, p,
 		emit(name, "amneziawg", mk_awg(secret, wg_addrs(addrs), pubkey, psk, keep, mtu, awg))
 		return
 	}
+	if (NX["warpplus"] == "1") {
+		emit(name, "warp", mk_wpwg(secret, wg_addrs(addrs), pubkey, psk, keep, mtu, wg_reserved(reserved)))
+		return
+	}
 	emit(name, "wireguard",
 	     mk_wg(secret, wg_addrs(addrs), pubkey, psk, keep, mtu, wg_reserved(reserved)))
 }
@@ -1978,6 +2259,14 @@ function do_wireguard(body,   label, secret, query, p) {
 	secret = urldec(substr(body, 1, p - 1))
 	if (!hostport(substr(body, p + 1))) return
 
+	if (NX["warpplus"] == "1") {
+		emit(label, "warp", \
+			mk_wpwg(secret, wg_addrs(qs(query, "address")), \
+			        qs(query, "publickey") != "" ? qs(query, "publickey") : qs(query, "public-key"), \
+			        qs(query, "presharedkey"), qs(query, "keepalive") + 0, \
+			        qs(query, "mtu") + 0, wg_reserved(qs(query, "reserved"))))
+		return
+	}
 	emit(label, "wireguard", \
 		mk_wg(secret, wg_addrs(qs(query, "address")), \
 		      qs(query, "publickey") != "" ? qs(query, "publickey") : qs(query, "public-key"), \

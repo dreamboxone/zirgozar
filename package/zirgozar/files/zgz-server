@@ -81,7 +81,7 @@ xray_out() {
 				"$_u" "$(j "${_a:-127.0.0.1}")" "${_p:-1080}" "$_users"
 			;;
 		*)
-			_r="$(node_records "$_o" 1 2>/dev/null | head -1)"
+			_r="$(node_records "$_o" 1 2>/dev/null | head -1 | warp_natives)"
 			case "$(printf '%s' "$_r" | cut -f3)" in
 				''|hysteria2|hysteria|tuic|openvpn|amneziawg)
 					warn "server $_u: the config '$_o' cannot be used as its way out - going out directly"

@@ -62,6 +62,10 @@ start_service() {
 	mkdir -p "$ZGZ_RUN" /var/etc "$ZGZ_ETC"
 	log_trim
 	log "Start running..."
+	# What the page was saying is about the last start - another node, another
+	# core - and this one is a fresh attempt. Whatever this start finds wrong,
+	# it says again; a message it does not repeat is no longer true.
+	clear_message
 
 	# A node chosen in Basic Settings is the node, at every start - including
 	# the one that follows saving it there. Reading one link is quick enough
@@ -171,9 +175,11 @@ start_service() {
 	# keeps it alive on the same terms.
 	# Only for Xray: sing-box speaks hysteria2 and tuic itself, and
 	# zgz-sbconfig dials them directly, with no second program in between.
-	if [ "$ENGINE" = "xray" ] && "$BRIDGE" needed 2>/dev/null; then
+	# WARP is warp-plus's under either engine.
+	if bridge_wanted "$ENGINE"; then
 		if BRIDGE_CMD="$("$BRIDGE" command 2>/dev/null)"; then
-			log_step "Bridge: $(sed -n 's/.*"type"[ \t]*:[ \t]*"\([^"]*\)".*/\1/p' "$ZGZ_ETC/bridge.json" 2>/dev/null | head -1) through $BRIDGE_CMD"
+			log_step "Bridge: $(bridge_type) through $BRIDGE_CMD"
+			bridge_is_warp && log_step "WARP: $(sed -n 's/.*"mode":"\([^"]*\)".*/\1/p' "$ZGZ_ETC/bridge.json" | head -1) - finding an address and connecting can take a minute"
 			_bbin="${BRIDGE_CMD%% *}"
 			printf 'bridge=%s\nbridge_version=%s\n' "$_bbin" "$(core_version "$_bbin")" >> "$ZGZ_RUN/core.info" 2>/dev/null || true
 			procd_open_instance bridge
@@ -184,6 +190,8 @@ start_service() {
 			procd_set_param stderr 1
 			procd_close_instance
 		else
+			# Asked again for the reason, which it puts on the page.
+			"$BRIDGE" config >/dev/null 2>&1 || true
 			log "the chosen server needs a core this router does not have"
 			return 1
 		fi
@@ -232,14 +240,21 @@ start_service() {
 # Is anything listening on this port? Ask three ways rather than one: a check
 # that cannot see a healthy listener is indistinguishable from a tunnel that
 # never came up, and it tears the tunnel down either way.
+#
+# The port has to be the socket's own, and for TCP the socket has to be
+# listening. Matching ":<port> " anywhere on the line also matched a
+# connection going *to* that port - the core dialling a helper that was not
+# there yet - and took a helper that never came up for one that had.
 listening() {
 	local hex
 	hex=$(printf %04X "$1" 2>/dev/null)
 	[ -n "$hex" ] || return 1
-	grep -qi ":$hex " /proc/net/tcp  2>/dev/null && return 0
-	grep -qi ":$hex " /proc/net/tcp6 2>/dev/null && return 0
-	grep -qi ":$hex " /proc/net/udp  2>/dev/null && return 0
-	netstat -ln 2>/dev/null | grep -q "[:.]$1[[:space:]]" && return 0
+	# Through cat: a kernel without IPv6 has no tcp6, and awk would stop at it.
+	cat /proc/net/tcp /proc/net/tcp6 2>/dev/null |
+		awk -v p=":$hex" 'toupper(substr($2, length($2) - 4)) == p && $4 == "0A" { f = 1 } END { exit !f }' && return 0
+	cat /proc/net/udp /proc/net/udp6 2>/dev/null |
+		awk -v p=":$hex" 'toupper(substr($2, length($2) - 4)) == p { f = 1 } END { exit !f }' && return 0
+	netstat -ln 2>/dev/null | awk -v p="$1" '{ n = split($4, a, /[:.]/); if (a[n] == p) f = 1 } END { exit !f }' && return 0
 	return 1
 }
 
@@ -270,11 +285,21 @@ service_started() {
 	tproxy_port="$(cfg tproxy_port 1082)"
 	bridge_port="$(cfg bridge_port 10808)"
 
-	if [ "$(active_engine)" = "xray" ] && "$BRIDGE" needed 2>/dev/null; then
-		if ! wait_for_port "$bridge_port" 15; then
+	if bridge_wanted; then
+		# warp-plus opens its port only once WARP answers: after registering
+		# an account the first time, scanning for an address, and - for WARP
+		# in WARP or Psiphon - the second hop as well. Psiphon alone can take
+		# most of a minute.
+		_bwait=15
+		bridge_is_warp && _bwait=120
+		if ! wait_for_port "$bridge_port" "$_bwait"; then
 			log "the bridge never started listening on $bridge_port"
 			say_status failed
-			say_message "The helper for this node's protocol would not start."
+			if bridge_is_warp; then
+				say_message "WARP did not connect. The Runtime Logs page says how far it got. Without an account, press Register on the node's page while another node is connected; without an answer from WARP, turn Scan on or give another endpoint."
+			else
+				say_message "The helper for this node's protocol would not start."
+			fi
 			return 1
 		fi
 	fi
@@ -316,6 +341,19 @@ service_started() {
 }
 
 stop_service() {
+	# A WARP node about to take over with no account yet. Cloudflare's
+	# registration address is blocked on a great many connections, and once
+	# this stops, the only way the router has left is that connection - or,
+	# worse, the WARP node itself, which cannot carry anything until it has
+	# the account. So the account is made now, through the tunnel that is
+	# still up. Only on the way to starting again, and only when there is a
+	# working tunnel to go through.
+	_wnext="$(cfg node '')"
+	if [ -n "$_wnext" ] && [ "$(cfg_bool enabled 0)" = "1" ] && tunnel_running &&
+	   [ "$(cat "$ZGZ_STATUS" 2>/dev/null)" = "ready" ]; then
+		bounded 120 "$ZGZ_LIB/zgz-warp" prepare "$_wnext" >/dev/null 2>&1 || true
+	fi
+
 	# Before anything is killed: the counters live inside the core and vanish
 	# with it, so whatever has gone through since the last sample has to be
 	# collected while it is still there to collect.
@@ -324,7 +362,7 @@ stop_service() {
 
 	"$DNS" down >/dev/null 2>&1 || true
 	"$RULES" down >/dev/null 2>&1 || true
-	rm -f "$ZGZ_CONFIG_JSON" "$ZGZ_BRIDGE_JSON" "$STARTED_FLAG" "$ZGZ_RUN/core.info" "$ZGZ_RUN/sb.counters"
+	rm -f "$ZGZ_CONFIG_JSON" "$ZGZ_BRIDGE_JSON" "$ZGZ_BRIDGE_JSON.conf" "$STARTED_FLAG" "$ZGZ_RUN/core.info" "$ZGZ_RUN/sb.counters"
 	log "Clearing and closing related programs complete."
 	return 0
 }
@@ -363,22 +401,31 @@ reload_service() {
 		return
 	fi
 
+	# The node chosen in Basic Settings is read first, because everything
+	# below is decided by it. Deciding first and reading it afterwards was
+	# deciding about the node before last: a save that moved from an OpenVPN
+	# node to a WARP one asked whether sing-box was still wanted, was told yes
+	# by the OpenVPN node's description, and swapped the core alone - for a
+	# node that needs warp-plus running beside Xray.
+	"$ZGZ_LIB/zgz-nodes" fixnames >/dev/null 2>&1 || true
+	_fixed="$(cfg node '')"
+	if [ -n "$_fixed" ] && [ "$(cfg_bool enabled 0)" = "1" ]; then
+		"$ZGZ_LIB/zgz-probe" use "$_fixed" >/dev/null 2>&1 || true
+	fi
+
 	# The engine is not something a swap of the configuration can change: the
-	# running core reads the other format, so it goes the whole way round.
+	# running core reads the other format, so it goes the whole way round. Nor
+	# is a helper program - one running, or one now wanted.
 	if [ "$(cfg_bool enabled 0)" != "1" ] || [ ! -f "$STARTED_FLAG" ] ||
-	   ! tunnel_running || { [ "$(active_engine)" = "xray" ] && "$BRIDGE" needed 2>/dev/null; } ||
+	   ! tunnel_running || bridge_wanted ||
+	   grep -q '^bridge=' "$ZGZ_RUN/core.info" 2>/dev/null ||
 	   [ "$(wanted_engine)" != "$(active_engine)" ]; then
 		restart
 		return
 	fi
 
 	"$ZGZ_LIB/zgz-router" rebind >/dev/null 2>&1 || true
-	"$ZGZ_LIB/zgz-nodes" fixnames >/dev/null 2>&1 || true
 	"$ZGZ_LIB/zgz-router" schedule sync >/dev/null 2>&1 || true
-	_fixed="$(cfg node '')"
-	if [ -n "$_fixed" ]; then
-		"$ZGZ_LIB/zgz-probe" use "$_fixed" >/dev/null 2>&1 || true
-	fi
 
 	# Ending in .json: the core decides how to read a file by its name, and
 	# refuses one it cannot tell the format of.

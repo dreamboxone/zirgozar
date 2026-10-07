@@ -384,7 +384,9 @@ body.pwp-fa #modal_overlay>.modal textarea,body.pwp-fa #modal_overlay>.modal inp
 :is(.mk,#modal_overlay>.modal) input[type=checkbox]:checked{background:linear-gradient(135deg,#10b981,#059669)}
 :is(.mk,#modal_overlay>.modal) input[type=checkbox]:checked::after{transform:translateX(20px)}
 :is(.mk,#modal_overlay>.modal) input[type=checkbox]:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
-.mk-dark input[type=checkbox],body.pwp-dark #modal_overlay>.modal input[type=checkbox]{background:#3a4a6b}
+/* Off only: in a window, this outweighs the green of :checked above, and a
+   switch turned on there stayed the colour of one turned off. */
+.mk-dark input[type=checkbox]:not(:checked),body.pwp-dark #modal_overlay>.modal input[type=checkbox]:not(:checked){background:#3a4a6b}
 :is(.mk,#modal_overlay>.modal) .cbi-checkbox>label{display:none}
 /* Except the tick box that selects a row for the buttons above the table:
    a switch there reads as turning the node on or off. A box, as in PassWall2. */

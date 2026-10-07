@@ -384,6 +384,67 @@ function addViaLinks() {
 	]);
 }
 
+/* -------------------------------------------------------------- WARP
+
+   A WARP node has no server of its own to paste a link for: warp-plus makes
+   the account and finds the address. So it is made here from a few choices,
+   as the warp:// link the rest of the program reads, and its own page has
+   everything else. */
+var WARP_COUNTRIES = [ 'AT', 'AU', 'BE', 'BG', 'CA', 'CH', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GB', 'HR',
+	'HU', 'IE', 'IN', 'IT', 'JP', 'LV', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SG', 'SK', 'US' ];
+
+function addWarp() {
+	var name = E('input', { 'type': 'text', 'style': 'width:100%', 'placeholder': 'WARP' });
+	var mode = E('select', { 'style': 'width:100%' }, [
+		E('option', { 'value': 'warp' }, _('WARP')),
+		E('option', { 'value': 'gool' }, _('WARP in WARP')),
+		E('option', { 'value': 'psiphon' }, _('Psiphon behind WARP')),
+		E('option', { 'value': 'masque' }, _('WARP over MASQUE'))
+	]);
+	var country = E('select', { 'style': 'width:100%' }, WARP_COUNTRIES.map(function(c) {
+		return E('option', { 'value': c }, c);
+	}));
+	var countryRow = E('div', { 'style': 'display:none;margin-top:10px' }, [
+		E('div', { 'style': 'font-weight:600;margin-bottom:4px' }, _('Exit country')), country ]);
+	mode.addEventListener('change', function() {
+		countryRow.style.display = (mode.value == 'psiphon') ? '' : 'none';
+	});
+	var key = E('input', { 'type': 'text', 'style': 'width:100%;direction:ltr', 'placeholder': 'xxxxxxxx-xxxxxxxx-xxxxxxxx' });
+
+	ui.showModal(_('Add WARP'), [
+		E('p', {}, _('Cloudflare WARP, carried by warp-plus. It makes a free account by itself and looks for a WARP address that answers from here. Everything else is on the config’s own page.')),
+		E('div', { 'style': 'font-weight:600;margin-bottom:4px' }, _('Name')), name,
+		E('div', { 'style': 'font-weight:600;margin:10px 0 4px' }, _('Mode')), mode,
+		countryRow,
+		E('div', { 'style': 'font-weight:600;margin:10px 0 4px' }, _('WARP+ licence (optional)')), key,
+		E('div', { 'class': 'right', 'style': 'margin-top:14px' }, [
+			E('button', { 'class': 'btn cbi-button cbi-button-neutral', 'click': ui.hideModal }, _('Close window')),
+			' ',
+			E('button', {
+				'class': 'btn cbi-button cbi-button-positive',
+				'click': ui.createHandlerFn(null, function(ev) {
+					var b = ev.currentTarget, k = key.value.trim();
+					if (k && !/^[A-Za-z0-9-]+$/.test(k)) {
+						pui.note(b, _('A WARP+ licence is letters, digits and dashes.'), 'error');
+						return;
+					}
+					var q = 'mode=' + mode.value + (mode.value == 'psiphon' ? '&country=' + country.value : '');
+					var link = 'warp://' + (k ? k + '@' : '') + 'auto?' + q +
+						'#' + encodeURIComponent(name.value.trim() || mode.options[mode.selectedIndex].text);
+					return callAction('add_links', link).then(function(r) {
+						if (!r || !r.added) {
+							pui.note(b, _('None of those could be read as a node.'), 'error');
+							return;
+						}
+						ui.hideModal();
+						location.reload();
+					});
+				})
+			}, _('Add'))
+		])
+	]);
+}
+
 function reassign(b) {
 	var ids = selected();
 	if (!ids.length) {
@@ -423,6 +484,7 @@ function toolbar(s) {
 		/* The table's own Add, moved up beside the rest. */
 		pui.btn(_('Add'), 'success mk-small', function(ev) { return s.handleAdd(ev); }, 'plus'),
 		pui.btn(_('Add the node via the link'), 'primary mk-small', addViaLinks, 'link'),
+		pui.btn(_('Add WARP'), 'primary mk-small', addWarp, 'cloud'),
 		pui.btn(_('Select all'), 'soft-blue mk-small', function(ev) {
 			all = !all;
 			document.querySelectorAll('.pwp-sel').forEach(function(c) { c.checked = all; });

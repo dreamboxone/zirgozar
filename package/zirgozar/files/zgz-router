@@ -206,12 +206,12 @@ cmd_schedule() {
 		start)
 			rm -f "$SCHEDULE_STOPPED"
 			log "Scheduled start"
-			bounded 90 /etc/init.d/zirgozar start >/dev/null 2>&1 || true
+			bounded 180 /etc/init.d/zirgozar start >/dev/null 2>&1 || true
 			;;
 		restart)
 			rm -f "$SCHEDULE_STOPPED"
 			log "Scheduled restart"
-			bounded 90 /etc/init.d/zirgozar restart >/dev/null 2>&1 || true
+			bounded 180 /etc/init.d/zirgozar restart >/dev/null 2>&1 || true
 			;;
 		geo)
 			# The files ticked on Rule Manage, and a restart when the tunnel
@@ -229,7 +229,7 @@ cmd_schedule() {
 			log "Scheduled update of the routing data ($_which)"
 			if "$ZGZ_LIB/zgz-geo" update "$_which" >/dev/null 2>&1; then
 				if [ "$(cfg_bool enabled 0)" = "1" ] && tunnel_running; then
-					bounded 90 /etc/init.d/zirgozar restart >/dev/null 2>&1 || true
+					bounded 180 /etc/init.d/zirgozar restart >/dev/null 2>&1 || true
 				fi
 			fi
 			;;
@@ -265,7 +265,7 @@ cmd_reset() {
 	log "Back to the settings the program was installed with"
 	cp -f "$DEFAULT_CONFIG" /etc/config/zirgozar
 	rm -rf "$ZGZ_ETC/best.json" "$ZGZ_ETC/best.meta" "$ZGZ_ETC/bridge.json" \
-	       "$ZGZ_ETC/nodes.cache" "$ZGZ_ETC/subs"
+	       "$ZGZ_ETC/nodes.cache" "$ZGZ_ETC/subs" "$ZGZ_ETC/warp"
 	if [ -n "$ZGZ_RUN" ] && [ -d "$ZGZ_RUN" ]; then
 		rm -rf "$ZGZ_RUN"/*.tsv "$ZGZ_RUN/tests" "$ZGZ_RUN/message" \
 		       "$ZGZ_RUN/attempts" "$ZGZ_RUN/rejected" "$ZGZ_RUN/progress"
