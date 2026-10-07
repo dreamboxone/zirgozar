@@ -818,8 +818,8 @@ var FA = {
 		'برای همه سایت‌هایی که از فیلترشکن می‌روند آدرس ساختگی داده می‌شود. فقط وقتی کار می‌کند که در برگه DNS، «روش پیدا کردن دامنه‌ها» روی «مستقیم داخل تونل» باشد.',
 	'When the Default row goes to a hand-added node, it is reached through this node first.':
 		'اگر ردیف پیش‌فرض به یک کانفیگ دستی می‌رود، اتصال اول از این کانفیگ رد می‌شود.',
-	'Delete the subscribed node': 'حذف کانفیگ‌ها',
-	'Manual subscription': 'به‌روزرسانی دستی',
+	'Delete the subscribed node': 'حذف',
+	'Manual subscription': 'به‌روزرسانی',
 	'Reading it now. The count will change when it is done.': 'در حال خواندن. پس از پایان، تعداد به‌روز می‌شود.',
 	'Cloudflare Connection': 'اتصال کلادفلر',
 	'The main switch is in the Main tab below.': 'کلید اصلی در زبانه «اصلی» پایین همین صفحه است.',
