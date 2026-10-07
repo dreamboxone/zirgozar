@@ -107,20 +107,64 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: armv7      # ipq40xx, mvebu, most ARM routers
+          - name: arm_cortex-a7_neon-vfpv4    # ipq40xx, mvebu, most ARM routers
             openwrt_arch: arm_cortex-a7_neon-vfpv4
-          - name: aarch64    # filogic, rockchip, newer ARM64 routers
+          - name: arm_cortex-a7
+            openwrt_arch: arm_cortex-a7
+          - name: arm_cortex-a7_vfpv4
+            openwrt_arch: arm_cortex-a7_vfpv4
+          - name: arm_cortex-a5_vfpv4
+            openwrt_arch: arm_cortex-a5_vfpv4
+          - name: arm_cortex-a8_vfpv3
+            openwrt_arch: arm_cortex-a8_vfpv3
+          - name: arm_cortex-a9    # mvebu, bcm53xx
+            openwrt_arch: arm_cortex-a9
+          - name: arm_cortex-a9_neon
+            openwrt_arch: arm_cortex-a9_neon
+          - name: arm_cortex-a9_vfpv3-d16
+            openwrt_arch: arm_cortex-a9_vfpv3-d16
+          - name: arm_cortex-a15_neon-vfpv4
+            openwrt_arch: arm_cortex-a15_neon-vfpv4
+          - name: arm_arm1176jzf-s_vfp    # Raspberry Pi 1 / Zero
+            openwrt_arch: arm_arm1176jzf-s_vfp
+          - name: arm_arm926ej-s
+            openwrt_arch: arm_arm926ej-s
+          - name: arm_xscale
+            openwrt_arch: arm_xscale
+          - name: aarch64_cortex-a53    # filogic, rockchip, newer ARM64 routers
             openwrt_arch: aarch64_cortex-a53
-          - name: aarch64_cortex-a72    # mvebu cortexa72, bcm27xx, Raspberry Pi 4 and the like
+          - name: aarch64_cortex-a72    # bcm27xx, Raspberry Pi 4
             openwrt_arch: aarch64_cortex-a72
-          - name: aarch64_cortex-a76    # Raspberry Pi 5 and the like
+          - name: aarch64_cortex-a76    # Raspberry Pi 5
             openwrt_arch: aarch64_cortex-a76
-          - name: aarch64_generic       # armsr, and any 64-bit ARM router the above do not name
+          - name: aarch64_generic    # armsr, and any other 64-bit ARM
             openwrt_arch: aarch64_generic
-          - name: mipsel     # ramips / mt7621
+          - name: mipsel_24kc    # ramips mt7621 / mt7620 / mt76x8
             openwrt_arch: mipsel_24kc
-          - name: x86_64     # x86 builds and VMs
+          - name: mipsel_74kc
+            openwrt_arch: mipsel_74kc
+          - name: mipsel_mips32
+            openwrt_arch: mipsel_mips32
+          - name: mips_24kc    # ath79 (Atheros / Qualcomm)
+            openwrt_arch: mips_24kc
+          - name: mips_4kec
+            openwrt_arch: mips_4kec
+          - name: mips_mips32
+            openwrt_arch: mips_mips32
+          - name: mips64_octeonplus
+            openwrt_arch: mips64_octeonplus
+          - name: mips64_mips64r2
+            openwrt_arch: mips64_mips64r2
+          - name: mips64el_mips64r2
+            openwrt_arch: mips64el_mips64r2
+          - name: x86_64    # x86 builds and VMs
             openwrt_arch: x86_64
+          - name: i386_pentium4
+            openwrt_arch: i386_pentium4
+          - name: riscv64_riscv64
+            openwrt_arch: riscv64_riscv64
+          - name: loongarch64_generic
+            openwrt_arch: loongarch64_generic
 
     steps:
       - name: Check out the repository
@@ -325,11 +369,6 @@ jobs:
           Your architecture is `DISTRIB_ARCH` in `/etc/openwrt_release`.
 
           Then open LuCI, go to **Services -> Zirgozar**, turn on the Main switch and press **Save & Apply**.
-
-          **Coming from Passwall+?** Zirgozar is the same program under a new name. Install it
-          over Passwall+: the settings, configs, subscriptions, routing data and traffic history
-          move across by themselves and Passwall+ is switched off. Then remove the old package:
-          `apk del luci-app-passwall-plus passwall-plus` (or `opkg remove` on 24.10 and older).
 
           راهنمای کامل: README.md · Full guide in English: README.en.md
           NOTES

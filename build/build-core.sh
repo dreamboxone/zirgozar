@@ -24,29 +24,39 @@ BASE="https://github.com/XTLS/Xray-core/releases/download/$XRAY_VERSION"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
+# The names the build has always taken, for the OpenWrt architecture each
+# stood for.
 case "$TARGET" in
-	armv7|arm_cortex-a7_neon-vfpv4|ipq40xx|arm)
-		ASSET=Xray-linux-arm32-v7a.zip;  OUTDIR=arm_cortex-a7_neon-vfpv4 ;;
-	aarch64|arm64|filogic|mediatek)
-		ASSET=Xray-linux-arm64-v8a.zip;  OUTDIR=aarch64_cortex-a53 ;;
-	# The same arm64 program under the other names OpenWrt gives a 64-bit ARM
-	# router: its package manager installs a package only when this name is the
-	# router's own, so a router with Cortex-A72 cores cannot take the a53 one.
-	aarch64_cortex-a72)
-		ASSET=Xray-linux-arm64-v8a.zip;  OUTDIR=aarch64_cortex-a72 ;;
-	aarch64_cortex-a76)
-		ASSET=Xray-linux-arm64-v8a.zip;  OUTDIR=aarch64_cortex-a76 ;;
-	aarch64_generic)
-		ASSET=Xray-linux-arm64-v8a.zip;  OUTDIR=aarch64_generic ;;
-	mipsel|mipsle|ramips|mt7621)
-		ASSET=Xray-linux-mips32le.zip;   OUTDIR=mipsel_24kc ;;
-	x86_64|amd64)
-		ASSET=Xray-linux-64.zip;         OUTDIR=x86_64 ;;
-	i386|x86)
-		ASSET=Xray-linux-32.zip;         OUTDIR=i386_pentium4 ;;
+	armv7|ipq40xx|arm)               TARGET=arm_cortex-a7_neon-vfpv4 ;;
+	aarch64|arm64|filogic|mediatek)  TARGET=aarch64_cortex-a53 ;;
+	mipsel|mipsle|ramips|mt7621)     TARGET=mipsel_24kc ;;
+	amd64)                           TARGET=x86_64 ;;
+	i386|x86)                        TARGET=i386_pentium4 ;;
+esac
+
+# Any OpenWrt architecture name, to the Xray build that runs on it. A package
+# installs only on a router whose own name it carries, so the same program is
+# packaged under every name a family of routers goes by. The MIPS builds are
+# the soft-float ones: most MIPS router chips have no FPU, and a hard-float
+# program there leans on the kernel's emulator for every float.
+OUTDIR="$TARGET"
+BIN=xray
+case "$TARGET" in
+	aarch64_*)                       ASSET=Xray-linux-arm64-v8a.zip ;;
+	arm_arm926ej-s|arm_xscale)       ASSET=Xray-linux-arm32-v5.zip ;;
+	arm_arm1176jzf-s_vfp)            ASSET=Xray-linux-arm32-v6.zip ;;
+	arm_cortex-a*)                   ASSET=Xray-linux-arm32-v7a.zip ;;
+	mips64el_*)                      ASSET=Xray-linux-mips64le.zip ;;
+	mips64_*)                        ASSET=Xray-linux-mips64.zip ;;
+	mipsel_*)                        ASSET=Xray-linux-mips32le.zip; BIN=xray_softfloat ;;
+	mips_*)                          ASSET=Xray-linux-mips32.zip;   BIN=xray_softfloat ;;
+	x86_64)                          ASSET=Xray-linux-64.zip ;;
+	i386_pentium4)                   ASSET=Xray-linux-32.zip ;;
+	riscv64_*)                       ASSET=Xray-linux-riscv64.zip ;;
+	loongarch64_*)                   ASSET=Xray-linux-loong64.zip ;;
 	*)
 		echo "unknown target '$TARGET'"
-		echo "supported: armv7 aarch64 aarch64_cortex-a72 aarch64_cortex-a76 aarch64_generic mipsel x86_64 i386"
+		echo "give an OpenWrt architecture name, such as arm_cortex-a7_neon-vfpv4, aarch64_cortex-a53, mipsel_24kc or x86_64"
 		exit 1 ;;
 esac
 
@@ -67,11 +77,15 @@ mkdir -p "$WORK" "$(dirname "$OUT")"
 echo ">>> downloading"
 curl -fsSL --retry 3 -o "$WORK/xray.zip" "$BASE/$ASSET"
 
-echo ">>> extracting the executable only"
-unzip -o -q "$WORK/xray.zip" xray -d "$WORK"
-[ -f "$WORK/xray" ] || { echo "no 'xray' entry inside $ASSET"; exit 1; }
+echo ">>> extracting the executable only ($BIN)"
+unzip -o -q "$WORK/xray.zip" "$BIN" -d "$WORK" 2>/dev/null || {
+	# A release without the soft-float build: the ordinary one still runs.
+	BIN=xray
+	unzip -o -q "$WORK/xray.zip" xray -d "$WORK"
+}
+[ -f "$WORK/$BIN" ] || { echo "no '$BIN' entry inside $ASSET"; exit 1; }
 
-install -m 0755 "$WORK/xray" "$OUT"
+install -m 0755 "$WORK/$BIN" "$OUT"
 printf '%s\n' "$XRAY_VERSION" > "$ROOT/prebuilt/$OUTDIR/xray-version.txt"
 
 echo ">>> done: $OUT"
