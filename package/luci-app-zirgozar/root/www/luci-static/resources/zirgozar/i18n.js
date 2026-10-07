@@ -1076,6 +1076,7 @@ var FA = {
 		'لایسنس WARP+ قبول نشد و اکانت رایگان ماند. لایسنس را بررسی کنید و اینکه روی پنج دستگاه دیگر فعال نباشد.',
 	'That node is not a WARP node.': 'این کانفیگ وارپ نیست.',
 	'Where the tunnel comes out': 'محل خروج تونل',
+	'This is the node in use.': 'این کانفیگ همین الان در حال استفاده است.',
 	'WARP over MASQUE': 'وارپ با MASQUE',
 	'MASQUE account': 'اکانت MASQUE',
 	'WARP: Cloudflare’s own exit. WARP in WARP: a second WARP behind the first, for an exit address the first does not show. Psiphon behind WARP: an exit in the country chosen below. WARP over MASQUE: WARP reached over HTTP/3 on port 443 rather than WireGuard, for a connection that blocks WireGuard; it needs Vwarp.':

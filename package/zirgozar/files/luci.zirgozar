@@ -208,7 +208,11 @@ method_traffic() {
 # ranked file has the ones that completed a request; the reachable file has
 # handshake times for the rest.
 method_nodes() {
-	_cur="$(meta_get tag)"
+	# The node in use, by what it is rather than by its tag: a node chosen in
+	# Basic Settings is read on its own, and its tag is not the one it has in
+	# this list - "n0" there, whatever it is here - which marked the first node
+	# of the list as the one in use.
+	_cur="$(meta_get label)|$(meta_get protocol)|$(meta_get host)|$(meta_get port)"
 	awk -F'\t' -v cur="$_cur" \
 		-v ranked="$ZGZ_RANKED" -v alive="$ZGZ_RUN/alive.tsv" '
 		BEGIN {
@@ -234,7 +238,7 @@ method_nodes() {
 				$1, lab, $3, $4, $5,
 				(($1 in ms) ? ms[$1] : 0),
 				(($1 in hs) ? hs[$1] : 0),
-				($1 == cur ? "true" : "false")
+				((!found && $2 "|" $3 "|" $4 "|" $5 == cur && (found = 1)) ? "true" : "false")
 		}
 		END { printf "],\"count\":%d}\n", n }
 	' "$ZGZ_CANDIDATES" 2>/dev/null || echo '{"nodes":[],"count":0}'

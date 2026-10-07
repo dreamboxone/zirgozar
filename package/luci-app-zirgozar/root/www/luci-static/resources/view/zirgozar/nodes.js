@@ -639,18 +639,24 @@ function renderNodes(d) {
 			E('td', { 'class': 'td' }, listTestCell(n.tag, 'url', n.ms)),
 			E('td', { 'class': 'td' }, listTestCell(n.tag, 'tcp', n.handshake)),
 			E('td', { 'class': 'td' }, [
+				/* Not for the node already in use: there is nothing to switch to. */
 				E('button', {
 					'class': 'btn cbi-button cbi-button-apply',
 					'style': 'padding:2px 10px;font-size:12px',
-					'click': ui.createHandlerFn(null, function(ev) {
+					'disabled': n.current ? '' : null,
+					'title': n.current ? _('This is the node in use.') : null,
+					'click': function(ev) {
 						var b = ev.currentTarget;
+						if (b.disabled) return;
+						b.disabled = true;
 						return callAction('pick', n.tag).then(function(r) {
-							if (r && r.error)
+							if (r && r.error) {
+								b.disabled = false;
 								pui.note(b, _(r.error), 'error');
-							else
+							} else
 								pui.note(b, _('Connecting through %s…').format(n.label || n.host), 'ok');
-						});
-					})
+						}, function() { b.disabled = false; });
+					}
 				}, _('Use'))
 			])
 		]));
@@ -894,14 +900,20 @@ return view.extend({
 						return nodeAct(ev.currentTarget, 'top_node', section_id, true);
 					})
 				}, _('To Top')),
+				/* Not for the node Basic Settings already names. */
 				E('button', {
 					'class': 'btn cbi-button cbi-button-apply',
-					'click': ui.createHandlerFn(this, function(ev) {
+					'disabled': uci.get('zirgozar', 'config', 'node') == section_id ? '' : null,
+					'title': uci.get('zirgozar', 'config', 'node') == section_id ? _('This is the node in use.') : null,
+					'click': function(ev) {
+						var b = ev.currentTarget;
+						if (b.disabled) return;
 						if (!window.confirm(_('Are you sure set this node?')))
 							return;
-						return nodeAct(ev.currentTarget, 'use_node', section_id, false,
+						b.disabled = true;
+						return nodeAct(b, 'use_node', section_id, false,
 							_('This is now the node in Basic Settings.'));
-					})
+					}
 				}, _('Use')),
 				E('button', {
 					'class': 'btn cbi-button cbi-button-neutral',
