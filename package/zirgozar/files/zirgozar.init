@@ -43,6 +43,8 @@ start_service() {
 	# The rebind exceptions on the Traffic Rules page belong to dnsmasq, not
 	# to the tunnel, so they are brought in step whether or not the tunnel is
 	# about to start - this runs on every boot and on every save.
+	# Remote DNS off 1.1.1.1, once, before anything writes a configuration.
+	"$ZGZ_LIB/zgz-router" dnsmove >/dev/null 2>&1 || true
 	"$ZGZ_LIB/zgz-router" rebind >/dev/null 2>&1 || true
 	# Nodes and subscriptions with names of their own, not places in the
 	# file - see zgz-nodes. Before anything reads a setting naming one.

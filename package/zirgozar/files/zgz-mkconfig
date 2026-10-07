@@ -688,8 +688,8 @@ set -- $(direct_dns)
 dd_proto="$1"; dd_addr="$2"; dd_port="$3"
 direct_qs="$(cfg direct_dns_query_strategy UseIPv4)"
 remote_proto="$(cfg remote_dns_protocol tcp)"
-remote_dns="$(cfg remote_dns 1.1.1.1)"
-remote_doh="$(cfg remote_dns_doh 'https://1.1.1.1/dns-query')"
+remote_dns="$(cfg remote_dns 8.8.8.8)"
+remote_doh="$(cfg remote_dns_doh 'https://8.8.8.8/dns-query')"
 remote_ecs="$(cfg remote_dns_client_ip '')"
 remote_qs="$(cfg remote_dns_query_strategy UseIPv4)"
 

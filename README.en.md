@@ -267,8 +267,8 @@ a **Remote DNS** for everything that goes through the tunnel.
 | **Direct DNS** | `direct_dns` | — | With UDP or TCP above: the resolver, `1.2.3.4` or `1.2.3.4:53`. Iranian public resolvers are offered; picking one means it sees every name that goes straight out |
 | **Direct Query Strategy** | `direct_dns_query_strategy` | UseIPv4 | Which address families to ask the direct resolver for |
 | **Remote DNS Protocol** | `remote_dns_protocol` | TCP | TCP, UDP or DoH. TCP is the default because a great many free configs carry no UDP, and a lookup sent as UDP through one of them is simply lost |
-| **Remote DNS** | `remote_dns` | 1.1.1.1 | The resolver for TCP or UDP. Cloudflare, Google, Quad9 and OpenDNS are offered |
-| **Remote DNS DoH** | `remote_dns_doh` | `https://1.1.1.1/dns-query` | For DoH: an address, or an address and the server's own IP after a comma so its name is never itself a lookup |
+| **Remote DNS** | `remote_dns` | 8.8.8.8 | The resolver for TCP or UDP. Cloudflare, Google, Quad9 and OpenDNS are offered. Google and not Cloudflare by default: configs built on Cloudflare Workers - patterniha's list, for one - cannot reach 1.1.1.1, and through them no name was ever found. A router left on the old 1.1.1.1 default is moved to 8.8.8.8 once |
+| **Remote DNS DoH** | `remote_dns_doh` | `https://8.8.8.8/dns-query` | For DoH: an address, or an address and the server's own IP after a comma so its name is never itself a lookup |
 | **Remote DNS EDNS Client Subnet** | `remote_dns_client_ip` | — | Tells the DNS server where the client is, so a CDN can answer with an edge near it. Not a private address, and the server must support RFC 7871 |
 | **Remote DNS Outbound** | `remote_dns_detour` | Remote | Whether the remote resolver is reached through the tunnel or straight out |
 | **FakeDNS** | `remote_fakedns` | off | Answers with made-up addresses and lets the tunnel find the real one at the far end, saving a lookup on every new site. Only with *Straight into the tunnel*: with dnsmasq in front, the router's own lookups would be made up too |

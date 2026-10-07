@@ -582,6 +582,14 @@ method_action() {
 			# set aside at once whenever Basic Settings named a node of its
 			# own - which is when Use is pressed most.
 			_ref="$("$NODES" origin "$arg" 2>/dev/null | head -1)"
+			# Pressed again while the first press is still taking effect: nothing
+			# more to do. Each press restarted the tunnel, and a few quick ones
+			# took it down as many times just as it had come up.
+			if [ -n "$_ref" ] && [ "$(cfg node '')" = "$_ref" ] && [ "$(cfg_bool enabled 0)" = "1" ]; then
+				case "$(cat "$ZGZ_STATUS" 2>/dev/null)" in
+					starting|selecting|ready) json_init; json_add_boolean "ok" 1; json_dump; return ;;
+				esac
+			fi
 			if [ -n "$_ref" ]; then
 				uci -q set zirgozar.config.node="$_ref"
 				uci -q set zirgozar.config.enabled='1'
@@ -665,6 +673,13 @@ method_action() {
 				use_node)
 					# PassWall2's Use: the node in Basic Settings, applied.
 					[ "$(uci -q get "zirgozar.$_ids")" = "node" ] || { fail "unknown node"; return; }
+					# Already the node, and the tunnel on its way up or up
+					# with it: a second press would only start it again.
+					if [ "$(cfg node '')" = "$_ids" ] && [ "$(cfg_bool enabled 0)" = "1" ]; then
+						case "$(cat "$ZGZ_STATUS" 2>/dev/null)" in
+							starting|selecting|ready) json_init; json_add_boolean "ok" 1; json_dump; return ;;
+						esac
+					fi
 					uci -q set zirgozar.config.node="$_ids" && uci -q commit zirgozar
 					if [ "$(cfg_bool enabled 0)" = "1" ]; then
 						say_status starting

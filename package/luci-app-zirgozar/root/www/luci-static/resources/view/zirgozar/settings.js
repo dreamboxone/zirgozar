@@ -525,7 +525,7 @@ return view.extend({
 
 		o = s.taboption('dns', form.Value, 'remote_dns', _('Remote DNS'));
 		o.datatype = 'or(ipaddr,ipaddrport(1))';
-		o.default = '1.1.1.1';
+		o.default = '8.8.8.8';
 		o.value('1.1.1.1', '1.1.1.1 (CloudFlare)');
 		o.value('1.1.1.2', '1.1.1.2 (CloudFlare-Security)');
 		o.value('8.8.4.4', '8.8.4.4 (Google)');
@@ -540,7 +540,7 @@ return view.extend({
 
 		o = s.taboption('dns', form.Value, 'remote_dns_doh', _('Remote DNS DoH'),
 			_('An address, or an address and the server’s own IP after a comma so its name is never itself a lookup.'));
-		o.default = 'https://1.1.1.1/dns-query';
+		o.default = 'https://8.8.8.8/dns-query';
 		o.value('https://1.1.1.1/dns-query', 'CloudFlare');
 		o.value('https://1.1.1.2/dns-query', 'CloudFlare-Security');
 		o.value('https://8.8.4.4/dns-query', 'Google 8844');

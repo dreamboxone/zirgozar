@@ -276,10 +276,32 @@ cmd_reset() {
 	return 0
 }
 
+# Once, on a router set up before the remote DNS default became Google:
+# Cloudflare's 1.1.1.1, written in as the old default, moves to 8.8.8.8, and
+# the DoH address with it. Through a node built on Cloudflare Workers -
+# patterniha's list is all of them - 1.1.1.1 cannot be reached, so every
+# lookup failed while the node itself measured fine and nothing opened. A
+# resolver chosen by hand is left as it is; so is 1.1.1.1 after this has run.
+cmd_dnsmove() {
+	[ "$(cfg dns_moved 0)" = "1" ] && return 0
+	command -v uci >/dev/null 2>&1 || return 0
+	if [ "$(uci -q get zirgozar.config.remote_dns)" = "1.1.1.1" ]; then
+		uci -q set zirgozar.config.remote_dns='8.8.8.8'
+		log "Remote DNS moved from 1.1.1.1 to 8.8.8.8, which nodes on Cloudflare Workers can reach"
+	fi
+	if [ "$(uci -q get zirgozar.config.remote_dns_doh)" = "https://1.1.1.1/dns-query" ]; then
+		uci -q set zirgozar.config.remote_dns_doh='https://8.8.8.8/dns-query'
+	fi
+	uci -q set zirgozar.config.dns_moved='1'
+	uci -q commit zirgozar
+	return 0
+}
+
 case "${1:-}" in
 	reset)    cmd_reset ;;
 	rebind)   cmd_rebind ;;
+	dnsmove)  cmd_dnsmove ;;
 	clock)    cmd_clock ;;
 	schedule) cmd_schedule "${2:-}" "${3:-}" ;;
-	*) echo "usage: $0 reset|rebind|clock|schedule sync|stop|start|restart|geo|sub <section>" >&2; exit 1 ;;
+	*) echo "usage: $0 reset|rebind|dnsmove|clock|schedule sync|stop|start|restart|geo|sub <section>" >&2; exit 1 ;;
 esac
