@@ -19,12 +19,6 @@
   <a href="https://t.me/routekernel1">💬 <b>Support on Telegram</b></a>
 </p>
 
-> [!NOTE]
-> **Zirgozar is Passwall+ under a new name.** If Passwall+ is installed on your
-> router, just install Zirgozar: the settings, configs, subscriptions, routing
-> data and traffic history move across by themselves and Passwall+ is switched
-> off. Then remove the old package: `apk del luci-app-passwall-plus passwall-plus`
-
 ## ✨ Features
 
 - 🌐 **Every device on the network** — phone, laptop, TV, console — goes through the tunnel with nothing installed on it
