@@ -256,9 +256,12 @@ function renderTests(d) {
 		/* A cell showing "…" for a test the router has not written anything
 		   about yet is a request in flight, not a stale value: leave it. */
 		if (!(k in results) && cells[i].textContent == '…') continue;
-		cells[i].textContent = testText(results[k]);
+		/* On the list of every node, a cell nobody has pressed shows what the
+		   last measurement found rather than "Test". */
+		var v = (k in results) ? results[k] : (cells[i].getAttribute('data-measured') > 0 ? +cells[i].getAttribute('data-measured') : undefined);
+		cells[i].textContent = testText(v);
 		cells[i].setAttribute('style',
-			'cursor:pointer;user-select:none;white-space:nowrap;' + testColour(results[k]));
+			'cursor:pointer;user-select:none;white-space:nowrap;' + testColour(v));
 	}
 }
 
@@ -548,6 +551,19 @@ function showAddresses(on) {
 	document.querySelectorAll('.pwp-addr').forEach(function(el) { el.style.display = showInfo ? '' : 'none'; });
 }
 
+/* A test cell on the list of every node: pressed, it measures that node now,
+   as the cells of the nodes added by hand do; until then it shows what the
+   last measurement found, or "Test" when nothing has measured it yet. */
+function listTestCell(tag, kind, measured) {
+	var c = testCell(tag, kind), key = tag + '.' + kind;
+	if (!(key in results) && measured > 0) {
+		c.setAttribute('data-measured', measured);
+		c.textContent = testText(measured);
+		c.setAttribute('style', 'cursor:pointer;user-select:none;white-space:nowrap;' + testColour(measured));
+	}
+	return c;
+}
+
 function renderNodes(d) {
 	var box = document.getElementById('pwp-nodelist');
 	if (!box) return;
@@ -591,8 +607,8 @@ function renderNodes(d) {
 				address(n.host + ':' + n.port)
 			]),
 			E('td', { 'class': 'td' }, n.protocol),
-			E('td', { 'class': 'td' }, n.ms > 0 ? pui.ms(n.ms) : '—'),
-			E('td', { 'class': 'td' }, n.handshake > 0 ? pui.ms(n.handshake) : '—'),
+			E('td', { 'class': 'td' }, listTestCell(n.tag, 'url', n.ms)),
+			E('td', { 'class': 'td' }, listTestCell(n.tag, 'tcp', n.handshake)),
 			E('td', { 'class': 'td' }, [
 				E('button', {
 					'class': 'btn cbi-button cbi-button-apply',
