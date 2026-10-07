@@ -433,7 +433,7 @@ method_subnodes() {
 	"$NODES" subnodes 2>/dev/null | awk -F'\t' 'BEGIN { printf "{\"nodes\":["; n = 0 }
 		NF >= 6 {
 			for (i = 1; i <= NF; i++) { gsub(/\\/, "\\\\", $i); gsub(/"/, "\\\"", $i) }
-			printf "%s{\"sub\":\"%s\",\"subname\":\"%s\",\"protocol\":\"%s\",\"host\":\"%s\",\"port\":%d,\"label\":\"%s\"}", (n++ ? "," : ""), $1, $2, $3, $4, $5, $6
+			printf "%s{\"sub\":\"%s\",\"subname\":\"%s\",\"protocol\":\"%s\",\"host\":\"%s\",\"port\":%d,\"label\":\"%s\",\"fp\":\"%s\"}", (n++ ? "," : ""), $1, $2, $3, $4, $5, $6, $7
 		}
 		END { printf "]}\n" }'
 }

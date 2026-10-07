@@ -1011,6 +1011,29 @@ cmd_group() {
 # the same subscription. When none of them is there any more, its first node,
 # and the log says so.
 
+# A short fingerprint of one node's outbound, the last part of its reference:
+# "#" and six hex digits - small enough that busybox awk, whose numbers turn
+# to 32-bit integers for % and %x, gives the same answer as any other. A list can hold the same server two or three times
+# under one name - patterniha's holds every one with ECH, with a fragment and
+# over IPv6 - and protocol, address, port and name then name all of them
+# alike, so the node used was whichever of them came first, not the one
+# chosen. The dialer a subscription's pre-proxy puts on its nodes is left out:
+# the node is the same node with or without one. awk rather than md5sum, so
+# that a whole list is one program and not one per node.
+FP_AWK='BEGIN { for (i = 1; i < 256; i++) ORDS[sprintf("%c", i)] = i }
+function fp(s,   h, i) {
+	gsub(/,?"sockopt":\{"dialerProxy":"[^"]*"\}/, "", s)
+	gsub(/,?"dialerProxy":"[^"]*"/, "", s)
+	h = 5381
+	for (i = 1; i <= length(s); i++) h = (h * 33 + ORDS[substr(s, i, 1)]) % 16777213
+	return sprintf("%06x", h)
+}
+function payload(line,   p, i) {
+	p = line
+	for (i = 1; i <= 5; i++) sub(/^[^\t]*\t/, "", p)
+	return p
+}'
+
 # The parsed list of one subscription, as records.
 sub_parsed() {
 	sub_restore "$1"
@@ -1029,14 +1052,18 @@ subnodes_one() {
 	# answer it took most of a second. What the parser said is kept beside
 	# the list and used again until the list itself is newer.
 	sub_restore "$1"
-	_sn_links="$SUBS_DIR/$1.links" _sn_cache="$SUBS_DIR/$1.subnodes"
+	# A file of a new name for the fingerprint column, so that a list cached
+	# without it is read again rather than used as it is.
+	_sn_links="$SUBS_DIR/$1.links" _sn_cache="$SUBS_DIR/$1.subnodes3"
+	rm -f "$SUBS_DIR/$1.subnodes" "$SUBS_DIR/$1.subnodes2"
 	[ -s "$_sn_links" ] || return 0
 	if [ ! -f "$_sn_cache" ] || [ "$_sn_links" -nt "$_sn_cache" ]; then
-		sub_parsed "$1" | awk -F'\t' 'NF >= 5 { printf "%s\t%s\t%s\t%s\n", $3, $4, $5, $2 }' \
+		sub_parsed "$1" | LC_ALL=C awk -F'\t' "$FP_AWK"'
+			NF >= 6 { printf "%s\t%s\t%s\t%s\t%s\n", $3, $4, $5, $2, fp(payload($0)) }' \
 			> "$_sn_cache.new" 2>/dev/null && mv -f "$_sn_cache.new" "$_sn_cache"
 	fi
 	awk -F'\t' -v s="$1" -v n="$name" \
-		'NF >= 4 { printf "%s\t%s\t%s\t%s\t%s\t%s\n", s, n, $1, $2, $3, $4 }' "$_sn_cache" 2>/dev/null
+		'NF >= 5 { printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s, n, $1, $2, $3, $4, $5 }' "$_sn_cache" 2>/dev/null
 	return 0
 }
 
@@ -1054,15 +1081,20 @@ cmd_resolve() {
 	_rs="${_rr%%:*}"
 	_rk="${_rr#*:}"
 	[ -n "$_rs" ] && [ "$_rs" != "$_rr" ] || return 1
-	_rec="$(sub_parsed "$_rs" | awk -F'\t' -v key="$_rk" '
+	# The fingerprint, when the reference has one, finds the very node first;
+	# the rest is how one without it - or whose node has changed - is found.
+	_rec="$(sub_parsed "$_rs" | LC_ALL=C awk -F'\t' -v key="$_rk" "$FP_AWK"'
 		BEGIN {
 			n = split(key, k, "|")
+			F = ""
+			if (n > 4 && k[n] ~ /^#[0-9a-f]+$/) { F = substr(k[n], 2); n-- }
 			P = k[1]; H = k[2]; O = k[3]; L = k[4]
 			for (i = 5; i <= n; i++) L = L "|" k[i]
 		}
-		NF >= 6 { r[++c] = $0; l[c] = $2; p[c] = $3; h[c] = $4; o[c] = $5 }
+		NF >= 6 { r[++c] = $0; l[c] = $2; p[c] = $3; h[c] = $4; o[c] = $5; if (F != "") f[c] = fp(payload($0)) }
 		END {
-			for (i = 1; i <= c && !b; i++) if (p[i] == P && h[i] == H && o[i] == O && l[i] == L) { b = i; how = "same" }
+			if (F != "") for (i = 1; i <= c && !b; i++) if (f[i] == F) { b = i; how = "same" }
+			for (i = 1; i <= c && !b; i++) if (p[i] == P && h[i] == H && o[i] == O && l[i] == L) { b = i; how = (F != "" ? "protocol, address, port and name" : "same") }
 			for (i = 1; i <= c && !b; i++) if (p[i] == P && h[i] == H && o[i] == O) { b = i; how = "protocol, address and port" }
 			for (i = 1; i <= c && !b; i++) if (h[i] == H && o[i] == O) { b = i; how = "address and port" }
 			for (i = 1; i <= c && !b; i++) if (h[i] == H) { b = i; how = "address" }
@@ -1097,21 +1129,28 @@ cmd_resolve() {
 cmd_origin() {
 	_or="$(awk -F'\t' -v t="$1" '$1 == t { print; exit }' "$ZGZ_CANDIDATES" 2>/dev/null)"
 	[ -n "$_or" ] || return 1
-	_ok="$(printf '%s' "$_or" | cut -f2-5)"
 	# A node added by hand: its own record, as the list was built from it.
 	for _os in $(uci -q -X show zirgozar 2>/dev/null | sed -n 's/^zirgozar\.\([A-Za-z0-9_]*\)=node$/\1/p'); do
 		[ "$(uci -q get "zirgozar.$_os.enabled")" = "0" ] && continue
-		if node_records "$_os" 2>/dev/null | cut -f2-5 | grep -qxF "$_ok"; then
+		# The whole record: two nodes with one name and one address are told
+		# apart by the rest.
+		if node_records "$_os" 2>/dev/null | cut -f2- | grep -qxF "$(printf '%s' "$_or" | cut -f2-)"; then
 			echo "$_os"
 			return 0
 		fi
 	done
-	# A subscription's: by what it is, the way the reference is read back.
+	# A subscription's: by what it is, the way the reference is read back -
+	# its fingerprint too, so that of several nodes with one name and one
+	# address it is this one.
+	_ofp="$(printf '%s\n' "$_or" | LC_ALL=C awk -F'\t' "$FP_AWK"' { print fp(payload($0)); exit }')"
 	cmd_subnodes 2>/dev/null | awk -F'\t' -v p="$(printf '%s' "$_or" | cut -f3)" \
 		-v h="$(printf '%s' "$_or" | cut -f4)" -v o="$(printf '%s' "$_or" | cut -f5)" \
-		-v l="$(printf '%s' "$_or" | cut -f2)" '
-		$3 == p && $4 == h && $5 == o && $6 == l { printf "sub:%s:%s|%s|%s|%s\n", $1, $3, $4, $5, $6; f = 1; exit }
-		END { exit !f }'
+		-v l="$(printf '%s' "$_or" | cut -f2)" -v fp="$_ofp" '
+		$3 == p && $4 == h && $5 == o && $6 == l {
+			if ($7 == fp) { printf "sub:%s:%s|%s|%s|%s|#%s\n", $1, $3, $4, $5, $6, $7; f = 1; exit }
+			if (!first) first = sprintf("sub:%s:%s|%s|%s|%s\n", $1, $3, $4, $5, $6)
+		}
+		END { if (!f && first != "") { printf "%s", first; f = 1 } exit !f }'
 }
 
 case "${1:-update}" in

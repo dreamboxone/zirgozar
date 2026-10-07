@@ -653,8 +653,7 @@ function renderNodes(d) {
 							if (r && r.error) {
 								b.disabled = false;
 								pui.note(b, _(r.error), 'error');
-							} else
-								pui.note(b, _('Connecting through %s…').format(n.label || n.host), 'ok');
+							}
 						}, function() { b.disabled = false; });
 					}
 				}, _('Use'))
@@ -911,8 +910,7 @@ return view.extend({
 						if (!window.confirm(_('Are you sure set this node?')))
 							return;
 						b.disabled = true;
-						return nodeAct(b, 'use_node', section_id, false,
-							_('This is now the node in Basic Settings.'));
+						return nodeAct(b, 'use_node', section_id, false);
 					}
 				}, _('Use')),
 				E('button', {

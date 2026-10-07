@@ -174,10 +174,22 @@ return view.extend({
 		   time, so one is kept by what it is - subscription, protocol, address,
 		   port and name - and found again in each new list. */
 		var subNodes = (data[2] && data[2].nodes) || [];
+		/* Several nodes of one list can share a name and an address - one
+		   with ECH, one with a fragment, one over IPv6 - and are told apart by
+		   a fingerprint of the node, which the reference ends in and the name
+		   shows when the name alone is not enough. */
+		var seenName = {};
+		subNodes.forEach(function(n) {
+			var k = n.sub + '|' + n.label;
+			seenName[k] = (seenName[k] || 0) + 1;
+		});
 		function subChoices(opt) {
 			subNodes.forEach(function(n) {
-				opt.value('sub:' + n.sub + ':' + [ n.protocol, n.host, n.port, n.label ].join('|'),
-					n.subname + ' › ' + (n.label || (n.host + ':' + n.port)));
+				var parts = [ n.protocol, n.host, n.port, n.label ];
+				if (n.fp) parts.push('#' + n.fp);
+				var name = n.label || (n.host + ':' + n.port);
+				if (n.fp && seenName[n.sub + '|' + n.label] > 1) name += ' · ' + n.fp.slice(0, 4);
+				opt.value('sub:' + n.sub + ':' + parts.join('|'), n.subname + ' › ' + name);
 			});
 			/* A choice whose node has left the list is still the choice, and is
 			   found again by the router; it keeps a name here. */
