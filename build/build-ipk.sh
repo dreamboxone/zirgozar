@@ -48,7 +48,7 @@ finalize() {
 
 	find "$idir" -type d -exec chmod 0755 {} +
 	find "$idir" -type f -exec chmod 0644 {} +
-	for d in usr/bin usr/sbin etc/init.d usr/libexec usr/libexec/rpcd usr/libexec/zirgozar; do
+	for d in usr/bin usr/sbin etc/init.d etc/hotplug.d/firewall usr/libexec usr/libexec/rpcd usr/libexec/zirgozar; do
 		if [ -d "$idir/$d" ]; then
 			find "$idir/$d" -maxdepth 1 -type f -exec chmod 0755 {} +
 		fi

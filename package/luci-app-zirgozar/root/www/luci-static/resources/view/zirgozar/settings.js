@@ -255,6 +255,11 @@ return view.extend({
 		o.default = '1';
 		o.rmempty = false;
 
+		o = s.taboption('main', form.Flag, 'kill_switch', _('Kill switch'),
+			_('Off, the network works directly whenever the tunnel is not carrying it — stopped, failed, restarting, or not up yet after a reboot. On, a rule of its own, kept apart from the tunnel and never removed with it, closes the way out for the devices on your network in all of those cases: they reach the local network and nothing else, and are never sent out untunnelled without your knowing. Iranian addresses stay reachable if the Iran split is on, and so do the addresses and devices you set to go direct. Pings, which the tunnel does not carry, are blocked too. To get the direct network back, turn this off and save.'));
+		o.default = '0';
+		o.rmempty = false;
+
 		o = s.taboption('main', form.Value, 'node_socks_port', _('Node Socks Listen Port'),
 			_('A SOCKS server on the router that goes out the way the tunnel does. Empty for none.'));
 		o.datatype = 'port';

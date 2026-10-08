@@ -944,6 +944,475 @@ ipt_status() {
 	return 0
 }
 
+# -------------------------------------------------------------- kill switch
+
+# Basic Settings' Kill switch: one rule, apart from everything above, that
+# keeps LAN devices from leaving by the uplink untunnelled.
+#
+# Everything above is the tunnel's, and it is taken away whenever the tunnel
+# goes - stopped, failed to start, no node able to carry a request, restarted
+# by a save, not started yet after a boot - because a network that falls back
+# to direct beats one that falls over. This is the other choice, for whoever
+# makes it: while it is on, the way out is shut instead, and stays shut across
+# all of those, because it is not part of the tunnel. It is loaded from its
+# own boot script before the network is even up, and `down` of the tunnel
+# never touches it.
+#
+# It acts on the forward hook only, and only on what the tunnel carries when it
+# is up: with the tunnel up, LAN traffic is handed to the local socket and
+# never forwarded, so the only thing forwarded to the uplink is what this
+# program lets go direct on purpose - and each of those is let past here too:
+# the local network, the Traffic Rules page's addresses, Iranian addresses
+# when the Iran split is on, Access Control devices set to "not through the
+# tunnel", the forwarding ports that go straight out, name lookups when DNS
+# Redirect is off, and replies to connections that came in from outside.
+# Anything else - including pings, which the tunnel does not carry - is dropped.
+KS_TABLE=zirgozar_ks
+# Iranian address ranges, cut out of geoip.dat once and kept on flash, so that
+# the rule can be loaded at boot without reading seventeen megabytes.
+KS_IR="$ZGZ_ETC/ks-ir.list"
+KS_IPSET=zgz_ks_ir
+KS_APPLIED="$ZGZ_RUN/ks.applied"
+
+# The ranges the Iran split sends direct, when the split is really on - the
+# same condition zgz-mkconfig applies: switched on, and the routing data there.
+ks_ir_cidrs() {
+	[ "$(cfg_bool route_ir 0)" = "1" ] || return 0
+	geo_dir >/dev/null 2>&1 || return 0
+	[ -s "$KS_IR" ] || return 0
+	grep -E '^[0-9A-Fa-f:.]+(/[0-9]+)?$' "$KS_IR" 2>/dev/null || true
+	return 0
+}
+
+# Cut the list out of geoip.dat again when that is newer than the list.
+# Needs Geoview (App Update installs it); without it the list from last time
+# is kept, and without that the Iranian exception is simply not there - which
+# fails closed.
+ks_ir_refresh() {
+	[ "$(cfg_bool route_ir 0)" = "1" ] || return 0
+	_kd="$(geo_dir)" || return 0
+	if [ -s "$KS_IR" ] && [ "$KS_IR" -nt "$_kd/geoip.dat" ]; then
+		return 0
+	fi
+	_kg="$(find_geoview)" || {
+		[ -s "$KS_IR" ] || warn "Kill switch: Geoview is not installed, so Iranian addresses cannot be let past it - install Geoview on the App Update page"
+		return 0
+	}
+	_kn="$KS_IR.new"
+	"$_kg" -type geoip -action extract -input "$_kd/geoip.dat" -list ir -lowmem=true > "$_kn" 2>/dev/null || true
+	if [ "$(grep -c . "$_kn" 2>/dev/null || echo 0)" -gt 10 ]; then
+		write_if_changed "$_kn" "$KS_IR" || true
+		touch "$KS_IR" 2>/dev/null || true
+	else
+		warn "Kill switch: Geoview could not read the Iranian addresses out of geoip.dat"
+	fi
+	rm -f "$_kn"
+	return 0
+}
+
+ks_nft_ruleset() {
+	_devs="$1"
+	_iflist=""
+	for _d in $_devs; do
+		[ -n "$_iflist" ] && _iflist="$_iflist, "
+		_iflist="$_iflist\"$_d\""
+	done
+	_v4set=""
+	for _c in $RESERVED_V4; do
+		[ -n "$_v4set" ] && _v4set="$_v4set, "
+		_v4set="$_v4set$_c"
+	done
+
+	_ir="$(ks_ir_cidrs)"
+	_ir4="$(printf '%s\n' "$_ir" | awk '/:/ || !NF { next } { printf "%s%s", (n++ ? ", " : ""), $0 }')"
+	_ir6="$(printf '%s\n' "$_ir" | awk '!/:/ { next } { printf "%s%s", (n++ ? ", " : ""), $0 }')"
+
+	_sets=""
+	_pass=""
+	_dl="$(direct_ips | awk 'NF { printf "%s%s", (n++ ? ", " : ""), $0 }')"
+	if [ -n "$_dl" ]; then
+		_sets="$_sets	set direct {
+		type ipv4_addr
+		flags interval
+		auto-merge
+		elements = { $_dl }
+	}
+
+"
+		_pass="$_pass		ip daddr @direct return
+"
+	fi
+	if [ -n "$_ir4" ]; then
+		_sets="$_sets	set ir4 {
+		type ipv4_addr
+		flags interval
+		auto-merge
+		elements = { $_ir4 }
+	}
+
+"
+		_pass="$_pass		ip daddr @ir4 return
+"
+	fi
+	if [ -n "$_ir6" ]; then
+		_sets="$_sets	set ir6 {
+		type ipv6_addr
+		flags interval
+		auto-merge
+		elements = { $_ir6 }
+	}
+
+"
+		_pass="$_pass		ip6 daddr @ir6 return
+"
+	fi
+
+	# IPv6 is the tunnel's business only while it is being refused; with it
+	# left alone it goes straight out by the reader's own choice.
+	_v6="		meta nfproto ipv6 return
+"
+	[ "$ipv6_mode" = "off" ] || _v6=""
+
+	# Access Control: the same rules the tunnel applies, so that a device the
+	# page says goes direct still does, and one it says to tunnel is held.
+	_acljumps=""
+	_aclchains=""
+	_n=0
+	if [ "$(cfg_bool acl_enable 0)" = "1" ]; then
+	while IFS='	' read -r _id _if _macs _ips _sets_ _mode _port _tno _uno _tr _ur; do
+		[ -n "$_id" ] || continue
+		_n=$((_n + 1))
+		_c="ks_acl_$_n"
+		_ifm=""
+		[ "$_if" != "-" ] && _ifm="iifname \"$_if\" "
+		_m=""
+		if [ "$_macs" != "-" ]; then
+			_m="$_m		${_ifm}ether saddr { $(printf '%s' "$_macs" | sed 's/,/, /g') } jump $_c
+"
+		fi
+		if [ "$_ips" != "-" ]; then
+			_m="$_m		${_ifm}ip saddr { $(printf '%s' "$_ips" | sed 's/,/, /g') } jump $_c
+"
+		fi
+		if [ "$_macs" = "-" ] && [ "$_ips" = "-" ] && [ "$_sets_" = "-" ]; then
+			_m="		${_ifm}jump $_c
+"
+		fi
+		[ -n "$_m" ] || continue
+		_acljumps="$_acljumps$_m"
+		if [ "$_mode" = "0" ]; then
+			_body="		accept
+"
+		else
+			_body=""
+			[ "$_tno" != "-" ] && _body="$_body		tcp dport { $(nft_ports "$_tno") } accept
+"
+			[ "$_uno" != "-" ] && _body="$_body		udp dport { $(nft_ports "$_uno") } accept
+"
+			[ "$_tr" != "-" ] && [ "$_tr" != "1:65535" ] && _body="$_body		meta l4proto tcp tcp dport != { $(nft_ports "$_tr") } accept
+"
+			[ "$_ur" != "-" ] && [ "$_ur" != "1:65535" ] && _body="$_body		meta l4proto udp udp dport != { $(nft_ports "$_ur") } accept
+"
+			_body="$_body		counter drop
+"
+		fi
+		_aclchains="$_aclchains	chain $_c {
+$_body	}
+
+"
+	done <<ACL
+$(acl_lines)
+ACL
+	fi
+
+	# Everything the Access Control page did not decide.
+	_glob=""
+	if [ "$client_proxy" = "1" ]; then
+		[ "$dns_hijack" = "1" ] || _glob="$_glob		meta l4proto { tcp, udp } th dport 53 return
+"
+		[ "$g_tcp_no" != "-" ] && _glob="$_glob		tcp dport { $(nft_ports "$g_tcp_no") } return
+"
+		[ "$g_udp_no" != "-" ] && _glob="$_glob		udp dport { $(nft_ports "$g_udp_no") } return
+"
+		[ "$g_tcp_r" != "-" ] && [ "$g_tcp_r" != "1:65535" ] && _glob="$_glob		meta l4proto tcp tcp dport != { $(nft_ports "$g_tcp_r") } return
+"
+		[ "$g_udp_r" != "-" ] && [ "$g_udp_r" != "1:65535" ] && _glob="$_glob		meta l4proto udp udp dport != { $(nft_ports "$g_udp_r") } return
+"
+		_glob="$_glob		counter drop
+"
+	fi
+
+	cat <<NFT
+table inet $KS_TABLE {
+	set reserved {
+		type ipv4_addr
+		flags interval
+		elements = { $_v4set }
+	}
+
+	set reserved6 {
+		type ipv6_addr
+		flags interval
+		elements = { ::1/128, fc00::/7, fe80::/10, ff00::/8 }
+	}
+
+$_sets$_aclchains	chain forward {
+		# Ahead of the firewall's own forward chain, though a drop here is
+		# final wherever it sits: another table's accept does not undo it.
+		type filter hook forward priority -5; policy accept;
+
+		iifname != { $_iflist } return
+		oifname { $_iflist } return
+		# A reply belongs to a connection that came in from outside - a port
+		# forward - and is not this device going anywhere.
+		ct direction reply return
+		ip daddr @reserved return
+		ip6 daddr @reserved6 return
+$_v6$_pass$_acljumps$_glob	}
+}
+NFT
+	return 0
+}
+
+ks_nft_up() {
+	# One transaction: the table is replaced, never absent in between.
+	{ printf 'add table inet %s\ndelete table inet %s\n' "$KS_TABLE" "$KS_TABLE"; ks_nft_ruleset "$1"; } | nft -f -
+	return $?
+}
+
+ks_nft_down() {
+	nft delete table inet $KS_TABLE 2>/dev/null || true
+	return 0
+}
+
+# The iptables way, as the lines of rules to run, so that what will be installed
+# can be looked at without a router and compared with what is.
+ks_ipt_rules() {
+	_devs="$1"
+	echo "-N ZGZ_KS"
+	echo "-A ZGZ_KS -m conntrack --ctdir REPLY -j RETURN"
+	for _d in $_devs; do
+		echo "-A ZGZ_KS -o $_d -j RETURN"
+	done
+	for _c in $RESERVED_V4 $(direct_ips); do
+		echo "-A ZGZ_KS -d $_c -j RETURN"
+	done
+	if [ -n "$(ks_ir_cidrs | grep -v :)" ] && command -v ipset >/dev/null 2>&1; then
+		echo "-A ZGZ_KS -m set --match-set $KS_IPSET dst -j RETURN"
+	fi
+	_n=0
+	if [ "$(cfg_bool acl_enable 0)" = "1" ]; then
+	while IFS='	' read -r _id _if _macs _ips _sets_ _mode _port _tno _uno _tr _ur; do
+		[ -n "$_id" ] || continue
+		_n=$((_n + 1))
+		_c="ZGZ_KSA$_n"
+		echo "-N $_c"
+		if [ "$_mode" = "0" ]; then
+			echo "-A $_c -j ACCEPT"
+		else
+			[ "$_tno" != "-" ] && for _g in $(ipt_port_groups "$_tno"); do echo "-A $_c -p tcp -m multiport --dports $_g -j ACCEPT"; done
+			[ "$_uno" != "-" ] && for _g in $(ipt_port_groups "$_uno"); do echo "-A $_c -p udp -m multiport --dports $_g -j ACCEPT"; done
+			if [ "$_tr" != "-" ] && [ "$_tr" != "1:65535" ]; then
+				echo "-N ${_c}T"
+				for _g in $(ipt_port_groups "$_tr"); do echo "-A ${_c}T -p tcp -m multiport --dports $_g -j RETURN"; done
+				echo "-A ${_c}T -p tcp -j ACCEPT"
+				echo "-A $_c -p tcp -j ${_c}T"
+			fi
+			if [ "$_ur" != "-" ] && [ "$_ur" != "1:65535" ]; then
+				echo "-N ${_c}U"
+				for _g in $(ipt_port_groups "$_ur"); do echo "-A ${_c}U -p udp -m multiport --dports $_g -j RETURN"; done
+				echo "-A ${_c}U -p udp -j ACCEPT"
+				echo "-A $_c -p udp -j ${_c}U"
+			fi
+			echo "-A $_c -j DROP"
+		fi
+		_ifa=""
+		[ "$_if" != "-" ] && _ifa="-i $_if "
+		_any=0
+		if [ "$_macs" != "-" ]; then
+			for _v in $(printf '%s' "$_macs" | tr ',' ' '); do echo "-A ZGZ_KS ${_ifa}-m mac --mac-source $_v -j $_c"; done
+			_any=1
+		fi
+		if [ "$_ips" != "-" ]; then
+			for _v in $(printf '%s' "$_ips" | tr ',' ' '); do
+				case "$_v" in
+					*-*) echo "-A ZGZ_KS ${_ifa}-m iprange --src-range $_v -j $_c" ;;
+					*)   echo "-A ZGZ_KS ${_ifa}-s $_v -j $_c" ;;
+				esac
+			done
+			_any=1
+		fi
+		if [ "$_sets_" != "-" ]; then
+			for _v in $(printf '%s' "$_sets_" | tr ',' ' '); do echo "-A ZGZ_KS ${_ifa}-m set --match-set $_v src -j $_c"; done
+			_any=1
+		fi
+		[ "$_any" = "1" ] || echo "-A ZGZ_KS ${_ifa}-j $_c"
+	done <<ACL
+$(acl_lines)
+ACL
+	fi
+	if [ "$client_proxy" = "1" ]; then
+		[ "$dns_hijack" = "1" ] || { echo "-A ZGZ_KS -p tcp --dport 53 -j RETURN"; echo "-A ZGZ_KS -p udp --dport 53 -j RETURN"; }
+		[ "$g_tcp_no" != "-" ] && for _g in $(ipt_port_groups "$g_tcp_no"); do echo "-A ZGZ_KS -p tcp -m multiport --dports $_g -j RETURN"; done
+		[ "$g_udp_no" != "-" ] && for _g in $(ipt_port_groups "$g_udp_no"); do echo "-A ZGZ_KS -p udp -m multiport --dports $_g -j RETURN"; done
+		if [ "$g_tcp_r" != "-" ] && [ "$g_tcp_r" != "1:65535" ]; then
+			echo "-N ZGZ_KSGT"
+			for _g in $(ipt_port_groups "$g_tcp_r"); do echo "-A ZGZ_KSGT -p tcp -m multiport --dports $_g -j RETURN"; done
+			echo "-A ZGZ_KSGT -p tcp -j ACCEPT"
+			echo "-A ZGZ_KS -p tcp -j ZGZ_KSGT"
+		fi
+		if [ "$g_udp_r" != "-" ] && [ "$g_udp_r" != "1:65535" ]; then
+			echo "-N ZGZ_KSGU"
+			for _g in $(ipt_port_groups "$g_udp_r"); do echo "-A ZGZ_KSGU -p udp -m multiport --dports $_g -j RETURN"; done
+			echo "-A ZGZ_KSGU -p udp -j ACCEPT"
+			echo "-A ZGZ_KS -p udp -j ZGZ_KSGU"
+		fi
+		echo "-A ZGZ_KS -j DROP"
+	fi
+	return 0
+}
+
+ks_ipt_down() {
+	command -v iptables >/dev/null 2>&1 || return 0
+	ipt_drop_jumps filter FORWARD ZGZ_KS iptables
+	for _c in $(iptables -t filter -S 2>/dev/null | sed -n 's/^-N \(ZGZ_KS[0-9A-Z]*\)$/\1/p'); do
+		ipt_kill_chain filter "$_c" iptables
+	done
+	if command -v ip6tables >/dev/null 2>&1; then
+		ipt_drop_jumps filter FORWARD ZGZ_KS6 ip6tables
+		ipt_kill_chain filter ZGZ_KS6 ip6tables
+	fi
+	command -v ipset >/dev/null 2>&1 && { ipset destroy $KS_IPSET >/dev/null 2>&1 || true; }
+	rm -f "$KS_APPLIED"
+	return 0
+}
+
+ks_ipt_up() {
+	_devs="$1"
+	_rules="$(ks_ipt_rules "$_devs")"
+	_sig="$(printf '%s\n%s\n' "$_devs" "$_rules" | md5sum | cut -c1-32)"
+	# Taking it down to put it up again leaves a moment with nothing in the
+	# way, so what is already there and right is left alone.
+	_have=1
+	iptables -t filter -S ZGZ_KS >/dev/null 2>&1 || _have=0
+	for _d in $_devs; do
+		iptables -t filter -C FORWARD -i "$_d" -j ZGZ_KS >/dev/null 2>&1 || _have=0
+	done
+	if [ "$_have" = "1" ] && [ "$(cat "$KS_APPLIED" 2>/dev/null)" = "$_sig" ]; then
+		return 0
+	fi
+	ks_ipt_down
+
+	if [ -n "$(ks_ir_cidrs | grep -v :)" ]; then
+		if command -v ipset >/dev/null 2>&1; then
+			{ echo "create $KS_IPSET hash:net -exist"; echo "flush $KS_IPSET"
+			  ks_ir_cidrs | grep -v : | sed "s/^/add $KS_IPSET /"; } | ipset restore -exist >/dev/null 2>&1 ||
+				warn "Kill switch: could not make the set of Iranian addresses - they stay closed with the rest"
+		else
+			warn "Kill switch: there is no ipset on this router, so Iranian addresses stay closed with the rest"
+		fi
+	fi
+
+	printf '%s\n' "$_rules" | while IFS= read -r _l; do
+		[ -n "$_l" ] || continue
+		# shellcheck disable=SC2086
+		iptables -w 2 -t filter $_l >/dev/null 2>&1 || iptables -t filter $_l >/dev/null 2>&1 || {
+			case "$_l" in
+				*"-j DROP"|-N\ *) echo "iptables -t filter $_l failed" >&2; exit 1 ;;
+			esac
+		}
+	done || { ks_ipt_down; return 1; }
+
+	for _d in $_devs; do
+		ipt_must -t filter -I FORWARD 1 -i "$_d" -j ZGZ_KS || { ks_ipt_down; return 1; }
+	done
+
+	if [ "$ipv6_mode" != "off" ] && command -v ip6tables >/dev/null 2>&1; then
+		ipt6 -t filter -N ZGZ_KS6
+		ipt6 -t filter -A ZGZ_KS6 -m conntrack --ctdir REPLY -j RETURN
+		for _d in $_devs; do
+			ipt6 -t filter -A ZGZ_KS6 -o "$_d" -j RETURN
+		done
+		ipt6 -t filter -A ZGZ_KS6 -d ::1/128 -j RETURN
+		ipt6 -t filter -A ZGZ_KS6 -d fc00::/7 -j RETURN
+		ipt6 -t filter -A ZGZ_KS6 -d fe80::/10 -j RETURN
+		ipt6 -t filter -A ZGZ_KS6 -j DROP
+		for _d in $_devs; do
+			ipt6 -t filter -I FORWARD 1 -i "$_d" -j ZGZ_KS6
+		done
+	fi
+	echo "$_sig" > "$KS_APPLIED" 2>/dev/null || true
+	return 0
+}
+
+ks_loaded() {
+	nft list table inet $KS_TABLE >/dev/null 2>&1 && return 0
+	command -v iptables >/dev/null 2>&1 && iptables -t filter -S ZGZ_KS >/dev/null 2>&1 && return 0
+	return 1
+}
+
+ks_down() {
+	ks_nft_down
+	ks_ipt_down
+	rm -f "$ZGZ_RUN/ks.backend"
+	return 0
+}
+
+ks_up() {
+	_backend="$(firewall_backend)"
+	if [ "$_backend" = "none" ]; then
+		say_message "The Kill switch is on, but this router has neither nftables nor iptables, so it cannot be put in place."
+		echo "no firewall available" >&2
+		return 1
+	fi
+	_devs="$(lan_devices)"
+	case "$_backend" in
+		nft)
+			ks_ipt_down
+			if ! ks_nft_up "$_devs"; then
+				warn "Kill switch: could not load the nftables ruleset"
+				say_message "The Kill switch could not be put in place, so nothing is holding traffic back if the tunnel fails. The Runtime Logs page says why."
+				return 1
+			fi
+			;;
+		ipt)
+			ks_nft_down
+			if ! ks_ipt_up "$_devs"; then
+				warn "Kill switch: could not install the iptables rules"
+				say_message "The Kill switch could not be put in place, so nothing is holding traffic back if the tunnel fails. The Runtime Logs page says why."
+				return 1
+			fi
+			;;
+	esac
+	echo "$_backend" > "$ZGZ_RUN/ks.backend" 2>/dev/null || true
+	return 0
+}
+
+# zgz-rules ks up|down|apply|sync|status|dump|dump-ipt
+#
+#   apply   what the setting says: in place when it is on, gone when it is off.
+#           Quick, and the one the boot script and the firewall's reload use.
+#   sync    apply, after the list of Iranian addresses has been brought up to
+#           date. Run when the service starts and when settings are saved.
+cmd_ks() {
+	case "${1:-}" in
+		up)     ks_up ;;
+		down)   ks_down ;;
+		apply)
+			if ks_on; then ks_up; else ks_down; fi
+			;;
+		sync)
+			if ks_on; then ks_ir_refresh; ks_up; else ks_down; fi
+			;;
+		status)
+			if ks_loaded; then echo "killswitch: yes"; else echo "killswitch: no"; fi
+			;;
+		dump)     ks_nft_ruleset "$(lan_devices)" ;;
+		dump-ipt) ks_ipt_rules "$(lan_devices)" ;;
+		*) echo "usage: $0 ks up|down|apply|sync|status|dump|dump-ipt" >&2; return 1 ;;
+	esac
+}
+
 # --------------------------------------------------------------------- main
 
 cmd_up() {
@@ -1076,6 +1545,7 @@ cmd_status() {
 		*) echo "backend: none"; echo "active:  no" ;;
 	esac
 	echo "devices: $(lan_devices)"
+	cmd_ks status
 	return 0
 }
 
@@ -1086,5 +1556,6 @@ case "${1:-}" in
 	dump)   nft_ruleset "$(lan_devices)" ;;
 	dump-local) nft_local_ruleset ;;
 	local)  cmd_local "${2:-}" ;;
-	*) echo "usage: $0 up|down|status|dump|dump-local|local pause|resume" >&2; exit 1 ;;
+	ks)     cmd_ks "${2:-}" ;;
+	*) echo "usage: $0 up|down|status|dump|dump-local|local pause|resume|ks ..." >&2; exit 1 ;;
 esac

@@ -23,6 +23,10 @@ STARTED_FLAG="$ZGZ_RUN/instance-opened"
 # the boot sequence reaches this, and a start that finds no way out chooses a
 # node against a connection that is still coming up.
 boot() {
+	# The Kill switch has its own boot script, well before this one. Asked
+	# again here, cheaply, so that it is in place during the delay below even
+	# on a router where that script did not run.
+	"$RULES" ks apply >/dev/null 2>&1 || true
 	_d="$(cfg start_delay 1)"
 	case "$_d" in ''|*[!0-9]*) _d=0 ;; esac
 	if [ "$_d" -gt 0 ]; then
@@ -53,6 +57,13 @@ start_service() {
 	# The scheduled stop, start and restart from Other Settings, kept in the
 	# crontab only while the main switch is on - as in PassWall2.
 	"$ZGZ_LIB/zgz-router" schedule sync >/dev/null 2>&1 || true
+
+	# The Kill switch is not part of the tunnel and does not depend on it: it
+	# is put in step with the setting on every start, whether or not the main
+	# switch is on and whatever becomes of the start below. Started again
+	# once the configuration is written, because Access Control is read from
+	# there.
+	"$RULES" ks sync >/dev/null 2>&1 || true
 
 	# The main switch, the way PassWall2 has it: this service is always
 	# enabled at boot, and the switch is what decides whether it runs. Off is
@@ -129,6 +140,7 @@ start_service() {
 		fi
 	fi
 	chmod 600 "$ZGZ_CONFIG_JSON"
+	"$RULES" ks apply >/dev/null 2>&1 || true
 
 	# Prefer a core the router already has; fall back to our own copy. The
 	# candidate has to accept this exact configuration to be chosen, which is
@@ -328,6 +340,7 @@ service_started() {
 	# network has nowhere to go - no web, no DNS, and no obvious reason why.
 	if ! wait_for_port "$tproxy_port" 20; then
 		log "$(core_title "$(active_engine)") never started listening on $tproxy_port - leaving the network untouched"
+		ks_on && log "Kill switch is on: devices have no way out by the uplink until the tunnel works"
 		log "listening now: $(netstat -ln 2>/dev/null | awk '/LISTEN|udp/ { print $4 }' | tr '\n' ' ')"
 		say_status failed
 		say_message "The tunnel process started but never accepted connections. Check the system log for what it said."
@@ -337,6 +350,7 @@ service_started() {
 
 	if ! "$RULES" up >/dev/null 2>&1; then
 		log "could not install the routing rules - leaving the network untouched"
+		ks_on && log "Kill switch is on: devices have no way out by the uplink until the tunnel works"
 		say_status failed
 		"$RULES" down >/dev/null 2>&1 || true
 		return 1
@@ -381,7 +395,9 @@ stop_service() {
 
 	"$DNS" down >/dev/null 2>&1 || true
 	"$RULES" down >/dev/null 2>&1 || true
+	# The Kill switch is not the tunnel's rules and is not taken down with them.
 	rm -f "$ZGZ_CONFIG_JSON" "$ZGZ_BRIDGE_JSON" "$ZGZ_BRIDGE_JSON.conf" "$STARTED_FLAG" "$ZGZ_RUN/core.info" "$ZGZ_RUN/sb.counters"
+	ks_on && log "Kill switch stays in place: devices have no way out by the uplink until the tunnel is back"
 	log "Clearing and closing related programs complete."
 	return 0
 }
@@ -455,6 +471,9 @@ reload_service() {
 		restart
 		return
 	fi
+	# Access Control has just been read again, and the Kill switch setting may
+	# be what this save changed.
+	"$RULES" ks sync >/dev/null 2>&1 || true
 	_core=same
 	cmp -s "$_next" "$ZGZ_CONFIG_JSON" || _core=changed
 	_rules=same

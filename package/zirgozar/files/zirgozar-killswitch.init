@@ -1,0 +1,30 @@
+#!/bin/sh /etc/rc.common
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+# Part of Zirgozar - https://github.com/dreamboxone/zirgozar
+
+# The Kill switch of Basic Settings, put in place before the network is up.
+#
+# It is not part of the tunnel and is not loaded by it: the tunnel starts at 95,
+# after the network and the firewall, and from the moment the network is up
+# until then a router with the tunnel's rules not yet in place sends every LAN
+# device straight out. This runs ahead of the firewall and the network, and
+# loads the one rule that closes that - when the setting is on, and removes it
+# when it is off. Nothing here ever takes it away on a stop: its whole purpose
+# is to outlast the tunnel.
+START=18
+STOP=99
+
+ZGZ_LIB=/usr/libexec
+. "$ZGZ_LIB/zgz-common.sh"
+
+start() {
+	mkdir -p "$ZGZ_RUN" 2>/dev/null || true
+	"$ZGZ_LIB/zgz-rules" ks apply >/dev/null 2>&1 || true
+	return 0
+}
+
+stop() {
+	return 0
+}

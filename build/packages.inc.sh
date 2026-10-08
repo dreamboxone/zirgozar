@@ -7,7 +7,7 @@
 # packages.inc.sh - what goes into a package, shared by the .apk and .ipk
 # builders so the two formats can never drift apart.
 
-VERSION=2.4.5
+VERSION=2.4.6
 RELEASE=1
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
@@ -69,6 +69,9 @@ stage_zgz() {
 	install -m 0644 "$f/zirgozar.config"   "$i/usr/share/zirgozar/zirgozar.config"
 	install -m 0755 "$f/zirgozar.init"     "$i/etc/init.d/zirgozar"
 	install -m 0755 "$f/zirgozar-server.init" "$i/etc/init.d/zirgozar-server"
+	install -m 0755 "$f/zirgozar-killswitch.init" "$i/etc/init.d/zirgozar-killswitch"
+	install -d "$i/etc/hotplug.d/firewall"
+	install -m 0755 "$f/zirgozar-killswitch.hotplug" "$i/etc/hotplug.d/firewall/90-zirgozar-killswitch"
 	install -m 0644 "$f/zgz-common.sh" "$i/usr/libexec/zgz-common.sh"
 	install -m 0755 "$f/luci.zirgozar"     "$i/usr/libexec/rpcd/luci.zirgozar"
 
@@ -186,6 +189,12 @@ fi
 # Always in the boot sequence; the main switch decides whether it runs.
 bounded 15 /etc/init.d/zirgozar enable >/dev/null 2>&1 || true
 bounded 15 /etc/init.d/zirgozar-server enable >/dev/null 2>&1 || true
+# Ahead of the network, so that the Kill switch - when it is on - is in place
+# before the first packet; with the setting off it does nothing.
+bounded 15 /etc/init.d/zirgozar-killswitch enable >/dev/null 2>&1 || true
+# The package manager's remove step took it down for the upgrade; the setting
+# says whether it comes back.
+bounded 15 /usr/libexec/zgz-rules ks apply >/dev/null 2>&1 || true
 exit 0
 EOF
 
@@ -198,6 +207,10 @@ EOF
 bounded() {
 	if timeout 5 true >/dev/null 2>&1; then timeout "$@"; else shift; "$@"; fi
 }
+# A Kill switch left behind would shut the network with nothing left to
+# open it again.
+bounded 15 /usr/libexec/zgz-rules ks down >/dev/null 2>&1 || true
+bounded 15 /etc/init.d/zirgozar-killswitch disable >/dev/null 2>&1 || true
 bounded 20 /etc/init.d/zirgozar-server stop >/dev/null 2>&1 || true
 bounded 15 /etc/init.d/zirgozar-server disable >/dev/null 2>&1 || true
 bounded 20 /etc/init.d/zirgozar stop >/dev/null 2>&1 || true
