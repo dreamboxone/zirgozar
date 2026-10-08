@@ -444,7 +444,9 @@ test_core() {
 core_config() {
 	_cc_engine="$1"; shift
 	if [ "$_cc_engine" = "singbox" ]; then
-		"$ZGZ_LIB/zgz-mkconfig" "$@" | sbconfig
+		# What only sing-box can do - an inverted shunt rule, a rule-set -
+		# is written only into a configuration that is going to be its.
+		ZGZ_FOR_SINGBOX=1 "$ZGZ_LIB/zgz-mkconfig" "$@" | sbconfig
 	else
 		"$ZGZ_LIB/zgz-mkconfig" "$@"
 	fi

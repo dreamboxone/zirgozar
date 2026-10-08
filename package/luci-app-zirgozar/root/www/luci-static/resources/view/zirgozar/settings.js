@@ -477,6 +477,11 @@ return view.extend({
 			return eachLine(value, ipEntry);
 		};
 
+		so = sr.option(form.Flag, 'invert', 'invert',
+			_('Invert match result.') + ' ' + _('Only support Sing-Box.') + ' ' +
+			_('With Xray as the active core the rule is left out.'));
+		so.modalonly = true;
+
 		sr.description = _('FakeDNS works with its main switch on, for a rule whose names go through a node. Preproxy: the rule’s hand-added node is reached through this node first — only for a rule that goes to a hand-added node, and one layer only: a node with a chain of its own keeps it.');
 
 		o = s.taboption('shunt', form.ListValue, 'default_node', _('Default'),

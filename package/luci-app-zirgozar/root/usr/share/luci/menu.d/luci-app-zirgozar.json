@@ -35,6 +35,13 @@
 		}
 	},
 
+	"admin/services/zirgozar/shunt_rule": {
+		"action": {
+			"type": "view",
+			"path": "zirgozar/shunt_rule"
+		}
+	},
+
 	"admin/services/zirgozar/subscribe": {
 		"title": "Node Subscribe",
 		"order": 30,

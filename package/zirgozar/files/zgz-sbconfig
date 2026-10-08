@@ -541,6 +541,30 @@ for (let i in X.inbounds) {
 
 // -------------------------------------------------------------- name lists
 
+// A sing-box rule-set named in a shunt rule, as PassWall2 writes one:
+// rule-set:remote:URL or rule-set:local:PATH, rs: for short. A remote one is
+// fetched by sing-box itself, through the default way out.
+let user_sets = {};      // tag -> definition
+let user_set_n = 0;
+
+function user_set(entry) {
+	let m = match(entry, /^(rule-set|rs):(local|remote):(.+)$/);
+	if (!m) {
+		warn(`${entry}: not a rule-set:local: or rule-set:remote: entry - left out`);
+		return null;
+	}
+	let where = m[3];
+	for (let t, d in user_sets)
+		if ((d.url ?? d.path) == where)
+			return t;
+	let t = `user-rs-${++user_set_n}`;
+	let format = match(where, /\.json$/i) ? 'source' : 'binary';
+	user_sets[t] = (m[2] == 'remote')
+		? { tag: t, type: 'remote', format, url: where }
+		: { tag: t, type: 'local', format, path: where };
+	return t;
+}
+
 // One Xray list of names, as sing-box's separate matchers. `lit` and `sets`
 // have to stay apart: a rule-set in a rule is an extra condition, not another
 // way to match, so a rule with both would need a name to be in both.
@@ -551,6 +575,10 @@ function split_names(list) {
 		if ((m = match(d, /^geosite:(.+)$/))) {
 			let name = replace(m[1], /@.*$/, '');
 			let t = geo_tag('geosite', name);
+			if (t && !(t in g.sets))
+				push(g.sets, t);
+		} else if (match(d, /^(rule-set|rs):/)) {
+			let t = user_set(d);
 			if (t && !(t in g.sets))
 				push(g.sets, t);
 		} else if (match(d, /^ext:/)) {
@@ -600,6 +628,10 @@ function ip_groups(list) {
 				if (t && !(t in sets))
 					push(sets, t);
 			}
+		} else if (match(a, /^(rule-set|rs):/)) {
+			let t = user_set(a);
+			if (t && !(t in sets))
+				push(sets, t);
 		} else if (match(a, /^ext:/)) {
 			warn(`${a}: external geo files are not supported by sing-box - left out`);
 		} else {
@@ -685,7 +717,7 @@ for (let ri, r in xr) {
 
 	// The last rule says where everything else goes: that is not a rule here,
 	// it is `final` - or, for a blackhole, a rule that drops what is left.
-	if (ri == length(xr) - 1 && !r.domain && !r.ip && !r.protocol && !r.port && !r.source && !length(tags)) {
+	if (ri == length(xr) - 1 && !r.domain && !r.ip && !r.protocol && !r.port && !r.source && !length(tags) && !r.invert) {
 		if (to == 'block')
 			push(rules, with_action({}, 'block'));
 		else
@@ -697,6 +729,20 @@ for (let ri, r in xr) {
 	// matches everything.
 	if ((r.domain || r.ip) && !length(groups))
 		continue;
+
+	// PassWall2's invert, written by zgz-mkconfig only for sing-box: the whole
+	// rule, names and addresses together, the other way round - one logical
+	// rule when there is more than one kind of thing to match.
+	if (r.invert) {
+		if (!length(groups))
+			push(rules, with_action({ ...base, invert: true }, to));
+		else if (length(groups) == 1)
+			push(rules, with_action({ ...base, ...groups[0], invert: true }, to));
+		else
+			push(rules, with_action({ type: 'logical', mode: 'or',
+				rules: map(groups, (g) => ({ ...base, ...g })), invert: true }, to));
+		continue;
+	}
 
 	if (!length(groups)) {
 		push(rules, with_action({ ...base }, to));
@@ -794,8 +840,11 @@ let route = {
 	final: final_out,
 	default_mark: MARK
 };
-if (length(keys(rule_sets)))
-	route.rule_set = map(keys(rule_sets), (t) => ({ tag: t, type: 'local', format: 'binary', path: rule_sets[t] }));
+if (length(keys(rule_sets)) || length(keys(user_sets)))
+	route.rule_set = [
+		...map(keys(rule_sets), (t) => ({ tag: t, type: 'local', format: 'binary', path: rule_sets[t] })),
+		...map(keys(user_sets), (t) => user_sets[t])
+	];
 // The resolver a node's own name is looked up with: the direct one, or in a
 // measurement the one resolver it has, which is the direct resolver too.
 let node_dns = have_direct_dns ? 'dns-direct' : (args.mode == 'test' ? dns_final : null);

@@ -588,7 +588,21 @@ PassWall2, until the next reboot or update. A download that will not fit is
 refused rather than half written, and a file the core cannot read is never
 installed.
 
-The shunt rules are in the **Shunt Rule** tab of Basic Settings.
+**Sing-Box/Xray Shunt Rule**, as in PassWall2: the rules, a tab for each group
+with its count, in the order they are tried — the higher, the sooner. Type an
+ID — letters, digits and `_` — and press **Add**, and the new rule opens on a
+page of its own with PassWall2's fields: Remarks, Shunt Rule Group, Protocol
+(http, tls, quic, bittorrent), Inbound Tag (transparent proxy, SOCKS),
+Network, Source, Port, Domain, IP and **invert**. **To Top**, dragging by the
+handle, **Edit** and **Delete** are beside each rule; the order is kept with
+Save & Apply. Where a rule sends what it matches is chosen beside it in the
+**Shunt Rule** tab of Basic Settings.
+
+Two things there only sing-box can do. **invert** turns the whole rule round —
+its names and addresses together; while Xray carries the tunnel such a rule is
+left out, and the log says so, because run the right way round it would send
+exactly the other traffic. A `rule-set:local:` or `rule-set:remote:` line
+(`rs:` for short) is used by sing-box and passed over by Xray.
 
 **This program's own**
 

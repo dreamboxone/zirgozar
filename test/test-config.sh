@@ -350,6 +350,38 @@ fi
 # WireGuard the program could not read: wireguard:// links and WireGuard
 # inside somebody else's JSON both worked, and the file people are actually
 # given did not.
+echo "== a shunt rule that is inverted, and one with a rule-set"
+# PassWall2's invert, which only sing-box has. Under Xray the rule is left out
+# - run the right way round it would send exactly the other traffic - and a
+# sing-box rule-set means nothing to Xray either. For sing-box both go across.
+rig_clear
+echo '{"protocol":"vless","settings":{"vnext":[{"address":"1.2.3.4","port":443,"users":[{"id":"11111111-2222-3333-4444-555555555555","encryption":"none"}]}]},"streamSettings":{"network":"tcp","security":"tls","tlsSettings":{"serverName":"a.com"}}}' > "$RIG/etc/best.json"
+printf 'tag=n0\nlabel=N\nprotocol=vless\nhost=1.2.3.4\nport=443\n' > "$RIG/etc/best.meta"
+ZGZ_TEST_SECTIONS="$WORK/sections.tsv"
+printf 'r1\tshunt_rules\nr1\t.node\t_direct\nr1\t.domain_list\tdomain:a.com\\nrule-set:local:/x/geosite-x.srs\n' > "$ZGZ_TEST_SECTIONS"
+printf 'r2\tshunt_rules\nr2\t.node\t_blackhole\nr2\t.invert\t1\nr2\t.domain_list\tdomain:b.com\nr2\t.ip_list\t5.6.7.0/24\n' >> "$ZGZ_TEST_SECTIONS"
+export ZGZ_TEST_SECTIONS
+ZGZ_FUNCTIONS="$RIG_SRC/test/functions-stub.sh" sh "$RIG/lib/zgz-mkconfig" > "$WORK/inv-x.json" 2>/dev/null || bad "mkconfig failed"
+INVX="$(tr -d ' \n' < "$WORK/inv-x.json")"
+case "$INVX" in *'"domain":["domain:a.com"]'*) ok "under Xray the rule is there, without its rule-set line" ;; *) bad "under Xray the rule is there, without its rule-set line" ;; esac
+case "$INVX" in *b.com*|*5.6.7.0*|*rule-set:*) bad "under Xray the inverted rule and the rule-set are left out" ;; *) ok "under Xray the inverted rule and the rule-set are left out" ;; esac
+if [ -x "$RIG/core/xray" ]; then
+	"$RIG/core/xray" run -test -config "$WORK/inv-x.json" >/dev/null 2>&1 && ok "and Xray accepts it" || bad "and Xray accepts it"
+fi
+ZGZ_FOR_SINGBOX=1 ZGZ_FUNCTIONS="$RIG_SRC/test/functions-stub.sh" sh "$RIG/lib/zgz-mkconfig" > "$WORK/inv-s.json" 2>/dev/null || bad "mkconfig failed"
+INVS="$(tr -d ' \n' < "$WORK/inv-s.json")"
+case "$INVS" in *'"domain":["domain:b.com"],"ip":["5.6.7.0/24"],"invert":true'*) ok "for sing-box the inverted rule is one rule, names and addresses together" ;; *) bad "for sing-box the inverted rule is one rule, names and addresses together" ;; esac
+if command -v ucode >/dev/null 2>&1; then
+	ucode "$RIG/lib/zgz-sbconfig" level=none < "$WORK/inv-s.json" > "$WORK/inv-sb.json" 2>/dev/null
+	INVSB="$(tr -d ' \n\t' < "$WORK/inv-sb.json")"
+	case "$INVSB" in *'"type":"logical","mode":"or","rules":[{'*'"domain_suffix":["b.com"]},{'*'"ip_cidr":["5.6.7.0/24"]}],"invert":true'*) ok "and sing-box gets one logical rule, inverted" ;; *) bad "and sing-box gets one logical rule, inverted" ;; esac
+	case "$INVSB" in *'"tag":"user-rs-1","type":"local","format":"binary","path":"/x/geosite-x.srs"'*) ok "and the rule-set as one of its own" ;; *) bad "and the rule-set as one of its own" ;; esac
+else
+	echo "  skip - no ucode to translate it for sing-box"
+fi
+unset ZGZ_TEST_SECTIONS
+rm -f "$RIG/etc/best.json" "$RIG/etc/best.meta"
+
 echo "== a wireguard .conf, as it comes"
 
 WG="$RIG/work/wg.conf"

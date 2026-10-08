@@ -5,8 +5,9 @@
  *
  * Rule Manage, PassWall2's page of that name: the routing data - where it
  * comes from, where it is kept, when it is updated, and going back to the
- * copy before. The shunt rules are in the Shunt Rule tab of Basic Settings,
- * beside where each one goes.
+ * copy before - and PassWall2's Sing-Box/Xray Shunt Rule list: the rules by
+ * group, added by name here and each edited on a page of its own. Where each
+ * rule goes is in the Shunt Rule tab of Basic Settings, beside the rule.
  *
  * Under them, this program's own: Iranian traffic direct, the blocks, the
  * sites dnsmasq should stop refusing, and the names that never go through
@@ -130,6 +131,126 @@ function renderGeo(g) {
    write: the router brings it in step with this list itself, once the list
    has actually been applied. */
 var listening = false;
+
+/* PassWall2's Sing-Box/Xray Shunt Rule list. A tab for each group, "default"
+   first; in each, the rules in the order they are tried, and under them a
+   name and Add. The name is the rule's ID, as in PassWall2, and Add opens the
+   new rule's own page. Delete, Add and Edit keep what has been done here
+   among the unsaved changes - as PassWall2 does - and the order, moved with
+   To Top or by dragging, is saved with the page. */
+var shuntGroup = null;
+
+function shuntPage(sid) {
+	return L.url('admin', 'services', 'zirgozar', 'shunt_rule') + '?sid=' + encodeURIComponent(sid);
+}
+
+function shuntGroupOf(r) {
+	var g = String(r.group || '');
+	return (g == '' || g.toLowerCase() == 'default') ? 'default' : g;
+}
+
+function drawShuntRules(box) {
+	var rules = uci.sections('zirgozar', 'shunt_rules');
+	var groups = { 'default': [] }, order = [ 'default' ];
+	rules.forEach(function(r) {
+		var g = shuntGroupOf(r);
+		if (!groups[g]) { groups[g] = []; order.push(g); }
+		groups[g].push(r);
+	});
+	if (shuntGroup == null || !groups[shuntGroup]) shuntGroup = 'default';
+
+	var tabs = E('ul', { 'class': 'cbi-tabmenu' }, order.map(function(g) {
+		return E('li', { 'class': g == shuntGroup ? 'cbi-tab' : 'cbi-tab-disabled' }, [
+			E('a', {
+				'href': '#',
+				'click': function(ev) {
+					ev.preventDefault();
+					shuntGroup = g;
+					drawShuntRules(box);
+				}
+			}, [ g == 'default' ? _('default') : g, ' | ',
+				E('span', { 'style': 'color:red' }, String(groups[g].length)) ])
+		]);
+	}));
+
+	var list = groups[shuntGroup];
+	function moveTop(sid) {
+		if (list.length && list[0]['.name'] != sid) {
+			uci.move('zirgozar', sid, list[0]['.name'], false);
+			drawShuntRules(box);
+		}
+	}
+	function keepAndGo(url) {
+		return uci.save().then(function() { window.location.href = url; });
+	}
+
+	var rows = [ E('tr', { 'class': 'tr cbi-section-table-titles' }, [
+		E('th', { 'class': 'th', 'style': 'width:30%;text-align:center' }, 'ID'),
+		E('th', { 'class': 'th', 'style': 'width:30%;text-align:center' }, _('Remarks')),
+		E('th', { 'class': 'th cbi-section-actions' }, '')
+	]) ];
+	list.forEach(function(r, i) {
+		var sid = r['.name'];
+		rows.push(E('tr', { 'class': 'tr cbi-section-table-row cbi-rowstyle-' + (i % 2 + 1), 'data-sid': sid }, [
+			E('td', { 'class': 'td', 'style': 'text-align:center' }, E('b', {}, sid)),
+			E('td', { 'class': 'td', 'style': 'text-align:center' }, r.remarks || ''),
+			E('td', { 'class': 'td cbi-section-actions' }, E('div', {
+				'style': 'display:inline-flex;gap:4px;align-items:center'
+			}, [
+				E('button', { 'class': 'btn cbi-button cbi-button-edit', 'click': function(ev) {
+					ev.preventDefault(); moveTop(sid);
+				} }, _('To Top')),
+				E('button', { 'class': 'btn cbi-button cbi-button-edit', 'click': function(ev) {
+					ev.preventDefault(); return keepAndGo(shuntPage(sid));
+				} }, _('Edit')),
+				E('button', { 'class': 'btn cbi-button cbi-button-remove', 'click': function(ev) {
+					ev.preventDefault();
+					uci.remove('zirgozar', sid);
+					return uci.save().then(function() { drawShuntRules(box); });
+				} }, _('Delete')),
+				E('span', { 'class': 'drag-handle', 'title': _('Drag to reorder'),
+					'style': 'cursor:grab;font-size:20px;user-select:none' }, '⠿')
+			]))
+		]));
+	});
+
+	var name = E('input', { 'type': 'text', 'class': 'cbi-input-text' });
+	var add = E('button', { 'class': 'btn cbi-button cbi-button-add', 'click': function(ev) {
+		ev.preventDefault();
+		var b = ev.currentTarget, id = name.value.trim();
+		/* PassWall2 takes a name of two letters or more; it is the rule's
+		   section in the configuration, so letters, digits and _ only. */
+		if (id.length < 2) return;
+		if (!/^[A-Za-z0-9_]+$/.test(id)) {
+			pui.note(b, _('Only letters, digits and _ can be used in an ID.'), 'error');
+			return;
+		}
+		if (uci.get('zirgozar', id) != null) {
+			pui.note(b, _('This ID already exists.'), 'error');
+			return;
+		}
+		uci.add('zirgozar', 'shunt_rules', id);
+		if (shuntGroup != 'default') uci.set('zirgozar', id, 'group', shuntGroup);
+		return keepAndGo(shuntPage(id));
+	} }, _('Add'));
+
+	while (box.firstChild) box.removeChild(box.firstChild);
+	box.appendChild(tabs);
+	box.appendChild(E('table', { 'class': 'table cbi-section-table' }, rows));
+	box.appendChild(E('div', { 'class': 'cbi-section-create cbi-tblsection-create',
+		'style': 'display:flex;gap:8px;align-items:center' }, [ name, add ]));
+}
+
+function shuntRuleSection() {
+	var box = E('div', {});
+	drawShuntRules(box);
+	return E('div', { 'class': 'cbi-section' }, [
+		E('h3', {}, 'Sing-Box/Xray ' + _('Shunt Rule')),
+		E('div', { 'class': 'cbi-section-descr' }, E('span', { 'style': 'color:red' },
+			_('Please note attention to the priority, the higher the order, the higher the priority.'))),
+		box
+	]);
+}
 
 function hostname(v) {
 	return /^[A-Za-z0-9_]([A-Za-z0-9_-]{0,62}\.)*[A-Za-z0-9_-]{1,63}\.?$/.test(v);
@@ -322,6 +443,11 @@ return view.extend({
 		};
 
 		return m.render().then(function(el) {
+			/* Under the rule status, where PassWall2 has it. */
+			var first = el.querySelector('.cbi-section');
+			var shunt = shuntRuleSection();
+			if (first && first.parentNode) first.parentNode.insertBefore(shunt, first.nextSibling);
+			else el.appendChild(shunt);
 			/* Filled in once it is in the document, then kept current - a
 			   download takes a while, and this is where it shows. */
 			window.setTimeout(function() { renderGeo(data[1]); }, 0);

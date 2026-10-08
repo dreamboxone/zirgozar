@@ -1141,7 +1141,30 @@ var FA = {
 		'فایل دانلودشده Xray با چک‌سام منتشرشده‌اش نمی‌خواند؛ چیزی نصب نشد.',
 
 	'yes': 'بله',
-	'no': 'خیر'
+	'no': 'خیر',
+	/* Sing-Box/Xray Shunt Rule, on Rule Manage and the rule's own page. */
+	'Back to Rule Manage': 'بازگشت به مدیریت قوانین',
+	'This shunt rule is not there any more.': 'این قانون شانت دیگر وجود ندارد.',
+	'Please note attention to the priority, the higher the order, the higher the priority.': 'به اولویت توجه کنید: هر قانون که بالاتر باشد، اولویت بیشتری دارد.',
+	'Only letters, digits and _ can be used in an ID.': 'در شناسه فقط حروف انگلیسی، عدد و _ مجاز است.',
+	'This ID already exists.': 'این شناسه از قبل وجود دارد.',
+	'Where this rule sends what it matches is chosen in the Shunt Rule tab of Basic Settings.': 'اینکه این قانون ترافیک مطابق را به کجا بفرستد، در تب «قانون شانت» تنظیمات پایه انتخاب می‌شود.',
+	"Plaintext: If this string matches any part of the targeting domain, this rule takes effet. Example: rule 'sina.com' matches targeting domain 'sina.com', 'sina.com.cn' and 'www.sina.com', but not 'sina.cn'.": "متن ساده: اگر این عبارت با هر بخشی از دامنهٔ مقصد جور باشد، قانون اعمال می‌شود. مثال: قانون 'sina.com' با 'sina.com'، 'sina.com.cn' و 'www.sina.com' جور است، ولی با 'sina.cn' نه.",
+	"Regular expression: Begining with 'regexp:', the rest is a regular expression. When the regexp matches targeting domain, this rule takes effect. Example: rule 'regexp:\\.goo.*\\.com$' matches 'www.google.com' and 'fonts.googleapis.com', but not 'google.com'.": "عبارت باقاعده: با 'regexp:' شروع می‌شود و بقیه‌اش یک عبارت باقاعده است. وقتی با دامنهٔ مقصد جور باشد، قانون اعمال می‌شود. مثال: قانون 'regexp:\\.goo.*\\.com$' با 'www.google.com' و 'fonts.googleapis.com' جور است، ولی با 'google.com' نه.",
+	"Subdomain (recommended): Begining with 'domain:' and the rest is a domain. When the targeting domain is exactly the value, or is a subdomain of the value, this rule takes effect. Example: rule 'domain:v2ray.com' matches 'www.v2ray.com', 'v2ray.com', but not 'xv2ray.com'.": "زیردامنه (پیشنهادی): با 'domain:' شروع می‌شود و بقیه‌اش یک دامنه است. وقتی دامنهٔ مقصد دقیقاً همین یا زیردامنهٔ آن باشد، قانون اعمال می‌شود. مثال: قانون 'domain:v2ray.com' با 'www.v2ray.com' و 'v2ray.com' جور است، ولی با 'xv2ray.com' نه.",
+	"Full domain: Begining with 'full:' and the rest is a domain. When the targeting domain is exactly the value, the rule takes effect. Example: rule 'domain:v2ray.com' matches 'v2ray.com', but not 'www.v2ray.com'.": "دامنهٔ کامل: با 'full:' شروع می‌شود و بقیه‌اش یک دامنه است. فقط وقتی دامنهٔ مقصد دقیقاً همین باشد، قانون اعمال می‌شود. مثال: قانون 'full:v2ray.com' با 'v2ray.com' جور است، ولی با 'www.v2ray.com' نه.",
+	"Pre-defined domain list: Begining with 'geosite:' and the rest is a name, such as geosite:google or geosite:cn.": "فهرست آمادهٔ دامنه‌ها: با 'geosite:' شروع می‌شود و بقیه‌اش یک نام است، مثل geosite:google یا geosite:ir.",
+	"Sing-Box rule-set: Begining with 'rule-set:remote:' or 'rule-set:local:'": "rule-set سینگ‌باکس: با 'rule-set:remote:' یا 'rule-set:local:' شروع می‌شود",
+	'Such as:': 'مثلاً:',
+	'Annotation: Begining with #': 'توضیح: با # شروع می‌شود',
+	'Not valid domain name, please re-enter!': 'نام دامنه معتبر نیست، دوباره وارد کنید!',
+	"IP: such as '127.0.0.1'.": "IP: مثل '127.0.0.1'.",
+	"CIDR: such as '127.0.0.0/8'.": "CIDR: مثل '127.0.0.0/8'.",
+	"GeoIP: such as 'geoip:cn'. It begins with geoip: (lower case) and followed by two letter of country code.": "GeoIP: مثل 'geoip:ir'. با geoip: (حروف کوچک) شروع می‌شود و بعد از آن کد دوحرفی کشور می‌آید.",
+	'Not valid IP format, please re-enter!': 'قالب IP معتبر نیست، دوباره وارد کنید!',
+	'Invert match result.': 'نتیجهٔ تطبیق برعکس می‌شود.',
+	'Only support Sing-Box.': 'فقط با Sing-Box کار می‌کند.',
+	'With Xray as the active core the rule is left out.': 'وقتی هستهٔ فعال Xray باشد، این قانون کنار گذاشته می‌شود.',
 };
 
 /* LuCI's own words - the buttons and messages its form draws for us: Add,

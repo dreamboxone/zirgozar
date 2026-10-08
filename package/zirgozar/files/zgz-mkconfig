@@ -536,12 +536,14 @@ $(printf '%s\n' "$_so" | sed -e 's/^[[:space:]]*//' -e "s/^{/{\"tag\":\"shunt$sh
 }
 
 # One entry a line, as PassWall2 writes them, into a JSON list. # starts a
-# comment, and a sing-box rule-set means nothing to Xray.
+# comment, and a sing-box rule-set means nothing to Xray - it is kept only in
+# a configuration that zgz-sbconfig will turn into sing-box's.
 shunt_list() {
 	printf '%s\n' "$1" | tr '\r' '\n' |
 		sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/\\/\\\\/g' -e 's/"/\\"/g' |
-		awk -v G="$2" -v NOGEO="$shunt_nogeo" '
-			$0 == "" || /^#/ || /^rule-set:/ || /^rs:/ { next }
+		awk -v G="$2" -v NOGEO="$shunt_nogeo" -v SB="${ZGZ_FOR_SINGBOX:-0}" '
+			$0 == "" || /^#/ { next }
+			(/^rule-set:/ || /^rs:/) && SB != "1" { next }
 			NOGEO == "1" && (index($0, G) == 1 || index($0, "ext:") == 1) { next }
 			{ printf "%s\"%s\"", (n++ ? "," : ""), $0 }'
 	return 0
@@ -556,11 +558,21 @@ shunt_words() {
 }
 
 shunt_one() {
-	local node group network protocol inbound source port domain_list ip_list fake pre
+	local node group network protocol inbound source port domain_list ip_list fake pre invert _rm _x
 	config_get node "$1" node ""
 	[ -n "$node" ] || return 0
 	config_get group "$1" group ""
 	[ "$(printf '%s' "$group" | tr 'A-Z' 'a-z')" = "$shunt_group" ] || return 0
+
+	# PassWall2's invert, which only sing-box has. Run the right way round
+	# under Xray it would send exactly the other traffic there, so under
+	# Xray the rule is left out, and the log says so.
+	config_get_bool invert "$1" invert 0
+	if [ "$invert" = "1" ] && [ "${ZGZ_FOR_SINGBOX:-0}" != "1" ]; then
+		config_get _rm "$1" remarks "$1"
+		warn "shunt rule '$_rm' is inverted, which only sing-box can do - left out while Xray carries the tunnel"
+		return 0
+	fi
 
 	config_get_bool fake "$1" fakedns 0
 	config_get pre "$1" preproxy ""
@@ -604,6 +616,20 @@ shunt_one() {
 
 	_d="$(shunt_list "$domain_list" geosite:)"
 	_i="$(shunt_list "$ip_list" geoip:)"
+	# Inverted, the names and the addresses are one rule: what is in neither
+	# list. Two rules, each inverted, would each catch what the other lists.
+	# zgz-sbconfig reads "invert"; Xray never sees this rule - see above.
+	if [ "$invert" = "1" ]; then
+		if [ -z "$_d" ] && [ -z "$_i" ] &&
+		   [ -n "$(printf '%s%s' "$domain_list" "$ip_list" | tr -d ' \t\r\n')" ]; then
+			return 0
+		fi
+		_x="$_base"
+		[ -n "$_d" ] && _x="$_x,\"domain\":[$_d]"
+		[ -n "$_i" ] && _x="$_x,\"ip\":[$_i]"
+		add_shunt "{$_x,\"invert\":true,\"outboundTag\":\"$SHUNT_TAG\"}"
+		return 0
+	fi
 	if [ -n "$_d" ]; then
 		add_shunt "{$_base,\"domain\":[$_d],\"outboundTag\":\"$SHUNT_TAG\"}"
 		# The names a rule sends straight out are looked up the way every
@@ -642,8 +668,9 @@ if [ "$_dn" != "_proxy" ]; then
 	shunt_default="$SHUNT_TAG"
 fi
 
-if [ -r /lib/functions.sh ]; then
-	. /lib/functions.sh
+# OpenWrt's config_load; ZGZ_FUNCTIONS lets the tests hand it a stand-in.
+if [ -r "${ZGZ_FUNCTIONS:-/lib/functions.sh}" ]; then
+	. "${ZGZ_FUNCTIONS:-/lib/functions.sh}"
 	config_load zirgozar
 	config_foreach shunt_one shunt_rules
 fi
