@@ -459,17 +459,19 @@ check "$(printf '%s\n' "$BT2_OUT" | sed -n 's/^have=//p')" "0" "the broken timeo
 # nothing read yet, or only nodes added by hand. The answer has to be JSON
 # all the same: it was the start of one with the empty answer glued on.
 echo "== the web interface's lists, before there is anything in them"
-: > "$RIG/jshn.sh"
-sed -e "s|^ZGZ_LIB=/usr/libexec|ZGZ_LIB=$RIG/lib|" -e "s|/usr/share/libubox/jshn.sh|$RIG/jshn.sh|" \
-	"$ROOT/package/zirgozar/files/luci.zirgozar" > "$RIG/lib/luci.zirgozar"
+# Out of the tree and into a folder of its own: this suite never calls
+# rig_setup, so $RIG/lib is there only where another suite ran first.
 ZGZ_RUN="$RIG/ul/run"; ZGZ_ETC="$RIG/ul/etc"
 export ZGZ_RUN ZGZ_ETC
 rm -rf "$RIG/ul"; mkdir -p "$ZGZ_RUN" "$ZGZ_ETC"
+: > "$RIG/ul/jshn.sh"
+sed -e "s|^ZGZ_LIB=/usr/libexec|ZGZ_LIB=$ROOT/package/zirgozar/files|" -e "s|/usr/share/libubox/jshn.sh|$RIG/ul/jshn.sh|" \
+	"$ROOT/package/zirgozar/files/luci.zirgozar" > "$RIG/ul/luci.zirgozar"
 for m in nodes subs; do
-	check "$(sh "$RIG/lib/luci.zirgozar" call $m 2>/dev/null)" "{\"$m\":[],\"count\":0}" "$m with nothing read yet is an empty list"
+	check "$(sh "$RIG/ul/luci.zirgozar" call $m 2>/dev/null)" "{\"$m\":[],\"count\":0}" "$m with nothing read yet is an empty list"
 done
 printf 'n0\tOne\tvless\ta.example.com\t443\t{}\n' > "$ZGZ_RUN/candidates.tsv"
-case "$(sh "$RIG/lib/luci.zirgozar" call nodes 2>/dev/null)" in
+case "$(sh "$RIG/ul/luci.zirgozar" call nodes 2>/dev/null)" in
 	'{"nodes":[{"tag":"n0","label":"One",'*'],"count":1}') ok "and nodes with a list is that list" ;;
 	*) bad "and nodes with a list is that list" ;;
 esac
