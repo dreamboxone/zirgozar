@@ -313,8 +313,8 @@ var FA = {
 	'Remove': 'حذف',
 	'%s removed.': '%s حذف شد.',
 	'Check for new versions': 'بررسی نسخه‌های جدید',
-	'Checking the latest version of each core. They will be shown in a moment.':
-		'آخرین نسخه هر هسته در حال بررسی است و تا لحظاتی دیگر نمایش داده می‌شود.',
+	'Checking the latest version. It will be shown in a moment.':
+		'آخرین نسخه در حال بررسی است و تا لحظاتی دیگر نمایش داده می‌شود.',
 	'(installed by another package — left alone)':
 		'(توسط پکیج دیگری نصب شده — دست‌نخورده مانده)',
 	'Xray carries the traffic. sing-box and hysteria are only needed for nodes that speak hysteria2 or tuic, which Xray does not — one of them is then run as a local helper for that one node, and everything else works exactly as before.':

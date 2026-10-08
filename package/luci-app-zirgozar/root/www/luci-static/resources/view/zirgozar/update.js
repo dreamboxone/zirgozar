@@ -81,7 +81,7 @@ function act(key, name, arg, note) {
 
 function checkUpdate(key) {
 	return function() {
-		return act(key, 'cores_latest', '', _('Checking the latest version of each core. They will be shown in a moment.'));
+		return act(key, 'cores_latest', '', _('Checking the latest version. It will be shown in a moment.'));
 	};
 }
 
