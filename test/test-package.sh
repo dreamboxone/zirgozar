@@ -184,13 +184,20 @@ www/luci-static/resources/zirgozar/qr.js
 www/luci-static/resources/zirgozar/nodelink.js
 usr/share/luci/menu.d/luci-app-zirgozar.json
 usr/share/rpcd/acl.d/luci-app-zirgozar.json"
+# And every page the menu opens: a view added to the menu and to the tree but
+# not to a packaging path is a page that answers "not found" on the router.
+for v in $(grep -o '"path": *"[^"]*"' "$ROOT/package/luci-app-zirgozar/root/usr/share/luci/menu.d/luci-app-zirgozar.json" |
+           cut -d'"' -f4 | grep -v '^admin/'); do
+	LUCI_FILES="$LUCI_FILES
+www/luci-static/resources/view/$v.js"
+done
 MISSING=""
 for f in $LUCI_FILES; do
 	[ -f "$ROOT/package/luci-app-zirgozar/root/$f" ] || MISSING="$MISSING $f(not in the tree)"
-	grep -q "$(basename "$f")" "$ROOT/package/luci-app-zirgozar/Makefile" || MISSING="$MISSING $f(Makefile)"
+	grep -qw "$(basename "$f")" "$ROOT/package/luci-app-zirgozar/Makefile" || MISSING="$MISSING $f(Makefile)"
 	# Without the extension: the shell builder installs the three views from a
 	# loop over their names, so the file name never appears in it whole.
-	grep -q "$(basename "$f" .js)" "$ROOT/build/packages.inc.sh" || MISSING="$MISSING $f(packages.inc.sh)"
+	grep -qw "$(basename "$f" .js)" "$ROOT/build/packages.inc.sh" || MISSING="$MISSING $f(packages.inc.sh)"
 done
 if [ -z "$MISSING" ]; then
 	ok "all of them, in both"

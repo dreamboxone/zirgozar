@@ -7,7 +7,7 @@
 # packages.inc.sh - what goes into a package, shared by the .apk and .ipk
 # builders so the two formats can never drift apart.
 
-VERSION=2.4.10
+VERSION=2.4.11
 RELEASE=1
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
@@ -230,7 +230,7 @@ stage_luci() {
 	install -d "$i/www/luci-static/resources/view/zirgozar" \
 	           "$i/www/luci-static/resources/zirgozar" \
 	           "$i/usr/share/luci/menu.d" "$i/usr/share/rpcd/acl.d"
-	for v in settings nodes node subscribe other server update traffic geoview acl log; do
+	for v in settings nodes node shunt_rule subscribe other server update traffic geoview acl log; do
 		install -m 0644 "$l/www/luci-static/resources/view/zirgozar/$v.js" \
 			"$i/www/luci-static/resources/view/zirgozar/$v.js"
 	done

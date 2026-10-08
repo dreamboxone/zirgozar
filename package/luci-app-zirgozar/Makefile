@@ -5,7 +5,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-zirgozar
-PKG_VERSION:=2.4.10
+PKG_VERSION:=2.4.11
 PKG_RELEASE:=1
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
@@ -39,6 +39,10 @@ define Package/luci-app-zirgozar/install
 		$(1)/www/luci-static/resources/view/zirgozar/geoview.js
 	$(INSTALL_DATA) ./root/www/luci-static/resources/view/zirgozar/nodes.js \
 		$(1)/www/luci-static/resources/view/zirgozar/nodes.js
+	$(INSTALL_DATA) ./root/www/luci-static/resources/view/zirgozar/node.js \
+		$(1)/www/luci-static/resources/view/zirgozar/node.js
+	$(INSTALL_DATA) ./root/www/luci-static/resources/view/zirgozar/shunt_rule.js \
+		$(1)/www/luci-static/resources/view/zirgozar/shunt_rule.js
 	$(INSTALL_DATA) ./root/www/luci-static/resources/view/zirgozar/traffic.js \
 		$(1)/www/luci-static/resources/view/zirgozar/traffic.js
 	$(INSTALL_DATA) ./root/www/luci-static/resources/view/zirgozar/acl.js \
