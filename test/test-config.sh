@@ -478,7 +478,7 @@ printf '{"private_key":"MHcCAQEE","endpoint_v4":"162.159.198.2","endpoint_pub_ke
 MQOUT="$(PAYLOAD='{"type":"warp","mode":"masque","id":"x","endpoint":"","noize":""}' TAG=t LABEL=m \
 	LC_ALL=C awk -v WARPWG=1 -f "$RIG/lib/zgz-parse" < "$MQ")"
 check "$(printf '%s' "$MQOUT" | cut -f3-5 | tr '\t' ' ')" "masque 162.159.198.2 443" "the account's own endpoint, on 443"
-for want in '"protocol":"masque"' '"network":"masque"' '"publicKey":"MFkwEw=="' '"privateKey":"MHcCAQEE"' '"address":["172.16.0.2","2606:4700::2"]'; do
+for want in '"protocol":"masque"' '"network":"masque"' '"alpn":["h2"]' '"publicKey":"MFkwEw=="' '"privateKey":"MHcCAQEE"' '"address":["172.16.0.2","2606:4700::2"]'; do
 	if printf '%s' "$MQOUT" | grep -qF "$want"; then ok "into the outbound: $want"; else bad "into the outbound: $want"; fi
 done
 

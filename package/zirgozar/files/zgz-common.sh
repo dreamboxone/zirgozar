@@ -653,9 +653,18 @@ core_version_cached() {
 # in Xray months earlier, kept failing here while the same server worked
 # from a laptop and from PassWall2 on the very same router. Versions are
 # compared as numbers, part by part; one that will not say comes last.
+#
+# patterniha's build is not among them: it is newer than the official one
+# more often than not, and "newest first" made it the core under Auto too,
+# and the one the Xray row of the Update page spoke of. It comes last, for a
+# configuration no official Xray will take - a VLESS or Trojan without TLS
+# to a public address - and first only when the Active core names it (see
+# xray_preferred).
 xray_by_version() {
+	_xbv_p="$(core_dir)/xray-patterniha"
 	for _xv in $(xray_paths); do
 		[ -x "$_xv" ] || continue
+		[ "$_xv" = "$_xbv_p" ] && continue
 		# The path first: a version that will not say is an empty field, and
 		# an empty field first shifts every other one along - which made the
 		# path come out empty, and no core at all be found.
@@ -666,7 +675,19 @@ xray_by_version() {
 		for (i = 1; i <= 4; i++) k = k sprintf("%06d", (i <= n && p[i] ~ /^[0-9]+$/) ? p[i] : 0)
 		print k, $1
 	}' | sort -r | awk '{ print $2 }'
+	[ -x "$_xbv_p" ] && echo "$_xbv_p"
 	return 0
+}
+
+# The newest official Xray, for the Xray row of the Update page: patterniha's
+# has a row of its own.
+xray_official() {
+	for _xo in $(xray_by_version); do
+		[ "$_xo" = "$(core_dir)/xray-patterniha" ] && continue
+		echo "$_xo"
+		return 0
+	done
+	return 1
 }
 
 # Which Xray a page should talk about, without starting any of them to find
@@ -1378,7 +1399,7 @@ warp_natives() {
 # that needs nothing but the outbound, and the answer kept until the set of
 # Xray files changes.
 xray_has_masque() {
-	_xm_set="$(for _x in $(xray_by_version) "$(core_dir)/xray-patterniha"; do
+	_xm_set="$(for _x in $(xray_by_version); do
 		[ -x "$_x" ] && printf '%s %s %s;' "$_x" "$(file_size "$_x")" "$(date -r "$_x" +%s 2>/dev/null)"
 	done)"
 	_xm_c="$ZGZ_RUN/masque.ok"
@@ -1390,7 +1411,7 @@ xray_has_masque() {
 	printf '%s
 ' '{"log":{"loglevel":"none"},"outbounds":[{"protocol":"masque","settings":{"address":"162.159.198.1","port":443},"streamSettings":{"network":"masque","security":"tls"}}]}' > "$_xm_cfg"
 	_xm_ok=no
-	for _x in $(xray_by_version) "$(core_dir)/xray-patterniha"; do
+	for _x in $(xray_by_version); do
 		[ -x "$_x" ] || continue
 		"$_x" run -test -config "$_xm_cfg" >/dev/null 2>&1 && { _xm_ok=yes; break; }
 	done

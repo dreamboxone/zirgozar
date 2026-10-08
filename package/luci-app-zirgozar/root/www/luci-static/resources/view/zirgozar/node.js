@@ -157,6 +157,7 @@ function parseLink(link) {
 		   it says how. */
 		var nz = wq('noize').toLowerCase();
 		f.warp_noize = NOIZE.indexOf(nz) >= 0 ? nz : (f.warp_mode == 'masque' && nz != 'off' ? 'medium' : 'off');
+		f.warp_mt = wq('mt') == 'h3' ? 'h3' : 'h2';
 		f.rest = q;
 		return f;
 	}
@@ -250,7 +251,7 @@ function blankNode() {
 		proto: 'vless', rest: {}, address: '', port: '',
 		encryption: 'none', security: 'none', type: 'tcp', header_type: 'none',
 		alter_id: '0', vmess_security: 'auto', ss_method: 'aes-128-gcm', uot: '0', insecure: '0',
-		warp_mode: 'warp', warp_country: 'AT', warp_scan: '1', warp_noize: 'off'
+		warp_mode: 'warp', warp_country: 'AT', warp_scan: '1', warp_noize: 'off', warp_mt: 'h2'
 	};
 }
 
@@ -285,6 +286,7 @@ function buildLink(f, name) {
 		q.ipv = f.warp_ipv; q.dns = f.warp_dns; q.reserved = f.warp_reserved;
 		if (f.warp_mode == 'masque') { q.scan = ''; q.rtt = ''; }
 		q.noize = (f.warp_noize && f.warp_noize != 'off') ? f.warp_noize : (f.warp_mode == 'masque' ? 'off' : '');
+		q.mt = (f.warp_mode == 'masque' && f.warp_mt == 'h3') ? 'h3' : '';
 		var wqs = buildQuery(q);
 		return 'warp://' + (f.warp_key ? enc(f.warp_key) + '@' : '') + (f.warp_endpoint || 'auto') +
 			(wqs ? '?' + wqs : '') + frag;
@@ -680,6 +682,12 @@ return view.extend({
 			o.value('4', _('IPv4 only'));
 			o.value('6', _('IPv6 only'));
 			o.depends('_proto', 'warp');
+
+			o = field(form.ListValue, 'warp_mt', _('MASQUE over'),
+				_('When Xray carries WARP over MASQUE itself (Disguise Off): HTTP/2 goes over TCP 443, which gets through where UDP is blocked; HTTP/3 is QUIC over UDP 443, Cloudflare’s own default.'));
+			o.value('h2', _('HTTP/2 (TCP)'));
+			o.value('h3', _('HTTP/3 (QUIC)'));
+			o.depends({ '_proto': 'warp', '_warp_mode': 'masque' });
 
 			o = field(form.ListValue, 'warp_noize', _('Disguise (noize)'),
 				_('Junk and padding sent around the first packets, so that a filter does not recognise WireGuard or MASQUE. Heavier gets past more and connects more slowly. Anything but Off needs Vwarp. WARP over MASQUE with Off is carried by Xray itself when it speaks MASQUE - patterniha’s 26.10.8 or later - and Vwarp is then only needed to register the account.'));

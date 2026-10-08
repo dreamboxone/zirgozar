@@ -890,6 +890,11 @@ var FA = {
 	'Node Config': 'ویرایش کانفیگ',
 	'New Config': 'ایجاد کانفیگ جدید',
 	'Add file': 'افزودن فایل',
+	'MASQUE over': 'MASQUE روی',
+	'When Xray carries WARP over MASQUE itself (Disguise Off): HTTP/2 goes over TCP 443, which gets through where UDP is blocked; HTTP/3 is QUIC over UDP 443, Cloudflare’s own default.':
+		'وقتی خود Xray وارپ روی MASQUE را می‌برد (noize خاموش): HTTP/2 روی TCP 443 می‌رود و جایی که UDP بسته است رد می‌شود؛ HTTP/3 یعنی QUIC روی UDP 443، که پیش‌فرض خود کلودفلر است.',
+	'HTTP/2 (TCP)': 'HTTP/2 (TCP)',
+	'HTTP/3 (QUIC)': 'HTTP/3 (QUIC)',
 	'OpenVPN did not connect. The Runtime Logs page says how far it got.': 'OpenVPN وصل نشد. صفحه‌ی «گزارش اجرا» می‌گوید تا کجا پیش رفت.',
 	'OpenVPN is the official client, from the router’s own packages: every OpenVPN config is carried by it and by nothing else. Install, update and remove go through the package manager.':
 		'OpenVPN کلاینت رسمی است و از بسته‌های خود روتر نصب می‌شود: هر کانفیگ OpenVPN فقط با آن اجرا می‌شود. نصب، به‌روزرسانی و حذفش با مدیر بسته‌ی روتر انجام می‌شود.',

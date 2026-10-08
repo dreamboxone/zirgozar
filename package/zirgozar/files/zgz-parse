@@ -661,7 +661,7 @@ function do_tuic(body,   label, cred, uuid, pass, query, p, q) {
 #
 # Which account the node uses is its id: the section of a node added by hand,
 # so that each has an account of its own, kept under /etc/zirgozar/warp.
-function do_warp(body,   label, query, p, key, ep, mode, country, scan, rtt, ipv, dns, res, id, noize) {
+function do_warp(body,   label, query, p, key, ep, mode, country, scan, rtt, ipv, dns, res, id, noize, mt) {
 	p = index(body, "#")
 	if (p > 0) { label = clean_label(substr(body, p + 1)); body = substr(body, 1, p - 1) }
 	p = index(body, "?")
@@ -707,6 +707,10 @@ function do_warp(body,   label, query, p, key, ep, mode, country, scan, rtt, ipv
 	if (dns !~ /^[0-9A-Fa-f:.]+$/) dns = "1.1.1.1"
 	res = wg_reserved(qs(query, "reserved"))
 	gsub(/[][]/, "", res)
+	# What Xray's own MASQUE is carried over: HTTP/2 on TCP unless the link
+	# says h3, because UDP to Cloudflare's MASQUE address is very often what
+	# a filter here drops.
+	mt = (qs(query, "mt") == "h3") ? "h3" : "h2"
 	noize = tolower(qs(query, "noize"))
 	if (noize !~ /^(minimal|light|medium|heavy|stealth|gfw|firewall)$/) noize = ""
 	# MASQUE is Vwarp's, and Vwarp disguises it unless told otherwise.
@@ -722,7 +726,8 @@ function do_warp(body,   label, query, p, key, ep, mode, country, scan, rtt, ipv
 		",\"endpoint\":\"" jesc(ep) "\",\"key\":\"" key "\"" \
 		",\"scan\":" (scan ? "true" : "false") ",\"rtt\":" rtt \
 		",\"ipv\":\"" ipv "\",\"country\":\"" country "\"" \
-		",\"dns\":\"" dns "\",\"reserved\":\"" res "\",\"noize\":\"" noize "\"}")
+		",\"dns\":\"" dns "\",\"reserved\":\"" res "\",\"noize\":\"" noize "\"" \
+		(mode == "masque" ? ",\"mt\":\"" mt "\"" : "") "}")
 }
 
 # A WireGuard node carried by warp-plus rather than by Xray - the node's own
@@ -896,13 +901,15 @@ function warp_masque(d, p,   pk, pub, v4, v6, ep) {
 	if (ep == "") ep = "162.159.198.1:443"
 	if (!hostport(ep)) exit 1
 	printf "%s\t%s\tmasque\t%s\t%d\t%s\n", ENVIRON["TAG"], ENVIRON["LABEL"], HOST, PORT, \
-		mk_masque(pk, pub, "\"" v4 "\"" (v6 != "" ? ",\"" v6 "\"" : ""))
+		mk_masque(pk, pub, "\"" v4 "\"" (v6 != "" ? ",\"" v6 "\"" : ""), jstr(p, "mt") == "h3")
 }
 
-function mk_masque(pk, pub, addrs) {
+# H3 is MASQUE over QUIC, as Cloudflare's own client does it; otherwise the
+# ALPN asks for HTTP/2, which Xray carries over TCP.
+function mk_masque(pk, pub, addrs, h3) {
 	return "{\"protocol\":\"masque\",\"settings\":{\"address\":\"" jesc(HOST) "\",\"port\":" PORT "}," \
 	       "\"streamSettings\":{\"network\":\"masque\",\"security\":\"tls\"," \
-	       "\"tlsSettings\":{\"serverName\":\"consumer-masque.cloudflareclient.com\"}," \
+	       "\"tlsSettings\":{\"serverName\":\"consumer-masque.cloudflareclient.com\"" (h3 ? "" : ",\"alpn\":[\"h2\"]") "}," \
 	       "\"masqueSettings\":{\"warp\":{\"privateKey\":\"" jesc(pk) "\",\"publicKey\":\"" jesc(pub) "\"," \
 	       "\"address\":[" addrs "]}}}}"
 }

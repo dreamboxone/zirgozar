@@ -694,7 +694,7 @@ one() {
 cmd_list() {
 	# Found without starting any of them - see xray_installed. The versions
 	# come from the cache in core_version_cached for the same reason.
-	_x="$(xray_installed 2>/dev/null)" || _x=""
+	_x="$(xray_official 2>/dev/null)" || _x=""
 	_s="$(singbox_path)"; [ -x "$_s" ] || _s=""
 	_l="$(singbox_lx_path)"; [ -x "$_l" ] || _l=""
 	_h="$(hysteria_path)"; [ -x "$_h" ] || _h=""
