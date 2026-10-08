@@ -33,6 +33,10 @@
 //   bridge=FILE    the hysteria2, tuic or AmneziaWG server the chosen node is,
 //                  if it is one
 //   bridgeport=N   the local port Xray would have been given for it
+//   mode=test      a measuring configuration from zgz-test or zgz-probe, not
+//                  the tunnel: no node is called proxy, every node it names
+//                  has to come across or none is measured with sing-box, and
+//                  there is no clash API to collide with the running tunnel's
 
 import { stdin, stderr, popen, stat, mkdir, readfile, writefile, unlink } from 'fs';
 
@@ -193,6 +197,8 @@ function tls_of(ss) {
 		t.reality = { enabled: true, public_key: st.publicKey ?? '' };
 		if (st.shortId)
 			t.reality.short_id = st.shortId;
+		if (st.mldsa65Verify)
+			warn('the post-quantum check of the REALITY server (pqv) has no sing-box equivalent - the node connects unverified');
 	} else if (fp) {
 		t.utls = { enabled: true, fingerprint: fp };
 	}
@@ -475,7 +481,14 @@ function conv_outbound(o) {
 for (let o in X.outbounds)
 	conv_outbound(o);
 
-if (!out_tags.proxy) {
+// A measurement of a node sing-box cannot carry is not to be taken through
+// some other node: the core that can carry it measures the lot instead.
+if (args.mode == 'test') {
+	for (let t, why in failed) {
+		stderr.write(`error: ${t} cannot be used with sing-box: ${why}\n`);
+		exit(2);
+	}
+} else if (!out_tags.proxy) {
 	stderr.write(`error: the tunnel's own node cannot be used with sing-box: ${failed.proxy ?? 'not translated'}\n`);
 	exit(2);
 }
@@ -484,7 +497,11 @@ if (!out_tags.proxy) {
 function target(tag) {
 	if (tag == 'direct' || tag == 'block')
 		return tag;
-	return out_tags[tag] ? tag : 'proxy';
+	if (out_tags[tag])
+		return tag;
+	// A measurement has no tunnel to fall back on: a blackhole, the one thing
+	// left out without failing, drops what it is sent.
+	return args.mode == 'test' ? 'block' : 'proxy';
 }
 
 // ----------------------------------------------------------------- inbounds
@@ -719,7 +736,8 @@ function dns_server(sv) {
 		if (sv.port && sv.port != 53)
 			o.server_port = sv.port;
 	}
-	o.tag = sv.tag;
+	// A measuring configuration's one resolver has no tag of its own.
+	o.tag = sv.tag ?? (args.mode == 'test' ? 'dns-test' : null);
 	let via = dns_via[sv.tag];
 	if (via && via != 'direct' && via != 'block')
 		o.detour = via;
@@ -752,7 +770,7 @@ for (let sv in X.dns?.servers ?? []) {
 			push(dns.rules, { ...g, action: 'route', server: sv.tag });
 		}
 	} else {
-		dns_final = sv.tag;
+		dns_final = s.tag;
 		if (qs)
 			dns.strategy = qs;
 	}
@@ -766,6 +784,11 @@ if (X.dns?.disableCache)
 
 let level = { debug: 'debug', info: 'info', warning: 'warn', error: 'error' }[args.level ?? 'warning'];
 
+// A measuring configuration has no node called proxy; what no rule sends
+// anywhere - nothing, there - leaves directly.
+if (args.mode == 'test')
+	final_out = 'direct';
+
 let route = {
 	rules,
 	final: final_out,
@@ -773,24 +796,31 @@ let route = {
 };
 if (length(keys(rule_sets)))
 	route.rule_set = map(keys(rule_sets), (t) => ({ tag: t, type: 'local', format: 'binary', path: rule_sets[t] }));
+// The resolver a node's own name is looked up with: the direct one, or in a
+// measurement the one resolver it has, which is the direct resolver too.
+let node_dns = have_direct_dns ? 'dns-direct' : (args.mode == 'test' ? dns_final : null);
 for (let o in [ ...outbounds ]) {
-	if (o._strategy && have_direct_dns)
-		o.domain_resolver = { server: 'dns-direct', strategy: o._strategy };
+	if (o._strategy && node_dns)
+		o.domain_resolver = { server: node_dns, strategy: o._strategy };
 	delete o._strategy;
 }
-if (have_direct_dns)
+if (have_direct_dns) {
 	route.default_domain_resolver = { server: 'dns-direct', strategy: 'ipv4_only' };
+} else if (node_dns) {
+	route.default_domain_resolver = { server: node_dns };
+	if (QS[X.dns?.queryStrategy])
+		route.default_domain_resolver.strategy = QS[X.dns.queryStrategy];
+}
 
 let cfg = {
 	log: level ? { level, timestamp: true } : { disabled: true },
 	dns,
 	inbounds,
 	outbounds: [ ...outbounds, { type: 'direct', tag: 'direct', routing_mark: MARK } ],
-	route,
-	experimental: {
-		clash_api: { external_controller: `127.0.0.1:${args.api ?? 10853}` }
-	}
+	route
 };
+if (args.mode != 'test')
+	cfg.experimental = { clash_api: { external_controller: `127.0.0.1:${args.api ?? 10853}` } };
 if (length(endpoints))
 	cfg.endpoints = endpoints;
 

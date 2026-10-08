@@ -309,7 +309,7 @@ kill_stale_tester() {
 	# these ports. The next run then cannot bind, every measurement fails,
 	# and the answer is "no server responded" for good - a failure that keeps
 	# itself alive and looks exactly like the network.
-	_stale="$(pgrep -f "run -config $TEST_CFG" 2>/dev/null || true)"
+	_stale="$(pgrep -f "run -c[a-z]* $TEST_CFG" 2>/dev/null || true)"
 	[ -n "$_stale" ] && kill $_stale 2>/dev/null || true
 	return 0
 }
@@ -337,7 +337,7 @@ prune_batch() {
 			"$(printf '%s' "$_one" | sed 's/^{/{"tag":"one",/')" \
 			"$(chain_outbounds "$_one" | while read -r _co; do [ -n "$_co" ] && printf ',%s' "$_co"; done)" \
 			"$(measure_dns)" > "$ZGZ_RUN/one.json"
-		if find_xray "$ZGZ_RUN/one.json" >/dev/null 2>&1; then
+		if test_core "$ZGZ_RUN/one.json" >/dev/null 2>&1; then
 			printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$tag" "$label" "$proto" "$host" "$port" "$payload" >> "$_kept"
 		else
 			echo "$tag" >> "$REJECTED"
@@ -354,20 +354,22 @@ run_batch() {
 	_list="$1"
 	build_batch_config "$_list"
 
-	if ! _xray="$(find_xray "$TEST_CFG")"; then
+	# Measured by the core the tunnel runs on - see test_core.
+	if ! _xray="$(test_core "$TEST_CFG")"; then
 		prune_batch "$_list"
 		if [ ! -s "$_list" ]; then
 			warn "no server in this batch can be used by any core on this router"
 			return 1
 		fi
 		build_batch_config "$_list"
-		if ! _xray="$(find_xray "$TEST_CFG")"; then
+		if ! _xray="$(test_core "$TEST_CFG")"; then
 			warn "this batch is still refused after dropping the bad entries"
 			return 1
 		fi
 	fi
+	_eng="${_xray%% *}"; _xray="${_xray#* }"
 
-	"$_xray" run -config "$TEST_CFG" >/dev/null 2>&1 &
+	"$_xray" $(core_run_args "$_eng" "$TEST_CFG") >/dev/null 2>&1 &
 	_xpid=$!
 	trap 'kill "$_xpid" 2>/dev/null || true' INT TERM
 	# Without this the first server in every batch is scored on the core's

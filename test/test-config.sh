@@ -46,6 +46,12 @@ LINKS
 	# that would cost a working server for the sake of a cosmetic field.
 	echo 'vless://11111111-2222-3333-4444-555555555555@good.example.com:443?encryption=none&security=tls&sni=good.example.com&fp=unsafe#GOODFP' >> "$LIST"
 	echo 'vless://11111111-2222-3333-4444-555555555555@bad.example.com:443?encryption=none&security=tls&sni=bad.example.com&fp=madeupvalue#BADFP' >> "$LIST"
+	# REALITY with the post-quantum check of the server, "pqv": a real
+	# ML-DSA-65 key is 2603 characters, and one that is not a key must cost
+	# the check, not the node.
+	PQVKEY=$(awk 'BEGIN { while (n++ < 2603) printf "A" }')
+	echo "vless://11111111-2222-3333-4444-555555555555@pq.example.com:443?encryption=none&security=reality&sni=www.microsoft.com&fp=chrome&pbk=OO2OqOYyZ2fdqXTWku23mRI0Hz7-1eYEoFsKANj6hn8&sid=abcd1234&pqv=$PQVKEY&type=tcp#PQV" >> "$LIST"
+	echo 'vless://11111111-2222-3333-4444-555555555555@pqbad.example.com:443?encryption=none&security=reality&sni=www.microsoft.com&fp=chrome&pbk=OO2OqOYyZ2fdqXTWku23mRI0Hz7-1eYEoFsKANj6hn8&sid=abcd1234&pqv=Zm9vYmFy&type=tcp#PQVBAD' >> "$LIST"
 fi
 
 echo "== parsing $(grep -c . "$LIST") lines"
@@ -74,6 +80,13 @@ check "$BADFP" "0" "an unknown TLS fingerprint is dropped, not passed on"
 # ...and the one it will accept must not be thrown away with it.
 GOODFP=$(grep -c '"fingerprint":"unsafe"' "$WORK/cand.tsv" || true)
 check "$GOODFP" "1" "a real fingerprint is kept"
+
+# pqv is Xray's mldsa65Verify, and one link's is not the next one's.
+PQV=$(grep -c "\"mldsa65Verify\":\"A\{2603\}\"" "$WORK/cand.tsv" || true)
+check "$PQV" "1" "a REALITY link's pqv becomes mldsa65Verify, on that node only"
+PQVBAD=$(grep 'pqbad.example.com' "$WORK/cand.tsv" | grep -c 'mldsa65Verify' || true)
+check "$PQVBAD" "0" "a pqv that is not a key is left out"
+check "$(grep -c 'pqbad.example.com' "$WORK/cand.tsv")" "1" "and the node is kept without it"
 
 # Removed from Xray in 26.x, and its presence makes the core refuse the whole
 # outbound rather than merely relaxing a check.

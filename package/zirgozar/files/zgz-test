@@ -172,18 +172,20 @@ url_ms() {
 		"$(chain_outbounds "$_out" | while read -r _co; do [ -n "$_co" ] && printf ',%s' "$_co"; done)" \
 		"$_dns" "$(node_domain_strategy)" > "$_cfg"
 
-	if ! _x="$(find_xray "$_cfg")"; then
+	# Measured by the core the tunnel runs on - see test_core.
+	if ! _x="$(test_core "$_cfg")"; then
 		rm -f "$_cfg"
 		rmdir "$DIR/.url-lock" 2>/dev/null || true
 		echo -2
 		return 1
 	fi
+	_eng="${_x%% *}"; _x="${_x#* }"
 
 	_geo="$(geo_dir)" || _geo=""
 	if [ -n "$_geo" ]; then
-		XRAY_LOCATION_ASSET="$_geo" "$_x" run -config "$_cfg" >/dev/null 2>&1 &
+		XRAY_LOCATION_ASSET="$_geo" "$_x" $(core_run_args "$_eng" "$_cfg") >/dev/null 2>&1 &
 	else
-		"$_x" run -config "$_cfg" >/dev/null 2>&1 &
+		"$_x" $(core_run_args "$_eng" "$_cfg") >/dev/null 2>&1 &
 	fi
 	_pid=$!
 	# Otherwise the core's own start-up is charged to the node.

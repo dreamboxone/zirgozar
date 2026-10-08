@@ -180,7 +180,9 @@ function hostport(s,   p) {
 
 # ------------------------------------------------------------ streamSettings
 
-function stream(net, sec, host, path, sni, fp, alpn, pbk, sid, spx, svc, hdr, mode,   s, t, n, a, i) {
+function stream(net, sec, host, path, sni, fp, alpn, pbk, sid, spx, svc, hdr, mode,   s, t, n, a, i, pqv) {
+	# One link's pqv is its own, like its cipher suites.
+	pqv = XPQV; XPQV = ""
 	if (net == "") net = "tcp"
 	if (net == "h2") net = "http"
 	if (net == "splithttp") net = "xhttp"
@@ -226,6 +228,16 @@ function stream(net, sec, host, path, sni, fp, alpn, pbk, sid, spx, svc, hdr, mo
 			if (pbk != "") t = t ",\"publicKey\":\"" jesc(pbk) "\""
 			if (sid != "") t = t ",\"shortId\":\"" jesc(sid) "\""
 			if (spx != "") t = t ",\"spiderX\":\"" jesc(spx) "\""
+			# The post-quantum check of the server, as a link writes it -
+			# "pqv", the ML-DSA-65 public key in base64url. Xray verifies the
+			# REALITY server's signature with it, and refuses the whole
+			# outbound over one that is not exactly a key: 1952 bytes, 2603
+			# characters unpadded. Without it the node still connects, only
+			# unverified, so a value that is not a key is left out rather
+			# than costing the node.
+			sub(/=+$/, "", pqv)
+			if (pqv ~ /^[A-Za-z0-9_-]+$/ && length(pqv) == 2603)
+				t = t ",\"mldsa65Verify\":\"" pqv "\""
 			s = s ",\"realitySettings\":{" t "}"
 		} else {
 			# No allowInsecure here, however tempting. Xray removed it in 26.x
@@ -480,6 +492,7 @@ function do_vless(body,   label, uuid, query, p, sec, flow, enc) {
 	XCS = qs(query, "cs")
 	XFM = qs(query, "fm")
 	XECH = qs(query, "ech")
+	XPQV = qs(query, "pqv")
 
 	emit(label, "vless", mk_vless(uuid, enc, flow, \
 		stream(qs(query, "type"), sec, qs(query, "host"), qs(query, "path"), \

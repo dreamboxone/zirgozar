@@ -150,4 +150,50 @@ else
 	bad "the unusable candidate was written down"
 fi
 
+# With sing-box chosen as the engine the measuring is sing-box's too: a node
+# that works under one core can fail under the other, and the tunnel will be
+# carried by the one in the settings.
+echo "== with sing-box as the engine, sing-box measures"
+if [ -n "$RIG_SINGBOX" ] && [ -x "$RIG_SINGBOX" ] && command -v ucode >/dev/null 2>&1; then
+	printf '#!/bin/sh\necho "$*" >> "%s"\nexec "%s" "$@"\n' "$WORK/sb.calls" "$RIG_SINGBOX" > "$RIG/core/sing-box"
+	chmod +x "$RIG/core/sing-box"
+	rig_set core_engine singbox
+	{
+		printf 'dead\tblackhole\tvless\twww.gstatic.com\t80\t{"protocol":"blackhole"}\n'
+		printf 'f0\tdirect 0\tvless\twww.gstatic.com\t80\t{"protocol":"freedom"}\n'
+		printf 'f1\tdirect 1\tvless\twww.gstatic.com\t80\t{"protocol":"freedom"}\n'
+	} > "$RIG/run/candidates.tsv"
+	: > "$RIG/run/rejected"
+	rm -f "$RIG/etc/best.meta"
+	if sh "$RIG/lib/zgz-probe" select >"$WORK/sel3.log" 2>&1; then
+		ok "a server was chosen"
+	else
+		bad "a server was chosen ($(tail -2 "$WORK/sel3.log" | tr '\n' ' '))"
+	fi
+	if grep -q '^run -c ' "$WORK/sb.calls" 2>/dev/null; then
+		ok "the batch was run by sing-box"
+	else
+		bad "the batch was run by sing-box"
+	fi
+	CHOSEN=$(sed -n 's/^tag=//p' "$RIG/etc/best.meta" 2>/dev/null)
+	case "$CHOSEN" in
+		f*) ok "and the server that answers nothing was passed over (picked $CHOSEN)" ;;
+		*)  bad "and the server that answers nothing was passed over (got '$CHOSEN')" ;;
+	esac
+
+	# The URL button on a node's row, the same way.
+	: > "$WORK/sb.calls"
+	printf 'f0\tdirect 0\tvless\twww.gstatic.com\t80\t{"protocol":"freedom"}\n' > "$RIG/run/candidates.tsv"
+	sh "$RIG/lib/zgz-test" url f0 >/dev/null 2>&1 || true
+	URL=$(cat "$RIG/run/tests/f0.url" 2>/dev/null)
+	if [ "${URL:-0}" -gt 0 ] 2>/dev/null && grep -q '^run -c ' "$WORK/sb.calls"; then
+		ok "the URL test is run by sing-box too ($URL ms)"
+	else
+		bad "the URL test is run by sing-box too (got '$URL', calls: $(tr '\n' ' ' < "$WORK/sb.calls"))"
+	fi
+	rig_set core_engine xray
+else
+	echo "  skip - no sing-box and ucode to run (set RIG_SINGBOX)"
+fi
+
 rig_report

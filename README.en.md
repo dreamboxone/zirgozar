@@ -335,7 +335,7 @@ rather than left pointing at nothing.
 | **Name** | `name` | Your name for it. Left empty, the name after the `#` in the link is used, Persian included |
 | **Type** | — | What the link is: vless, vmess, trojan, shadowsocks, socks, hysteria2, tuic, wireguard, warp |
 | **Group Name** | `group` | For your own order; empty is the default group |
-| **Ping / TCPing / URL Test** | — | Three different questions: an ICMP round trip to the address (says nothing about the server behind it); a handshake to the port the tunnel will use; a whole request carried through the config — the only one that proves it works. Each says *Test* until pressed. `✕` is no answer, `—` a test that cannot be run on that config |
+| **Ping / TCPing / URL Test** | — | Three different questions: an ICMP round trip to the address (says nothing about the server behind it); a handshake to the port the tunnel will use; a whole request carried through the config — the only one that proves it works. The request is carried by the active core, as the automatic ranking's are: with sing-box or sing-box-lx chosen under **Active core**, by that sing-box, so a config is measured the way the tunnel will run it; by Xray where the tunnel would fall back to Xray too - no sing-box, or a config sing-box cannot speak. Each says *Test* until pressed. `✕` is no answer, `—` a test that cannot be run on that config |
 | **On** | `enabled` | This config on or off |
 | **Share link** (edit window) | `link` | A share link — vless, vmess, trojan, ss, socks, hysteria2, tuic, wireguard — several one per line, or a whole WireGuard `.conf`. **Browse…** puts a file's contents in the box; nothing is uploaded |
 | **Chain Proxy** (edit window) | `chain_proxy` | PassWall2's chain: *Preproxy Node* — this config is reached through another; *Landing Node* — traffic goes through this config and leaves from another |
@@ -350,7 +350,9 @@ Beside **Edit** and **Delete** on each row: **To Top** moves it to the top,
 Node Config. A vless, vmess, trojan, shadowsocks, socks, http, hysteria2 or
 tuic link is shown there field by field: protocol, address, port, ID or
 password, flow, security (TLS or REALITY, with SNI, alpn, fingerprint, public
-key, Short Id and Spider X) and transport (RAW, WebSocket, gRPC, HTTP/2,
+key, Short Id and Spider X; a link's `pqv`, the ML-DSA-65 key the REALITY
+server is checked with, is kept and given to Xray - sing-box has no such check
+and connects without it) and transport (RAW, WebSocket, gRPC, HTTP/2,
 HTTPUpgrade, XHTTP with its Extra, mKCP with its Seed). Saving builds the link
 again from the fields; parameters the page has no field for are kept as they
 were. A WireGuard or OpenVPN file, or several links in one config, is edited as

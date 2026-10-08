@@ -408,7 +408,34 @@ sbconfig() {
 		geoview="$(geoview_path)" geodir="$(geo_dir 2>/dev/null)" \
 		rsdir="$ZGZ_RUN/rs" api="$(cfg api_port 10853)" \
 		bridge="$ZGZ_ETC/bridge.json" bridgeport="$(cfg bridge_port 10808)" \
-		mark="$ZGZ_OUT_MARK" level="$_sb_level"
+		mark="$ZGZ_OUT_MARK" level="$_sb_level" "$@"
+}
+
+# The core a measurement is taken with: the one the settings run the tunnel
+# on. A node measured through Xray and then carried by sing-box is a
+# measurement of something else - each has its own REALITY, its own xhttp,
+# its own idea of a fingerprint - and a node that works under sing-box-lx
+# could read as dead, or the other way round. So with sing-box chosen the
+# measuring configuration is translated, as the tunnel's is, and run by that
+# sing-box; Xray measures it only where the service would fall back to Xray
+# too: no sing-box, or a node sing-box cannot speak.
+#
+#   test_core CFG   prints "<engine> <program>"; for sing-box, CFG has been
+#                   rewritten in sing-box's words
+test_core() {
+	_tc_cfg="$1"
+	if [ "$(core_engine)" = "singbox" ] && _tc_sb="$(engine_singbox_path)" && [ -x "$_tc_sb" ]; then
+		if sbconfig mode=test level=none < "$_tc_cfg" > "$_tc_cfg.sb" 2>/dev/null &&
+		   "$_tc_sb" check -c "$_tc_cfg.sb" >/dev/null 2>&1; then
+			mv -f "$_tc_cfg.sb" "$_tc_cfg"
+			echo "singbox $_tc_sb"
+			return 0
+		fi
+		rm -f "$_tc_cfg.sb"
+	fi
+	_tc_x="$(find_xray "$_tc_cfg")" || return 1
+	echo "xray $_tc_x"
+	return 0
 }
 
 # The configuration for the engine asked for, on stdout.
