@@ -288,7 +288,23 @@ service_started() {
 	tproxy_port="$(cfg tproxy_port 1082)"
 	bridge_port="$(cfg bridge_port 10808)"
 
-	if bridge_wanted; then
+	if bridge_wanted && bridge_is_ovpn; then
+		# OpenVPN opens no port: what it makes is its tunnel device, with an
+		# address on it once the server has answered. Waited for, so that the
+		# rules do not send the network into a way out that is not there yet.
+		_ovw=0
+		while [ "$_ovw" -lt 120 ]; do
+			ip -4 addr show dev "$ZGZ_OVPN_DEV" 2>/dev/null | grep -q inet && break
+			sleep 1
+			_ovw=$((_ovw + 1))
+		done
+		if [ "$_ovw" -ge 120 ]; then
+			log "OpenVPN did not connect within two minutes"
+			say_status failed
+			say_message "OpenVPN did not connect. The Runtime Logs page says how far it got."
+			return 1
+		fi
+	elif bridge_wanted; then
 		# warp-plus opens its port only once WARP answers: after registering
 		# an account the first time, scanning for an address, and - for WARP
 		# in WARP or Psiphon - the second hop as well. Psiphon alone can take

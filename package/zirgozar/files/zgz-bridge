@@ -26,6 +26,9 @@
 # A WARP node is warp-plus's, whichever engine carries the tunnel: it finds a
 # WARP address by scanning, puts a second WARP or Psiphon behind the first,
 # and sends junk ahead of a WireGuard handshake - none of which a core does.
+#
+# An OpenVPN node is OpenVPN's, the same way. It is not a SOCKS port but a
+# tunnel device, and the core's way out for it is bound to that device.
 
 set -e
 
@@ -189,10 +192,100 @@ hysteria_config() {
 	return 0
 }
 
+# ---------------------------------------------------------------- OpenVPN
+
+# The official client, from the router's own packages: openvpn-openssl, or
+# openvpn-mbedtls - Router requirements installs the first when there is an
+# OpenVPN config and neither.
+find_openvpn() {
+	for _ov in "$(command -v openvpn 2>/dev/null)" /usr/sbin/openvpn; do
+		[ -n "$_ov" ] && [ -x "$_ov" ] && { echo "$_ov"; return 0; }
+	done
+	return 1
+}
+
+# The profile as zgz-parse kept it, and after it this program's own lines:
+# its device, no routes of its own (the core decides what goes in), the mark
+# the firewall lets past, no scripts, and the device kept through a reconnect
+# so that the core's way out, bound to it, does not vanish under it.
+# Written where only root can read it: the password and the key are in it.
+ovpn_config() {
+	[ "$(jget type)" = "openvpn" ] || return 1
+	if grep -q '"tap":true' "$NODE"; then
+		say_message "This OpenVPN profile uses a TAP device (dev tap). Only TUN profiles are supported."
+		return 1
+	fi
+	# Read by an earlier version, which kept only parts of the profile.
+	if ! grep -q '"profile":"' "$NODE"; then
+		say_message "This OpenVPN config was read by an earlier version. Open it on the Node List page and press Save, so that it is read again."
+		return 1
+	fi
+	if grep -q '"needs_auth":true' "$NODE"; then
+		say_message "This OpenVPN profile asks for a user name and password. Enter them in the settings of the config."
+		return 1
+	fi
+	_ovf="$ZGZ_BRIDGE_JSON.ovpn"
+	_old="$(umask)"
+	umask 077
+	AUTHFILE="$_ovf.auth" PASSFILE="$_ovf.pass" \
+		LC_ALL=C awk -v OVPNCONF=1 -f "$ZGZ_LIB/zgz-parse" < "$NODE" > "$_ovf.new" 2>/dev/null || {
+		umask "$_old"
+		rm -f "$_ovf.new"
+		return 1
+	}
+	_verb=3
+	[ "$(cfg loglevel warning)" = "debug" ] && _verb=4
+	# A static-key profile - no TLS, one shared key. OpenVPN 2.7 still runs
+	# it, but only when told to in so many words; 2.8 will not at all.
+	if grep -qE '^(<secret>|secret[[:space:]])' "$_ovf.new" &&
+	   ! grep -qE '^(client|tls-client|tls-server)([[:space:]]|$)' "$_ovf.new"; then
+		echo "allow-deprecated-insecure-static-crypto" >> "$_ovf.new"
+	fi
+	# OpenVPN waits two minutes on a server that does not answer before it
+	# tries again or moves to the next one, and a first attempt that hangs
+	# is common enough here: a second one, seconds later, very often goes
+	# straight through. Ten seconds, unless the profile says otherwise.
+	if ! grep -qE '^(server-poll-timeout|connect-timeout)[[:space:]]' "$_ovf.new"; then
+		echo "server-poll-timeout 10" >> "$_ovf.new"
+	fi
+	# Reached through another node: the core's SOCKS port that leaves by it
+	# - see ovpn_via. Last, so it wins over a proxy the profile names.
+	if [ -n "$(ovpn_via)" ] && grep -q "\"ovpn-via\"" "$ZGZ_CONFIG_JSON" 2>/dev/null; then
+		echo "socks-proxy 127.0.0.1 $(cfg bridge_port 10808)" >> "$_ovf.new"
+	fi
+	cat >> "$_ovf.new" <<EOF
+dev $ZGZ_OVPN_DEV
+dev-type tun
+route-noexec
+ignore-unknown-option dns-updown
+dns-updown disable
+mark $ZGZ_OUT_MARK
+script-security 1
+persist-tun
+auth-nocache
+suppress-timestamps
+verb $_verb
+EOF
+	umask "$_old"
+	mv -f "$_ovf.new" "$_ovf"
+	return 0
+}
+
 # ------------------------------------------------------------------- main
 
 cmd_config() {
 	cmd_needed || { echo "no bridge needed" >&2; return 1; }
+
+	if [ "$(jget type)" = "openvpn" ]; then
+		if ! find_openvpn >/dev/null; then
+			say_message "An OpenVPN config needs OpenVPN on the router. Press Install dependencies under Router requirements."
+			warn "no openvpn installed to carry the OpenVPN node"
+			return 1
+		fi
+		ovpn_config || return 1
+		echo "$ZGZ_BRIDGE_JSON.ovpn"
+		return 0
+	fi
 
 	if [ "$(jget type)" = "warp" ]; then
 		if ! _wpp="$(warp_program "$(cat "$NODE")")"; then
@@ -236,6 +329,12 @@ cmd_config() {
 # is a procd instance like any other and gets its respawning for free.
 cmd_command() {
 	cmd_needed || return 1
+	if [ "$(jget type)" = "openvpn" ]; then
+		_ov="$(find_openvpn)" || return 1
+		ovpn_config || return 1
+		echo "$_ov --config $ZGZ_BRIDGE_JSON.ovpn"
+		return 0
+	fi
 	if [ "$(jget type)" = "warp" ]; then
 		_wpp="$(warp_program "$(cat "$NODE")")" || return 1
 		warp_config "${_wpp%% *}" || return 1

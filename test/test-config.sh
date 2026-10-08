@@ -425,17 +425,49 @@ KKKK
 ' > "$OV"
 OVOUT="$(LC_ALL=C awk -f "$RIG/lib/zgz-parse" < "$OV")"
 check "$(printf '%s' "$OVOUT" | cut -f2-5 | tr '	' ' ')" "Office openvpn 203.0.113.9 1194" "the profile is one node, named by its leading comment"
-for want in '"network":"tcp"' '"server_name":"srv"' '"wrap":"tls_crypt"' '"username":"bob"' '"password":"secret"'; do
+for want in '"network":"tcp"' '"username":"bob"' '"password":"secret"' '"profile":"'; do
 	if printf '%s' "$OVOUT" | grep -q "$want"; then ok "carried through: $want"; else bad "carried through: $want"; fi
 done
+# The profile itself, as OpenVPN will be given it: whole, but for what would
+# act on the router rather than on the connection.
+printf 'up /etc/x.sh
+script-security 2
+redirect-gateway def1
+socks-proxy 127.0.0.1 1080
+' >> "$OV"
+OVRUN="$(LC_ALL=C awk -f "$RIG/lib/zgz-parse" < "$OV" | cut -f6- |
+	AUTHFILE="$RIG/work/ov.auth" LC_ALL=C awk -v OVPNCONF=1 -f "$RIG/lib/zgz-parse")"
+for want in 'verify-x509-name srv name' '<tls-crypt>' 'KKKK' 'socks-proxy 127.0.0.1 1080' "auth-user-pass $RIG/work/ov.auth"; do
+	if printf '%s\n' "$OVRUN" | grep -qF "$want"; then ok "the profile keeps: $want"; else bad "the profile keeps: $want"; fi
+done
+for gone in 'up /etc/x.sh' 'script-security 2' 'redirect-gateway'; do
+	if printf '%s\n' "$OVRUN" | grep -qF "$gone"; then bad "the profile drops: $gone"; else ok "the profile drops: $gone"; fi
+done
+check "$(cat "$RIG/work/ov.auth" 2>/dev/null | tr '\n' ' ')" "bob secret " "the user name and password go to a file of their own"
+# A static key: no certificate authority, and still a node now that OpenVPN
+# itself carries it.
+printf 'dev tun
+remote 203.0.113.9 1194
+ifconfig 10.8.0.2 10.8.0.1
+<secret>
+SSSS
+</secret>
+' > "$OV"
+if [ -n "$(LC_ALL=C awk -f "$RIG/lib/zgz-parse" < "$OV")" ]; then
+	ok "a static-key profile is a node"
+else
+	bad "a static-key profile is a node"
+fi
 printf 'client
 proto udp
-remote 203.0.113.9 1194
+<ca>
+AAAA
+</ca>
 ' > "$OV"
 if [ -z "$(LC_ALL=C awk -f "$RIG/lib/zgz-parse" < "$OV")" ]; then
-	ok "a profile with no certificate authority produces nothing"
+	ok "a profile with no server produces nothing"
 else
-	bad "a profile with no certificate authority produces nothing"
+	bad "a profile with no server produces nothing"
 fi
 
 # The two shapes people are actually handed, and the two this could not read.

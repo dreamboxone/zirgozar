@@ -7,7 +7,7 @@
 # packages.inc.sh - what goes into a package, shared by the .apk and .ipk
 # builders so the two formats can never drift apart.
 
-VERSION=2.3.1
+VERSION=2.4.0
 RELEASE=1
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
@@ -46,7 +46,7 @@ LUCI_DESC="Web interface for Zirgozar: connect, servers and subscriptions, traff
 CRON_LIST='*/15 * * * * /usr/libexec/zgz-refresh >/dev/null 2>&1'
 CRON_STATS='*/5 * * * * /usr/libexec/zgz-stats sample >/dev/null 2>&1'
 
-ZGZ_SCRIPTS="zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-stats zgz-test zgz-geo zgz-cores zgz-deps zgz-bridge zgz-router zgz-sbconfig zgz-sbstats zgz-ovpnkey zgz-server zgz-warp"
+ZGZ_SCRIPTS="zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-stats zgz-test zgz-geo zgz-cores zgz-deps zgz-bridge zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp"
 
 # stage_zgz <staging-root> <source-root> <xray-binary>
 stage_zgz() {
@@ -234,6 +234,9 @@ stage_luci() {
 	# The QR code of a node's link, drawn in the browser - no CDN to reach.
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/qr.js" \
 		"$i/www/luci-static/resources/zirgozar/qr.js"
+	# The link-or-file input, shared by Node List and the Node Config page.
+	install -m 0644 "$l/www/luci-static/resources/zirgozar/nodelink.js" \
+		"$i/www/luci-static/resources/zirgozar/nodelink.js"
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/theme.css" \
 		"$i/www/luci-static/resources/zirgozar/theme.css"
 	# The logo drawn light, for the dark banner every page opens with.

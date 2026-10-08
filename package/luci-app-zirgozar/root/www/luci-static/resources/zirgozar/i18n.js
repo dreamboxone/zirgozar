@@ -291,6 +291,11 @@ var FA = {
 	'Update': 'به‌روزرسانی',
 	'Downloading. The page will show the new size when it is done.':
 		'در حال دانلود. وقتی تمام شد، حجم جدید در همین صفحه نشان داده می‌شود.',
+	'Downloading from the addresses shown. Press Save & Apply as well, or the automatic update will go back to the saved ones.':
+		'از همین آدرس‌هایی که در صفحه هست دانلود می‌شود. «ذخیره و اعمال» را هم بزنید، وگرنه به‌روزرسانی خودکار دوباره از آدرس‌های ذخیره‌شده می‌گیرد.',
+	'UDP over TCP': 'UDP روی TCP',
+	'UDP is carried inside the TCP connection, for a SOCKS server that takes it that way. Only sing-box does this, so a node with it on is carried by sing-box when there is one.':
+		'UDP درون همان اتصال TCP فرستاده می‌شود، برای سرور ساکسی که UDP را این‌طور می‌پذیرد. این کار فقط از sing-box برمی‌آید، پس اگر sing-box نصب باشد، این نود با sing-box اجرا می‌شود.',
 	'Free space': 'فضای خالی',
 	'Remove both': 'حذف هر دو',
 	'Routing data removed.': 'داده مسیریابی حذف شد.',
@@ -342,16 +347,18 @@ var FA = {
 	'Only for an OpenVPN profile that asks for a user name and password.': 'فقط برای پروفایل OpenVPN که نام کاربری و رمز می‌خواهد.',
 	'OpenVPN password': 'رمز OpenVPN',
 	'OpenVPN key pass phrase': 'رمز کلید OpenVPN',
-	'Only for an OpenVPN profile whose private key is encrypted. Unlocking it needs the openssl-util package, which Router requirements installs.': 'فقط برای پروفایل OpenVPN که کلید خصوصی‌اش رمزدار است. باز کردن آن به بسته openssl-util نیاز دارد که «پیش‌نیازهای روتر» نصب می‌کند.',
+	'Only for an OpenVPN profile whose private key is encrypted.': 'فقط برای پروفایل OpenVPN که کلید خصوصی‌اش رمزدار است.',
 	'A share link, several of them one per line, a whole WireGuard .conf file or an OpenVPN .ovpn profile. Choose a file and its contents are put in the box for you.': 'یک لینک اشتراک‌گذاری، چند لینک هر کدام در یک خط، کل یک فایل conf وایرگارد یا یک پروفایل ovpn اوپن‌وی‌پی‌ان. فایل را انتخاب کنید تا محتوایش خودش داخل کادر بیاید.',
-	'The private key of this OpenVPN profile has a pass phrase. Enter it in the settings of the config.': 'کلید خصوصی این پروفایل OpenVPN رمز دارد. آن را در تنظیمات همین کانفیگ وارد کنید.',
-	'Unlocking the private key of this OpenVPN profile needs the openssl-util package. Press Install dependencies under Router requirements.': 'باز کردن کلید خصوصی این پروفایل OpenVPN به بسته openssl-util نیاز دارد. زیر «پیش‌نیازهای روتر» دکمه نصب پیش‌نیازها را بزنید.',
-	'The pass phrase for the private key of this OpenVPN profile is wrong.': 'رمز کلید خصوصی این پروفایل OpenVPN درست نیست.',
-	'There is no OpenVPN profile to run.': 'پروفایل OpenVPN برای اجرا وجود ندارد.',
+	'An OpenVPN config needs OpenVPN on the router. Press Install dependencies under Router requirements.': 'کانفیگ OpenVPN به خود OpenVPN روی روتر نیاز دارد. زیر «پیش‌نیازهای روتر» دکمه نصب پیش‌نیازها را بزنید.',
+	'This OpenVPN profile uses a TAP device (dev tap). Only TUN profiles are supported.': 'این پروفایل OpenVPN از دستگاه TAP (dev tap) استفاده می‌کند. فقط پروفایل‌های TUN پشتیبانی می‌شوند.',
+	'This OpenVPN profile asks for a user name and password. Enter them in the settings of the config.': 'این پروفایل OpenVPN نام کاربری و رمز می‌خواهد. آن‌ها را در تنظیمات همین کانفیگ وارد کنید.',
+	'There is no AmneziaWG config to run.': 'کانفیگ AmneziaWG برای اجرا وجود ندارد.',
+	'This OpenVPN config was read by an earlier version. Open it on the Node List page and press Save, so that it is read again.':
+		'این کانفیگ OpenVPN را نسخه‌ی قبلی خوانده است. آن را در صفحه‌ی نودها باز کنید و «ذخیره» را بزنید تا دوباره خوانده شود.',
 	'The core refused the new settings, so the tunnel was left running as it was. Check the Runtime Logs page.': 'هسته تنظیمات جدید را نپذیرفت، پس تونل همان‌طور که بود روشن ماند. دلیلش را در صفحه «گزارش اجرا» ببینید.',
 	'sing-box could not run this tunnel, so Xray is carrying it. The Runtime Logs page says why. The official sing-box has no xhttp: install sing-box-lx on the App Update page and choose it under Active core in Basic Settings, or choose Xray there.': 'sing-box نتوانست این تونل را اجرا کند و Xray آن را می‌برد. دلیلش را صفحه «گزارش اجرا» می‌گوید. sing-box رسمی xhttp ندارد: sing-box-lx را از صفحه «به‌روزرسانی» نصب کنید و در تنظیمات پایه زیر «هسته فعال» آن را انتخاب کنید، یا همان‌جا Xray را انتخاب کنید.',
-	'Auto: Xray, and sing-box for a config Xray cannot run. Xray (patterniha): his build first, with QUIC refused as PattN does. sing-box or sing-box-lx: every config through it; if it cannot start, Xray takes over.':
-		'خودکار: Xray، و برای کانفیگی که Xray اجرا نمی‌کند sing-box. Xray (patterniha): اول هستهٔ پترنیها، و QUIC مثل PattN بسته می‌شود. با sing-box یا sing-box-lx همه کانفیگ‌ها با آن اجرا می‌شوند؛ اگر راه نیفتد، Xray جایش را می‌گیرد.',
+	'Auto: Xray, and sing-box for a config Xray cannot run. Xray (patterniha): his build first, with QUIC refused as PattN does. sing-box or sing-box-lx: every config through it; if it cannot start, Xray takes over. An OpenVPN config is always carried by OpenVPN itself, beside whichever is chosen here; install it on the App Update page.':
+		'خودکار: Xray، و برای کانفیگی که Xray اجرا نمی‌کند sing-box. Xray (patterniha): اول هستهٔ پترنیها، و QUIC مثل PattN بسته می‌شود. با sing-box یا sing-box-lx همه کانفیگ‌ها با آن اجرا می‌شوند؛ اگر راه نیفتد، Xray جایش را می‌گیرد. کانفیگ OpenVPN همیشه با خود OpenVPN اجرا می‌شود، کنار هر هسته‌ای که اینجا انتخاب شده باشد؛ آن را از صفحه‌ی «به‌روزرسانی» نصب کنید.',
 	'Direct addresses and domains': 'آدرس‌ها و دامنه‌های مستقیم',
 	'These sites always go straight out, never through the tunnel. A name covers everything under it: example.com also covers www.example.com. Xray’s own forms — full:, regexp:, keyword: — are accepted as written.':
 		'این سایت‌ها همیشه مستقیم می‌روند و هیچ‌وقت از تونل رد نمی‌شوند. هر دامنه زیردامنه‌هایش را هم شامل می‌شود: ‎example.com‎ شامل ‎www.example.com‎ هم هست. شکل‌های خود Xray — ‎full:‎، ‎regexp:‎، ‎keyword:‎ — همان‌طور که نوشته شوند پذیرفته می‌شوند.',
@@ -731,9 +738,9 @@ var FA = {
 	'Close window': 'بستن',
 	'Add': 'افزودن',
 	'Default Preproxy': 'پیش‌پراکسی پیش‌فرض',
-	'Locator': 'موقعیت‌یاب',
+	'Geoview': 'موقعیت‌یاب',
 	'Geoview App Path': 'مسیر برنامه Geoview',
-	'Only the Locator page needs it. Empty means this program’s own copy in the folder above.':
+	'Only the Geoview page needs it. Empty means this program’s own copy in the folder above.':
 		'فقط صفحه «موقعیت‌یاب» به آن نیاز دارد. خالی یعنی نسخه خود این برنامه در پوشه بالا.',
 	'Enter something to look for first.': 'اول چیزی برای جست‌وجو وارد کنید.',
 	'Processing, please wait…': 'در حال پردازش، لطفا صبر کنید…',
@@ -881,6 +888,28 @@ var FA = {
 	'This config is not there any more.': 'این کانفیگ دیگر وجود ندارد.',
 	'Back to configs': 'بازگشت به کانفیگ‌ها',
 	'Node Config': 'ویرایش کانفیگ',
+	'New Config': 'ایجاد کانفیگ جدید',
+	'Add file': 'افزودن فایل',
+	'OpenVPN did not connect. The Runtime Logs page says how far it got.': 'OpenVPN وصل نشد. صفحه‌ی «گزارش اجرا» می‌گوید تا کجا پیش رفت.',
+	'OpenVPN is the official client, from the router’s own packages: every OpenVPN config is carried by it and by nothing else. Install, update and remove go through the package manager.':
+		'OpenVPN کلاینت رسمی است و از بسته‌های خود روتر نصب می‌شود: هر کانفیگ OpenVPN فقط با آن اجرا می‌شود. نصب، به‌روزرسانی و حذفش با مدیر بسته‌ی روتر انجام می‌شود.',
+	'This router has neither opkg nor apk, so OpenVPN cannot be installed automatically.': 'این روتر نه opkg دارد نه apk، پس OpenVPN خودکار نصب نمی‌شود.',
+	'OpenVPN profile': 'پروفایل OpenVPN',
+	'The whole .ovpn profile. Choose the file and its contents are put in the box for you.':
+		'کل پروفایل .ovpn. فایل را انتخاب کنید تا محتوایش خودبه‌خود در کادر قرار بگیرد.',
+	'an .ovpn file': 'یک فایل .ovpn',
+	'That is not an OpenVPN profile.': 'این پروفایل OpenVPN نیست.',
+	'Local Address': 'آدرس محلی',
+	'This side’s address in the tunnel, as the server gave it: 10.0.0.2/32, and an IPv6 one after a comma if there is one.':
+		'آدرس این طرف در تونل، همان که سرور داده: مثل 10.0.0.2/32، و اگر آدرس IPv6 هم هست بعد از یک ویرگول.',
+	'Peer Public Key': 'کلید عمومی سرور (Peer)',
+	'Pre-shared Key': 'کلید مشترک (Pre-shared Key)',
+	'Only if the server gave one.': 'فقط اگر سرور داده باشد.',
+	'Three numbers, such as 12,34,56. Empty unless you were told otherwise.':
+		'سه عدد، مثل 12,34,56. خالی بگذارید مگر اینکه گفته شده باشد.',
+	'Keep Alive': 'Keep Alive',
+	'Seconds between keep-alive packets. Empty sends none.':
+		'فاصله‌ی بسته‌های keep-alive به ثانیه. خالی یعنی فرستاده نمی‌شود.',
 	'From Share URL': 'از لینک اشتراک‌گذاری',
 	'Build Share URL': 'ساخت لینک اشتراک‌گذاری',
 	'Generate QRCode': 'ساخت QR کد',

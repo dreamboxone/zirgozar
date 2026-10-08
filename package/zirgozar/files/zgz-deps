@@ -42,6 +42,14 @@ pkg_manager() {
 	return 0
 }
 
+# Is there an OpenVPN profile among the configs added by hand? A profile is
+# kept as the text of the file, so one of its own lines - client, remote, or
+# the block holding its certificate authority - starts a line of it.
+has_ovpn_node() {
+	uci -q show zirgozar 2>/dev/null | grep -qE "(^|='|^[[:space:]]*)(client|remote[[:space:]]|<ca>|<secret>)"
+	return $?
+}
+
 # What is needed, given how this router does firewalling.
 wanted() {
 	echo "curl ca-bundle ip-full"
@@ -51,10 +59,10 @@ wanted() {
 	esac
 	# only needed to install a core later, so not worth failing over
 	echo "unzip"
-	# An OpenVPN profile whose private key has a pass phrase cannot be used
-	# until the key is unlocked, and unlocking it is openssl's job.
-	if uci -q show zirgozar 2>/dev/null | grep -q "ENCRYPTED"; then
-		echo "openssl-util"
+	# An OpenVPN config is carried by OpenVPN itself, and by nothing else.
+	# Any build of it will do; the OpenSSL one when there is none.
+	if [ ! -x /usr/sbin/openvpn ] && ! command -v openvpn >/dev/null 2>&1 && has_ovpn_node; then
+		echo "openvpn-openssl"
 	fi
 	return 0
 }

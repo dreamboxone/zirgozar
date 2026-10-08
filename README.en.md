@@ -148,7 +148,7 @@ status card.
 
 The tabs across the top are PassWall2's, in PassWall2's order: **Basic
 Settings, Configs, Node Subscribe, Other Settings, App Update, Rule Manage,
-Locator, Access Control, Runtime Logs**.
+Geoview, Access Control, Runtime Logs**.
 
 The pages' language, English or Persian, is switched with the language button
 at the top and kept in `lang`.
@@ -190,7 +190,7 @@ The form below has four tabs, in PassWall2's order.
 | Option | In the file | Default | What it does |
 |---|---|---|---|
 | **Main switch** | `enabled` | off | The tunnel on or off. Save and apply for it to take effect; it holds across a reboot |
-| **Active core** | `core_engine` | Auto | *Auto* (value `xray`): Xray, and sing-box on its own for a config Xray cannot run (OpenVPN, AmneziaWG, hysteria2, tuic); or `sing-box` or `sing-box-lx` for every config. sing-box is given the same configuration, translated: same inbounds, rules, DNS and Iran split; hysteria2 and tuic nodes are dialled directly, with no helper program. Not carried over: mux, noise, FakeDNS, mKCP and the poisoned-address inbound; traffic statistics are counted by polling and run a little low. The official sing-box has no xhttp; [sing-box-lx](https://github.com/Leadaxe/sing-box-lx) does, and is installed from the Cores list on this page with one press (its path is **Sing-Box-LX App Path**). If the chosen sing-box is missing or cannot run the tunnel, Xray takes over and the page says so |
+| **Active core** | `core_engine` | Auto | *Auto* (value `xray`): Xray, and sing-box on its own for a config Xray cannot run (AmneziaWG, hysteria2, tuic); an OpenVPN config is always carried by OpenVPN itself; or `sing-box` or `sing-box-lx` for every config. sing-box is given the same configuration, translated: same inbounds, rules, DNS and Iran split; hysteria2 and tuic nodes are dialled directly, with no helper program. Not carried over: mux, noise, FakeDNS, mKCP and the poisoned-address inbound; traffic statistics are counted by polling and run a little low. The official sing-box has no xhttp; [sing-box-lx](https://github.com/Leadaxe/sing-box-lx) does, and is installed from the Cores list on this page with one press (its path is **Sing-Box-LX App Path**). If the chosen sing-box is missing or cannot run the tunnel, Xray takes over and the page says so |
 | **Node** | `node` | Auto (fastest) | Auto measures the configs and uses the fastest. A config chosen here - one added by hand or one from a subscription - is used as it is, and nothing is measured. A subscription's config is kept by what it is, and each time the list is read it is found again as PassWall2 finds it: the same config; then protocol, address and port; address and port; address; name. When none is left, the subscription's first config, and the log says so |
 | **Preproxy** | `preproxy_enabled` | off | Every config the tunnel may choose dials out through a config of yours first — PassWall2's pre-proxy. For configs that cannot be reached from here directly, or to hide which ones are being used. With it on, the first-pass handshake is skipped, because no config is reached directly |
 | **Preproxy Node** | `preproxy_node` | — | The config dialled first. Only configs added by hand on Configs |
@@ -385,7 +385,7 @@ fingerprint or CertName, and those are left out.
 `DNS` are deliberately ignored: routing and name lookups are Zirgozar's own
 settings.
 
-**OpenVPN.** A whole `.ovpn` profile can be added by hand: the servers, `proto`, the certificates in `<ca>`, `<cert>` and `<key>`, `tls-crypt`, `tls-crypt-v2` and `tls-auth`, `verify-x509-name`, the ciphers and `auth`, compression, and a user name and password inside `<auth-user-pass>`. A profile that wants a user name and password without carrying them, or whose private key has a pass phrase, gets those in the edit window of its config - the pass phrase needs `openssl-util`, which *Router requirements* installs. sing-box carries it, so it needs a sing-box on the router: while this config is chosen, sing-box carries the whole tunnel by itself and Xray stands aside, even with Xray as the active core. Scripts, pushed routes and DNS in the profile are ignored, and a profile with no certificate authority (a static key) is not read. Like hysteria2 it is chosen by hand: the automatic ranking does not measure it.
+**OpenVPN.** An OpenVPN config is carried by the official OpenVPN client (`openvpn-openssl`) and by nothing else. When it is not on the router, *Router requirements* installs it; until it is, the config does not run and the page says so. The `.ovpn` profile is given to OpenVPN as it is, so every directive the official client knows works: a static key (`<secret>`), `pkcs12`, `socks-proxy` and `http-proxy`, `ping-restart` and `connect-retry`, `tun-mtu`, `mssfix` and `fragment`, and the rest. Only what would act on the router rather than on the connection is taken out: scripts and plugins, the management socket, the routes and DNS the profile would install, and the device name. What goes through the tunnel is this program's decision, not the profile's. OpenVPN makes the device `zgzovpn` and the core's way out for this node is bound to it, so the Iran split, DNS and the rules work as for any other node, whether the active core is Xray or sing-box. A user name and password, and the pass phrase of an encrypted private key, go in the settings of the config when the profile does not carry them. An OpenVPN config can be built field by field under **Add**, or read from its file with **Add file**. A TAP profile (`dev tap`) is not supported. Like hysteria2 it is chosen by hand: the automatic ranking does not measure it.
 
 **AmneziaWG.** A WireGuard `.conf` that carries any of the AmneziaWG lines - `Jc`, `Jmin`, `Jmax`, `S1` to `S4`, `H1` to `H4` (a number or a range) and the decoy packets `I1` to `I5` - is an AmneziaWG node, version 2 or 3. Xray cannot speak it, and neither can the official sing-box: it is carried by [sing-box-lx](https://github.com/Leadaxe/sing-box-lx). While this config is chosen, sing-box-lx carries the whole tunnel by itself and Xray stands aside. Without sing-box-lx installed the page says so. Chosen by hand, like hysteria2 and OpenVPN.
 
@@ -543,7 +543,7 @@ be made.
 | Card | What it shows |
 |---|---|
 | **App Update** | This program's version and whether a newer one is published. **Update to …** downloads the new version from GitHub, checks it against that release's checksums and installs it with the router's own package manager (apk or opkg); the settings are kept, the tunnel comes back if it was on, and the page reloads by itself |
-| **Cores** | Xray, Xray (patterniha), sing-box, hysteria, Geoview, warp-plus and Vwarp: what is installed, what each project has published, **Check update**, **Install / Update to …**, **Remove**. An update is only offered for something actually newer. Beside Xray is a list of its recent releases, pre-releases included, with **Install this version**. Of the Xray cores on the router the **newest** is always used; to pin one, put its path in Xray App Path. sing-box and hysteria are only for configs that speak hysteria2 or tuic, which Xray does not; Geoview only for the Locator page; warp-plus only for WARP configs, and its download is checked against the checksum its release publishes; Vwarp only for WARP over MASQUE or with noize. **Xray (patterniha)** is [patterniha/Xray-core](https://github.com/patterniha/Xray-core): since 26.7 the official Xray refuses VLESS and Trojan without TLS to a public address - the configs that go over Cloudflare's plain-HTTP ports such as 80 and 8080, with no SNI for a filter to read - and this build takes them. It is installed beside the official one; every configuration is offered to every Xray on the router, and the first that accepts it runs it |
+| **Cores** | Xray, Xray (patterniha), sing-box, hysteria, Geoview, warp-plus and Vwarp: what is installed, what each project has published, **Check update**, **Install / Update to …**, **Remove**. An update is only offered for something actually newer. Beside Xray is a list of its recent releases, pre-releases included, with **Install this version**. Of the Xray cores on the router the **newest** is always used; to pin one, put its path in Xray App Path. sing-box and hysteria are only for configs that speak hysteria2 or tuic, which Xray does not; Geoview only for the Geoview page; warp-plus only for WARP configs, and its download is checked against the checksum its release publishes; Vwarp only for WARP over MASQUE or with noize. **Xray (patterniha)** is [patterniha/Xray-core](https://github.com/patterniha/Xray-core): since 26.7 the official Xray refuses VLESS and Trojan without TLS to a public address - the configs that go over Cloudflare's plain-HTTP ports such as 80 and 8080, with no SNI for a filter to read - and this build takes them. It is installed beside the official one; every configuration is offered to every Xray on the router, and the first that accepts it runs it |
 | **Router requirements** | One line: everything is ready, or how many things are missing. **Details** opens the questions put to the running system — transparent proxy, policy routing, HTTPS, the firewall in use, missing packages — with **Install them**. They open by themselves when something is missing |
 
 **App Path**
@@ -599,7 +599,7 @@ The shunt rules are in the **Shunt Rule** tab of Basic Settings.
 | **Direct IP List** | `direct_ip` | — | Addresses that connect directly and never enter the core |
 | **Direct domains** | `direct_domain` | — | Sites that always go straight out. A name covers everything under it; `full:`, `regexp:`, `keyword:` are accepted as written |
 
-### 🔍 4.7 Locator
+### 🔍 4.7 Geoview
 
 PassWall2's Geo View, with its tool Geoview (install it with the button on the
 page, or on App Update).
@@ -784,7 +784,8 @@ happens again.
 | … answered a handshake, but none could complete a request | The configs are there, the traffic is not getting through | Choose again, or another list |
 | Nothing in the list could be read as a node | The subscription's format was not recognised | Check the subscription |
 | There is no node list yet | No subscription read and no config of your own | Add one on Configs |
-| The chosen node speaks hysteria2, tuic, OpenVPN or AmneziaWG, which Xray cannot | sing-box is needed to carry the whole tunnel | Install sing-box (sing-box-lx for AmneziaWG) on App Update |
+| The chosen node speaks hysteria2, tuic or AmneziaWG, which Xray cannot | sing-box is needed to carry the whole tunnel | Install sing-box (sing-box-lx for AmneziaWG) on App Update |
+| The chosen node is OpenVPN and OpenVPN is not on the router | An OpenVPN config is carried by OpenVPN alone | Press Install dependencies under Router requirements |
 | The helper for this node's protocol would not start | The helper core did not run | Check Runtime Logs, or pick another config |
 | A WARP node needs warp-plus | warp-plus is not installed | Install it on App Update |
 | WARP did not connect | warp-plus did not open its port within two minutes: no account could be made, or no WARP address answered | Connect through another config and press Register; turn Scan on or give another endpoint |
@@ -851,7 +852,7 @@ The default config list is the **TOP 100** collection published by
 [@Raydikalx](https://t.me/raydikalx), gathered and kept current as free, public
 work. The Iranian routing data is
 [Chocolate4U/Iran-v2ray-rules](https://github.com/Chocolate4U/Iran-v2ray-rules).
-Locator uses [Geoview](https://github.com/snowie2000/geoview). WARP configs are
+The Geoview page uses [Geoview](https://github.com/snowie2000/geoview). WARP configs are
 carried by [warp-plus](https://github.com/bepass-org/warp-plus). This project
 runs no servers of its own: it measures what those lists offer and picks
 whichever answers fastest from where you are. Without them there would be

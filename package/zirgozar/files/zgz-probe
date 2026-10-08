@@ -565,8 +565,16 @@ select_row() {
 			write_if_changed "$ZGZ_RUN/bridge.new" "$ZGZ_ETC/bridge.json" || true
 			chmod 600 "$ZGZ_ETC/bridge.json" 2>/dev/null || true
 			rm -f "$ZGZ_RUN/bridge.new"
-			printf '{"protocol":"socks","settings":{"servers":[{"address":"127.0.0.1","port":%s}]},"streamSettings":{"network":"tcp"}}\n' \
-				"$_bport" > "$_tmp"
+			if [ "$_proto" = "openvpn" ]; then
+				# OpenVPN is a tunnel device, not a port: the way out is
+				# that device, with the core's own mark so the firewall
+				# leaves it alone.
+				printf '{"protocol":"freedom","settings":{},"streamSettings":{"sockopt":{"interface":"%s","mark":%s,"domainStrategy":"UseIP"}}}\n' \
+					"$ZGZ_OVPN_DEV" "$ZGZ_OUT_MARK" > "$_tmp"
+			else
+				printf '{"protocol":"socks","settings":{"servers":[{"address":"127.0.0.1","port":%s}]},"streamSettings":{"network":"tcp"}}\n' \
+					"$_bport" > "$_tmp"
+			fi
 			;;
 		*)
 			rm -f "$ZGZ_ETC/bridge.json"

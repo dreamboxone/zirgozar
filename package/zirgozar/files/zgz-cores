@@ -10,6 +10,7 @@
 #   zgz-cores install xray|sing-box|hysteria|warp-plus
 #   zgz-cores install zirgozar       (this program, from its latest release)
 #   zgz-cores remove  sing-box|hysteria|warp-plus
+#   zgz-cores install|remove openvpn (through the package manager)
 #
 # Xray is the engine. It is what the configuration generator writes for, what
 # the measurements run through, and what carries the traffic, and one copy of
@@ -75,6 +76,8 @@ asset_for() {
 		geoview)  echo "$_a" | awk '{ print ($2 == "386") ? "i386" : $2 }' ;;
 		# warp-plus: arm7 rather than armv7, soft-float MIPS spelled without a
 		# dash, and nothing for 32-bit x86 or ARM older than v7.
+		# OpenVPN comes from the router's own packages, built for it already.
+		openvpn) [ "$(ovpn_pkg_manager)" != "none" ] && echo pkg || echo - ;;
 		warp-plus|vwarp) echo "$_a" | awk '{ s = $2
 			if (s == "armv7") s = "arm7"
 			else if (s ~ /^mips/) s = s "softfloat"
@@ -462,6 +465,89 @@ install_binary() {
 # from the network: this is printed for a page that polls every few seconds,
 # and asking GitHub three times on every poll would be both rude and slow.
 # `zgz-cores latest` is what refreshes it, in the background.
+# ---------------------------------------------------------------- OpenVPN
+#
+# Not a download like the others: the official client from the router's own
+# package feed, built for it, put in by its package manager - which is also
+# the only thing that can update or remove it cleanly. Whichever build is
+# there, openvpn-openssl or openvpn-mbedtls, is the one kept up to date; the
+# OpenSSL one when there is none.
+
+ovpn_pkg_manager() {
+	if command -v apk >/dev/null 2>&1 && [ -d /lib/apk ]; then
+		echo apk
+	elif command -v opkg >/dev/null 2>&1; then
+		echo opkg
+	else
+		echo none
+	fi
+	return 0
+}
+
+ovpn_pkg() {
+	for _op in openvpn-openssl openvpn-mbedtls openvpn-wolfssl; do
+		case "$(ovpn_pkg_manager)" in
+			apk)  apk info -e "$_op" >/dev/null 2>&1 && { echo "$_op"; return 0; } ;;
+			opkg) opkg list-installed "$_op" 2>/dev/null | grep -q . && { echo "$_op"; return 0; } ;;
+		esac
+	done
+	echo openvpn-openssl
+	return 0
+}
+
+openvpn_path() {
+	[ -x /usr/sbin/openvpn ] && echo /usr/sbin/openvpn
+	return 0
+}
+
+# What the feed offers, from the index the package manager already has: no
+# request of its own.
+ovpn_latest() {
+	_op="$(ovpn_pkg)"
+	case "$(ovpn_pkg_manager)" in
+		apk)  apk search -x "$_op" 2>/dev/null | head -1 | sed "s/^$_op-//; s/-r[0-9]*$//" ;;
+		opkg) opkg list "$_op" 2>/dev/null | head -1 | awk -F' - ' '{ sub(/-[0-9]+$/, "", $2); print $2 }' ;;
+	esac
+	return 0
+}
+
+install_openvpn() {
+	_op="$(ovpn_pkg)"
+	_had="$(openvpn_path)"
+	case "$(ovpn_pkg_manager)" in
+		apk)
+			apk update >/dev/null 2>&1 || true
+			if [ -n "$_had" ]; then apk add -u "$_op" >"$ZGZ_RUN/ovpn-install.log" 2>&1
+			else apk add "$_op" >"$ZGZ_RUN/ovpn-install.log" 2>&1; fi
+			;;
+		opkg)
+			opkg update >/dev/null 2>&1 || true
+			if [ -n "$_had" ]; then opkg upgrade "$_op" >"$ZGZ_RUN/ovpn-install.log" 2>&1
+			else opkg install "$_op" >"$ZGZ_RUN/ovpn-install.log" 2>&1; fi
+			;;
+		*)
+			say_message "This router has neither opkg nor apk, so OpenVPN cannot be installed automatically."
+			return 1
+			;;
+	esac
+	if [ -z "$(openvpn_path)" ]; then
+		say_message "OpenVPN could not be installed: $(tail -1 "$ZGZ_RUN/ovpn-install.log" 2>/dev/null | cut -c1-160)"
+		return 1
+	fi
+	log "OpenVPN $(core_version /usr/sbin/openvpn) installed ($_op)"
+	return 0
+}
+
+remove_openvpn() {
+	_op="$(ovpn_pkg)"
+	case "$(ovpn_pkg_manager)" in
+		apk)  apk del "$_op" >/dev/null 2>&1 ;;
+		opkg) opkg remove "$_op" >/dev/null 2>&1 ;;
+	esac
+	[ -z "$(openvpn_path)" ] && log "OpenVPN removed ($_op)"
+	return 0
+}
+
 LATEST_CACHE="$ZGZ_ETC/cores.latest"
 LATEST_MAX_AGE=43200        # twelve hours
 
@@ -567,6 +653,9 @@ cmd_latest() {
 			[ -n "$_old" ] && printf '%s\t%s\n' "$_c" "$_old" >> "$_tmp"
 		fi
 	done
+	_ol="$(ovpn_latest)"
+	[ -n "$_ol" ] && printf 'openvpn	%s
+' "$_ol" >> "$_tmp"
 	if [ -s "$_tmp" ]; then
 		mv -f "$_tmp" "$LATEST_CACHE"
 	else
@@ -592,7 +681,7 @@ one() {
 			"$(json_escape "$_have")" \
 			"$(json_escape "$_latest")" "$_new" \
 			"$(file_size "$_path")" \
-			"$(case "$_path" in "$DIR"/*|"$(singbox_path)"|"$(singbox_lx_path)"|"$(hysteria_path)"|"$(geoview_path)"|"$(warpplus_path)"|"$(vwarp_path)") echo true ;; *) echo false ;; esac)" \
+			"$(case "$_path" in "$DIR"/*|/usr/sbin/openvpn|"$(singbox_path)"|"$(singbox_lx_path)"|"$(hysteria_path)"|"$(geoview_path)"|"$(warpplus_path)"|"$(vwarp_path)") echo true ;; *) echo false ;; esac)" \
 			"$([ "$(asset_for "$_name")" != "-" ] && echo true || echo false)"
 	else
 		printf '{"name":"%s","installed":false,"path":"","version":"","latest":"%s","update":false,"bytes":0,"ours":false,"arch_ok":%s}' \
@@ -623,7 +712,8 @@ cmd_list() {
 	one hysteria "$_h"; printf ','
 	one geoview "$_g"; printf ","
 	one warp-plus "$_w"; printf ","
-	one vwarp "$_v"
+	one vwarp "$_v"; printf ","
+	one openvpn "$(openvpn_path)"
 	printf ']'
 	# This program itself, for the App Update page: what is installed and
 	# what has been published. It is updated by installing the new package,
@@ -782,11 +872,14 @@ cmd_remove() {
 				log "$1 removed"
 			fi
 			;;
+		openvpn)
+			remove_openvpn
+			;;
 		xray)
 			say_message "Xray is the engine and cannot be removed - it can only be updated."
 			return 1
 			;;
-		*) echo "usage: $0 remove sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|xray-patterniha" >&2; return 1 ;;
+		*) echo "usage: $0 remove sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|xray-patterniha|openvpn" >&2; return 1 ;;
 	esac
 	return 0
 }
@@ -802,10 +895,11 @@ case "${1:-list}" in
 			geoview)  install_geoview ;;
 			warp-plus|vwarp) install_warpplus "$2" ;;
 			xray-patterniha) install_xray_patterniha ;;
+			openvpn)  install_openvpn ;;
 			# This file is among those the install replaces, so nothing
 			# after it may be read from here: it ends the script outright.
 			zirgozar) install_self; exit $? ;;
-			*) echo "usage: $0 install xray|xray-patterniha|sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|zirgozar" >&2; exit 1 ;;
+			*) echo "usage: $0 install xray|xray-patterniha|sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|openvpn|zirgozar" >&2; exit 1 ;;
 		esac
 		;;
 	remove) clear_message; cmd_remove "${2:-}" ;;

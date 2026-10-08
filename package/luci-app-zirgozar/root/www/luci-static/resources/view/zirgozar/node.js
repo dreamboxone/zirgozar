@@ -28,6 +28,7 @@
 'require zirgozar.i18n as i18n';
 'require zirgozar.qr as qr';
 'require zirgozar.ui as pui';
+'require zirgozar.nodelink as nodelink';
 
 var _ = i18n.tr;
 
@@ -39,7 +40,8 @@ var callNodeConfig = rpc.declare({ object: 'luci.zirgozar', method: 'nodeconfig'
 var SCHEMES = {
 	vless: 'vless', vmess: 'vmess', trojan: 'trojan', ss: 'shadowsocks',
 	socks: 'socks', socks5: 'socks', http: 'http', https: 'http',
-	hysteria2: 'hysteria2', hy2: 'hysteria2', tuic: 'tuic', warp: 'warp'
+	hysteria2: 'hysteria2', hy2: 'hysteria2', tuic: 'tuic', warp: 'warp',
+	wireguard: 'wireguard', wg: 'wireguard'
 };
 
 /* Vwarp's disguises for the first packets, lightest first. */
@@ -200,6 +202,14 @@ function parseLink(link) {
 			var ui2 = u.indexOf(':');
 			f.user = ui2 >= 0 ? u.slice(0, ui2) : u; f.password = ui2 >= 0 ? u.slice(ui2 + 1) : '';
 		}
+		/* This program's own query - see do_proxy in zgz-parse. */
+		f.uot = take('uot') == '1' ? '1' : '0';
+		f.type = take('type') || 'tcp'; f.host = take('host'); f.path = take('path');
+		f.service_name = take('serviceName'); f.header_type = take('headerType');
+		var pmode = take('mode');
+		if (f.type == 'grpc') f.grpc_mode = pmode; else f.xhttp_mode = pmode;
+		f.extra = take('extra');
+		if (f.type == 'kcp') { f.kcp_seed = take('seed') || f.path; f.path = ''; }
 	} else if (proto == 'hysteria2') {
 		f.password = dec(cred); f.sni = take('sni');
 		f.hy2_obfs = take('obfs'); f.hy2_obfs_password = take('obfs-password');
@@ -209,9 +219,39 @@ function parseLink(link) {
 		f.uuid = ti >= 0 ? t.slice(0, ti) : t; f.password = ti >= 0 ? t.slice(ti + 1) : '';
 		f.sni = take('sni'); f.alpn = take('alpn'); f.cc = take('congestion_control');
 		f.insecure = take('allow_insecure') == '1' ? '1' : '0';
+	} else if (proto == 'wireguard') {
+		/* wireguard://PRIVATE-KEY@endpoint?address=…&publickey=… - see
+		   do_wireguard in zgz-parse. */
+		f.wg_secret = dec(cred);
+		f.wg_address = take('address');
+		f.wg_pubkey = take('publickey') || take('public-key');
+		f.wg_psk = take('presharedkey'); f.wg_reserved = take('reserved');
+		f.wg_mtu = take('mtu'); f.wg_keepalive = take('keepalive');
 	}
 	f.rest = q;
 	return f;
+}
+
+/* The transport, as a vless link writes it. */
+function transportQuery(f, q) {
+	q.type = f.type;
+	if (f.type == 'ws' || f.type == 'httpupgrade' || f.type == 'http' || f.type == 'xhttp' ||
+	    (f.type == 'tcp' && f.header_type == 'http')) { q.host = f.host; q.path = f.path; }
+	if (f.type == 'grpc') { q.serviceName = f.service_name; q.mode = f.grpc_mode; }
+	if (f.type == 'xhttp') { q.mode = f.xhttp_mode; q.extra = f.extra; }
+	if (f.type == 'tcp' || f.type == 'kcp') q.headerType = f.header_type;
+	if (f.type == 'kcp') q.seed = f.kcp_seed;
+}
+
+/* An empty node, for Add: every field a value the page can show, whichever
+   protocol is chosen first. */
+function blankNode() {
+	return {
+		proto: 'vless', rest: {}, address: '', port: '',
+		encryption: 'none', security: 'none', type: 'tcp', header_type: 'none',
+		alter_id: '0', vmess_security: 'auto', ss_method: 'aes-128-gcm', uot: '0', insecure: '0',
+		warp_mode: 'warp', warp_country: 'AT', warp_scan: '1', warp_noize: 'off'
+	};
 }
 
 /* And back together. */
@@ -230,6 +270,10 @@ function buildLink(f, name) {
 		Object.keys(q).forEach(function(k) { j[k] = q[k]; });
 		return 'vmess://' + b64enc(JSON.stringify(j));
 	}
+
+	/* An OpenVPN node is its profile, kept as the file it came from. */
+	if (p == 'openvpn')
+		return String(f.ovpn_profile || '').trim();
 
 	if (p == 'warp') {
 		q.mode = f.warp_mode || 'warp';
@@ -252,13 +296,7 @@ function buildLink(f, name) {
 		q.security = f.security;
 		if (f.security != 'none') { q.sni = f.sni; q.fp = f.fp; q.alpn = f.alpn; }
 		if (f.security == 'reality') { q.pbk = f.pbk; q.sid = f.sid; q.spx = f.spx; }
-		q.type = f.type;
-		if (f.type == 'ws' || f.type == 'httpupgrade' || f.type == 'http' || f.type == 'xhttp' ||
-		    (f.type == 'tcp' && f.header_type == 'http')) { q.host = f.host; q.path = f.path; }
-		if (f.type == 'grpc') { q.serviceName = f.service_name; q.mode = f.grpc_mode; }
-		if (f.type == 'xhttp') { q.mode = f.xhttp_mode; q.extra = f.extra; }
-		if (f.type == 'tcp' || f.type == 'kcp') q.headerType = f.header_type;
-		if (f.type == 'kcp') q.seed = f.kcp_seed;
+		transportQuery(f, q);
 		var cred = p == 'vless' ? f.uuid : f.password;
 		var qs = buildQuery(q);
 		return p + '://' + enc(cred) + '@' + hp + (qs ? '?' + qs : '') + frag;
@@ -270,7 +308,13 @@ function buildLink(f, name) {
 	}
 	if (p == 'socks' || p == 'http') {
 		var auth = f.user ? enc(f.user) + ':' + enc(f.password) + '@' : '';
-		return p + '://' + auth + hp + frag;
+		/* Plain TCP says nothing, so a link like any other client's comes out
+		   unless something else was chosen. */
+		if ((f.type || 'tcp') != 'tcp' || (f.header_type && f.header_type != 'none'))
+			transportQuery(f, q);
+		if (p == 'socks' && f.uot == '1') q.uot = '1';
+		var qs5 = buildQuery(q);
+		return p + '://' + auth + hp + (qs5 ? '?' + qs5 : '') + frag;
 	}
 	if (p == 'hysteria2') {
 		q.sni = f.sni; q.obfs = f.hy2_obfs; q['obfs-password'] = f.hy2_obfs ? f.hy2_obfs_password : '';
@@ -283,6 +327,12 @@ function buildLink(f, name) {
 		q.allow_insecure = f.insecure == '1' ? '1' : '';
 		var qs4 = buildQuery(q);
 		return 'tuic://' + enc(f.uuid) + ':' + enc(f.password) + '@' + hp + (qs4 ? '?' + qs4 : '') + frag;
+	}
+	if (p == 'wireguard') {
+		q.address = f.wg_address; q.publickey = f.wg_pubkey; q.presharedkey = f.wg_psk;
+		q.reserved = f.wg_reserved; q.mtu = f.wg_mtu; q.keepalive = f.wg_keepalive;
+		var qs6 = buildQuery(q);
+		return 'wireguard://' + enc(f.wg_secret) + '@' + hp + (qs6 ? '?' + qs6 : '') + frag;
 	}
 	return '';
 }
@@ -408,8 +458,23 @@ return view.extend({
 	render: function() {
 		i18n.setLang(uci.get('zirgozar', 'config', 'lang'));
 
-		var sid = new URLSearchParams(window.location.search).get('sid') || '';
+		var params = new URLSearchParams(window.location.search);
+		var sid = params.get('sid') || '';
 		var back = L.url('admin', 'services', 'zirgozar', 'nodes');
+		/* Add, and Add file: a node of this page's own, in its copy of the
+		   configuration only. Save is what puts it in the file; Back leaves
+		   nothing. Add fills in the fields; Add file takes a link or a whole
+		   file - a WireGuard .conf, an OpenVPN .ovpn, an Xray .json, a Clash
+		   .yaml - exactly as Node List's window took it. */
+		var isNew = !sid && (params.get('new') == '1' || params.get('new') == 'file');
+		var isFile = isNew && params.get('new') == 'file';
+		if (isNew) {
+			do {
+				sid = 'n' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
+			} while (uci.get('zirgozar', sid));
+			uci.add('zirgozar', 'node', sid);
+			uci.set('zirgozar', sid, 'enabled', '1');
+		}
 		if (!sid || uci.get('zirgozar', sid) == null || uci.get('zirgozar', sid, '.type') != 'node') {
 			return pui.page([ E('div', { 'class': 'mk-alert' }, [
 				E('p', {}, _('This config is not there any more.')),
@@ -418,11 +483,11 @@ return view.extend({
 		}
 
 		var link = uci.get('zirgozar', sid, 'link') || '';
-		var f = parseLink(link);
+		var f = isFile ? null : (isNew ? blankNode() : parseLink(link));
 		var structured = !!f;
 
 		var m = new form.Map('zirgozar');
-		var s = m.section(form.NamedSection, sid, 'node', _('Node Config'));
+		var s = m.section(form.NamedSection, sid, 'node', isFile ? _('Add file') : (isNew ? _('New Config') : _('Node Config')));
 		s.anonymous = true;
 		s.addremove = false;
 
@@ -437,6 +502,23 @@ return view.extend({
 		uci.sections('zirgozar', 'node').forEach(function(n) { if (n.group) groups[n.group] = true; });
 		Object.keys(groups).sort().forEach(function(g) { o.value(g); });
 
+		if (isFile) {
+			o = s.option(form.TextValue, 'link', _('Share link'),
+				_('A share link, several of them one per line, a whole WireGuard .conf file or an OpenVPN .ovpn profile. Choose a file and its contents are put in the box for you.'));
+			o.rows = 8;
+			o.monospace = true;
+			o.rmempty = false;
+			o.placeholder = 'vless://…';
+			nodelink.withBrowse(o, _('a .conf file, or a list of links'));
+			o.validate = function(section_id, value) {
+				if (!value) return true;
+				/* A WireGuard .conf is a file, not a link: it has no :// in it. */
+				if (!/:\/\//.test(value) && !/^\s*\[(interface|peer)\]/im.test(value) && !/^\s*(client\s*$|remote\s+\S+|<ca>)/im.test(value))
+					return _('That does not look like a share link');
+				return true;
+			};
+		}
+
 		/* A field of the link, not a setting: read from the parsed link and
 		   written back to it. */
 		function field(type, key, title, desc) {
@@ -447,7 +529,7 @@ return view.extend({
 			return x;
 		}
 
-		if (!structured) {
+		if (!structured && !isFile) {
 			/* A whole file, or several links: edited as text. */
 			o = s.option(form.TextValue, 'link', _('Share link'),
 				_('A share link, several of them one per line, a whole WireGuard .conf file or an OpenVPN .ovpn profile.'));
@@ -468,17 +550,49 @@ return view.extend({
 				o = s.option(form.Value, 'ovpn_keypass', _('OpenVPN key pass phrase'));
 				o.password = true;
 			}
-		} else {
+		} else if (structured) {
 			var XR = [ 'vless', 'vmess', 'trojan', 'shadowsocks', 'socks', 'http' ];
 			var TLSP = [ 'vless', 'vmess', 'trojan' ];
+			/* What has a transport to choose: the TLS protocols, and SOCKS and
+			   HTTP, as in PassWall2. */
+			var TRP = TLSP.concat([ 'socks', 'http' ]);
 
 			o = field(form.ListValue, 'proto', _('Protocol'));
 			[ [ 'vless', 'VLESS' ], [ 'vmess', 'VMess' ], [ 'trojan', 'Trojan' ], [ 'shadowsocks', 'Shadowsocks' ],
-			  [ 'socks', 'Socks' ], [ 'http', 'HTTP' ], [ 'hysteria2', 'Hysteria2' ], [ 'tuic', 'TUIC' ], [ 'warp', 'WARP' ] ]
+			  [ 'socks', 'Socks' ], [ 'http', 'HTTP' ], [ 'hysteria2', 'Hysteria2' ], [ 'tuic', 'TUIC' ], [ 'warp', 'WARP' ],
+			  [ 'wireguard', 'WireGuard' ], [ 'openvpn', 'OpenVPN' ] ]
 				.forEach(function(v) { o.value(v[0], v[1]); });
 
-			/* Every protocol but WARP has a server of its own. */
-			var SERVERS = XR.concat([ 'hysteria2', 'tuic' ]);
+			/* --------------------------------------------------- OpenVPN
+			   The profile as it is, pasted or read from its file, and what it
+			   may not carry itself: an account's user name and password, and
+			   the pass phrase of an encrypted key. Each is left empty when the
+			   profile needs none. */
+			o = field(form.TextValue, 'ovpn_profile', _('OpenVPN profile'),
+				_('The whole .ovpn profile. Choose the file and its contents are put in the box for you.'));
+			o.rows = 10;
+			o.monospace = true;
+			o.rmempty = false;
+			o.depends('_proto', 'openvpn');
+			nodelink.withBrowse(o, _('an .ovpn file'));
+			o.validate = function(section_id, value) {
+				if (!value) return true;
+				return /^\s*(client\s*$|remote\s+\S+|<ca>)/im.test(value) ? true : _('That is not an OpenVPN profile.');
+			};
+			o = s.option(form.Value, 'ovpn_user', _('OpenVPN user name'),
+				_('Only for an OpenVPN profile that asks for a user name and password.'));
+			o.depends('_proto', 'openvpn');
+			o = s.option(form.Value, 'ovpn_pass', _('OpenVPN password'));
+			o.password = true;
+			o.depends('_proto', 'openvpn');
+			o = s.option(form.Value, 'ovpn_keypass', _('OpenVPN key pass phrase'),
+				_('Only for an OpenVPN profile whose private key is encrypted.'));
+			o.password = true;
+			o.depends('_proto', 'openvpn');
+
+			/* A server of its own for all but WARP and OpenVPN, whose profile
+			   names its own. */
+			var SERVERS = XR.concat([ 'hysteria2', 'tuic', 'wireguard' ]);
 			o = field(form.Value, 'address', _('Address (Support Domain Name)'));
 			o.rmempty = false;
 			SERVERS.forEach(function(p) { o.depends('_proto', p); });
@@ -486,6 +600,41 @@ return view.extend({
 			o.datatype = 'port';
 			o.rmempty = false;
 			SERVERS.forEach(function(p) { o.depends('_proto', p); });
+
+			/* ------------------------------------------------- WireGuard
+			   The fields of a [Interface] and [Peer] pair, entered by hand.
+			   A whole .conf is given with Add file instead. */
+			o = field(form.Value, 'wg_secret', _('Private Key'));
+			o.password = true;
+			o.rmempty = false;
+			o.depends('_proto', 'wireguard');
+			o = field(form.Value, 'wg_address', _('Local Address'),
+				_('This side’s address in the tunnel, as the server gave it: 10.0.0.2/32, and an IPv6 one after a comma if there is one.'));
+			o.rmempty = false;
+			o.placeholder = '10.0.0.2/32';
+			o.depends('_proto', 'wireguard');
+			o = field(form.Value, 'wg_pubkey', _('Peer Public Key'));
+			o.rmempty = false;
+			o.depends('_proto', 'wireguard');
+			o = field(form.Value, 'wg_psk', _('Pre-shared Key'), _('Only if the server gave one.'));
+			o.password = true;
+			o.depends('_proto', 'wireguard');
+			o = field(form.Value, 'wg_reserved', _('Reserved'),
+				_('Three numbers, such as 12,34,56. Empty unless you were told otherwise.'));
+			o.depends('_proto', 'wireguard');
+			o.validate = function(section_id, value) {
+				return (!value || /^\d{1,3},\d{1,3},\d{1,3}$/.test(value)) ? true : _('Three numbers with commas between them.');
+			};
+			o = field(form.Value, 'wg_mtu', 'MTU');
+			o.datatype = 'range(576,9200)';
+			o.placeholder = '1420';
+			o.depends('_proto', 'wireguard');
+			o = field(form.Value, 'wg_keepalive', _('Keep Alive'), _('Seconds between keep-alive packets. Empty sends none.'));
+			o.datatype = 'uinteger';
+			o.depends('_proto', 'wireguard');
+			o = s.option(form.Flag, 'warpplus', _('Carry with warp-plus'),
+				_('warp-plus sends junk ahead of every WireGuard handshake, which gets it past a filter that drops WireGuard on sight. It needs warp-plus, from App Update. As a pre-proxy or a landing node, the config is still carried by Xray.'));
+			o.depends('_proto', 'wireguard');
 
 			/* ------------------------------------------------------ WARP */
 			o = field(form.ListValue, 'warp_mode', _('Mode'),
@@ -574,6 +723,11 @@ return view.extend({
 			o.password = true;
 			[ 'trojan', 'shadowsocks', 'socks', 'http', 'hysteria2', 'tuic' ].forEach(function(p) { o.depends('_proto', p); });
 
+			o = field(form.Flag, 'uot', _('UDP over TCP'),
+				_('UDP is carried inside the TCP connection, for a SOCKS server that takes it that way. Only sing-box does this, so a node with it on is carried by sing-box when there is one.'));
+			/* sing-box's socks has no transport, so plain TCP only. */
+			o.depends({ '_proto': 'socks', '_type': 'tcp', '_header_type': 'none' });
+
 			o = field(form.Value, 'encryption', _('Encrypt Method (encryption)'));
 			o.placeholder = 'none';
 			o.depends('_proto', 'vless');
@@ -655,10 +809,10 @@ return view.extend({
 			[ [ 'tcp', 'RAW (TCP)' ], [ 'ws', 'WebSocket' ], [ 'grpc', 'gRPC' ], [ 'http', 'HTTP/2' ],
 			  [ 'httpupgrade', 'HTTPUpgrade' ], [ 'xhttp', 'XHTTP' ], [ 'kcp', 'mKCP' ] ]
 				.forEach(function(v) { o.value(v[0], v[1]); });
-			TLSP.forEach(function(p) { o.depends('_proto', p); });
+			TRP.forEach(function(p) { o.depends('_proto', p); });
 
 			function onType(x, types) {
-				TLSP.forEach(function(p) { types.forEach(function(t) { x.depends({ '_proto': p, '_type': t }); }); });
+				TRP.forEach(function(p) { types.forEach(function(t) { x.depends({ '_proto': p, '_type': t }); }); });
 			}
 
 			o = field(form.ListValue, 'header_type', _('Camouflage Type'));
@@ -667,11 +821,11 @@ return view.extend({
 
 			o = field(form.Value, 'host', 'Host');
 			onType(o, [ 'ws', 'httpupgrade', 'http', 'xhttp' ]);
-			TLSP.forEach(function(p) { o.depends({ '_proto': p, '_type': 'tcp', '_header_type': 'http' }); });
+			TRP.forEach(function(p) { o.depends({ '_proto': p, '_type': 'tcp', '_header_type': 'http' }); });
 
 			o = field(form.Value, 'path', 'Path');
 			onType(o, [ 'ws', 'httpupgrade', 'http', 'xhttp' ]);
-			TLSP.forEach(function(p) { o.depends({ '_proto': p, '_type': 'tcp', '_header_type': 'http' }); });
+			TRP.forEach(function(p) { o.depends({ '_proto': p, '_type': 'tcp', '_header_type': 'http' }); });
 
 			o = field(form.Value, 'service_name', _('Service Name'));
 			onType(o, [ 'grpc' ]);
@@ -783,6 +937,37 @@ return view.extend({
 				return parse.apply(this, arguments).then(function() {
 					var built = buildLink(f, uci.get('zirgozar', sid, 'name') || f.name || '');
 					if (built) uci.set('zirgozar', sid, 'link', built);
+					/* A profile has no #name: its comment or its server names it. */
+					if (built && f.proto == 'openvpn' && !uci.get('zirgozar', sid, 'name')) {
+						var got = nodelink.nameFromLink(built);
+						if (got) uci.set('zirgozar', sid, 'name', got);
+					}
+				});
+			};
+		}
+
+		/* A link or a file is kept as it was given, and named from it when no
+		   name was typed. */
+		if (isFile) {
+			var parseFile = m.parse;
+			m.parse = function() {
+				return parseFile.apply(this, arguments).then(function() {
+					if (uci.get('zirgozar', sid, 'name')) return;
+					var got = nodelink.nameFromLink(uci.get('zirgozar', sid, 'link'));
+					if (got) uci.set('zirgozar', sid, 'name', got);
+				});
+			};
+		}
+
+		/* Once an added node is saved it is an ordinary one: the address
+		   names it, so that Save & Apply's reload, or the browser's, opens
+		   this node again rather than another empty one. */
+		if (isNew) {
+			var save = m.save;
+			m.save = function() {
+				return save.apply(this, arguments).then(function(r) {
+					window.history.replaceState(null, '', L.url('admin', 'services', 'zirgozar', 'node') + '?sid=' + encodeURIComponent(sid));
+					return r;
 				});
 			};
 		}

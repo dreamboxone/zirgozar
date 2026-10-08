@@ -30,7 +30,8 @@
 //   api=PORT       the clash API port the statistics are read from
 //   mark=N         the mark every connection the core opens carries
 //   level=LEVEL    the log level, in Xray's words
-//   bridge=FILE    the hysteria2 or tuic server the chosen node is, if it is one
+//   bridge=FILE    the hysteria2, tuic or AmneziaWG server the chosen node is,
+//                  if it is one
 //   bridgeport=N   the local port Xray would have been given for it
 
 import { stdin, stderr, popen, stat, mkdir, readfile, writefile, unlink } from 'fs';
@@ -82,98 +83,6 @@ let GEOVIEW = args.geoview;
 let GEODIR = args.geodir;
 let RSDIR = args.rsdir ?? '/var/run/zirgozar/rs';
 
-// ----------------------------------------------------------------- OpenVPN
-
-// A pass phrase in a shell word.
-function sq(s) {
-	return `'${replace(`${s}`, "'", "'\\''")}'`;
-}
-
-// The private key of an OpenVPN profile, ready for sing-box, which cannot
-// open one that has a pass phrase. Unlocked in a file in the RAM disk that
-// is gone a moment later; the key is stored as it came and nothing unlocked
-// is left on flash.
-function ovpn_key(pem, pass) {
-	if (!match(pem, /ENCRYPTED/))
-		return pem;
-	if (!pass) {
-		stderr.write('error: The private key of this OpenVPN profile has a pass phrase. Enter it in the settings of the config.\n');
-		exit(2);
-	}
-	mkdir(RSDIR);
-	let f = `${RSDIR}/.ovpnkey`;
-	writefile(f, pem + '\n');
-	let p = popen(`ZGZ_KEYPASS=${sq(pass)} sh '${args.lib ?? '/usr/libexec'}/zgz-ovpnkey' < '${f}'; echo "rc=$?"`, 'r');
-	let out = p.read('all');
-	p.close();
-	unlink(f);
-	let m = match(out, /rc=([0-9]+)\s*$/);
-	let rc = m ? int(m[1]) : 1;
-	if (rc == 3) {
-		stderr.write('error: Unlocking the private key of this OpenVPN profile needs the openssl-util package. Press Install dependencies under Router requirements.\n');
-		exit(2);
-	}
-	if (rc != 0) {
-		stderr.write('error: The pass phrase for the private key of this OpenVPN profile is wrong.\n');
-		exit(2);
-	}
-	return trim(replace(out, /rc=[0-9]+\s*$/, ''));
-}
-
-// A certificate or key as zgz-parse wrote it: a bar where each line ended.
-function pem(s) {
-	return replace(s, '|', '\n');
-}
-
-// The endpoint for one profile record, as zgz-parse wrote it.
-function ovpn_endpoint(b, tag, mark) {
-	let tls = {
-		certificate: [ pem(b.ca) ],
-		version_min: '1.2'
-	};
-	if (b.cert && b.key) {
-		tls.client_certificate = [ pem(b.cert) ];
-		tls.client_key = [ ovpn_key(pem(b.key), b.keypass) ];
-	}
-	if (b.server_name) {
-		tls.server_name = b.server_name;
-		tls.server_name_type = b.server_name_type ?? 'name';
-	}
-	if (b.wrap && b.wrap_key) {
-		tls.control_wrap = { type: b.wrap, key: [ pem(b.wrap_key) ] };
-		if (b.wrap_direction)
-			tls.control_wrap.direction = b.wrap_direction;
-	}
-
-	let e = { type: 'openvpn-client', tag, tls, routing_mark: mark };
-	if (type(b.servers) == 'array' && length(b.servers) > 1) {
-		e.servers = map(b.servers, (s) => ({ server: s.server, server_port: int(s.port), network: s.network }));
-	} else {
-		e.server = b.server;
-		e.server_port = int(b.port);
-		e.network = b.network ?? 'udp';
-	}
-	if (b.username) {
-		e.username = b.username;
-		e.password = b.password ?? '';
-	}
-	if (b.data_ciphers)
-		e.data_ciphers = b.data_ciphers;
-	if (b.cipher && !match(b.cipher, /GCM|CHACHA/i))
-		e.data_ciphers_fallback = b.cipher;
-	if (b.auth)
-		e.auth = b.auth;
-	if (b.compress && b.compress != 'stub') {
-		e.compression = b.compress;
-		e.allow_compression = 'yes';
-	}
-	if (b.comp_lzo) {
-		e.compression_lzo = b.comp_lzo;
-		e.allow_compression = 'yes';
-	}
-	return e;
-}
-
 // An AmneziaWG node: a WireGuard endpoint with the obfuscation fields of
 // sing-box-lx in it. Only that build has them; a sing-box without them refuses
 // the configuration, which is how this learns it cannot be used.
@@ -191,25 +100,20 @@ function awg_endpoint(b, tag, mark) {
 	return e;
 }
 
-// The endpoint a profile record is, whichever kind it is.
-function bridge_endpoint(b, tag, mark) {
-	return b.type == 'amneziawg' ? awg_endpoint(b, tag, mark) : ovpn_endpoint(b, tag, mark);
-}
-
 // zgz-sbconfig mode=bridge: the whole configuration of the helper that offers
-// one OpenVPN or AmneziaWG server as a SOCKS port on loopback - what
-// zgz-bridge runs when Xray is the engine.
+// one AmneziaWG server as a SOCKS port on loopback - what zgz-bridge runs when
+// Xray is the engine. OpenVPN is not here: the official client carries it.
 if (args.mode == 'bridge') {
 	let raw = readfile(args.bridge ?? '');
 	let b = raw ? json(raw) : null;
-	if (type(b) != 'object' || (b.type != 'openvpn' && b.type != 'amneziawg')) {
-		stderr.write('error: There is no OpenVPN profile to run.\n');
+	if (type(b) != 'object' || b.type != 'amneziawg') {
+		stderr.write('error: There is no AmneziaWG config to run.\n');
 		exit(2);
 	}
 	print(sprintf('%J', {
 		log: { level: 'warn', timestamp: true },
 		inbounds: [{ type: 'mixed', tag: 'in', listen: '127.0.0.1', listen_port: int(args.bridgeport ?? 10808) }],
-		endpoints: [ bridge_endpoint(b, 'out', int(args.mark ?? 255)) ],
+		endpoints: [ awg_endpoint(b, 'out', int(args.mark ?? 255)) ],
 		route: { final: 'out' }
 	}), '\n');
 	exit(0);
@@ -403,8 +307,8 @@ function native_bridge(o) {
 	let b = raw ? json(raw) : null;
 	if (type(b) != 'object')
 		return null;
-	if (b.type == 'openvpn' || b.type == 'amneziawg')
-		return bridge_endpoint(b, 'proxy', MARK);
+	if (b.type == 'amneziawg')
+		return awg_endpoint(b, 'proxy', MARK);
 	let tls = { enabled: true, server_name: b.sni ? b.sni : b.server };
 	if (b.insecure)
 		tls.insecure = true;
@@ -431,8 +335,8 @@ function conv_outbound(o) {
 	let tag = o.tag;
 	let nb = native_bridge(o);
 	if (nb) {
-		// An OpenVPN profile is an endpoint in sing-box, not an outbound.
-		push(nb.type == 'openvpn-client' || nb.type == 'wireguard' ? endpoints : outbounds, nb);
+		// An AmneziaWG node is an endpoint in sing-box, not an outbound.
+		push(nb.type == 'wireguard' ? endpoints : outbounds, nb);
 		out_tags[tag] = true;
 		return;
 	}
@@ -514,6 +418,10 @@ function conv_outbound(o) {
 				r.username = u.user;
 				r.password = u.pass;
 			}
+			// Written by zgz-parse for a node that asks for it; Xray has
+			// no such thing and passes over the key.
+			if (v.udpOverTcp)
+				r.udp_over_tcp = true;
 			break;
 		case 'http':
 			r.type = 'http';
@@ -531,6 +439,10 @@ function conv_outbound(o) {
 		let tr = transport_of(ss, tag);
 		if (tr === false)
 			return;
+		// sing-box's socks, http and shadowsocks have no transport field and
+		// refuse the whole configuration over one that does.
+		if (tr && (proto == 'socks' || proto == 'http' || proto == 'shadowsocks'))
+			return fail_out(tag, `a ${proto} node over ${tr.type} has no sing-box equivalent`);
 		let tls = tls_of(ss);
 		if (tls)
 			r.tls = tls;
@@ -543,6 +455,9 @@ function conv_outbound(o) {
 	if (sock.dialerProxy)
 		r.detour = sock.dialerProxy;
 	r.routing_mark = sock.mark ?? MARK;
+	// An OpenVPN node's way out: its tunnel device, which OpenVPN keeps.
+	if (sock.interface)
+		r.bind_interface = sock.interface;
 	if (sock.tcpFastOpen)
 		r.tcp_fast_open = true;
 	if (sock.tcpMptcp)

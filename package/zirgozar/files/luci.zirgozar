@@ -706,8 +706,22 @@ method_action() {
 			run_job "Checking for new versions" "$CORES latest force"
 			;;
 		geo_update)
-			case "$arg" in geoip|geosite|all) : ;; *) arg=all ;; esac
-			run_job "Downloading routing data" "$GEO update $arg"
+			# WHICH;GEOIP-URL;GEOSITE-URL - the addresses as the page shows
+			# them, which may not be saved yet. Until Save & Apply the router
+			# still holds the old ones, and the file the person just chose was
+			# not the one that came down: the lite pair picked, the full pair
+			# downloaded. An address that is not plainly http(s) is left to
+			# the setting. Handed over as arguments, never as shell text.
+			_which="${arg%%;*}"
+			_gip=""; _gsite=""
+			case "$arg" in
+				*\;*\;*) _gip="${arg#*;}"; _gsite="${_gip#*;}"; _gip="${_gip%%;*}" ;;
+			esac
+			case "$_which" in geoip|geosite|all) : ;; *) _which=all ;; esac
+			case "$_gip" in http://*|https://*) : ;; *) _gip="" ;; esac
+			case "$_gsite" in http://*|https://*) : ;; *) _gsite="" ;; esac
+			detach /bin/sh -c 'echo "Downloading routing data" > "$1"; ZGZ_GEOIP_URL="$2" ZGZ_GEOSITE_URL="$3" "$4" update "$5" >/dev/null 2>&1; rm -f "$1"' \
+				sh "$JOB" "$_gip" "$_gsite" "$GEO" "$_which"
 			;;
 		geo_remove)
 			"$GEO" remove >/dev/null 2>&1
@@ -721,7 +735,7 @@ method_action() {
 			;;
 		core_install)
 			case "$arg" in
-				xray|xray-patterniha|sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp) run_job "Installing $arg" "$CORES install $arg" ;;
+				xray|xray-patterniha|sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|openvpn) run_job "Installing $arg" "$CORES install $arg" ;;
 				# One particular Xray, picked from the list on the page.
 				xray@v[0-9]*)
 					_v="${arg#xray@}"
@@ -740,7 +754,7 @@ method_action() {
 			;;
 		core_remove)
 			case "$arg" in
-				sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|xray-patterniha) "$CORES" remove "$arg" >/dev/null 2>&1 ;;
+				sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|xray-patterniha|openvpn) "$CORES" remove "$arg" >/dev/null 2>&1 ;;
 				*) fail "unknown core"; return ;;
 			esac
 			;;

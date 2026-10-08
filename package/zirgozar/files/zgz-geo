@@ -50,10 +50,13 @@ BAK="${ZGZ_GEO_BAK:-/tmp/zirgozar-geo-bak}"
 # What must stay free in memory after a copy is kept.
 BAK_MARGIN=33554432
 
+# ZGZ_GEOIP_URL and ZGZ_GEOSITE_URL are the addresses the settings page had
+# on screen when Update was pressed, saved or not - see geo_update in
+# luci.zirgozar. Everything else reads the setting.
 url_for() {
 	case "$1" in
-		geoip)   cfg geoip_url "$GEOIP_DEFAULT" ;;
-		geosite) cfg geosite_url "$GEOSITE_DEFAULT" ;;
+		geoip)   [ -n "${ZGZ_GEOIP_URL:-}" ] && echo "$ZGZ_GEOIP_URL" || cfg geoip_url "$GEOIP_DEFAULT" ;;
+		geosite) [ -n "${ZGZ_GEOSITE_URL:-}" ] && echo "$ZGZ_GEOSITE_URL" || cfg geosite_url "$GEOSITE_DEFAULT" ;;
 	esac
 	return 0
 }

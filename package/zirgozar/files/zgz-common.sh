@@ -299,7 +299,7 @@ core_engine() {
 }
 
 # The engine that is to carry the tunnel: the one in the settings - except
-# that a node Xray cannot speak at all (OpenVPN, AmneziaWG, hysteria2, tuic)
+# that a node Xray cannot speak at all (AmneziaWG, hysteria2, tuic)
 # is carried by sing-box from end to end, when there is a sing-box that can.
 # Xray stands aside rather than sending everything through sing-box as a
 # SOCKS port beside it: one core, doing the whole job, as PassWall2 does with
@@ -308,10 +308,20 @@ core_engine() {
 #
 # WARP is the exception: what warp-plus does - finding an address, a second
 # WARP behind the first, Psiphon - no sing-box can be told to do, so it stays
-# a program of its own beside whichever engine the settings name.
+# a program of its own beside whichever engine the settings name. OpenVPN is
+# the other: the official client carries it, beside either engine, so that
+# every directive of a profile works - see ovpn_conf in zgz-parse.
 wanted_engine() {
 	_we="$(core_engine)"
-	if [ "$_we" = "xray" ] && [ -s "$ZGZ_ETC/bridge.json" ] && ! bridge_is_warp &&
+	if [ "$_we" = "xray" ] && [ -s "$ZGZ_ETC/bridge.json" ] && ! bridge_is_warp && ! bridge_is_ovpn &&
+	   [ -x "$(engine_singbox_path)" ]; then
+		_we=singbox
+	fi
+	# A SOCKS node set to carry UDP over TCP: Xray would connect it, and send
+	# its UDP the ordinary way the server was set up not to take. Over plain
+	# TCP only - sing-box's socks has no other transport.
+	if [ "$_we" = "xray" ] && grep -q '"protocol":"socks".*"udpOverTcp":true' "$ZGZ_BEST" 2>/dev/null &&
+	   grep -q '"network":"tcp"' "$ZGZ_BEST" 2>/dev/null && ! grep -q '"tcpSettings"' "$ZGZ_BEST" 2>/dev/null &&
 	   [ -x "$(engine_singbox_path)" ]; then
 		_we=singbox
 	fi
@@ -330,12 +340,32 @@ bridge_is_warp() {
 	return 1
 }
 
-# Does the tunnel need its helper program running? For a hysteria2, tuic,
-# OpenVPN or AmneziaWG node only while Xray is the engine - sing-box speaks
-# those itself. For WARP always.
+# OpenVPN is OpenVPN's own, under either engine: no core carries it.
+bridge_is_ovpn() {
+	[ "$(bridge_type)" = "openvpn" ] && return 0
+	return 1
+}
+
+# The node an OpenVPN node is reached through, if any: its own pre-proxy,
+# written into the record by node_records, or else the one every node dials
+# through. zgz-mkconfig offers OpenVPN a SOCKS port that leaves by it, and
+# zgz-bridge points OpenVPN at that port.
+ovpn_via() {
+	bridge_is_ovpn || return 1
+	_ov_v="$(sed -n 's/^{"type":"openvpn","via":"\([A-Za-z0-9_]*\)".*/\1/p' "$ZGZ_ETC/bridge.json" 2>/dev/null | head -1)"
+	[ -n "$_ov_v" ] || _ov_v="$(global_preproxy)" || _ov_v=""
+	[ -n "$_ov_v" ] || return 1
+	echo "$_ov_v"
+	return 0
+}
+
+# Does the tunnel need its helper program running? For a hysteria2, tuic or
+# AmneziaWG node only while Xray is the engine - sing-box speaks those itself.
+# For WARP and OpenVPN always.
 bridge_wanted() {
 	[ -s "$ZGZ_ETC/bridge.json" ] || return 1
 	bridge_is_warp && return 0
+	bridge_is_ovpn && return 0
 	[ "${1:-$(active_engine)}" = "xray" ] && return 0
 	return 1
 }
@@ -648,6 +678,8 @@ core_version() {
 	[ -x "$1" ] || { echo ""; return 1; }
 	case "$1" in
 		*hysteria*) "$1" version 2>/dev/null | sed -n 's/^Version:[[:space:]]*//p' | head -1 ;;
+		# "OpenVPN 2.7.7 arm-openwrt-linux-gnu [SSL (OpenSSL)] ..."
+		*openvpn*)  "$1" --version 2>/dev/null | awk 'NR == 1 && $1 == "OpenVPN" { print $2 }' ;;
 		*sing-box*) "$1" version 2>/dev/null | sed -n 's/^sing-box version //p' | head -1 ;;
 		*geoview*)  "$1" -version 2>/dev/null | awk 'NR == 1 && $1 == "Geoview" { print $2 }' ;;
 		# warp-plus says it on stderr, as the tag it was built from:
@@ -1283,6 +1315,10 @@ decorate() {
 # rules already honour as "leave this alone".
 ZGZ_OUT_MARK=255
 
+# The tunnel device OpenVPN is given for an OpenVPN node; the way out of the
+# core for that node is bound to it.
+ZGZ_OVPN_DEV="${ZGZ_OVPN_DEV:-zgzovpn}"
+
 # Records on stdin, written back with every WARP node that can be one as the
 # WireGuard outbound Xray carries itself, and every one that cannot left out.
 #
@@ -1481,6 +1517,15 @@ node_records() {
 			_nd_pre="$(uci -q get "zirgozar.$1.preproxy_node" 2>/dev/null)" || _nd_pre=""
 			if [ -n "$_nd_pre" ] && [ "$_nd_pre" != "$1" ] &&
 			   uci -q get "zirgozar.$_nd_pre.link" >/dev/null 2>&1; then
+				# An OpenVPN node reached through another: OpenVPN is pointed
+				# at a SOCKS port of the core's that leaves by that node, so a
+				# filter sees only the other node - see zgz-bridge.
+				case "$(printf '%s\n' "$_nd_recs" | head -1 | cut -f3)" in
+					openvpn)
+						printf '%s\n' "$_nd_recs" | sed "s/	{\"type\":\"openvpn\",/	{\"type\":\"openvpn\",\"via\":\"$_nd_pre\",/"
+						return 0
+						;;
+				esac
 				# A WARP node reached through another is Xray's own WireGuard
 				# outbound: warp-plus cannot be told to dial through anything.
 				_nd_nat="$(printf '%s\n' "$_nd_recs" | warp_natives)"

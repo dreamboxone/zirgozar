@@ -267,7 +267,7 @@ function render(d) {
 					return act('core:' + c.name, 'core_remove', c.name, _('%s removed.').format(c.name));
 				}, 'trash'));
 
-			cbox.appendChild(row({ xray: 'Xray', geoview: 'Geoview', 'sing-box-lx': 'sing-box-lx', 'warp-plus': 'warp-plus', vwarp: 'Vwarp', 'xray-patterniha': _('Xray (patterniha)') }[c.name] || c.name, value, actions, 'core:' + c.name));
+			cbox.appendChild(row({ xray: 'Xray', geoview: 'Geoview', 'sing-box-lx': 'sing-box-lx', 'warp-plus': 'warp-plus', vwarp: 'Vwarp', 'xray-patterniha': _('Xray (patterniha)'), openvpn: 'OpenVPN' }[c.name] || c.name, value, actions, 'core:' + c.name));
 		});
 		cbox.appendChild(row(_('Free space'),
 			[ E('span', {}, bytes(cores.free)), E('code', { 'style': 'font-size:11.5px;color:var(--muted)' }, cores.dir || '') ]));
@@ -277,6 +277,8 @@ function render(d) {
 			_('warp-plus is only needed for WARP nodes: Cloudflare WARP, WARP in WARP, Psiphon behind WARP, and WireGuard nodes set to be carried by it.')));
 		cbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:6px 0 0' },
 			_('Vwarp is warp-plus with WARP over MASQUE and noize; WARP nodes that use either need it. Xray (patterniha) is Xray that also carries VLESS and Trojan without TLS to public addresses - configs over Cloudflare’s plain-HTTP ports - which the official Xray refuses; installed beside it, it is used for those configs.')));
+		cbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:6px 0 0' },
+			_('OpenVPN is the official client, from the router’s own packages: every OpenVPN config is carried by it and by nothing else. Install, update and remove go through the package manager.')));
 	}
 }
 
@@ -326,7 +328,7 @@ return view.extend({
 		o.placeholder = '/usr/libexec/zirgozar/hysteria';
 
 		o = s.option(form.Value, 'core_geoview', _('Geoview App Path'),
-			_('Only the Locator page needs it. Empty means this program’s own copy in the folder above.'));
+			_('Only the Geoview page needs it. Empty means this program’s own copy in the folder above.'));
 		o.placeholder = '/usr/libexec/zirgozar/geoview';
 
 		o = s.option(form.Value, 'core_warpplus', _('warp-plus App Path'),

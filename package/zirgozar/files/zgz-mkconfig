@@ -144,6 +144,19 @@ add_rule() {
 add_rule '{"type":"field","inboundTag":["api-in"],"outboundTag":"api"}'
 add_rule '{"type":"field","inboundTag":["dns-in"],"outboundTag":"dns-out"}'
 
+# An OpenVPN node reached through another node: OpenVPN is given a SOCKS port
+# of the core's, and what comes in on it leaves by that node and nothing
+# else - ahead of every other rule, the Iran split included, because the
+# OpenVPN server's own address is very often an Iranian one.
+ovpn_via="$(ovpn_via)" || ovpn_via=""
+if [ -n "$ovpn_via" ] && ! chain_outbound "$ovpn_via" >/dev/null 2>&1; then
+	warn "OpenVPN cannot go through '$ovpn_via': it is gone, or Xray cannot speak it - connecting directly"
+	ovpn_via=""
+fi
+if [ -n "$ovpn_via" ]; then
+	add_rule "{\"type\":\"field\",\"inboundTag\":[\"ovpn-via\"],\"outboundTag\":\"chain-$ovpn_via\"}"
+fi
+
 # Where each resolver's own queries go. The Direct DNS always straight out;
 # the Remote DNS through the tunnel, or straight out when the DNS tab says so.
 # First, so that nothing further down - a private range, the Iran split - can
@@ -337,6 +350,10 @@ if [ -n "$_nsp" ]; then
 	[ "$(cfg_bool node_socks_bind_local 1)" = "1" ] && _nsl="127.0.0.1"
 	socks_inbounds=",
     { \"tag\": \"socks-in\", \"listen\": \"$_nsl\", \"port\": $_nsp, \"protocol\": \"socks\", \"settings\": { \"udp\": true } }"
+fi
+if [ -n "$ovpn_via" ]; then
+	socks_inbounds="$socks_inbounds,
+    { \"tag\": \"ovpn-via\", \"listen\": \"127.0.0.1\", \"port\": $(cfg bridge_port 10808), \"protocol\": \"socks\", \"settings\": { \"udp\": true } }"
 fi
 
 # And PassWall2's Socks Config: more SOCKS ports, each through a node of its
@@ -677,6 +694,7 @@ proxy_out="$(printf 'best\tbest\tx\t%s\t%s\t%s\n' "$best_host" "$best_port" \
 
 # Every node something here dials through, as outbounds of their own.
 chain_outs="$(chain_outbounds "$proxy_out
+${ovpn_via:+\"dialerProxy\":\"chain-$ovpn_via\"}
 $acl_outbounds
 $socks_outbounds
 $shunt_outbounds" | awk 'NF { printf "%s%s,\n", "    ", $0 }')"

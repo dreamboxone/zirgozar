@@ -180,6 +180,7 @@ www/luci-static/resources/view/zirgozar/server.js
 www/luci-static/resources/zirgozar/i18n.js
 www/luci-static/resources/zirgozar/status.js
 www/luci-static/resources/zirgozar/qr.js
+www/luci-static/resources/zirgozar/nodelink.js
 usr/share/luci/menu.d/luci-app-zirgozar.json
 usr/share/rpcd/acl.d/luci-app-zirgozar.json"
 MISSING=""

@@ -214,6 +214,16 @@ return view.extend({
 				var opt = map.lookupOption(name, 'config');
 				return opt && opt[0] ? opt[0].formvalue('config') == '1' : true;
 			}
+			/* The address as the field shows it, and whether that is still
+			   only on the page. */
+			function shown(name) {
+				var opt = map.lookupOption(name, 'config');
+				return opt && opt[0] ? String(opt[0].formvalue('config') || '').trim() : '';
+			}
+			function unsaved(name) {
+				var opt = map.lookupOption(name, 'config');
+				return !!(opt && opt[0] && shown(name) != String(opt[0].cfgvalue('config') || '').trim());
+			}
 			return E('div', { 'class': 'cbi-value' }, [
 				E('label', { 'class': 'cbi-value-title' }, _('Rule version')),
 				E('div', { 'class': 'cbi-value-field' }, [
@@ -226,8 +236,14 @@ return view.extend({
 								pui.note(b, _('Tick GeoIP, Geosite or both first.'), 'warn');
 								return;
 							}
-							return callAction('geo_update', ip && site ? 'all' : ip ? 'geoip' : 'geosite').then(function(r) {
+							/* The addresses on screen go with it: the router still
+							   has the saved ones until Save & Apply. */
+							var arg = (ip && site ? 'all' : ip ? 'geoip' : 'geosite') + ';' +
+								shown('geoip_url') + ';' + shown('geosite_url');
+							var later = unsaved('geoip_url') || unsaved('geosite_url');
+							return callAction('geo_update', arg).then(function(r) {
 								if (r && r.error) pui.note(b, _(r.error), 'error');
+								else if (later) pui.note(b, _('Downloading from the addresses shown. Press Save & Apply as well, or the automatic update will go back to the saved ones.'), 'info');
 								else pui.note(b, _('Downloading. The page will show the new size when it is done.'), 'info');
 							});
 						}, 'download'),

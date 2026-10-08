@@ -81,7 +81,7 @@
 	},
 
 	"admin/services/zirgozar/geoview": {
-		"title": "Locator",
+		"title": "Geoview",
 		"order": 70,
 		"action": {
 			"type": "view",

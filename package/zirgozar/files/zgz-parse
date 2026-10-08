@@ -65,6 +65,25 @@ function b64(s,   out, i, c, bits, nbits, n) {
 	return out
 }
 
+# The other direction, for the one thing kept whole inside a record: an
+# OpenVPN profile, which has every character a TSV line or a JSON string could
+# trip on. Bytes, under LC_ALL=C, as the decoder reads them.
+function b64enc(s,   chars, out, i, n, a, b, c, v) {
+	chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+	out = ""
+	n = length(s)
+	for (i = 1; i <= n; i += 3) {
+		a = ORD[substr(s, i, 1)] + 0
+		b = (i + 1 <= n) ? ORD[substr(s, i + 1, 1)] + 0 : 0
+		c = (i + 2 <= n) ? ORD[substr(s, i + 2, 1)] + 0 : 0
+		v = a * 65536 + b * 256 + c
+		out = out substr(chars, int(v / 262144) + 1, 1) substr(chars, int(v / 4096) % 64 + 1, 1)
+		out = out ((i + 1 <= n) ? substr(chars, int(v / 64) % 64 + 1, 1) : "=")
+		out = out ((i + 2 <= n) ? substr(chars, v % 64 + 1, 1) : "=")
+	}
+	return out
+}
+
 function exp2(n,   r, i) {
 	r = 1
 	for (i = 0; i < n; i++) r = r * 2
@@ -537,11 +556,18 @@ function do_ss(body,   label, p, cred, method, pass, dec, plug) {
 
 # --------------------------------------------------- socks:// and http://
 
-function do_proxy(body, proto,   label, p, cred, user, pass, dec, q) {
+# The query is this program's own, written by the node page: the transport,
+# as a vless link writes it, and uot=1 for UDP carried inside the TCP
+# connection. Links from elsewhere have none and come out as they always did.
+#
+# UDP over TCP is sing-box's, not Xray's: Xray reads past the key and sends UDP
+# the ordinary SOCKS way, and wanted_engine hands a node that asks for it to
+# sing-box, which zgz-sbconfig tells to do it.
+function do_proxy(body, proto,   label, p, cred, user, pass, dec, q, query) {
 	p = index(body, "#")
 	if (p > 0) { label = clean_label(substr(body, p + 1)); body = substr(body, 1, p - 1) }
 	p = index(body, "?")
-	if (p > 0) body = substr(body, 1, p - 1)
+	if (p > 0) { query = substr(body, p + 1); body = substr(body, 1, p - 1) }
 
 	p = index(body, "@")
 	if (p > 0) {
@@ -556,7 +582,12 @@ function do_proxy(body, proto,   label, p, cred, user, pass, dec, q) {
 		if (!hostport(body)) return
 	}
 
-	emit(label, proto, mk_proxy(proto, user, pass))
+	XEXTRA = qs(query, "extra")
+	emit(label, proto, mk_proxy(proto, user, pass, \
+		stream(qs(query, "type"), "none", qs(query, "host"), qs(query, "path"), \
+		       "", "", "", "", "", "", qs(query, "serviceName"), qs(query, "headerType"), \
+		       qs(query, "mode")), \
+		proto == "socks" && qs(query, "uot") == "1"))
 }
 
 # ------------------------------------------------- hysteria2:// and tuic://
@@ -1071,6 +1102,9 @@ function decorate(p, hp,   proto, ss, sock, net, fm, tcp, udp, first, d, wgs) {
 			p = jset(p, "settings", jset(wgs, "noKernelTun", "true"))
 	}
 	if (proto == "socks" && p ~ /"address":"127\.0\.0\.1"/) return p
+	# An OpenVPN node: out of its tunnel device, which is already its first
+	# and only hop - nothing to dial through, fragment or multiplex.
+	if (proto == "freedom" && p ~ /"interface":/) return p
 
 	ss = jraw(p, "streamSettings")
 	if (ss == "") ss = "{}"
@@ -1159,11 +1193,15 @@ function mk_ss(method, pass) {
 	       "\"streamSettings\":{\"network\":\"tcp\"}}"
 }
 
-function mk_proxy(proto, user, pass) {
+# ST is what stream() made of the link, plain TCP when there is none; UOT asks
+# for UDP over TCP, which only sing-box does - see do_proxy.
+function mk_proxy(proto, user, pass, st, uot) {
+	if (st == "") st = "\"network\":\"tcp\""
 	return "{\"protocol\":\"" proto "\",\"settings\":{\"servers\":[{" \
 	       "\"address\":\"" jesc(HOST) "\",\"port\":" PORT \
 	       (user != "" ? ",\"users\":[{\"user\":\"" jesc(user) "\",\"pass\":\"" jesc(pass) "\"}]" : "") \
-	       "}]},\"streamSettings\":{\"network\":\"tcp\"}}"
+	       (uot ? ",\"udpOverTcp\":true" : "") \
+	       "}]},\"streamSettings\":{" st "}}"
 }
 
 # WireGuard is an Xray outbound like any other, which is what makes it worth
@@ -1635,6 +1673,8 @@ LANDING {
 # For a WireGuard node, the .conf it reads is written to WGFILE.
 WARPCONF { wdoc = wdoc $0; next }
 
+OVPNCONF { wdoc = wdoc $0; next }
+
 # -v WARPWG=1: a WARP account on stdin - the wgcf-identity.json warp-plus
 # keeps - and on stdout the same account as a WireGuard record Xray can carry
 # itself, for a WARP node that is a link in a chain, a shunt rule's way out or
@@ -1684,7 +1724,7 @@ WARPWG { wdoc = wdoc $0 "\n"; next }
 			else if (tolower(probe) ~ /^\[(interface|peer)\]/) { WGCONF = 1; doc = head }
 			# An OpenVPN profile: the first directive is one of these, or the
 			# file opens with a block holding the certificate authority.
-			else if (tolower(probe) ~ /^(client|dev[ \t]|remote[ \t]|proto[ \t]|setenv[ \t]|nobind|persist-(key|tun)|<ca>)/) { OVPN = 1; doc = head }
+			else if (tolower(probe) ~ /^(client|dev[ \t]|remote[ \t]|proto[ \t]|setenv[ \t]|nobind|persist-(key|tun)|tls-client|pull|resolv-retry|auth-user-pass|cipher[ \t]|data-ciphers[ \t]|verb[ \t]|secret[ \t]|<(ca|cert|key|secret|pkcs12|tls-crypt|tls-auth)>)/) { OVPN = 1; doc = head }
 			else if (substr(probe, 1, 1) == "[") JSONDOC = 1
 			# A YAML key, which is what a Clash or a hysteria file opens
 			# with. Not a link: "vless://x" also starts with letters and a
@@ -1699,6 +1739,7 @@ WARPWG { wdoc = wdoc $0 "\n"; next }
 
 END {
 	if (WARPCONF) warp_conf(wdoc)
+	else if (OVPNCONF) ovpn_run(wdoc)
 	else if (WARPWG) warp_wg(wdoc)
 	else if (DECODE) printf "%s", b64(blob)
 	else if (WGCONF) wg_conf(doc)
@@ -1722,6 +1763,9 @@ function do_line(line) {
 	else if (index(line, "ss://")        == 1) do_ss(substr(line, 6))
 	else if (index(line, "socks5://")    == 1) do_proxy(substr(line, 10), "socks")
 	else if (index(line, "socks://")     == 1) do_proxy(substr(line, 9), "socks")
+	# The node page's HTTP proxy. Only host:port makes one, so the address of
+	# a web page in a pasted list is still not taken for a server.
+	else if (index(line, "http://")      == 1) do_proxy(substr(line, 8), "http")
 	else if (index(line, "hysteria2://") == 1) do_hysteria2(substr(line, 13))
 	else if (index(line, "hy2://")       == 1) do_hysteria2(substr(line, 7))
 	else if (index(line, "tuic://")      == 1) do_tuic(substr(line, 8))
@@ -2006,36 +2050,26 @@ function yaml_doc(doc,   j) {
 
 # ----------------------------------------------------------- an OpenVPN profile
 #
-# The .ovpn file a provider hands out: directives, and the certificates and
-# keys inside <ca>, <cert>, <key> and <tls-crypt> blocks. sing-box speaks
-# OpenVPN, Xray does not, so the node is a record like hysteria2's - the
-# fields below, as JSON - and zgz-bridge or zgz-sbconfig turns it into an
-# endpoint.
+# The .ovpn file a provider hands out, carried by OpenVPN itself - the official
+# client, openvpn-openssl - and by nothing else: every directive it knows works,
+# a static key, a PKCS#12 bundle, socks-proxy and http-proxy, the reconnect
+# and MTU settings, because what it is given is the profile as it came.
 #
-# What is read is what an endpoint can use: the servers, the transport, the
-# certificates and the wrapping of the control channel, the ciphers and the
-# digest, the name the server certificate must carry, compression and the
-# user name and password. Everything else - scripts, routes, DNS the server
-# pushes - is left alone: what goes through the tunnel is this program's
-# decision and not the profile's.
+# So the record keeps the profile whole, base64 in a "profile" field, and
+# beside it only what the rest of the program asks of a node: the first
+# server, its port and its transport. zgz-bridge writes it back out (see
+# OVPNCONF below) and puts its own few lines after it.
+#
+# What is taken out is what would let a downloaded file act on the router
+# rather than on the connection: scripts and plugins, the management socket,
+# a different user or root, the routes and DNS it would install, a log or a
+# pid file of its own, the device - every one of which this program sets
+# itself. The routes in particular: what goes through the tunnel is this
+# program's decision and not the profile's.
 #
 # The user name, the password and the pass phrase of an encrypted key are not
 # in the file or are not meant to be; they arrive as comment lines
 # "#!zgz-user=..." in front of it, from the settings of the node.
-
-function jpem(s) {
-	gsub(/\\/, "\\\\", s)
-	gsub(/"/, "\\\"", s)
-	gsub(/\t/, " ", s)
-	gsub(/\r/, "", s)
-	sub(/\n+$/, "", s)
-	# A bar for a line break, not the backslash-n of JSON: busybox's awk drops
-	# the backslash from a replacement, and the shell reads this record back
-	# through more than one pipe. Base64 and the PEM headers have no bar in
-	# them, so zgz-sbconfig turns each one back into a newline.
-	gsub(/\n/, "|", s)
-	return s
-}
 
 function ov_net(p) {
 	p = tolower(p)
@@ -2044,39 +2078,33 @@ function ov_net(p) {
 	return ""
 }
 
-function ov_array(s,   a, n, i, out) {
-	n = split(s, a, ":")
-	out = ""
-	for (i = 1; i <= n; i++)
-		if (a[i] != "") out = out (out != "" ? "," : "") "\"" jesc(a[i]) "\""
-	return "[" out "]"
+# Directives left out of the profile this program runs.
+function ov_dropped(k) {
+	return k ~ /^(up|down|down-pre|up-delay|up-restart|route-up|route-pre-down|ipchange|client-connect|client-disconnect|learn-address|tls-verify|auth-user-pass-verify|plugin|script-security|setenv-safe|management|management-.*|daemon|log|log-append|syslog|writepid|status|status-version|chroot|user|group|cd|config|dev|dev-type|dev-node|redirect-gateway|redirect-private|route|route-ipv6|route-gateway|route-delay|route-metric|route-noexec|route-nopull|iproute|dhcp-option|block-outside-dns|register-dns|mark|askpass|auth-user-pass|verb|tmp-dir|machine-readable-output)$/
 }
 
-function ovpn_conf(doc,   lines, m, i, l, t, k, w, nw, p, inblk, blk, name, nrem, rh, rp, rn, \
-                          proto, dport, cipher, dciph, auth, vname, vtype, wrap, wrapkey, kdir, \
-                          comp, lzo, user, pass, keypass, ca, cert, key, extra, pl, j, servers, first, ap) {
+function ovpn_conf(doc,   lines, m, i, l, t, k, w, nw, p, inblk, name, nrem, rh, rp, rn, \
+                          proto, dport, extra, keep, auth, authblk, pl, j, servers, out, tap) {
 	m = split(doc, lines, "\n")
 	proto = "udp"; dport = 1194
 	for (i = 1; i <= m; i++) {
 		l = lines[i]
 		gsub(/\r/, "", l)
-		if (inblk != "") {
-			if (l ~ ("^[ \t]*</" inblk ">")) inblk = ""
-			else blk[inblk] = blk[inblk] l "\n"
-			continue
-		}
 		t = l
 		sub(/^[ \t]+/, "", t)
 		sub(/[ \t]+$/, "", t)
-		if (t == "") continue
+		if (inblk != "") {
+			if (t ~ ("^</" inblk ">")) inblk = ""
+			continue
+		}
 		if (t ~ /^#!zgz-/) {
 			t = substr(t, 7)
 			p = index(t, "=")
 			if (p > 0) extra[substr(t, 1, p - 1)] = substr(t, p + 1)
 			continue
 		}
-		if (t ~ /^[#;]/) {
-			if (name == "") {
+		if (t == "" || t ~ /^[#;]/) {
+			if (t != "" && name == "") {
 				name = substr(t, 2)
 				sub(/^[ \t]+/, "", name)
 				name = clean_label(name)
@@ -2085,7 +2113,7 @@ function ovpn_conf(doc,   lines, m, i, l, t, k, w, nw, p, inblk, blk, name, nrem
 		}
 		if (t ~ /^<[A-Za-z0-9-]+>$/) {
 			inblk = substr(t, 2, length(t) - 2)
-			blk[inblk] = ""
+			if (inblk == "auth-user-pass") authblk = 1
 			continue
 		}
 		nw = split(t, w, /[ \t]+/)
@@ -2098,40 +2126,40 @@ function ovpn_conf(doc,   lines, m, i, l, t, k, w, nw, p, inblk, blk, name, nrem
 		}
 		else if (k == "proto" || k == "proto-force") proto = ov_net(w[2]) != "" ? ov_net(w[2]) : proto
 		else if (k == "port" || k == "rport") dport = w[2] + 0
-		else if (k == "cipher") cipher = w[2]
-		else if (k == "data-ciphers" || k == "ncp-ciphers") dciph = w[2]
-		else if (k == "auth") auth = w[2]
-		else if (k == "verify-x509-name") {
-			vname = w[2]
-			vtype = (nw >= 3) ? tolower(w[3]) : "subject"
+		else if (k == "auth-user-pass") auth = 1
+		else if (k == "dev" && w[2] ~ /^tap/) tap = 1
+		else if (k == "dev-type" && w[2] == "tap") tap = 1
+	}
+
+	# Nowhere to connect to: a server's profile, or half of one.
+	if (nrem < 1) return
+
+	# The profile as it will run: the same lines, without the dropped ones,
+	# and without the user name and password block when the node's settings
+	# give them instead.
+	out = ""; inblk = ""
+	for (i = 1; i <= m; i++) {
+		l = lines[i]
+		gsub(/\r/, "", l)
+		t = l
+		sub(/^[ \t]+/, "", t)
+		sub(/[ \t]+$/, "", t)
+		if (inblk != "") {
+			if (keep) out = out l "\n"
+			if (t ~ ("^</" inblk ">")) inblk = ""
+			continue
 		}
-		else if (k == "key-direction") kdir = (w[2] == "1") ? "client" : "server"
-		else if (k == "tls-auth") { wrap = "tls_auth"; if (nw >= 3) kdir = (w[3] == "1") ? "client" : "server" }
-		else if (k == "tls-crypt") wrap = "tls_crypt"
-		else if (k == "tls-crypt-v2") wrap = "tls_crypt_v2"
-		else if (k == "compress") comp = (nw >= 2) ? w[2] : "stub"
-		else if (k == "comp-lzo") lzo = (nw >= 2) ? w[2] : "adaptive"
-		else if (k == "auth-user-pass" && nw >= 2) { }
+		if (t == "" || t ~ /^[#;]/) continue
+		if (t ~ /^<[A-Za-z0-9-]+>$/) {
+			inblk = substr(t, 2, length(t) - 2)
+			keep = !(inblk == "auth-user-pass" && extra["user"] != "")
+			if (keep) out = out l "\n"
+			continue
+		}
+		split(t, w, /[ \t]+/)
+		if (ov_dropped(tolower(w[1]))) continue
+		out = out t "\n"
 	}
-
-	# A profile with no certificate authority is a static-key one, or one
-	# that keeps its certificates in a file this cannot see. Neither can be
-	# used, and saying nothing for it is what every other unusable entry does.
-	ca = blk["ca"]
-	if (ca == "" || nrem < 1) return
-
-	if (blk["tls-crypt-v2"] != "") { wrap = "tls_crypt_v2"; wrapkey = blk["tls-crypt-v2"] }
-	else if (blk["tls-crypt"] != "") { wrap = "tls_crypt"; wrapkey = blk["tls-crypt"] }
-	else if (blk["tls-auth"] != "") { wrap = "tls_auth"; wrapkey = blk["tls-auth"] }
-	else wrap = ""
-
-	user = extra["user"]; pass = extra["pass"]
-	if (blk["auth-user-pass"] != "") {
-		split(blk["auth-user-pass"], ap, "\n")
-		if (user == "") user = ap[1]
-		if (pass == "") pass = ap[2]
-	}
-	keypass = extra["keypass"]
 
 	for (j = 1; j <= nrem; j++) {
 		if (rp[j] <= 0) rp[j] = dport
@@ -2147,24 +2175,34 @@ function ovpn_conf(doc,   lines, m, i, l, t, k, w, nw, p, inblk, blk, name, nrem
 			servers = servers (j > 1 ? "," : "") "{\"server\":\"" jesc(rh[j]) "\",\"port\":" rp[j] ",\"network\":\"" rn[j] "\"}"
 		pl = pl ",\"servers\":[" servers "]"
 	}
-	pl = pl ",\"ca\":\"" jpem(ca) "\""
-	if (blk["cert"] != "") pl = pl ",\"cert\":\"" jpem(blk["cert"]) "\""
-	if (blk["key"] != "") pl = pl ",\"key\":\"" jpem(blk["key"]) "\""
-	if (keypass != "") pl = pl ",\"keypass\":\"" jesc(keypass) "\""
-	if (wrap != "") {
-		pl = pl ",\"wrap\":\"" wrap "\",\"wrap_key\":\"" jpem(wrapkey) "\""
-		if (wrap == "tls_auth" && kdir != "") pl = pl ",\"wrap_direction\":\"" kdir "\""
-	}
-	if (vname != "") pl = pl ",\"server_name\":\"" jesc(vname) "\",\"server_name_type\":\"" (vtype ~ /^(subject|name|name-prefix)$/ ? vtype : "name") "\""
-	if (dciph != "") pl = pl ",\"data_ciphers\":" ov_array(dciph)
-	if (cipher != "") pl = pl ",\"cipher\":\"" jesc(cipher) "\""
-	if (auth != "") pl = pl ",\"auth\":\"" jesc(auth) "\""
-	if (comp != "") pl = pl ",\"compress\":\"" jesc(comp) "\""
-	if (lzo != "") pl = pl ",\"comp_lzo\":\"" jesc(lzo) "\""
-	if (user != "") pl = pl ",\"username\":\"" jesc(user) "\",\"password\":\"" jesc(pass) "\""
-	pl = pl "}"
+	if (tap) pl = pl ",\"tap\":true"
+	# Asks for a user name and password and is given none: said on the page
+	# rather than left for OpenVPN to ask a console nobody is at.
+	if (auth && !authblk && extra["user"] == "") pl = pl ",\"needs_auth\":true"
+	if (extra["user"] != "") pl = pl ",\"username\":\"" jesc(extra["user"]) "\",\"password\":\"" jesc(extra["pass"]) "\""
+	if (extra["keypass"] != "") pl = pl ",\"keypass\":\"" jesc(extra["keypass"]) "\""
+	pl = pl ",\"profile\":\"" b64enc(out) "\"}"
 
 	emit(name, "openvpn", pl)
+}
+
+# -v OVPNCONF=1: an openvpn record's payload on stdin, the profile it keeps
+# on stdout as OpenVPN reads it. The user name and password, and the pass
+# phrase of the key, go to the files named by AUTHFILE and PASSFILE, and the
+# lines that point OpenVPN at them follow the profile.
+function ovpn_run(doc,   u) {
+	printf "%s", b64(jstr(doc, "profile"))
+	u = jstr(doc, "username")
+	if (u != "" && ENVIRON["AUTHFILE"] != "") {
+		printf "%s\n%s\n", u, jstr(doc, "password") > ENVIRON["AUTHFILE"]
+		close(ENVIRON["AUTHFILE"])
+		printf "auth-user-pass %s\n", ENVIRON["AUTHFILE"]
+	}
+	if (jstr(doc, "keypass") != "" && ENVIRON["PASSFILE"] != "") {
+		printf "%s\n", jstr(doc, "keypass") > ENVIRON["PASSFILE"]
+		close(ENVIRON["PASSFILE"])
+		printf "askpass %s\n", ENVIRON["PASSFILE"]
+	}
 }
 
 # --------------------------------------------------------- a wireguard .conf
