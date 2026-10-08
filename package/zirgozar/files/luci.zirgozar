@@ -212,6 +212,14 @@ method_nodes() {
 	# Basic Settings is read on its own, and its tag is not the one it has in
 	# this list - "n0" there, whatever it is here - which marked the first node
 	# of the list as the one in use.
+	# No list yet - nothing read, or only nodes added by hand - is an empty
+	# answer. Left to awk, it had already written the opening of the object
+	# when it found no file, the fallback was written after it, and the page
+	# was handed {"nodes":[{"nodes":[],"count":0} - which it cannot read.
+	if [ ! -r "$ZGZ_CANDIDATES" ]; then
+		echo '{"nodes":[],"count":0}'
+		return 0
+	fi
 	_cur="$(meta_get label)|$(meta_get protocol)|$(meta_get host)|$(meta_get port)"
 	awk -F'\t' -v cur="$_cur" \
 		-v ranked="$ZGZ_RANKED" -v alive="$ZGZ_RUN/alive.tsv" '
@@ -241,7 +249,7 @@ method_nodes() {
 				((!found && $2 "|" $3 "|" $4 "|" $5 == cur && (found = 1)) ? "true" : "false")
 		}
 		END { printf "],\"count\":%d}\n", n }
-	' "$ZGZ_CANDIDATES" 2>/dev/null || echo '{"nodes":[],"count":0}'
+	' "$ZGZ_CANDIDATES" 2>/dev/null
 }
 
 # What the three per-node buttons have measured so far. Keys are
@@ -439,6 +447,11 @@ method_subnodes() {
 }
 
 method_subs() {
+	# Before any subscription has been read there is no file - see method_nodes.
+	if [ ! -r "$ZGZ_RUN/subs.status" ]; then
+		echo '{"subs":[],"count":0}'
+		return 0
+	fi
 	awk -F'\t' 'BEGIN { printf "{\"subs\":["; n = 0 }
 		{
 			if (n++ > 0) printf ","
@@ -447,7 +460,7 @@ method_subs() {
 				$1, $2, $3, $4, $5, $6, ($7 == "" ? -1 : $7), ($8 == "" ? -1 : $8)
 		}
 		END { printf "],\"count\":%d}\n", n }' \
-		"$ZGZ_RUN/subs.status" 2>/dev/null || echo '{"subs":[],"count":0}'
+		"$ZGZ_RUN/subs.status" 2>/dev/null
 }
 
 # ------------------------------------------------------------------- system

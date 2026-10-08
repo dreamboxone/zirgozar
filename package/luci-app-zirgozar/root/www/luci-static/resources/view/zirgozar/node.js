@@ -137,6 +137,9 @@ function parseLink(link) {
 
 	var q = {}, qi = body.indexOf('?');
 	if (qi >= 0) { q = parseQuery(body.slice(qi + 1)); body = body.slice(0, qi); }
+	/* host:port/?… - hysteria2's own form, and Shadowsocks' SIP002 - is the
+	   same link as host:port?…, and zgz-parse reads it so. */
+	body = body.replace(/\/+$/, '');
 
 	/* warp://[licence@]endpoint-or-auto?mode=…#name - see zgz-parse. */
 	if (proto == 'warp') {
