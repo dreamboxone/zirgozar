@@ -223,7 +223,11 @@ jobs:
           [ -n "$name" ] || { echo "::error::no SDK found under $base"; exit 1; }
           echo "SDK: $name"
 
-          curl -fsSL --retry 3 -o sdk.tar "$base/$name"
+          # A few hundred megabytes, fetched by every architecture at once:
+          # downloads.openwrt.org has broken one such transfer off mid-way
+          # over HTTP/2 (curl error 92), which --retry alone does not retry.
+          curl -fsSL --http1.1 --retry 5 --retry-all-errors --retry-delay 10 \
+               -o sdk.tar "$base/$name"
           mkdir -p sdk
           case "$name" in
             *.zst) sudo apt-get update -qq && sudo apt-get install -y zstd
