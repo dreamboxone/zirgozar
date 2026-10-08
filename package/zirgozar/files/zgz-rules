@@ -225,6 +225,24 @@ routing_down() {
 # `zgz-rules dump` can show exactly what would be sent to the kernel - which
 # is both how the tests check the syntax without a router and the first thing
 # worth looking at when a router says the ruleset would not load.
+# What a tproxy rule does when nothing is listening on its port - the core
+# killed, or between procd seeing it die and starting it again - is not to
+# drop the packet but to step aside, and the packet carries on down the chain
+# and out of the uplink as if there were no tunnel at all: measured, a LAN
+# machine left by the router's own address a second after the core was
+# killed. So every tproxy rule is followed by the same match dropping
+# whatever it could not take. While the core listens, the accept before it
+# means it is never reached. iptables' TPROXY drops by itself.
+tproxy_guard() {
+	awk '{ print }
+	/ tproxy ip6? to / {
+		sel = $0
+		sub(/[ 	]*counter[ 	]+tproxy .*$/, "", sel)
+		sub(/[ 	]*tproxy .*$/, "", sel)
+		print sel " counter drop"
+	}'
+}
+
 nft_ruleset() {
 	_devs="$1"
 	_iflist=""
@@ -477,7 +495,7 @@ $_aclfwd$_v6
 "
 	fi
 
-	cat <<NFT
+	cat <<NFT | tproxy_guard
 table inet $TABLE {
 	set reserved {
 		type ipv4_addr

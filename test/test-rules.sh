@@ -83,6 +83,22 @@ for want in 'tproxy ip to 127.0.0.1:1082' 'meta mark set 0x162' \
 	fi
 done
 
+# A tproxy rule with nothing listening steps aside rather than dropping, and
+# the packet goes out of the uplink untunnelled - so each one is followed by
+# the same match, dropping. Measured on a router before this was added: a LAN
+# machine left by the uplink's own address a second after the core died.
+unguarded="$(awk '
+	prev != "" { sel = prev; sub(/[ \t]*counter[ \t]+tproxy .*$/, "", sel)
+	             if (index($0, sel " counter drop") == 0) n++
+	             prev = "" }
+	/ tproxy ip6? to / { prev = $0 }
+	END { print n + 0 }' "$WORK/rules.nft")"
+if [ "$unguarded" = "0" ] && grep -q 'tproxy ip to' "$WORK/rules.nft"; then
+	ok "every tproxy rule is followed by a drop for what it could not take"
+else
+	bad "every tproxy rule is followed by a drop for what it could not take ($unguarded are not)"
+fi
+
 # Name lookups must be let past the transparent proxy chain and taken by the
 # nat chain instead. Both rules in the same chain would mean queries are
 # tproxied and redirected at once, and the redirect never happens.
