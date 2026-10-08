@@ -1037,11 +1037,7 @@ var FA = {
 	'WARP': 'وارپ',
 	'WARP in WARP': 'وارپ در وارپ',
 	'Psiphon behind WARP': 'سایفون پشت وارپ',
-	'Add WARP': 'افزودن وارپ',
 	'Exit country': 'کشور خروجی',
-	'Cloudflare WARP, carried by warp-plus. It makes a free account by itself and looks for a WARP address that answers from here. Everything else is on the config’s own page.':
-		'وارپ کلودفلر، با warp-plus. خودش یک اکانت رایگان می‌سازد و دنبال آدرسی از وارپ می‌گردد که از اینجا جواب بدهد. بقیه تنظیمات در صفحه خود کانفیگ است.',
-	'WARP+ licence (optional)': 'لایسنس WARP+ (اختیاری)',
 	'WARP+ licence': 'لایسنس WARP+',
 	'A WARP+ licence is letters, digits and dashes.': 'لایسنس WARP+ فقط حرف، عدد و خط تیره است.',
 	'WARP: Cloudflare’s own exit. WARP in WARP: a second WARP behind the first, for an exit address the first does not show. Psiphon behind WARP: an exit in the country chosen below.':

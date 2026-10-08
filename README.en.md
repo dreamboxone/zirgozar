@@ -317,9 +317,9 @@ PassWall2's buttons:
 
 | Button | What it does |
 |---|---|
-| **Add** | A new config, in a window where its link or file is pasted |
+| **Add** | A new config on its own page, field by field: every protocol, WARP, WireGuard and OpenVPN among them |
 | **Add the node via the link** | Paste share links, one per line; each becomes a config of its own, named the way its link names it |
-| **Add WARP** | A Cloudflare WARP config - see WARP below |
+| **Add file** | A config from a link or a whole file: a WireGuard .conf, an OpenVPN .ovpn, an Xray .json, a Clash .yaml or .yml |
 | **Select all / DeSelect all** | Ticks or clears the box on every row |
 | **Delete select nodes** | Deletes the ticked configs — never the one the tunnel is using right now |
 | **Reassign Group** | Puts the ticked configs in a group |
@@ -389,7 +389,7 @@ settings.
 
 **AmneziaWG.** A WireGuard `.conf` that carries any of the AmneziaWG lines - `Jc`, `Jmin`, `Jmax`, `S1` to `S4`, `H1` to `H4` (a number or a range) and the decoy packets `I1` to `I5` - is an AmneziaWG node, version 2 or 3. Xray cannot speak it, and neither can the official sing-box: it is carried by [sing-box-lx](https://github.com/Leadaxe/sing-box-lx). While this config is chosen, sing-box-lx carries the whole tunnel by itself and Xray stands aside. Without sing-box-lx installed the page says so. Chosen by hand, like hysteria2 and OpenVPN.
 
-**WARP.** Made with **Add WARP** above the table: a name, a mode, the exit country for Psiphon, and a WARP+ licence if you have one. It has no server of its own: [warp-plus](https://github.com/bepass-org/warp-plus) registers a free Cloudflare account by itself, finds a WARP address that answers from here, and hands the tunnel to Xray (or sing-box) as a SOCKS port on the router - so shunt rules, DNS, Access Control and the traffic figures work as with any other config. Install warp-plus on **App Update**. In the file it is a `warp://` link - `warp://[licence@]endpoint-or-auto?mode=…#name`, the shape Hiddify writes - and its edit page has these fields:
+**WARP.** Made with **Add**, with WARP as the protocol: a name, a mode, the exit country for Psiphon, a WARP+ licence if you have one, and the rest of its settings. It has no server of its own: [warp-plus](https://github.com/bepass-org/warp-plus) registers a free Cloudflare account by itself, finds a WARP address that answers from here, and hands the tunnel to Xray (or sing-box) as a SOCKS port on the router - so shunt rules, DNS, Access Control and the traffic figures work as with any other config. Install warp-plus on **App Update**. In the file it is a `warp://` link - `warp://[licence@]endpoint-or-auto?mode=…#name`, the shape Hiddify writes - and its edit page has these fields:
 
 | Field | In the link | What it does |
 |---|---|---|
