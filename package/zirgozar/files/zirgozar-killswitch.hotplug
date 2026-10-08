@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+# Part of Zirgozar - https://github.com/dreamboxone/zirgozar
+
+# After the firewall has been reloaded: the Kill switch back in place. An
+# nftables firewall leaves a table that is not its own alone, but firewall3
+# empties the chains it shares with iptables and with them the jump into this
+# one - and a kill switch quietly gone after a firewall reload is worse than
+# none. Asked unconditionally; applying it again when it is there is a no-op.
+[ -x /usr/libexec/zgz-rules ] || exit 0
+[ "$(uci -q get zirgozar.config.kill_switch)" = "1" ] || exit 0
+/usr/libexec/zgz-rules ks apply >/dev/null 2>&1
+exit 0

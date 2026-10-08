@@ -5,7 +5,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zirgozar
-PKG_VERSION:=2.4.5
+PKG_VERSION:=2.4.6
 PKG_RELEASE:=1
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
@@ -55,6 +55,9 @@ define Package/zirgozar/install
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/zirgozar.init $(1)/etc/init.d/zirgozar
 	$(INSTALL_BIN) ./files/zirgozar-server.init $(1)/etc/init.d/zirgozar-server
+	$(INSTALL_BIN) ./files/zirgozar-killswitch.init $(1)/etc/init.d/zirgozar-killswitch
+	$(INSTALL_DIR) $(1)/etc/hotplug.d/firewall
+	$(INSTALL_BIN) ./files/zirgozar-killswitch.hotplug $(1)/etc/hotplug.d/firewall/90-zirgozar-killswitch
 
 	$(INSTALL_DIR) $(1)/usr/libexec
 	$(INSTALL_DATA) ./files/zgz-common.sh $(1)/usr/libexec/zgz-common.sh
@@ -147,12 +150,22 @@ fi
 # Always in the boot sequence; the main switch decides whether it runs.
 /etc/init.d/zirgozar enable >/dev/null 2>&1
 /etc/init.d/zirgozar-server enable >/dev/null 2>&1
+# Ahead of the network, so that the Kill switch - when it is on - is in place
+# before the first packet; with the setting off it does nothing.
+/etc/init.d/zirgozar-killswitch enable >/dev/null 2>&1
+# The package manager's remove step took it down for the upgrade; the setting
+# says whether it comes back.
+/usr/libexec/zgz-rules ks apply >/dev/null 2>&1
 exit 0
 endef
 
 define Package/zirgozar/prerm
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] && exit 0
+# A Kill switch left behind would shut the network with nothing left to
+# open it again.
+/usr/libexec/zgz-rules ks down >/dev/null 2>&1
+/etc/init.d/zirgozar-killswitch disable >/dev/null 2>&1
 /etc/init.d/zirgozar-server stop >/dev/null 2>&1
 /etc/init.d/zirgozar-server disable >/dev/null 2>&1
 /etc/init.d/zirgozar stop >/dev/null 2>&1

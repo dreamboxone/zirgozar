@@ -978,6 +978,14 @@ firewall_backend() {
 	return 0
 }
 
+# The Kill switch in Basic Settings: a rule of its own, apart from the tunnel's,
+# that keeps LAN devices from leaving by the uplink untunnelled whatever the
+# tunnel is doing - stopped, failed to start, restarting, or not yet started
+# after a boot. See `zgz-rules ks`. Off unless asked for.
+ks_on() {
+	[ "$(cfg_bool kill_switch 0)" = "1" ]
+}
+
 # Can this kernel actually do what the ruleset is about to ask of it?
 #
 # nft parses a ruleset happily and then fails at commit time when a module is

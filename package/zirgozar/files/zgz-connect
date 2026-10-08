@@ -137,8 +137,13 @@ else
 		# start below already followed, which this path simply never did.
 		if tunnel_running && [ "$(cfg_bool enabled 0)" = "1" ]; then
 			if ! "${ZGZ_LIB:-/usr/libexec}/zgz-test" current >/dev/null 2>&1; then
-				log "no node can carry a request and the one in use cannot either - taking the network back"
-				say_message "No node on the list can carry traffic, and neither can the one in use. The tunnel has been taken out of the way so that the network works without it. Add a node that works on the Node List page, or check the subscription."
+				if ks_on; then
+					log "no node can carry a request and the one in use cannot either - the Kill switch keeps devices off the uplink"
+					say_message "No node on the list can carry traffic, and neither can the one in use. The Kill switch is on, so devices have no internet beyond the local network until a node works. Add a node that works on the Configs page, or check the subscription."
+				else
+					log "no node can carry a request and the one in use cannot either - taking the network back"
+					say_message "No node on the list can carry traffic, and neither can the one in use. The tunnel has been taken out of the way so that the network works without it. Add a node that works on the Node List page, or check the subscription."
+				fi
 				"$RULES" down >/dev/null 2>&1 || true
 				"${ZGZ_LIB:-/usr/libexec}/zgz-dns" down >/dev/null 2>&1 || true
 			fi

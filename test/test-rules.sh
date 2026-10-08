@@ -192,4 +192,158 @@ rig_set block_quic 0
 quic_auto "off is off, whatever the node" '{"protocol":"vless","streamSettings":{"network":"ws"}}' 0
 rm -f "$ZGZ_ETC/best.json"
 
+echo "== the Kill switch"
+# A table of its own, loaded by its own boot script and kept when the tunnel
+# comes down. What matters is what it lets past: everything the tunnel itself
+# lets go direct, and nothing else.
+ks_dump() { sh "$RIG/lib/zgz-rules" ks dump > "$WORK/ks.nft" 2>"$WORK/ks.err"; }
+ks_check() {
+	_what="$1"
+	ks_dump
+	if [ ! -s "$WORK/ks.nft" ]; then
+		bad "$_what: nothing was generated ($(cat "$WORK/ks.err"))"
+		return
+	fi
+	{ printf 'add table inet zirgozar_ks\ndelete table inet zirgozar_ks\n'; cat "$WORK/ks.nft"; } > "$WORK/ks.load.nft"
+	if nft --check --file "$WORK/ks.load.nft" >"$WORK/nft.err" 2>&1; then
+		ok "$_what"
+	else
+		bad "$_what: $(head -2 "$WORK/nft.err" | tr '\n' ' ')"
+	fi
+}
+ks_has() {
+	if grep -q -- "$1" "$WORK/ks.nft"; then ok "$2"; else bad "$2"; fi
+}
+ks_hasnt() {
+	if grep -q -- "$1" "$WORK/ks.nft"; then bad "$2"; else ok "$2"; fi
+}
+
+ZGZ_GEO_SEARCH=""; export ZGZ_GEO_SEARCH
+rig_clear
+rig_set lan_zone "br-lan eth1"
+rig_set kill_switch 1
+ks_check "the defaults load"
+ks_has 'hook forward priority -5' "it sits on the forward hook, ahead of the firewall's own chain"
+ks_has 'iifname != { "br-lan", "eth1" } return' "only what comes from the LAN is looked at"
+ks_has 'oifname { "br-lan", "eth1" } return' "LAN to LAN is left alone"
+ks_has 'ct direction reply return' "replies to connections from outside are left alone"
+ks_has 'ip daddr @reserved return' "private addresses are left alone"
+ks_has 'counter drop' "and the rest is dropped"
+ks_hasnt 'tproxy' "it has nothing of the tunnel in it"
+ks_hasnt '@ir4' "no Iranian addresses with the split off"
+
+# Nothing of it is the tunnel's: taking the tunnel down must leave it.
+if awk '/^cmd_down\(\)/, /^}/' "$RIG/lib/zgz-rules" | grep -q 'KS_TABLE\|ks_\|ZGZ_KS'; then
+	bad "taking the tunnel down leaves the Kill switch alone"
+else
+	ok "taking the tunnel down leaves the Kill switch alone"
+fi
+
+for combo in "ipv6 off" "ipv6 block" "dns_hijack 0" "dns_hijack 1" "client_proxy 0" "client_proxy 1"; do
+	# shellcheck disable=SC2086
+	rig_set $combo
+	ks_check "loads with $combo"
+done
+rig_set ipv6 block; rig_set dns_hijack 1; rig_set client_proxy 1
+
+rig_set ipv6 off
+ks_dump
+ks_has 'meta nfproto ipv6 return' "IPv6 left alone is not the Kill switch's business"
+rig_set ipv6 block
+ks_dump
+ks_hasnt 'meta nfproto ipv6 return' "IPv6 refused by the tunnel is refused here too"
+
+rig_set dns_hijack 0
+ks_dump
+ks_has 'th dport 53 return' "with DNS Redirect off, name lookups go as the tunnel lets them"
+rig_set dns_hijack 1
+ks_dump
+ks_hasnt 'th dport 53 return' "with DNS Redirect on, they are redirected and not let out"
+
+rig_set client_proxy 0
+ks_dump
+ks_hasnt 'counter drop' "with Client Proxy off, devices are not the tunnel's and are not dropped"
+rig_set client_proxy 1
+
+rig_set direct_ip "1.2.3.4 5.6.0.0/16"
+ks_dump
+ks_has 'ip daddr @direct return' "addresses on the Traffic Rules page that go direct are let past"
+ks_has '5.6.0.0/16' "with their ranges"
+rig_set direct_ip ""
+
+rig_set tcp_no_redir_ports "25,587"
+ks_dump
+ks_has 'tcp dport { 25, 587 } return' "ports that go straight out are let past"
+rig_set tcp_no_redir_ports ""
+
+# Iranian addresses: only with the split on, the routing data there, and a
+# list cut out of it.
+mkdir -p "$ZGZ_ETC/geo"
+: > "$ZGZ_ETC/geo/geoip.dat"; : > "$ZGZ_ETC/geo/geosite.dat"
+echo x > "$ZGZ_ETC/geo/geoip.dat"; echo x > "$ZGZ_ETC/geo/geosite.dat"
+printf '5.22.0.0/17\n2.176.0.0/12\n2a01:4f8::/32\n' > "$ZGZ_ETC/ks-ir.list"
+rig_set route_ir 0
+ks_dump
+ks_hasnt '@ir4' "a list of Iranian ranges is not used with the split off"
+rig_set route_ir 1
+ks_check "loads with the Iran split on"
+ks_has 'ip daddr @ir4 return' "Iranian IPv4 addresses are let past with the split on"
+ks_has 'ip6 daddr @ir6 return' "and Iranian IPv6 ones"
+ks_has '2.176.0.0/12' "the ranges are in the set"
+rm -f "$ZGZ_ETC/geo/geoip.dat"
+ks_dump
+ks_hasnt '@ir4' "no routing data, no Iranian exception - the split is not on either"
+rm -f "$ZGZ_ETC/geo/geosite.dat" "$ZGZ_ETC/ks-ir.list"
+rig_set route_ir 0
+
+# Access Control
+rig_set acl_enable 1
+printf 'r1\t-\t00:11:22:33:44:55\t192.168.1.50\t-\t0\t0\t-\t-\t-\t-\nr2\t-\t-\t192.168.1.60-192.168.1.70\t-\t2\t0\t25\t-\t-\t-\n' > "$ZGZ_RUN/acl.tsv"
+ks_check "loads with Access Control rules"
+ks_has 'ether saddr { 00:11:22:33:44:55 } jump ks_acl_1' "a device set to go direct is looked at first"
+ks_has 'ip saddr { 192.168.1.60-192.168.1.70 } jump ks_acl_2' "and so is a range set to be tunnelled"
+awk '/chain ks_acl_1 /, /^\t}/' "$WORK/ks.nft" | grep -q 'accept' && ok "a direct device is accepted" || bad "a direct device is accepted"
+awk '/chain ks_acl_2 /, /^\t}/' "$WORK/ks.nft" | grep -q 'counter drop' && ok "a tunnelled device is held" || bad "a tunnelled device is held"
+awk '/chain ks_acl_2 /, /^\t}/' "$WORK/ks.nft" | grep -q 'tcp dport { 25 } accept' && ok "except for the ports that rule sends direct" || bad "except for the ports that rule sends direct"
+rig_set acl_enable 0
+ks_dump
+ks_hasnt 'ks_acl_' "Access Control rules are not read with the page off"
+rm -f "$ZGZ_RUN/acl.tsv"
+
+echo "== the Kill switch, iptables"
+rig_set lan_zone "br-lan"
+rig_set kill_switch 1
+sh "$RIG/lib/zgz-rules" ks dump-ipt > "$WORK/ks.ipt" 2>&1
+for want in '^-N ZGZ_KS$' '^-A ZGZ_KS -o br-lan -j RETURN$' '^-A ZGZ_KS -d 192.168.0.0/16 -j RETURN$' '^-A ZGZ_KS -j DROP$'; do
+	if grep -q -- "$want" "$WORK/ks.ipt"; then ok "iptables rules contain: $want"; else bad "iptables rules contain: $want"; fi
+done
+if grep -q 'DROP' "$WORK/ks.ipt" && [ "$(tail -1 "$WORK/ks.ipt")" = "-A ZGZ_KS -j DROP" ]; then
+	ok "the drop is the last rule"
+else
+	bad "the drop is the last rule"
+fi
+
+echo "== the Kill switch outlasts the tunnel"
+# Its boot script runs before the firewall (19) and the network (20), and
+# never takes it away.
+start_n="$(sed -n 's/^START=//p' "$RIG_SRC/package/zirgozar/files/zirgozar-killswitch.init")"
+if [ -n "$start_n" ] && [ "$start_n" -lt 19 ]; then
+	ok "its boot script runs before the firewall"
+else
+	bad "its boot script runs before the firewall (START=$start_n)"
+fi
+if awk '/^stop\(\)/, /^}/' "$RIG_SRC/package/zirgozar/files/zirgozar-killswitch.init" | grep -q 'ks down\|ks_down'; then
+	bad "its boot script never takes it down"
+else
+	ok "its boot script never takes it down"
+fi
+# Both the stop and the failed paths of the tunnel's own service call the
+# tunnel's `down`, which does not touch it - and none calls `ks down`.
+if grep -n 'ks down' "$RIG_SRC/package/zirgozar/files/zirgozar.init" "$RIG_SRC/package/zirgozar/files/zgz-connect" >/dev/null 2>&1; then
+	bad "nothing on the tunnel's way down takes the Kill switch down"
+else
+	ok "nothing on the tunnel's way down takes the Kill switch down"
+fi
+rig_clear
+
 rig_report
