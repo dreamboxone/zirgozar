@@ -544,6 +544,12 @@ cmd_use() {
 select_row() {
 	_row="$1"
 	_ms="${2:-0}"
+	# WARP over MASQUE with no noize, on a router whose Xray speaks MASQUE:
+	# Xray's own outbound, and no Vwarp - see masque_native.
+	if [ "$(printf '%s' "$_row" | cut -f3)" = "warp" ] && masque_native "$(printf '%s' "$_row" | cut -f6-)"; then
+		_mrow="$(printf '%s\n' "$_row" | warp_natives | head -1)"
+		[ -n "$_mrow" ] && _row="$_mrow"
+	fi
 	_tag="$(printf '%s' "$_row" | cut -f1)"
 
 	_label="$(printf '%s' "$_row" | cut -f2)"

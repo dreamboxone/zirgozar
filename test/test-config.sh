@@ -470,6 +470,18 @@ else
 	bad "a profile with no server produces nothing"
 fi
 
+# A MASQUE account as Xray's own outbound: Vwarp's masque_config.json, the
+# server's PEM key reduced to the base64 Xray reads.
+echo "== WARP over MASQUE, carried by Xray"
+MQ="$RIG/work/masque_config.json"
+printf '{"private_key":"MHcCAQEE","endpoint_v4":"162.159.198.2","endpoint_pub_key":"-----BEGIN PUBLIC KEY-----\\nMFkwEw==\\n-----END PUBLIC KEY-----\\n","ipv4":"172.16.0.2","ipv6":"2606:4700::2"}' > "$MQ"
+MQOUT="$(PAYLOAD='{"type":"warp","mode":"masque","id":"x","endpoint":"","noize":""}' TAG=t LABEL=m \
+	LC_ALL=C awk -v WARPWG=1 -f "$RIG/lib/zgz-parse" < "$MQ")"
+check "$(printf '%s' "$MQOUT" | cut -f3-5 | tr '\t' ' ')" "masque 162.159.198.2 443" "the account's own endpoint, on 443"
+for want in '"protocol":"masque"' '"network":"masque"' '"publicKey":"MFkwEw=="' '"privateKey":"MHcCAQEE"' '"address":["172.16.0.2","2606:4700::2"]'; do
+	if printf '%s' "$MQOUT" | grep -qF "$want"; then ok "into the outbound: $want"; else bad "into the outbound: $want"; fi
+done
+
 # The two shapes people are actually handed, and the two this could not read.
 #
 # A Clash file and a hysteria file are both YAML, and the parser only treated a
@@ -731,9 +743,9 @@ WM="$(printf 'warp://auto?mode=masque#M\n' | LC_ALL=C awk -f "$RIG/lib/zgz-parse
 check "$(printf '%s' "$WM" | cut -f3-5 | tr '\t' ' ')" "warp 162.159.198.1 443" "WARP over MASQUE knocks on Cloudflare's MASQUE address"
 if printf '%s' "$WM" | grep -qF '"noize":"medium"'; then ok "and is disguised unless told otherwise"; else bad "and is disguised unless told otherwise"; fi
 WMA="$(printf '%s' "$WM" | cut -f6- | VWARP=1 BIND=127.0.0.1:10808 CACHE=/c MARK=255 LC_ALL=C awk -v WARPCONF=1 -f "$RIG/lib/zgz-parse")"
-check "$WMA" "--bind 127.0.0.1:10808 --cache-dir /c --fwmark 255 --dns 1.1.1.1 --masque --endpoint 162.159.198.1:443 --noize-preset medium" "Vwarp is told MASQUE, where, and how to disguise it"
+check "$WMA" "--bind 127.0.0.1:10808 --cache-dir /c --fwmark 255 --dns 1.1.1.1 --masque --endpoint 162.159.198.1:443 --noize --noize-preset medium" "Vwarp is told MASQUE, where, and how to disguise it"
 check "$(printf '%s' "$WM" | cut -f6- | BIND=x CACHE=y LC_ALL=C awk -v WARPCONF=1 -f "$RIG/lib/zgz-parse" 2>/dev/null | wc -l | tr -d ' ')" "0" "warp-plus is never handed MASQUE"
-check "$(printf 'warp://162.159.198.2?mode=masque&noize=off\n' | LC_ALL=C awk -f "$RIG/lib/zgz-parse" | cut -f6- | VWARP=1 BIND=b CACHE=c LC_ALL=C awk -v WARPCONF=1 -f "$RIG/lib/zgz-parse" | grep -o -- '--endpoint [^ ]*\|--noize-preset=$' | tr '\n' ' ')" "--endpoint 162.159.198.2:443 --noize-preset= " "an address alone is on 443, and off is off"
+check "$(printf 'warp://162.159.198.2?mode=masque&noize=off\n' | LC_ALL=C awk -f "$RIG/lib/zgz-parse" | cut -f6- | VWARP=1 BIND=b CACHE=c LC_ALL=C awk -v WARPCONF=1 -f "$RIG/lib/zgz-parse" | grep -o -- '--endpoint [^ ]*\|--noize' | tr '\n' ' ')" "--endpoint 162.159.198.2:443 " "an address alone is on 443, and off is off"
 printf '#!/bin/sh\necho refs/tags/v2.2.2 >&2\n' > "$RIG/core/vwarp"
 chmod +x "$RIG/core/vwarp"
 printf '#!/bin/sh\necho refs/tags/v1.2.6 >&2\n' > "$RIG/core/warp-plus"

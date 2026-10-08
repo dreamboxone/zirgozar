@@ -389,7 +389,7 @@ method_warp() {
 	[ -n "$_wi" ] || _wi='{"warp":false}'
 	printf '{"info":%s,"job":"%s","message":"%s"}\n' "$_wi" \
 		"$(json_escape "$(cat "$JOB" 2>/dev/null)")" \
-		"$(json_escape "$(cat "$ZGZ_MESSAGE" 2>/dev/null)")"
+		"$(json_escape "$(cat "$ZGZ_RUN/warp-$sid.message" 2>/dev/null)")"
 }
 
 # The Server-Side page's status line: which of the two cores is running its

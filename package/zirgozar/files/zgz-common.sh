@@ -317,6 +317,10 @@ wanted_engine() {
 	   [ -x "$(engine_singbox_path)" ]; then
 		_we=singbox
 	fi
+	# WARP over MASQUE is Xray's alone: sing-box has no such outbound.
+	if [ "$_we" = "singbox" ] && grep -q '"protocol":"masque"' "$ZGZ_BEST" 2>/dev/null; then
+		_we=xray
+	fi
 	# A SOCKS node set to carry UDP over TCP: Xray would connect it, and send
 	# its UDP the ordinary way the server was set up not to take. Over plain
 	# TCP only - sing-box's socks has no other transport.
@@ -1341,6 +1345,17 @@ warp_natives() {
 		_wn_f="$(warp_dir "$_wn_id")/primary/wgcf-identity.json"
 		case "$_wn_p" in
 			*'"mode":"wgconf"'*) _wn_f=/dev/null ;;
+			*'"mode":"masque"'*)
+				_wn_f="$(warp_dir "$_wn_id")/masque_config.json"
+				if [ ! -s "$_wn_f" ]; then
+					warn "WARP node '$(printf '%s' "$_wn" | cut -f2)' has no MASQUE account yet - press Register on its page"
+					continue
+				fi
+				if ! xray_has_masque; then
+					warn "WARP node '$(printf '%s' "$_wn" | cut -f2)': no Xray on this router speaks MASQUE - patterniha's 26.10.8 or later does"
+					continue
+				fi
+				;;
 			*'"mode":"warp"'*)
 				if [ ! -s "$_wn_f" ]; then
 					warn "WARP node '$(printf '%s' "$_wn" | cut -f2)' has no account yet - press Register on its page, or connect through it once"
@@ -1356,6 +1371,52 @@ warp_natives() {
 			LC_ALL=C awk -v WARPWG=1 -f "$ZGZ_LIB/zgz-parse" < "$_wn_f" 2>/dev/null || true
 	done
 	return 0
+}
+
+# Can an Xray on this router carry WARP over MASQUE itself? Since 26.10 one
+# can - patterniha's build first. Asked of each Xray there is with a config
+# that needs nothing but the outbound, and the answer kept until the set of
+# Xray files changes.
+xray_has_masque() {
+	_xm_set="$(for _x in $(xray_by_version) "$(core_dir)/xray-patterniha"; do
+		[ -x "$_x" ] && printf '%s %s %s;' "$_x" "$(file_size "$_x")" "$(date -r "$_x" +%s 2>/dev/null)"
+	done)"
+	_xm_c="$ZGZ_RUN/masque.ok"
+	if [ -s "$_xm_c" ] && [ "$(sed -n 1p "$_xm_c")" = "$_xm_set" ]; then
+		[ "$(sed -n 2p "$_xm_c")" = "yes" ]
+		return $?
+	fi
+	_xm_cfg="$ZGZ_RUN/masque-check.json"
+	printf '%s
+' '{"log":{"loglevel":"none"},"outbounds":[{"protocol":"masque","settings":{"address":"162.159.198.1","port":443},"streamSettings":{"network":"masque","security":"tls"}}]}' > "$_xm_cfg"
+	_xm_ok=no
+	for _x in $(xray_by_version) "$(core_dir)/xray-patterniha"; do
+		[ -x "$_x" ] || continue
+		"$_x" run -test -config "$_xm_cfg" >/dev/null 2>&1 && { _xm_ok=yes; break; }
+	done
+	rm -f "$_xm_cfg"
+	printf '%s
+%s
+' "$_xm_set" "$_xm_ok" > "$_xm_c" 2>/dev/null || true
+	[ "$_xm_ok" = "yes" ]
+	return $?
+}
+
+# A WARP node over MASQUE that the core can carry itself: its account is
+# there, it asks for none of Vwarp's noize, and an Xray here speaks MASQUE.
+# Then it is an outbound like any other, and Vwarp is not run at all.
+masque_native() {
+	case "$1" in
+		*'"mode":"masque"'*) : ;;
+		*) return 1 ;;
+	esac
+	case "$1" in
+		*'"noize":""'*) : ;;
+		*) return 1 ;;
+	esac
+	_mn_id="$(printf '%s' "$1" | sed -n 's/.*"id":"\([A-Za-z0-9_]*\)".*/\1/p')"
+	[ -s "$(warp_dir "$_mn_id")/masque_config.json" ] || return 1
+	xray_has_masque
 }
 
 # The outbound of one hand-added node, tagged chain-<section>, for the

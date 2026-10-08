@@ -682,7 +682,7 @@ return view.extend({
 			o.depends('_proto', 'warp');
 
 			o = field(form.ListValue, 'warp_noize', _('Disguise (noize)'),
-				_('Junk and padding sent around the first packets, so that a filter does not recognise WireGuard or MASQUE. Heavier gets past more and connects more slowly. Anything but Off needs Vwarp.'));
+				_('Junk and padding sent around the first packets, so that a filter does not recognise WireGuard or MASQUE. Heavier gets past more and connects more slowly. Anything but Off needs Vwarp. WARP over MASQUE with Off is carried by Xray itself when it speaks MASQUE - patterniha’s 26.10.8 or later - and Vwarp is then only needed to register the account.'));
 			o.value('off', _('Off'));
 			NOIZE.forEach(function(v) { o.value(v); });
 			o.depends('_proto', 'warp');

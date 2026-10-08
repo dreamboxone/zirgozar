@@ -66,12 +66,12 @@ register_one() {
 	if [ "$_rmasque" = "1" ]; then
 		_rf="$_rd/masque_config.json"
 		"$WP" --bind "127.0.0.1:$REG_PORT" --cache-dir "$_rd" --masque --endpoint 127.0.0.1:443 \
-			--noize-preset= >> "$REG_LOG" 2>&1 &
+			>> "$REG_LOG" 2>&1 &
 	elif [ "$WPK" = "vwarp" ]; then
 		_rf="$_rd/primary/$ID_FILE"
 		# shellcheck disable=SC2046
 		"$WP" --bind "127.0.0.1:$REG_PORT" --cache-dir "$_rd" --endpoint 127.0.0.1:9 \
-			$([ -n "$_rkey" ] && printf -- '--key %s' "$_rkey") --noize-preset= >> "$REG_LOG" 2>&1 &
+			$([ -n "$_rkey" ] && printf -- '--key %s' "$_rkey") >> "$REG_LOG" 2>&1 &
 	else
 		_rf="$_rd/primary/$ID_FILE"
 		printf '{"bind":"127.0.0.1:%s","cache-dir":"%s","endpoint":"127.0.0.1:9"%s}\n' \
@@ -121,16 +121,30 @@ has_account() {
 	return 1
 }
 
+# What became of a registration, said where it was asked for: the node's
+# own page, which reads it back with its account. Only when it was asked for
+# on the way to starting the tunnel - see cmd_prepare - is it the tunnel's
+# business too, and said on the Status page as well.
+WARP_SID=""
+WARP_SAY_GLOBAL=0
+warp_say() {
+	[ -n "$WARP_SID" ] && echo "$*" > "$ZGZ_RUN/warp-$WARP_SID.message" 2>/dev/null
+	[ "$WARP_SAY_GLOBAL" = "1" ] && say_message "$*"
+	return 0
+}
+
 register_node() {
-	_rec="$(warp_record "$1")" || { say_message "That node is not a WARP node."; return 1; }
+	WARP_SID="$1"
+	rm -f "$ZGZ_RUN/warp-$1.message"
+	_rec="$(warp_record "$1")" || { warp_say "That node is not a WARP node."; return 1; }
 	_p="$(printf '%s' "$_rec" | cut -f6-)"
 	_mode="$(payload_get "$_p" mode)"
 	[ "$_mode" != "wgconf" ] || return 0
 	pick_program "$_p" || {
 		if warp_needs_vwarp "$_p"; then
-			say_message "This WARP node uses MASQUE or noize, which need Vwarp. Install it on the App Update page."
+			warp_say "This WARP node uses MASQUE or noize, which need Vwarp. Install it on the App Update page."
 		else
-			say_message "A WARP node needs warp-plus. Install it on the App Update page."
+			warp_say "A WARP node needs warp-plus. Install it on the App Update page."
 		fi
 		return 1
 	}
@@ -153,10 +167,10 @@ register_node() {
 			*DialTLS*|*Handshake*|*EOF*|*timeout*|*"failed to send request"*) _why="Cloudflare's registration address did not answer from here" ;;
 		esac
 		log "WARP: no account - ${_why:-Cloudflare did not answer}"
-		say_message "Cloudflare could not be reached to register a WARP account. Connect through another node first, with Localhost Proxy on, and press Register again."
+		warp_say "Cloudflare could not be reached to register a WARP account. Connect through another node first, with Localhost Proxy on, and press Register again."
 		return 1
 	fi
-	[ "$_rc" = "2" ] && say_message "The WARP+ licence was not accepted, so the account is a free one. Check the licence, and that it is not already on five devices."
+	[ "$_rc" = "2" ] && warp_say "The WARP+ licence was not accepted, so the account is a free one. Check the licence, and that it is not already on five devices."
 
 	# WARP in WARP: the second account, made beside the first and moved to
 	# where warp-plus looks for it.
@@ -196,6 +210,7 @@ cmd_register() {
 # made through the tunnel that is still up - see stop_service in the init
 # script. Nothing at all for any other node, or for one that has its account.
 cmd_prepare() {
+	WARP_SAY_GLOBAL=1
 	_rec="$(warp_record "$1")" || return 0
 	_p="$(printf '%s' "$_rec" | cut -f6-)"
 	_mode="$(payload_get "$_p" mode)"

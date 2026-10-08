@@ -1113,8 +1113,8 @@ var FA = {
 	'WARP: Cloudflare’s own exit. WARP in WARP: a second WARP behind the first, for an exit address the first does not show. Psiphon behind WARP: an exit in the country chosen below. WARP over MASQUE: WARP reached over HTTP/3 on port 443 rather than WireGuard, for a connection that blocks WireGuard; it needs Vwarp.':
 		'وارپ: خروجی خود کلودفلر. وارپ در وارپ: یک وارپ دوم پشت اولی، برای یک IP خروجی دیگر. سایفون پشت وارپ: خروجی از کشوری که پایین‌تر انتخاب می‌کنید. وارپ با MASQUE: وارپ به‌جای وایرگارد از HTTP/3 روی پورت ۴۴۳، برای اینترنتی که وایرگارد را می‌بندد؛ به Vwarp نیاز دارد.',
 	'Disguise (noize)': 'پوشش (noize)',
-	'Junk and padding sent around the first packets, so that a filter does not recognise WireGuard or MASQUE. Heavier gets past more and connects more slowly. Anything but Off needs Vwarp.':
-		'بسته‌های بی‌معنی و پرکننده دور اولین بسته‌ها، تا فیلتر وایرگارد یا MASQUE را نشناسد. هرچه سنگین‌تر، از فیلترهای بیشتری رد می‌شود و دیرتر وصل می‌شود. هر گزینه‌ای جز «خاموش» به Vwarp نیاز دارد.',
+	'Junk and padding sent around the first packets, so that a filter does not recognise WireGuard or MASQUE. Heavier gets past more and connects more slowly. Anything but Off needs Vwarp. WARP over MASQUE with Off is carried by Xray itself when it speaks MASQUE - patterniha’s 26.10.8 or later - and Vwarp is then only needed to register the account.':
+		'بسته‌های بی‌معنی و پرکننده دور اولین بسته‌ها، تا فیلتر وایرگارد یا MASQUE را نشناسد. هرچه سنگین‌تر، از فیلترهای بیشتری رد می‌شود و دیرتر وصل می‌شود. هر گزینه‌ای جز «خاموش» به Vwarp نیاز دارد. WARP روی MASQUE با گزینه‌ی «خاموش» را، اگر Xray روی روتر MASQUE را بشناسد (Xray پترنیها 26.10.8 به بعد)، خود Xray اجرا می‌کند؛ آن‌وقت Vwarp فقط برای ثبت حساب لازم است.',
 	'Off': 'خاموش',
 	'Vwarp App Path': 'مسیر برنامه Vwarp',
 	'Only WARP nodes over MASQUE or with noize need it. Empty means this program’s own copy in the folder above.':

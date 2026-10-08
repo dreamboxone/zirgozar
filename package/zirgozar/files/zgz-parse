@@ -772,7 +772,7 @@ function warp_conf(d,   mode, out, ep, key, f, n, lines, i, v) {
 		close(f)
 		if (ENVIRON["VWARP"] == "1")
 			print "--bind " ENVIRON["BIND"] " --cache-dir " ENVIRON["CACHE"] \
-			      (ENVIRON["MARK"] != "" ? " --fwmark " (ENVIRON["MARK"] + 0) : "") " --wgconf " f " --noize-preset="
+			      (ENVIRON["MARK"] != "" ? " --fwmark " (ENVIRON["MARK"] + 0) : "") " --wgconf " f
 		else
 			print out ",\"wgconf\":\"" jesc(f) "\"}"
 		return
@@ -836,7 +836,9 @@ function vwarp_args(d, mode,   out, v, ep) {
 	v = jstr(d, "reserved")
 	if (v ~ /^[0-9]+,[0-9]+,[0-9]+$/) out = out " --reserved " v
 	v = jstr(d, "noize")
-	out = out ((v ~ /^(minimal|light|medium|heavy|stealth|gfw|firewall)$/) ? " --noize-preset " v : " --noize-preset=")
+	# Off unless asked for: Vwarp 2.2 turns noize on with --noize alone, and
+	# refuses an empty --noize-preset= outright.
+	if (v ~ /^(minimal|light|medium|heavy|stealth|gfw|firewall)$/) out = out " --noize --noize-preset " v
 	print out
 }
 
@@ -847,6 +849,7 @@ function vwarp_args(d, mode,   out, v, ep) {
 # the account's own unless the node names others.
 function warp_wg(d,   p, cfg, peer, ifc, v4, v6, pk, pub, ep, res) {
 	p = ENVIRON["PAYLOAD"]
+	if (jstr(p, "mode") == "masque") { warp_masque(d, p); return }
 	if (jstr(p, "mode") == "wgconf") {
 		if (!hostport(jstr(p, "endpoint")) || jraw(p, "xray") == "") exit 1
 		printf "%s\t%s\twireguard\t%s\t%d\t%s\n", ENVIRON["TAG"], ENVIRON["LABEL"], HOST, PORT, jraw(p, "xray")
@@ -869,6 +872,39 @@ function warp_wg(d,   p, cfg, peer, ifc, v4, v6, pk, pub, ep, res) {
 	res = (res != "") ? wg_reserved(res) : wg_reserved(jstr(cfg, "client_id"))
 	printf "%s\t%s\twireguard\t%s\t%d\t%s\n", ENVIRON["TAG"], ENVIRON["LABEL"], HOST, PORT, \
 		mk_wg(pk, "[\"" v4 "/32\"" (v6 != "" ? ",\"" v6 "/128\"" : "") "]", pub, "", 5, 1280, res)
+}
+
+# A MASQUE account - the masque_config.json Vwarp writes when it registers -
+# as Xray's own MASQUE outbound, which Xray has had since 26.10 (patterniha's
+# build first). The account's key is the client certificate, and the
+# server's key is pinned in place of a certificate authority, which is how
+# Cloudflare's WARP over MASQUE is checked. Vwarp's noize has no equivalent
+# here, so a node set to use it stays Vwarp's.
+function warp_masque(d, p,   pk, pub, v4, v6, ep) {
+	d = jtrim(d)
+	pk = jstr(d, "private_key")
+	# The server's key arrives as PEM; its base64 body is what Xray reads
+	# just as well, without the line breaks a JSON string turns into spaces.
+	pub = jraw(d, "endpoint_pub_key")
+	gsub(/-----(BEGIN|END) [A-Z ]*-----/, "", pub)
+	gsub(/\\n|\\r|["\t ]/, "", pub)
+	v4 = jstr(d, "ipv4")
+	v6 = jstr(d, "ipv6")
+	if (pk == "" || pub == "" || v4 == "") exit 1
+	ep = jstr(p, "endpoint")
+	if (ep == "" && jstr(d, "endpoint_v4") != "") ep = jstr(d, "endpoint_v4") ":443"
+	if (ep == "") ep = "162.159.198.1:443"
+	if (!hostport(ep)) exit 1
+	printf "%s\t%s\tmasque\t%s\t%d\t%s\n", ENVIRON["TAG"], ENVIRON["LABEL"], HOST, PORT, \
+		mk_masque(pk, pub, "\"" v4 "\"" (v6 != "" ? ",\"" v6 "\"" : ""))
+}
+
+function mk_masque(pk, pub, addrs) {
+	return "{\"protocol\":\"masque\",\"settings\":{\"address\":\"" jesc(HOST) "\",\"port\":" PORT "}," \
+	       "\"streamSettings\":{\"network\":\"masque\",\"security\":\"tls\"," \
+	       "\"tlsSettings\":{\"serverName\":\"consumer-masque.cloudflareclient.com\"}," \
+	       "\"masqueSettings\":{\"warp\":{\"privateKey\":\"" jesc(pk) "\",\"publicKey\":\"" jesc(pub) "\"," \
+	       "\"address\":[" addrs "]}}}}"
 }
 
 # ------------------------------------------------------------------- JSON
