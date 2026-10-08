@@ -184,7 +184,7 @@ function parseLink(link) {
 		}
 		f.security = take('security') || (proto == 'trojan' ? 'tls' : 'none');
 		f.sni = take('sni'); f.fp = take('fp'); f.alpn = take('alpn');
-		f.pbk = take('pbk'); f.sid = take('sid'); f.spx = take('spx');
+		f.pbk = take('pbk'); f.sid = take('sid'); f.spx = take('spx'); f.pqv = take('pqv');
 		f.type = take('type') || 'tcp'; f.host = take('host'); f.path = take('path');
 		f.service_name = take('serviceName'); f.header_type = take('headerType');
 		var mode = take('mode');
@@ -297,7 +297,7 @@ function buildLink(f, name) {
 		if (p == 'vless') { q.encryption = f.encryption || 'none'; q.flow = f.flow; }
 		q.security = f.security;
 		if (f.security != 'none') { q.sni = f.sni; q.fp = f.fp; q.alpn = f.alpn; }
-		if (f.security == 'reality') { q.pbk = f.pbk; q.sid = f.sid; q.spx = f.spx; }
+		if (f.security == 'reality') { q.pbk = f.pbk; q.sid = f.sid; q.spx = f.spx; q.pqv = f.pqv; }
 		transportQuery(f, q);
 		var cred = p == 'vless' ? f.uuid : f.password;
 		var qs = buildQuery(q);
@@ -794,6 +794,17 @@ return view.extend({
 			o = field(form.Value, 'sid', _('Short Id'));
 			TLSP.forEach(function(p) { o.depends({ '_proto': p, '_security': 'reality' }); });
 			o = field(form.Value, 'spx', _('Spider X'));
+			TLSP.forEach(function(p) { o.depends({ '_proto': p, '_security': 'reality' }); });
+			/* pqv: the server's ML-DSA-65 key, 2603 characters of base64url.
+			   Xray refuses the whole node over anything else, so the router
+			   leaves out a value that is not one - say so here, before saving. */
+			o = field(form.Value, 'pqv', _('ML-DSA-65 Verify (pqv)'),
+				_('The post-quantum check of the REALITY server: its ML-DSA-65 public key. Empty connects without the check. sing-box has no such check.'));
+			o.validate = function(section_id, value) {
+				var v = String(value || '').replace(/=+$/, '');
+				if (v === '' || (/^[A-Za-z0-9_-]+$/.test(v) && v.length == 2603)) return true;
+				return _('Not an ML-DSA-65 key: it has to be 2603 characters of base64url, and this is %d.').format(v.length);
+			};
 			TLSP.forEach(function(p) { o.depends({ '_proto': p, '_security': 'reality' }); });
 
 			o = field(form.Flag, 'insecure', _('allowInsecure'));

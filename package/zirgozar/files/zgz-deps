@@ -64,7 +64,20 @@ wanted() {
 	if [ ! -x /usr/sbin/openvpn ] && ! command -v openvpn >/dev/null 2>&1 && has_ovpn_node; then
 		echo "openvpn-openssl"
 	fi
+	# A profile for a server that speaks only an old cipher - BF-CBC, CAST5,
+	# DES - needs OpenSSL's legacy provider; zgz-bridge loads it when it is
+	# there. An OpenVPN built on mbed TLS has no providers to load.
+	if has_legacy_cipher && ! { _ovv="$(command -v openvpn 2>/dev/null || echo /usr/sbin/openvpn)"; [ -x "$_ovv" ] &&
+	   ! "$_ovv" --version 2>/dev/null | head -1 | grep -q OpenSSL; }; then
+		echo "libopenssl-legacy"
+	fi
 	return 0
+}
+
+has_legacy_cipher() {
+	has_ovpn_node || return 1
+	uci -q show zirgozar 2>/dev/null | grep -qiE "(^|='|^[[:space:]]*)cipher[[:space:]]+(BF|CAST5|DES|DESX|RC2|IDEA|SEED)-"
+	return $?
 }
 
 installed() {

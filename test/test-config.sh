@@ -457,6 +457,75 @@ for gone in 'up /etc/x.sh' 'script-security 2' 'redirect-gateway'; do
 	if printf '%s\n' "$OVRUN" | grep -qF "$gone"; then bad "the profile drops: $gone"; else ok "the profile drops: $gone"; fi
 done
 check "$(cat "$RIG/work/ov.auth" 2>/dev/null | tr '\n' ' ')" "bob secret " "the user name and password go to a file of their own"
+# A profile made for Windows, or for an old server: directives OpenVPN 2.6
+# refuses the whole file over. sing-box passed over them, and so must this.
+printf 'client
+remote 203.0.113.9 1194
+tls-remote srvname
+key-method 2
+keysize 128
+ip-win32 dynamic
+route-method exe
+dhcp-renew
+ns-cert-type server
+<ca>
+AAAA
+</ca>
+' > "$OV"
+OVRUN="$(LC_ALL=C awk -f "$RIG/lib/zgz-parse" < "$OV" | cut -f6- | LC_ALL=C awk -v OVPNCONF=1 -f "$RIG/lib/zgz-parse")"
+for gone in 'tls-remote' 'key-method' 'keysize' 'ip-win32' 'route-method' 'dhcp-renew'; do
+	if printf '%s\n' "$OVRUN" | grep -q "^$gone"; then bad "a directive OpenVPN 2.6 refuses is dropped: $gone"; else ok "a directive OpenVPN 2.6 refuses is dropped: $gone"; fi
+done
+for want in 'verify-x509-name srvname name' 'ns-cert-type server'; do
+	if printf '%s\n' "$OVRUN" | grep -qxF "$want"; then ok "and kept as OpenVPN 2.6 says it: $want"; else bad "and kept as OpenVPN 2.6 says it: $want"; fi
+done
+
+# The names of the servers OpenVPN dials are looked up directly, never through
+# the tunnel OpenVPN is opening: the core's way out for this node is OpenVPN's
+# own device.
+printf 'client
+remote vpn.example.com 1194 udp
+remote vpn2.example.net 443 tcp
+<ca>
+AAAA
+</ca>
+' > "$OV"
+rig_clear
+LC_ALL=C awk -f "$RIG/lib/zgz-parse" < "$OV" | cut -f6- > "$RIG/etc/bridge.json"
+printf '{"protocol":"freedom","settings":{},"streamSettings":{"sockopt":{"interface":"zgzovpn","mark":255,"domainStrategy":"UseIP"}}}\n' > "$RIG/etc/best.json"
+printf 'tag=n0\nlabel=OV\nprotocol=openvpn\nhost=vpn.example.com\nport=1194\n' > "$RIG/etc/best.meta"
+sh "$RIG/lib/zgz-mkconfig" > "$WORK/ovdns.json" 2>"$WORK/ovdns.err" || bad "mkconfig failed: $(cat "$WORK/ovdns.err")"
+OVDNS="$(tr -d ' \n' < "$WORK/ovdns.json")"
+if printf '%s' "$OVDNS" | grep -qF '"tag":"dns-direct"' &&
+   printf '%s' "$OVDNS" | grep -o '"tag":"dns-direct"[^]]*]' | grep -qF '"full:vpn.example.com","full:vpn2.example.net"'; then
+	ok "every OpenVPN server name is looked up by the direct resolver"
+else
+	bad "every OpenVPN server name is looked up by the direct resolver"
+fi
+
+# A server too old to negotiate a cipher: OpenVPN 2.6 no longer offers the
+# profile's "cipher" by itself, and the server refuses with "no shared cipher".
+# zgz-bridge offers it and falls back on it, as sing-box did.
+if command -v openvpn >/dev/null 2>&1; then
+	printf 'client
+remote 203.0.113.9 1194
+cipher AES-128-CBC
+<ca>
+AAAA
+</ca>
+' > "$OV"
+	LC_ALL=C awk -f "$RIG/lib/zgz-parse" < "$OV" | cut -f6- > "$RIG/etc/bridge.json"
+	ZGZ_BRIDGE_JSON="$WORK/ovb.json" sh "$RIG/lib/zgz-bridge" config >/dev/null 2>&1 || bad "zgz-bridge config failed"
+	if grep -qx 'data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305:AES-128-CBC' "$WORK/ovb.json.ovpn" 2>/dev/null &&
+	   grep -qx 'data-ciphers-fallback AES-128-CBC' "$WORK/ovb.json.ovpn"; then
+		ok "the profile's cipher is offered and fallen back on"
+	else
+		bad "the profile's cipher is offered and fallen back on"
+	fi
+else
+	echo "  skip - no openvpn to check the cipher fallback against"
+fi
+rm -f "$RIG/etc/bridge.json" "$RIG/etc/best.json" "$RIG/etc/best.meta"
 # A static key: no certificate authority, and still a node now that OpenVPN
 # itself carries it.
 printf 'dev tun

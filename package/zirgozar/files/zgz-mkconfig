@@ -770,6 +770,19 @@ direct_names="$(printf '%s\n%s\n%s\n%s\n%s\n' "$proxy_out" "$chain_outs" "$acl_o
 	grep -oE '"(address|endpoint)":"[^"]*"' | sed 's/^"[a-z]*":"//; s/"$//' |
 	sed 's/:[0-9]*$//' | grep '[a-zA-Z]' | grep -v -e '^\[' -e ':' | sort -u |
 	awk 'NF { printf "%s\"full:%s\"", (n++ ? "," : ""), $0 }')"
+# An OpenVPN node is dialled by OpenVPN, not by the core, and the core's way
+# out for it is OpenVPN's own device: its servers' names are not in any
+# outbound above, and were looked up through the remote resolver - through the
+# very tunnel OpenVPN is trying to open. The first start got away with it,
+# because the router's lookups are sent to the core only once OpenVPN is up;
+# every reconnect after that, and every switch to an OpenVPN node while another
+# was running, asked a tunnel that was not there, and OpenVPN never connected.
+if bridge_is_ovpn; then
+	_ovn="$(grep -oE '"server":"[^"]*"' "$ZGZ_ETC/bridge.json" 2>/dev/null | sed 's/^"server":"//; s/"$//' |
+		grep '[a-zA-Z]' | grep -v ':' | sort -u |
+		awk 'NF { printf "%s\"full:%s\"", (n++ ? "," : ""), $0 }')"
+	[ -n "$_ovn" ] && direct_names="${direct_names:+$direct_names,}$_ovn"
+fi
 [ -n "$direct_domains" ] && direct_names="${direct_names:+$direct_names,}$direct_domains"
 [ -n "$shunt_direct_names" ] && direct_names="${direct_names:+$direct_names,}$shunt_direct_names"
 [ "$route_ir" = "1" ] && direct_names="${direct_names:+$direct_names,}\"geosite:ir\""

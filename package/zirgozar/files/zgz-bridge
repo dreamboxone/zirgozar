@@ -241,6 +241,38 @@ ovpn_config() {
 	   ! grep -qE '^(client|tls-client|tls-server)([[:space:]]|$)' "$_ovf.new"; then
 		echo "allow-deprecated-insecure-static-crypto" >> "$_ovf.new"
 	fi
+	# The cipher of a server too old to negotiate one - an OpenVPN 2.3 or
+	# earlier, a SoftEther, most free lists. Its profile says "cipher X", and
+	# OpenVPN 2.6 no longer takes that as an offer: the server answers "no
+	# shared cipher" and refuses. sing-box, which carried these before, did
+	# take it. So X joins the ciphers offered and is the one fallen back on,
+	# unless the profile says otherwise - and only when this OpenVPN has it.
+	# BF-CBC and the other old ones are in OpenSSL 3's legacy provider, which
+	# is loaded for them when the router has it (libopenssl-legacy).
+	_oc="$(sed -n 's/^cipher[[:space:]]\{1,\}\([^[:space:]]*\).*/\1/p' "$_ovf.new" | tail -1)"
+	_ovb="$(find_openvpn)"
+	_ohas=""
+	if [ -n "$_oc" ] && [ "$_oc" != "none" ]; then
+		if "$_ovb" --show-ciphers 2>/dev/null | grep -qi "^$_oc[[:space:]]"; then
+			_ohas=1
+		elif ! grep -q '^providers[[:space:]]' "$_ovf.new" &&
+		     "$_ovb" --providers legacy default --show-ciphers 2>/dev/null | grep -qi "^$_oc[[:space:]]"; then
+			echo "providers legacy default" >> "$_ovf.new"
+			_ohas=1
+		else
+			log "OpenVPN: this OpenVPN has no $_oc, the cipher the profile names - a server that knows no other will refuse it"
+		fi
+	fi
+	if [ -n "$_ohas" ]; then
+		_odc="$(sed -n 's/^\(data-ciphers\|ncp-ciphers\)[[:space:]]\{1,\}\([^[:space:]]*\).*/\2/p' "$_ovf.new" | tail -1)"
+		[ -n "$_odc" ] || _odc="AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305"
+		case ":$(echo "$_odc" | tr 'a-z' 'A-Z'):" in
+			*":$(echo "$_oc" | tr 'a-z' 'A-Z'):"*) : ;;
+			*) echo "data-ciphers $_odc:$_oc" >> "$_ovf.new" ;;
+		esac
+		grep -q '^data-ciphers-fallback[[:space:]]' "$_ovf.new" ||
+			echo "data-ciphers-fallback $_oc" >> "$_ovf.new"
+	fi
 	# OpenVPN waits two minutes on a server that does not answer before it
 	# tries again or moves to the next one, and a first attempt that hangs
 	# is common enough here: a second one, seconds later, very often goes

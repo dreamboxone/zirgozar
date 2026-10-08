@@ -2134,13 +2134,19 @@ function ov_net(p) {
 	return ""
 }
 
-# Directives left out of the profile this program runs.
+# Directives left out of the profile this program runs. After the ones that
+# would act on the router: those OpenVPN 2.6 no longer has and refuses the
+# whole profile over - removed outright, or Windows-only and unknown to the
+# Linux build. Profiles made for Windows carry them as a matter of course,
+# and sing-box, which carried OpenVPN before, passed over them.
 function ov_dropped(k) {
+	if (k ~ /^(tls-remote|key-method|ncp-disable|keysize|no-iv|prng|mtu-dynamic|client-cert-not-required|ifconfig-pool-linear|compat-names|no-name-remapping|win-sys|ip-win32|route-method|dhcp-renew|dhcp-release|dhcp-pre-release|tap-sleep|show-net-up|allow-nonadmin|windows-driver|pause-exit|service)$/)
+		return 1
 	return k ~ /^(up|down|down-pre|up-delay|up-restart|route-up|route-pre-down|ipchange|client-connect|client-disconnect|learn-address|tls-verify|auth-user-pass-verify|plugin|script-security|setenv-safe|management|management-.*|daemon|log|log-append|syslog|writepid|status|status-version|chroot|user|group|cd|config|dev|dev-type|dev-node|redirect-gateway|redirect-private|route|route-ipv6|route-gateway|route-delay|route-metric|route-noexec|route-nopull|iproute|dhcp-option|block-outside-dns|register-dns|mark|askpass|auth-user-pass|verb|tmp-dir|machine-readable-output)$/
 }
 
 function ovpn_conf(doc,   lines, m, i, l, t, k, w, nw, p, inblk, name, nrem, rh, rp, rn, \
-                          proto, dport, extra, keep, auth, authblk, pl, j, servers, out, tap) {
+                          proto, dport, extra, keep, auth, authblk, pl, j, servers, out, tap, vx) {
 	m = split(doc, lines, "\n")
 	proto = "udp"; dport = 1194
 	for (i = 1; i <= m; i++) {
@@ -2185,6 +2191,7 @@ function ovpn_conf(doc,   lines, m, i, l, t, k, w, nw, p, inblk, name, nrem, rh,
 		else if (k == "auth-user-pass") auth = 1
 		else if (k == "dev" && w[2] ~ /^tap/) tap = 1
 		else if (k == "dev-type" && w[2] == "tap") tap = 1
+		else if (k == "verify-x509-name") vx = 1
 	}
 
 	# Nowhere to connect to: a server's profile, or half of one.
@@ -2212,7 +2219,13 @@ function ovpn_conf(doc,   lines, m, i, l, t, k, w, nw, p, inblk, name, nrem, rh,
 			if (keep) out = out l "\n"
 			continue
 		}
-		split(t, w, /[ \t]+/)
+		nw = split(t, w, /[ \t]+/)
+		# tls-remote is gone, and the check it made is verify-x509-name's
+		# now: a plain common name says the same thing in the new words.
+		if (tolower(w[1]) == "tls-remote" && nw == 2 && !vx && w[2] !~ /[\/=,"]/) {
+			out = out "verify-x509-name " w[2] " name\n"
+			continue
+		}
 		if (ov_dropped(tolower(w[1]))) continue
 		out = out t "\n"
 	}
