@@ -589,9 +589,10 @@ refused rather than half written, and a file the core cannot read is never
 installed.
 
 **Sing-Box/Xray Shunt Rule**, as in PassWall2: the rules, a tab for each group
-with its count, in the order they are tried — the higher, the sooner. Type an
-ID — letters, digits and `_` — and press **Add**, and the new rule opens on a
-page of its own with PassWall2's fields: Remarks, Shunt Rule Group, Protocol
+with its count, in the order they are tried — the higher, the sooner. Type a
+name — in any language — and press **Add**, and the new rule opens on a
+page of its own (a name of letters, digits and `_` is its ID too; any other is
+given an ID of its own) with PassWall2's fields: Remarks, Shunt Rule Group, Protocol
 (http, tls, quic, bittorrent), Inbound Tag (transparent proxy, SOCKS),
 Network, Source, Port, Domain, IP and **invert**. **To Top**, dragging by the
 handle, **Edit** and **Delete** are beside each rule; the order is kept with

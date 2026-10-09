@@ -430,12 +430,14 @@ return view.extend({
 		so.value('tls');
 		so.value('quic');
 		so.value('bittorrent');
+		pui.checkboxes(so);
 
 		so = sr.option(form.MultiValue, 'inbound', _('Inbound Tag'),
 			_('None ticked is both.'));
 		so.modalonly = true;
 		so.value('tproxy', _('Transparent proxy'));
 		so.value('socks', 'Socks');
+		pui.checkboxes(so);
 
 		so = sr.option(form.ListValue, 'network', _('Network'));
 		so.modalonly = true;

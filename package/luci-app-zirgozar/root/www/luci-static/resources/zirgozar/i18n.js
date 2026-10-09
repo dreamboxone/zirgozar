@@ -710,8 +710,8 @@ var FA = {
 	'User-Agent': 'User-Agent',
 
 	/* ------------------------------------------------------ Shunt Rule */
-	'Shunt Rule': 'قانون عبور',
-	'Shunt Rule Group': 'گروه قانون عبور',
+	'Shunt Rule': 'قانون شانت',
+	'Shunt Rule Group': 'گروه قانون شانت',
 	'default': 'پیش‌فرض',
 	'Default': 'پیش‌فرض',
 	'Rule': 'قانون',
@@ -730,11 +730,11 @@ var FA = {
 	'Only the rules of this group are used. Save and apply for the table below to show them.':
 		'فقط قانون‌های این گروه اجرا می‌شوند. بعد از تغییر گروه «ذخیره و اعمال» را بزنید تا جدول پایین قانون‌های همان گروه را نشان دهد.',
 	'No shunt rules yet. Add one with the button below.':
-		'هنوز قانون عبوری وجود ندارد. با دکمه پایین یکی اضافه کنید.',
+		'هنوز قانون شانتی وجود ندارد. با دکمه پایین یکی اضافه کنید.',
 	'AsIs: only the name is used for routing. IPIfNonMatch: when no rule matches the name, it is resolved to addresses and all the rules are tried again. IPOnDemand: whenever an address rule is met, the name is resolved at once. Auto chooses IPIfNonMatch when a rule or the Iran split has addresses in it, and AsIs otherwise.':
 		'اگر برای سایتی بر اساس نامش قانونی پیدا نشود چه کار شود. AsIs: فقط نام بررسی می‌شود (سریع‌تر). IPIfNonMatch: اگر هیچ قانونی با نام جور نشد، IP سایت پیدا می‌شود و قانون‌های IP هم بررسی می‌شوند. IPOnDemand: برای هر قانون IP، آدرس سایت فورا پیدا می‌شود. خودکار: اگر قانونی با IP دارید IPIfNonMatch، وگرنه AsIs.',
 	'Which traffic each rule is about. Where it goes — a node, direct, or blocked — is chosen in the Shunt Rule tab of Basic Settings. The rules steer the tunnel’s own traffic, in this order, ahead of the Iran split; a device with a node of its own on the Access Control page keeps it.':
-		'هر قانون مشخص می‌کند درباره کدام ترافیک است. اینکه آن ترافیک کجا برود (یک کانفیگ، مستقیم یا مسدود) در زبانه «قانون عبور» صفحه «تنظیمات پایه» انتخاب می‌شود. قانون‌ها به همین ترتیب و پیش از جداسازی ایران روی ترافیک تونل اعمال می‌شوند. دستگاهی که در «کنترل دسترسی» کانفیگ جداگانه دارد، همان را نگه می‌دارد.',
+		'هر قانون مشخص می‌کند درباره کدام ترافیک است. اینکه آن ترافیک کجا برود (یک کانفیگ، مستقیم یا مسدود) در زبانه «قانون شانت» صفحه «تنظیمات پایه» انتخاب می‌شود. قانون‌ها به همین ترتیب و پیش از جداسازی ایران روی ترافیک تونل اعمال می‌شوند. دستگاهی که در «کنترل دسترسی» کانفیگ جداگانه دارد، همان را نگه می‌دارد.',
 	'A device’s address, a range such as 192.168.1.0/24, or geoip:private.':
 		'آدرس یک دستگاه، یک محدوده مثل 192.168.1.0/24، یا geoip:private.',
 	'Such as 443, 80,443 or 1000-2000.': 'مثل 443 یا 80,443 یا 1000-2000.',
@@ -764,7 +764,7 @@ var FA = {
 	'Rules containing this value:': 'قانون‌هایی که این مقدار را دارند:',
 	'Query': 'جست‌وجو',
 	'Searches the routing data on this router with Geoview: which lists hold a domain or an address, and what a list such as geosite:ir holds. Useful for writing shunt rules.':
-		'داده‌های مسیریابی روی روتر را با Geoview جست‌وجو می‌کند: یک دامنه یا آدرس در کدام فهرست‌هاست، و یک فهرست مثل geosite:ir چه چیزهایی دارد. برای نوشتن قانون‌های عبور مفید است.',
+		'داده‌های مسیریابی روی روتر را با Geoview جست‌وجو می‌کند: یک دامنه یا آدرس در کدام فهرست‌هاست، و یک فهرست مثل geosite:ir چه چیزهایی دارد. برای نوشتن قانون‌های شانت مفید است.',
 	'Domain/IP Query': 'جست‌وجوی دامنه یا IP',
 	'GeoIP/Geosite Query': 'جست‌وجوی فهرست GeoIP یا Geosite',
 	'Install Geoview': 'نصب Geoview',
@@ -1146,8 +1146,8 @@ var FA = {
 	'Back to Rule Manage': 'بازگشت به مدیریت قوانین',
 	'This shunt rule is not there any more.': 'این قانون شانت دیگر وجود ندارد.',
 	'Please note attention to the priority, the higher the order, the higher the priority.': 'به اولویت توجه کنید: هر قانون که بالاتر باشد، اولویت بیشتری دارد.',
-	'Only letters, digits and _ can be used in an ID.': 'در شناسه فقط حروف انگلیسی، عدد و _ مجاز است.',
-	'This ID already exists.': 'این شناسه از قبل وجود دارد.',
+	'Please enter a name of your choice.': 'لطفاً یک نام دلخواه وارد کنید.',
+	'This name already exists.': 'این نام از قبل وجود دارد.',
 	'Where this rule sends what it matches is chosen in the Shunt Rule tab of Basic Settings.': 'اینکه این قانون ترافیک مطابق را به کجا بفرستد، در تب «قانون شانت» تنظیمات پایه انتخاب می‌شود.',
 	"Plaintext: If this string matches any part of the targeting domain, this rule takes effet. Example: rule 'sina.com' matches targeting domain 'sina.com', 'sina.com.cn' and 'www.sina.com', but not 'sina.cn'.": "متن ساده: اگر این عبارت با هر بخشی از دامنهٔ مقصد جور باشد، قانون اعمال می‌شود. مثال: قانون 'sina.com' با 'sina.com'، 'sina.com.cn' و 'www.sina.com' جور است، ولی با 'sina.cn' نه.",
 	"Regular expression: Begining with 'regexp:', the rest is a regular expression. When the regexp matches targeting domain, this rule takes effect. Example: rule 'regexp:\\.goo.*\\.com$' matches 'www.google.com' and 'fonts.googleapis.com', but not 'google.com'.": "عبارت باقاعده: با 'regexp:' شروع می‌شود و بقیه‌اش یک عبارت باقاعده است. وقتی با دامنهٔ مقصد جور باشد، قانون اعمال می‌شود. مثال: قانون 'regexp:\\.goo.*\\.com$' با 'www.google.com' و 'fonts.googleapis.com' جور است، ولی با 'google.com' نه.",

@@ -214,22 +214,40 @@ function drawShuntRules(box) {
 		]));
 	});
 
-	var name = E('input', { 'type': 'text', 'class': 'cbi-input-text' });
-	var add = E('button', { 'class': 'btn cbi-button cbi-button-add', 'click': function(ev) {
+	/* The name is the rule's ID, as in PassWall2, when it can be one - letters,
+	   digits and _ are what a section of the configuration may be called. Any
+	   other name, a Persian one among them, is the rule's Remarks, and the ID
+	   is made up for it. */
+	var err = E('div', { 'class': 'zgz-add-err',
+		'style': 'display:none;color:#ef4444;font-size:13px;margin-top:6px' });
+	var name = E('input', { 'type': 'text', 'class': 'cbi-input-text',
+		'style': 'flex:1 1 auto;min-width:0;margin:0',
+		'input': function() { err.style.display = 'none'; } });
+	function fail(msg) {
+		err.textContent = msg;
+		err.style.display = '';
+		name.focus();
+	}
+	var add = E('button', { 'class': 'btn cbi-button cbi-button-add',
+		'style': 'flex:0 0 auto;width:auto;min-width:110px;justify-content:center;text-align:center;margin:0',
+		'click': function(ev) {
 		ev.preventDefault();
-		var b = ev.currentTarget, id = name.value.trim();
-		/* PassWall2 takes a name of two letters or more; it is the rule's
-		   section in the configuration, so letters, digits and _ only. */
-		if (id.length < 2) return;
-		if (!/^[A-Za-z0-9_]+$/.test(id)) {
-			pui.note(b, _('Only letters, digits and _ can be used in an ID.'), 'error');
-			return;
-		}
-		if (uci.get('zirgozar', id) != null) {
-			pui.note(b, _('This ID already exists.'), 'error');
-			return;
+		var v = name.value.trim(), id;
+		if (!v) return fail(_('Please enter a name of your choice.'));
+		var taken = uci.sections('zirgozar', 'shunt_rules').some(function(r) {
+			return String(r.remarks || r['.name']) == v;
+		});
+		if (taken || uci.get('zirgozar', v) != null)
+			return fail(_('This name already exists.'));
+		if (/^[A-Za-z0-9_]+$/.test(v)) {
+			id = v;
+		} else {
+			do {
+				id = 'sr' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
+			} while (uci.get('zirgozar', id) != null);
 		}
 		uci.add('zirgozar', 'shunt_rules', id);
+		uci.set('zirgozar', id, 'remarks', v);
 		if (shuntGroup != 'default') uci.set('zirgozar', id, 'group', shuntGroup);
 		return keepAndGo(shuntPage(id));
 	} }, _('Add'));
@@ -237,8 +255,10 @@ function drawShuntRules(box) {
 	while (box.firstChild) box.removeChild(box.firstChild);
 	box.appendChild(tabs);
 	box.appendChild(E('table', { 'class': 'table cbi-section-table' }, rows));
-	box.appendChild(E('div', { 'class': 'cbi-section-create cbi-tblsection-create',
-		'style': 'display:flex;gap:8px;align-items:center' }, [ name, add ]));
+	box.appendChild(E('div', { 'class': 'cbi-section-create zgz-shunt-add', 'style': 'display:block' }, [
+		E('div', { 'style': 'display:flex;gap:10px;align-items:center;max-width:560px' }, [ name, add ]),
+		err
+	]));
 }
 
 function shuntRuleSection() {

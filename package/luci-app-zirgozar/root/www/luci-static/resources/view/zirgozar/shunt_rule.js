@@ -13,7 +13,6 @@
 'require view';
 'require form';
 'require uci';
-'require ui';
 'require zirgozar.i18n as i18n';
 'require zirgozar.ui as pui';
 
@@ -63,22 +62,6 @@ function items(list) {
 	return E('ul', { 'style': 'margin:.4em 0 0 1.2em' }, list.map(function(x) {
 		return E('li', {}, x);
 	}));
-}
-
-/* PassWall2 draws these as checkboxes in a row, not as a drop-down. */
-function checkboxes(o) {
-	o.renderWidget = function(section_id, option_index, cfgvalue) {
-		var value = (cfgvalue != null) ? cfgvalue : this.default;
-		var widget = new ui.Select(L.toArray(value), this.transformChoices(), {
-			id: this.cbid(section_id),
-			sort: this.keylist,
-			multiple: true,
-			widget: 'individual',
-			orientation: 'horizontal',
-			optional: true
-		});
-		return widget.render();
-	};
 }
 
 return view.extend({
@@ -147,12 +130,12 @@ return view.extend({
 		o.value('tls');
 		o.value('quic');
 		o.value('bittorrent');
-		checkboxes(o);
+		pui.checkboxes(o);
 
 		o = s.option(form.MultiValue, 'inbound', _('Inbound Tag'));
 		o.value('tproxy', _('Transparent proxy'));
 		o.value('socks', 'Socks');
-		checkboxes(o);
+		pui.checkboxes(o);
 
 		o = s.option(form.ListValue, 'network', _('Network'));
 		o.value('tcp,udp', 'TCP UDP');

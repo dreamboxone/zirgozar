@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '2.4.11-1';
+var BUILD = '2.4.12-1';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -462,8 +462,39 @@ function spinWhileBusy(b, done) {
 	window.setTimeout(check, 700);
 }
 
+/* checkboxes(option)
+
+   A MultiValue drawn as a row of tick boxes, one for each value, as
+   PassWall2 draws Protocol and Inbound Tag - rather than LuCI's drop-down,
+   which some LuCI versions show as a list to Ctrl-click in. What is ticked is
+   read straight from the boxes, so it works in a page and in a dialog. */
+function checkboxes(o) {
+	o.renderWidget = function(section_id, option_index, cfgvalue) {
+		var value = L.toArray(cfgvalue != null ? cfgvalue : this.default);
+		var box = E('div', { 'id': this.cbid(section_id), 'class': 'zgz-checks',
+			'style': 'display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;padding:6px 0' });
+		for (var i = 0; i < this.keylist.length; i++) {
+			var k = this.keylist[i];
+			box.appendChild(E('label', { 'style': 'display:inline-flex;align-items:center;gap:8px;cursor:pointer;margin:0' }, [
+				E('input', { 'type': 'checkbox', 'class': 'zgz-tick', 'value': k,
+					'checked': value.indexOf(k) >= 0 ? '' : null }),
+				E('span', {}, String(this.vallist[i]))
+			]));
+		}
+		return box;
+	};
+	o.formvalue = function(section_id) {
+		var box = document.getElementById(this.cbid(section_id));
+		if (!box) return this.cfgvalue(section_id);
+		return Array.prototype.map.call(box.querySelectorAll('input[type=checkbox]:checked'),
+			function(c) { return c.value; });
+	};
+	return o;
+}
+
 return baseclass.extend({
 	spinWhileBusy: spinWhileBusy,
+	checkboxes: checkboxes,
 	icon: icon,
 	btn: btn,
 	card: card,

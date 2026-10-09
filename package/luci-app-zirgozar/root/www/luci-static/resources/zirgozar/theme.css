@@ -479,3 +479,18 @@ body.pwp-fa #modal_overlay>.modal textarea,body.pwp-fa #modal_overlay>.modal inp
 
 /* Restore defaults: its warning in red, like every warning */
 #cbi-zirgozar-config-factory_reset .cbi-value-description{color:#dc2626!important;font-weight:600}
+
+/* Scroll bars in the page's own colours. Left to the browser they follow the
+   system's dark mode, and a light page had black bars in its lists and boxes. */
+.mk,#modal_overlay>.modal{color-scheme:light;scrollbar-color:#c3cde4 var(--soft)}
+.mk-dark,body.pwp-dark #modal_overlay>.modal{color-scheme:dark;scrollbar-color:#3a4d77 var(--soft)}
+:is(.mk,#modal_overlay>.modal) ::-webkit-scrollbar{width:10px;height:10px}
+:is(.mk,#modal_overlay>.modal) ::-webkit-scrollbar-track{background:var(--soft);border-radius:10px}
+:is(.mk,#modal_overlay>.modal) ::-webkit-scrollbar-thumb{background:#c3cde4;border-radius:10px;border:2px solid var(--soft)}
+:is(.mk-dark,body.pwp-dark #modal_overlay>.modal) ::-webkit-scrollbar-thumb{background:#3a4d77}
+
+/* Add under the shunt rules: a button its own size, its word in the middle,
+   and a message under the box rather than beside it. LuCI's theme stretches
+   whatever sits directly in a create row. */
+.mk .zgz-shunt-add{display:block!important}
+.mk .zgz-shunt-add .cbi-button-add{flex:0 0 auto!important;width:auto!important;min-width:110px;justify-content:center!important;text-align:center}
