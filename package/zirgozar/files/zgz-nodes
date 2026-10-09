@@ -538,6 +538,12 @@ add_node() {
 	config_get_bool enabled "$_sec" enabled 1
 	[ "$enabled" = "1" ] || return 0
 	[ -n "$link" ] || return 0
+	case "$link" in
+		balancing://*|shunt://*|interface://*)
+			node_records "$_sec" "$(cfg max_nodes 300)" >> "$CHAIN_TSV" 2>/dev/null || true
+			return 0
+			;;
+	esac
 
 	# A node with a chain of its own - a pre-proxy, or a landing node - is a
 	# record already, built where both ends of the chain are known, rather than

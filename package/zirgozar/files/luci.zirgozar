@@ -252,6 +252,23 @@ method_nodes() {
 	' "$ZGZ_CANDIDATES" 2>/dev/null
 }
 
+method_nodeorigins() {
+	local input tags tag origin
+	read -r input
+	[ -n "$input" ] || input='{}'
+	json_load "$input" 2>/dev/null
+	json_get_var tags tags
+	json_init
+	json_add_object origins
+	for tag in $tags; do
+		case "$tag" in ''|*[!A-Za-z0-9_-]*) continue ;; esac
+		origin="$("$NODES" origin "$tag" 2>/dev/null)" || origin=""
+		[ -n "$origin" ] && json_add_string "$tag" "$origin"
+	done
+	json_close_object
+	json_dump
+}
+
 # What the three per-node buttons have measured so far. Keys are
 # "<id>.<kind>"; the numbers are milliseconds, with -1 for still running and
 # -2 for a test that cannot be run on that node at all.
@@ -909,6 +926,7 @@ case "$1" in
 			state)   method_state ;;
 			traffic) method_traffic ;;
 			nodes)   method_nodes ;;
+			nodeorigins) method_nodeorigins ;;
 			subs)    method_subs ;;
 			subnodes) method_subnodes ;;
 			tests)   method_tests ;;
