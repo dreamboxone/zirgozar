@@ -606,6 +606,11 @@ return view.extend({
 			o.depends('_proto', '_balancing');
 			o.rmempty = false;
 			o.widget = 'checkbox';
+			/* LuCI's MultiValue renderer reads .length. A newly added node has
+			   no balancing_node list yet, so give it the empty list explicitly. */
+			o.cfgvalue = function(section_id) {
+				return uci.get_list('zirgozar', section_id, 'balancing_node') || [];
+			};
 			nodes.forEach(function(n) { o.value(n.tag, n.label || n.tag); });
 			pui.checkboxes(o);
 
