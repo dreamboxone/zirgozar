@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '2.4.15-1';
+var BUILD = '2.4.16-1';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -471,14 +471,16 @@ function spinWhileBusy(b, done) {
 function checkboxes(o) {
 	o.renderWidget = function(section_id, option_index, cfgvalue) {
 		var value = L.toArray(cfgvalue != null ? cfgvalue : this.default);
+		/* LuCI leaves the choice lists unset when no values were added. */
+		var keys = this.keylist || [], labels = this.vallist || [];
 		var box = E('div', { 'id': this.cbid(section_id), 'class': 'zgz-checks',
 			'style': 'display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;padding:6px 0' });
-		for (var i = 0; i < this.keylist.length; i++) {
-			var k = this.keylist[i];
+		for (var i = 0; i < keys.length; i++) {
+			var k = keys[i];
 			box.appendChild(E('label', { 'style': 'display:inline-flex;align-items:center;gap:8px;cursor:pointer;margin:0' }, [
 				E('input', { 'type': 'checkbox', 'class': 'zgz-tick', 'value': k,
 					'checked': value.indexOf(k) >= 0 ? '' : null }),
-				E('span', {}, String(this.vallist[i]))
+				E('span', {}, String(labels[i] == null ? k : labels[i]))
 			]));
 		}
 		return box;

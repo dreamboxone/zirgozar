@@ -39,6 +39,9 @@ jobs:
       - name: Install nftables
         run: sudo apt-get update -qq && sudo apt-get install -y nftables
 
+      - name: Check empty config choices
+        run: node test/test-ui.js
+
       - name: Fetch a core to check against
         run: |
           set -euo pipefail
