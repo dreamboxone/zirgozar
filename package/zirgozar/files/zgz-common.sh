@@ -1630,6 +1630,13 @@ section_links() {
 node_records() {
 	_nd_link="$(uci -q get "zirgozar.$1.link" 2>/dev/null)" || _nd_link=""
 	_nd_label="$(uci -q get "zirgozar.$1.name" 2>/dev/null)" || _nd_label="$1"
+	# Composite members must be real outbound nodes. Reject another virtual
+	# node before resolving it, including references back to this node.
+	case "$_nd_link" in
+		balancing://*|shunt://*|interface://*)
+			[ "${3:-0}" = "1" ] && return 1
+			;;
+	esac
 	case "$_nd_link" in
 		balancing://*)
 			_nd_members="$(uci -q get "zirgozar.$1.balancing_node" 2>/dev/null)" || _nd_members=""
@@ -1637,7 +1644,7 @@ node_records() {
 			for _nd_member in $_nd_members; do
 				case "$_nd_member" in
 					sub:*) _nd_r="$("$ZGZ_LIB/zgz-nodes" resolve "$_nd_member" 2>/dev/null | head -1)" ;;
-					*) _nd_r="$(node_records "$_nd_member" 1 2>/dev/null | head -1)" ;;
+					*) _nd_r="$(node_records "$_nd_member" 1 1 2>/dev/null | head -1)" ;;
 				esac
 				[ -n "$_nd_r" ] || continue
 				case "$(printf '%s' "$_nd_r" | cut -f3)" in
@@ -1670,12 +1677,12 @@ node_records() {
 				_proxy|_default|'')
 					_nd_selected="$(cfg node '')"
 					case "$_nd_selected" in ''|"$1") return 1 ;; esac
-					case "$_nd_selected" in sub:*) _nd_r="$("$ZGZ_LIB/zgz-nodes" resolve "$_nd_selected" 2>/dev/null | head -1)" ;; *) _nd_r="$(node_records "$_nd_selected" 1 2>/dev/null | head -1)" ;; esac
+					case "$_nd_selected" in sub:*) _nd_r="$("$ZGZ_LIB/zgz-nodes" resolve "$_nd_selected" 2>/dev/null | head -1)" ;; *) _nd_r="$(node_records "$_nd_selected" 1 1 2>/dev/null | head -1)" ;; esac
 					[ -n "$_nd_r" ] || return 1
 					_nd_host="$(printf '%s' "$_nd_r" | cut -f4)"; _nd_port="$(printf '%s' "$_nd_r" | cut -f5)"; _nd_payload="$(printf '%s' "$_nd_r" | cut -f6-)"
 					;;
 				*)
-					case "$_nd_default" in sub:*) _nd_r="$("$ZGZ_LIB/zgz-nodes" resolve "$_nd_default" 2>/dev/null | head -1)" ;; *) _nd_r="$(node_records "$_nd_default" 1 2>/dev/null | head -1)" ;; esac
+					case "$_nd_default" in sub:*) _nd_r="$("$ZGZ_LIB/zgz-nodes" resolve "$_nd_default" 2>/dev/null | head -1)" ;; *) _nd_r="$(node_records "$_nd_default" 1 1 2>/dev/null | head -1)" ;; esac
 					[ -n "$_nd_r" ] || return 1
 					_nd_host="$(printf '%s' "$_nd_r" | cut -f4)"; _nd_port="$(printf '%s' "$_nd_r" | cut -f5)"; _nd_payload="$(printf '%s' "$_nd_r" | cut -f6-)"
 					;;

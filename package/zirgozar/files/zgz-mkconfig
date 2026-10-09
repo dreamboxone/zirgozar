@@ -750,6 +750,7 @@ proxy_out="$(printf 'best\tbest\tx\t%s\t%s\t%s\n' "$best_host" "$best_port" \
 
 balancing_outbounds=""
 balancing_entries=""
+balancers_block=""
 balancing_selector=""
 balancing_rule=""
 balancing_fallback="direct"
@@ -811,7 +812,9 @@ $(printf '%s\n' "$_bal_fb" | sed -e 's/^[[:space:]]*//' -e "s/^{/{\"tag\":\"$bal
 		printf '%s\n' "$_bal_probe" | grep -Eq '^[1-9][0-9]*(s|m|h)$' || _bal_probe="1m"
 		_bal_url="$(uci -q get "zirgozar.$active_balancing.probeUrl" 2>/dev/null)" || _bal_url="https://www.google.com/generate_204"
 		case "$_bal_strategy" in
-			leastPing)
+			# random and roundRobin also require an observatory when a
+			# fallbackTag is set; otherwise Xray refuses to start.
+			random|roundRobin|leastPing)
 				observatory="\"observatory\":{\"subjectSelector\":[\"bal-$active_balancing-\"],\"probeUrl\":\"$(json_escape "$_bal_url")\",\"probeInterval\":\"$_bal_probe\",\"enableConcurrency\":true},"
 				;;
 			leastLoad)
@@ -826,7 +829,10 @@ $(printf '%s\n' "$_bal_fb" | sed -e 's/^[[:space:]]*//' -e "s/^{/{\"tag\":\"$bal
 	fi
 fi
 if [ -n "$balancing_rule" ]; then
-	add_rule "$balancing_rule"
+	# Loopback traffic has already passed the global rules once. Dispatch it
+	# to its balancer before the catch-all can send it back to loopback.
+	rules="$balancing_rule,$rules"
+	balancers_block=",\"balancers\":[$balancing_entries]"
 fi
 
 # Every node something here dials through, as outbounds of their own.
@@ -1033,6 +1039,7 @@ cat <<EOF
   ],
   "outbounds": [
     ${proxy_out},
+${balancing_outbounds}
 ${acl_outbounds}
 ${socks_outbounds}
 ${shunt_outbounds}
@@ -1051,8 +1058,7 @@ ${chain_outs}
   },
   "routing": {
     "domainStrategy": "${domain_strategy}"${domain_matcher},
-    "rules": [ ${rules} ]${balancing_entries:+,
-    "balancers": [ ${balancing_entries} ]}
+    "rules": [ ${rules} ]${balancers_block}
   }
 }
 EOF
