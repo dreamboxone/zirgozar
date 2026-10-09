@@ -265,7 +265,9 @@ function shuntRuleSection() {
 	var box = E('div', {});
 	drawShuntRules(box);
 	return E('div', { 'class': 'cbi-section' }, [
-		E('h3', {}, 'Sing-Box/Xray ' + _('Shunt Rule')),
+		i18n.get() == 'fa'
+			? E('h3', { 'dir': 'rtl' }, [ E('span', {}, _('Shunt Rule')), ' ', E('span', { 'dir': 'ltr' }, 'Sing-Box/Xray') ])
+			: E('h3', {}, 'Sing-Box/Xray ' + _('Shunt Rule')),
 		E('div', { 'class': 'cbi-section-descr' }, E('span', { 'style': 'color:red' },
 			_('Please note attention to the priority, the higher the order, the higher the priority.'))),
 		box

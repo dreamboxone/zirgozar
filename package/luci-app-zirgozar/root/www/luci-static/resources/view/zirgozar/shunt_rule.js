@@ -201,6 +201,16 @@ return view.extend({
 			_('With Xray as the active core the rule is left out.'));
 
 		return m.render().then(function(mapEl) {
+			if (i18n.get() == 'fa') {
+				var heading = mapEl.querySelector('.cbi-section-title, .cbi-section > h3, .cbi-section > legend');
+				if (heading) {
+					heading.setAttribute('dir', 'rtl');
+					while (heading.firstChild) heading.removeChild(heading.firstChild);
+					heading.appendChild(E('span', {}, _('Shunt Rule')));
+					heading.appendChild(document.createTextNode(' '));
+					heading.appendChild(E('span', { 'dir': 'ltr' }, 'Sing-Box/Xray'));
+				}
+			}
 			return pui.page([
 				E('div', { 'style': 'margin-bottom:12px' }, [ backBtn ]),
 				E('div', { 'style': 'color:#ef4444;margin:0 0 10px' },
