@@ -34,6 +34,10 @@ var _ = i18n.tr;
 
 var callNodeConfig = rpc.declare({ object: 'luci.zirgozar', method: 'nodeconfig',
                                    params: [ 'sid' ], expect: { '': {} } });
+var callNodes = rpc.declare({ object: 'luci.zirgozar', method: 'nodes', expect: { '': {} } });
+var callLan = rpc.declare({ object: 'luci.zirgozar', method: 'lan', expect: { '': {} } });
+var callNodeOrigins = rpc.declare({ object: 'luci.zirgozar', method: 'nodeorigins',
+	params: [ 'tags' ], expect: { '': {} } });
 
 /* --------------------------------------------------------- the link, apart */
 
@@ -43,6 +47,10 @@ var SCHEMES = {
 	hysteria2: 'hysteria2', hy2: 'hysteria2', tuic: 'tuic', warp: 'warp',
 	wireguard: 'wireguard', wg: 'wireguard'
 };
+
+SCHEMES.balancing = '_balancing';
+SCHEMES.shunt = '_shunt';
+SCHEMES.interface = '_iface';
 
 /* Vwarp's disguises for the first packets, lightest first. */
 var NOIZE = [ 'minimal', 'light', 'medium', 'heavy', 'stealth', 'gfw', 'firewall' ];
@@ -115,6 +123,8 @@ function parseLink(link) {
 	var proto = SCHEMES[m[1].toLowerCase()], body = m[2], f = { proto: proto, rest: {} };
 	var h = body.indexOf('#');
 	if (h >= 0) { f.name = dec(body.slice(h + 1)); body = body.slice(0, h); }
+	if (proto == '_balancing' || proto == '_shunt' || proto == '_iface')
+		return f;
 
 	if (proto == 'vmess') {
 		var j = null;
@@ -262,6 +272,9 @@ function blankNode() {
 function buildLink(f, name) {
 	var p = f.proto, frag = name ? '#' + enc(name) : '', q = {};
 	Object.keys(f.rest || {}).forEach(function(k) { q[k] = f.rest[k]; });
+	if (p == '_balancing') return 'balancing://config' + frag;
+	if (p == '_shunt') return 'shunt://config' + frag;
+	if (p == '_iface') return 'interface://config' + frag;
 
 	if (p == 'vmess') {
 		var j = {
@@ -457,10 +470,21 @@ function warpAccount(sid) {
 
 return view.extend({
 	load: function() {
-		return uci.load('zirgozar').catch(function() { return null; });
+		return Promise.all([
+			uci.load('zirgozar').catch(function() { return null; }),
+			callNodes().catch(function() { return {}; }),
+			callLan().catch(function() { return {}; })
+		]).then(function(data) {
+			var nodes = (data[1] && data[1].nodes) || [];
+			return callNodeOrigins(nodes.map(function(n) { return n.tag; }).join(' '))
+			.catch(function() { return {}; }).then(function(origins) {
+				data.push((origins && origins.origins) || {});
+				return data;
+			});
+		});
 	},
 
-	render: function() {
+	render: function(data) {
 		i18n.setLang(uci.get('zirgozar', 'config', 'lang'));
 
 		var params = new URLSearchParams(window.location.search);
@@ -565,8 +589,83 @@ return view.extend({
 			o = field(form.ListValue, 'proto', _('Protocol'));
 			[ [ 'vless', 'VLESS' ], [ 'vmess', 'VMess' ], [ 'trojan', 'Trojan' ], [ 'shadowsocks', 'Shadowsocks' ],
 			  [ 'socks', 'Socks' ], [ 'http', 'HTTP' ], [ 'hysteria2', 'Hysteria2' ], [ 'tuic', 'TUIC' ], [ 'warp', 'WARP' ],
-			  [ 'wireguard', 'WireGuard' ], [ 'openvpn', 'OpenVPN' ] ]
+			  [ 'wireguard', 'WireGuard' ], [ 'openvpn', 'OpenVPN' ], [ '_balancing', 'Balancing' ],
+			  [ '_shunt', 'Shunt' ], [ '_iface', 'Custom Interface' ] ]
 				.forEach(function(v) { o.value(v[0], v[1]); });
+
+			var candidates = (data && data[1] && data[1].nodes) || [];
+			var origins = (data && data[3]) || {};
+			var nodes = candidates.filter(function(n) {
+				return !/^(hysteria2|hysteria|tuic|openvpn|amneziawg|balancing|shunt|interface)$/.test(n.protocol);
+			}).map(function(n) {
+				var origin = origins[n.tag];
+				return origin ? { tag: origin, label: n.label || n.tag } : null;
+			}).filter(Boolean);
+			var interfaces = (data && data[2] && data[2].interfaces) || [];
+			o = s.option(form.MultiValue, 'balancing_node', _('Load balancing node list'));
+			o.depends('_proto', '_balancing');
+			o.rmempty = false;
+			o.widget = 'checkbox';
+			nodes.forEach(function(n) { o.value(n.tag, n.label || n.tag); });
+			pui.checkboxes(o);
+
+			o = s.option(form.ListValue, 'balancingStrategy', _('Balancing Strategy'));
+			o.depends('_proto', '_balancing');
+			[ 'random', 'roundRobin', 'leastPing', 'leastLoad' ].forEach(function(v) { o.value(v); });
+			o.default = 'random';
+
+			o = s.option(form.ListValue, 'fallback_node', _('Fallback Node'));
+			o.depends('_proto', '_balancing');
+			o.value('_direct', _('Direct Connection'));
+			o.default = '_direct';
+			nodes.forEach(function(n) { o.value(n.tag, n.label || n.tag); });
+
+			o = s.option(form.Value, 'probeInterval', _('Probe Interval'));
+			o.depends('_proto', '_balancing');
+			o.default = '1m';
+
+			o = s.option(form.Value, 'probeUrl', _('Probe URL'));
+			o.depends('_proto', '_balancing');
+			o.default = 'https://www.google.com/generate_204';
+
+			o = s.option(form.ListValue, 'iface', _('Interface'));
+			o.depends('_proto', '_iface');
+			o.rmempty = false;
+			interfaces.forEach(function(x) {
+				if (x && x.dev) o.value(x.dev, x.net && x.net != x.dev ? x.net + ' (' + x.dev + ')' : x.dev);
+			});
+
+			var rules = uci.sections('zirgozar', 'shunt_rules');
+			var groups = {};
+			rules.forEach(function(r) { if (r.group) groups[r.group] = true; });
+			o = s.option(form.ListValue, 'shunt_group', _('Shunt Rule Group'));
+			o.depends('_proto', '_shunt');
+			o.value('', _('default'));
+			Object.keys(groups).sort().forEach(function(g) { o.value(g); });
+
+			o = s.option(form.ListValue, 'shunt_default', _('Default Node'));
+			o.depends('_proto', '_shunt');
+			o.value('_direct', _('Direct Connection'));
+			o.value('_blackhole', _('Blackhole (Block)'));
+			nodes.forEach(function(n) { o.value(n.tag, n.label || n.tag); });
+
+			rules.forEach(function(r) {
+				var id = r['.name'], title = r.remarks || id;
+				o = s.option(form.ListValue, 'shunt_' + id, _('Rule destination') + ': ' + title);
+				o.depends('_proto', '_shunt');
+				o.value('_default', _('Default Node'));
+				o.value('_direct', _('Direct Connection'));
+				o.value('_blackhole', _('Blackhole (Block)'));
+				nodes.forEach(function(n) { o.value(n.tag, n.label || n.tag); });
+			});
+
+			o = s.option(form.DummyValue, '_traffic_rules', _('Traffic Rules'));
+			o.depends('_proto', '_shunt');
+			o.render = function() {
+				return E('div', { 'class': 'cbi-value-field' }, [
+					E('a', { 'href': L.url('admin', 'services', 'zirgozar', 'traffic') }, _('Open Traffic Rules'))
+				]);
+			};
 
 			/* --------------------------------------------------- OpenVPN
 			   The profile as it is, pasted or read from its file, and what it
@@ -939,16 +1038,20 @@ return view.extend({
 		/* PassWall2's Chain Proxy, with its option names. */
 		var others = uci.sections('zirgozar', 'node').filter(function(n) { return n['.name'] != sid; });
 		o = s.option(form.ListValue, 'chain_proxy', _('Chain Proxy'));
+		[ 'vless', 'vmess', 'trojan', 'shadowsocks', 'socks', 'http', 'hysteria2', 'tuic', 'warp', 'wireguard', 'openvpn' ]
+			.forEach(function(p) { o.depends('_proto', p); });
 		o.value('', _('Close'));
 		o.value('1', _('Preproxy Node'));
 		o.value('2', _('Landing Node'));
 		o = s.option(form.ListValue, 'preproxy_node', _('Preproxy Node'),
 			_('This node is reached through the one chosen here.'));
-		o.depends('chain_proxy', '1');
+		[ 'vless', 'vmess', 'trojan', 'shadowsocks', 'socks', 'http', 'hysteria2', 'tuic', 'warp', 'wireguard', 'openvpn' ]
+			.forEach(function(p) { o.depends({ 'chain_proxy': '1', '_proto': p }); });
 		others.forEach(function(n) { o.value(n['.name'], n.name || n['.name']); });
 		o = s.option(form.ListValue, 'to_node', _('Landing Node'),
 			_('Traffic goes through this node first and leaves from the one chosen here.'));
-		o.depends('chain_proxy', '2');
+		[ 'vless', 'vmess', 'trojan', 'shadowsocks', 'socks', 'http', 'hysteria2', 'tuic', 'warp', 'wireguard', 'openvpn' ]
+			.forEach(function(p) { o.depends({ 'chain_proxy': '2', '_proto': p }); });
 		others.forEach(function(n) { o.value(n['.name'], n.name || n['.name']); });
 
 		/* The link is put back together after every field has been read, from

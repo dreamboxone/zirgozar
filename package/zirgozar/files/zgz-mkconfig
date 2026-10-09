@@ -264,7 +264,10 @@ warp_in_use() {
 # node as it is set up, not as the tunnel's own choice would be.
 acl_outbound() {
 	warp_in_use "$1" && return 1
-	node_records "$1" 1 2>/dev/null | head -1 | warp_natives |
+	case "$1" in
+		sub:*) "$ZGZ_LIB/zgz-nodes" resolve "$1" 2>/dev/null | head -1 ;;
+		*) node_records "$1" 1 2>/dev/null | head -1 ;;
+	esac | warp_natives |
 		awk -F'\t' '$6 ~ /"protocol"/ { print; found = 1; exit } END { exit found ? 0 : 1 }' |
 		decorate | cut -f6-
 }
@@ -456,7 +459,19 @@ shunt_count=0
 shunt_ip=0
 shunt_direct_names=""
 shunt_fake_names=""
-shunt_group="$(cfg shunt_group '' | tr 'A-Z' 'a-z')"
+active_shunt=""
+if [ "$(sed -n 's/^protocol=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)" = "shunt" ]; then
+	active_shunt="$(sed -n 's/^tag=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)"
+	if [ -z "$(uci -q get "zirgozar.$active_shunt.link" 2>/dev/null)" ]; then
+		active_shunt="$("$ZGZ_LIB/zgz-nodes" origin "$active_shunt" 2>/dev/null)" || active_shunt=""
+	fi
+fi
+if [ -n "$active_shunt" ]; then
+	shunt_group="$(uci -q get "zirgozar.$active_shunt.shunt_group" 2>/dev/null)" || shunt_group=""
+else
+	shunt_group="$(cfg shunt_group '')"
+fi
+shunt_group="$(printf '%s' "$shunt_group" | tr 'A-Z' 'a-z')"
 
 # A geo category needs the routing data. Without it, or when the core has
 # already refused the categories this asks for, those entries are left out
@@ -560,9 +575,18 @@ shunt_words() {
 shunt_one() {
 	local node group network protocol inbound source port domain_list ip_list fake pre invert _rm _x
 	config_get node "$1" node ""
-	[ -n "$node" ] || return 0
 	config_get group "$1" group ""
 	[ "$(printf '%s' "$group" | tr 'A-Z' 'a-z')" = "$shunt_group" ] || return 0
+	if [ -n "$active_shunt" ]; then
+		_x="$(uci -q get "zirgozar.$active_shunt.shunt_$1" 2>/dev/null)" || _x=""
+		case "$_x" in
+			_default) node=_proxy ;;
+			_direct|_blackhole|_proxy) node="$_x" ;;
+			'') : ;;
+			*) node="$_x" ;;
+		esac
+	fi
+	[ -n "$node" ] || return 0
 
 	# PassWall2's invert, which only sing-box has. Run the right way round
 	# under Xray it would send exactly the other traffic there, so under
@@ -663,7 +687,12 @@ shunt_one() {
 
 shunt_default=proxy
 _dn="$(cfg default_node _proxy)"
+if [ -n "$active_shunt" ]; then
+	_dn="$(uci -q get "zirgozar.$active_shunt.shunt_default" 2>/dev/null)" || _dn="_direct"
+	[ -n "$_dn" ] || _dn="_direct"
+fi
 if [ "$_dn" != "_proxy" ]; then
+	[ "$_dn" = "_default" ] && _dn="_proxy"
 	shunt_tag "$_dn" default "$(cfg default_preproxy '')"
 	shunt_default="$SHUNT_TAG"
 fi
@@ -719,8 +748,90 @@ proxy_out="$(printf 'best\tbest\tx\t%s\t%s\t%s\n' "$best_host" "$best_port" \
 	decorate "${preproxy:+chain-$preproxy}" "$pre_hp" | cut -f6- |
 	sed -e 's/^{/{"tag":"proxy",/')"
 
+balancing_outbounds=""
+balancing_entries=""
+balancing_selector=""
+balancing_rule=""
+balancing_fallback="direct"
+observatory=""
+burst_observatory=""
+active_balancing=""
+if [ "$(sed -n 's/^protocol=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)" = "balancing" ]; then
+	active_balancing="$(sed -n 's/^tag=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)"
+	if [ -z "$(uci -q get "zirgozar.$active_balancing.link" 2>/dev/null)" ]; then
+		active_balancing="$("$ZGZ_LIB/zgz-nodes" origin "$active_balancing" 2>/dev/null)" || active_balancing=""
+	fi
+	_bal_members="$(uci -q get "zirgozar.$active_balancing.balancing_node" 2>/dev/null)" || _bal_members=""
+	_bal_i=0
+	for _bal_member in $_bal_members; do
+		case "$_bal_member" in
+			sub:*) _bal_row="$("$ZGZ_LIB/zgz-nodes" resolve "$_bal_member" 2>/dev/null | head -1)" ;;
+			*) _bal_row="$(node_records "$_bal_member" 1 2>/dev/null | head -1)" ;;
+		esac
+		[ -n "$_bal_row" ] || continue
+		case "$(printf '%s' "$_bal_row" | cut -f3)" in
+			hysteria2|hysteria|tuic|openvpn|amneziawg|balancing|shunt|interface) continue ;;
+		esac
+		_bal_payload="$(printf '%s\n' "$_bal_row" | warp_natives |
+			decorate "${preproxy:+chain-$preproxy}" "$pre_hp" | cut -f6-)" || continue
+		[ -n "$_bal_payload" ] || continue
+		_bal_i=$((_bal_i + 1))
+		_bal_tag="bal-$active_balancing-$_bal_i"
+		_bal_item="$(printf '%s\n' "$_bal_payload" | sed -e 's/^[[:space:]]*//' -e "s/^{/{\"tag\":\"$_bal_tag\",/")"
+		balancing_outbounds="$balancing_outbounds
+$_bal_item,"
+		balancing_selector="${balancing_selector:+$balancing_selector,}\"$_bal_tag\""
+	done
+	if [ "$_bal_i" -gt 0 ]; then
+		_bal_strategy="$(uci -q get "zirgozar.$active_balancing.balancingStrategy" 2>/dev/null)" || _bal_strategy="random"
+		case "$_bal_strategy" in random|roundRobin|leastPing|leastLoad) : ;; *) _bal_strategy=random ;; esac
+		_bal_fallback="$(uci -q get "zirgozar.$active_balancing.fallback_node" 2>/dev/null)" || _bal_fallback=""
+		case "$_bal_fallback" in
+			_direct|'') balancing_fallback=direct ;;
+			*)
+				case "$_bal_fallback" in
+					sub:*) _bal_fb_row="$("$ZGZ_LIB/zgz-nodes" resolve "$_bal_fallback" 2>/dev/null | head -1)" ;;
+					*) _bal_fb_row="$(node_records "$_bal_fallback" 1 2>/dev/null | head -1)" ;;
+				esac
+				case "$(printf '%s' "$_bal_fb_row" | cut -f3)" in
+					hysteria2|hysteria|tuic|openvpn|amneziawg|balancing|shunt|interface) _bal_fb_row="" ;;
+				esac
+				if [ -n "$_bal_fb_row" ]; then
+					_bal_fb="$(printf '%s\n' "$_bal_fb_row" | warp_natives |
+						decorate "${preproxy:+chain-$preproxy}" "$pre_hp" | cut -f6-)" || _bal_fb=""
+					if [ -n "$_bal_fb" ]; then
+						balancing_fallback="bal-$active_balancing-fallback"
+						balancing_outbounds="$balancing_outbounds
+$(printf '%s\n' "$_bal_fb" | sed -e 's/^[[:space:]]*//' -e "s/^{/{\"tag\":\"$balancing_fallback\",/"),"
+					fi
+				fi
+				;;
+		esac
+		_bal_probe="$(uci -q get "zirgozar.$active_balancing.probeInterval" 2>/dev/null)" || _bal_probe="1m"
+		printf '%s\n' "$_bal_probe" | grep -Eq '^[1-9][0-9]*(s|m|h)$' || _bal_probe="1m"
+		_bal_url="$(uci -q get "zirgozar.$active_balancing.probeUrl" 2>/dev/null)" || _bal_url="https://www.google.com/generate_204"
+		case "$_bal_strategy" in
+			leastPing)
+				observatory="\"observatory\":{\"subjectSelector\":[\"bal-$active_balancing-\"],\"probeUrl\":\"$(json_escape "$_bal_url")\",\"probeInterval\":\"$_bal_probe\",\"enableConcurrency\":true},"
+				;;
+			leastLoad)
+				burst_observatory="\"burstObservatory\":{\"subjectSelector\":[\"bal-$active_balancing-\"],\"pingConfig\":{\"destination\":\"$(json_escape "$_bal_url")\",\"interval\":\"$_bal_probe\",\"sampling\":3,\"timeout\":\"5s\"}},"
+				;;
+		esac
+		balancing_entries="{\"tag\":\"balancer-$active_balancing\",\"selector\":[$balancing_selector],\"fallbackTag\":\"$balancing_fallback\",\"strategy\":{\"type\":\"$_bal_strategy\"}}"
+		balancing_rule="{\"type\":\"field\",\"inboundTag\":[\"balance-$active_balancing\"],\"balancerTag\":\"balancer-$active_balancing\"}"
+	else
+		warn "balancing node '$active_balancing' has no usable Xray members"
+		proxy_out='{"tag":"proxy","protocol":"freedom","settings":{"domainStrategy":"UseIP"},"streamSettings":{"sockopt":{"mark":255}}}'
+	fi
+fi
+if [ -n "$balancing_rule" ]; then
+	add_rule "$balancing_rule"
+fi
+
 # Every node something here dials through, as outbounds of their own.
 chain_outs="$(chain_outbounds "$proxy_out
+${balancing_outbounds}
 ${ovpn_via:+\"dialerProxy\":\"chain-$ovpn_via\"}
 $acl_outbounds
 $socks_outbounds
@@ -885,6 +996,7 @@ log_step "DNS[$dns_port]: Direct DNS: $dd_proto://$dd_addr:$dd_port, Remote DNS:
 cat <<EOF
 {
   "log": { "loglevel": "${loglevel}" },
+  ${observatory}${burst_observatory}
   "stats": {},
   "api": { "tag": "api", "services": [ "StatsService" ] },
   "policy": {
@@ -939,7 +1051,8 @@ ${chain_outs}
   },
   "routing": {
     "domainStrategy": "${domain_strategy}"${domain_matcher},
-    "rules": [ ${rules} ]
+    "rules": [ ${rules} ]${balancing_entries:+,
+    "balancers": [ ${balancing_entries} ]}
   }
 }
 EOF

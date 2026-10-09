@@ -156,6 +156,7 @@ sift_one() {
 	# them behind everything that did answer, and the second pass, which makes
 	# a real request, decides whether they work.
 	case "$_proto" in
+		balancing|shunt|interface) return 0 ;;
 		wireguard|hysteria2|hysteria|tuic|openvpn|amneziawg|warp)
 			printf '%06d\t%s\n' 9000 "$_tag" >> "$ALIVE"
 			echo x >> "$ATTEMPTS"
@@ -538,6 +539,7 @@ cmd_use() {
 	# shows. Zero - no answer - is shown as a dash, as before. WARP has no TCP
 	# port to knock on, and which address it uses is warp-plus's choice.
 	case "$(printf '%s' "$_row" | cut -f3)" in
+		balancing|shunt|interface) select_row "$_row" 0; return $? ;;
 		warp) select_row "$_row" 0; return $? ;;
 	esac
 	select_row "$_row" "$(tcp_ms "$(printf '%s' "$_row" | cut -f4)" "$(printf '%s' "$_row" | cut -f5)")"

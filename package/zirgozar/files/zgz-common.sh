@@ -1628,6 +1628,72 @@ section_links() {
 # hop the router actually reaches. A chain naming the node itself, a node
 # that is gone, or one Xray cannot speak is ignored rather than guessed at.
 node_records() {
+	_nd_link="$(uci -q get "zirgozar.$1.link" 2>/dev/null)" || _nd_link=""
+	_nd_label="$(uci -q get "zirgozar.$1.name" 2>/dev/null)" || _nd_label="$1"
+	case "$_nd_link" in
+		balancing://*)
+			_nd_members="$(uci -q get "zirgozar.$1.balancing_node" 2>/dev/null)" || _nd_members=""
+			_nd_first=""
+			for _nd_member in $_nd_members; do
+				case "$_nd_member" in
+					sub:*) _nd_r="$("$ZGZ_LIB/zgz-nodes" resolve "$_nd_member" 2>/dev/null | head -1)" ;;
+					*) _nd_r="$(node_records "$_nd_member" 1 2>/dev/null | head -1)" ;;
+				esac
+				[ -n "$_nd_r" ] || continue
+				case "$(printf '%s' "$_nd_r" | cut -f3)" in
+					hysteria2|tuic|openvpn|amneziawg|balancing|shunt|interface) continue ;;
+				esac
+				_nd_first="$_nd_r"
+				break
+			done
+			[ -n "$_nd_first" ] || return 1
+			_nd_host="$(printf '%s' "$_nd_first" | cut -f4)"
+			_nd_port="$(printf '%s' "$_nd_first" | cut -f5)"
+			printf '%s\t%s\tbalancing\t%s\t%s\t%s\n' \
+				"$1" "$_nd_label" "$_nd_host" "$_nd_port" \
+				"{\"protocol\":\"loopback\",\"settings\":{\"inboundTag\":\"balance-$1\"}}"
+			return 0
+			;;
+		interface://*)
+			_nd_dev="$(uci -q get "zirgozar.$1.iface" 2>/dev/null)" || _nd_dev=""
+			case "$_nd_dev" in ''|*[!A-Za-z0-9_.:-]*) return 1 ;; esac
+			printf '%s\t%s\tinterface\t\t0\t%s\n' "$1" "$_nd_label" \
+				"{\"protocol\":\"freedom\",\"settings\":{},\"streamSettings\":{\"sockopt\":{\"interface\":\"$(json_escape "$_nd_dev")\",\"mark\":${ZGZ_OUT_MARK:-255}}}}"
+			return 0
+			;;
+		shunt://*)
+			_nd_r=""
+			_nd_default="$(uci -q get "zirgozar.$1.shunt_default" 2>/dev/null)" || _nd_default="_direct"
+			case "$_nd_default" in
+				_direct) _nd_payload='{"protocol":"freedom","settings":{},"streamSettings":{"sockopt":{"mark":255}}}'; _nd_host=""; _nd_port=0 ;;
+				_blackhole) _nd_payload='{"protocol":"blackhole","settings":{}}'; _nd_host=""; _nd_port=0 ;;
+				_proxy|_default|'')
+					_nd_selected="$(cfg node '')"
+					case "$_nd_selected" in ''|"$1") return 1 ;; esac
+					case "$_nd_selected" in sub:*) _nd_r="$("$ZGZ_LIB/zgz-nodes" resolve "$_nd_selected" 2>/dev/null | head -1)" ;; *) _nd_r="$(node_records "$_nd_selected" 1 2>/dev/null | head -1)" ;; esac
+					[ -n "$_nd_r" ] || return 1
+					_nd_host="$(printf '%s' "$_nd_r" | cut -f4)"; _nd_port="$(printf '%s' "$_nd_r" | cut -f5)"; _nd_payload="$(printf '%s' "$_nd_r" | cut -f6-)"
+					;;
+				*)
+					case "$_nd_default" in sub:*) _nd_r="$("$ZGZ_LIB/zgz-nodes" resolve "$_nd_default" 2>/dev/null | head -1)" ;; *) _nd_r="$(node_records "$_nd_default" 1 2>/dev/null | head -1)" ;; esac
+					[ -n "$_nd_r" ] || return 1
+					_nd_host="$(printf '%s' "$_nd_r" | cut -f4)"; _nd_port="$(printf '%s' "$_nd_r" | cut -f5)"; _nd_payload="$(printf '%s' "$_nd_r" | cut -f6-)"
+					;;
+			esac
+			if [ -n "$_nd_r" ]; then
+				_nd_r="$(printf '%s\n' "$_nd_r" | warp_natives | head -1)"
+				[ -n "$_nd_r" ] || return 1
+				case "$(printf '%s' "$_nd_r" | cut -f3)" in
+					hysteria2|hysteria|tuic|openvpn|amneziawg|balancing|shunt|interface) return 1 ;;
+				esac
+				_nd_host="$(printf '%s' "$_nd_r" | cut -f4)"
+				_nd_port="$(printf '%s' "$_nd_r" | cut -f5)"
+				_nd_payload="$(printf '%s' "$_nd_r" | cut -f6-)"
+			fi
+			printf '%s\t%s\tshunt\t%s\t%s\t%s\n' "$1" "$_nd_label" "$_nd_host" "$_nd_port" "$_nd_payload"
+			return 0
+			;;
+	esac
 	_nd_recs="$(section_links "$1" | LC_ALL=C awk -v LIMIT="${2:-300}" -f "$ZGZ_LIB/zgz-parse" 2>/dev/null)"
 	[ -n "$_nd_recs" ] || return 1
 	_nd_mode="$(uci -q get "zirgozar.$1.chain_proxy" 2>/dev/null)" || _nd_mode=""
