@@ -765,7 +765,7 @@ method_action() {
 			;;
 		core_install)
 			case "$arg" in
-				xray|xray-patterniha|sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|openvpn) run_job "Installing $arg" "$CORES install $arg" ;;
+				xray|xray-patterniha|sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|aether|openvpn) run_job "Installing $arg" "$CORES install $arg" ;;
 				# One particular Xray, picked from the list on the page.
 				xray@v[0-9]*)
 					_v="${arg#xray@}"
@@ -784,7 +784,7 @@ method_action() {
 			;;
 		core_remove)
 			case "$arg" in
-				sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|xray-patterniha|openvpn) "$CORES" remove "$arg" >/dev/null 2>&1 ;;
+				sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|xray-patterniha|aether|openvpn) "$CORES" remove "$arg" >/dev/null 2>&1 ;;
 				*) fail "unknown core"; return ;;
 			esac
 			;;

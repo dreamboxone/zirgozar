@@ -267,7 +267,7 @@ function render(d) {
 					return act('core:' + c.name, 'core_remove', c.name, _('%s removed.').format(c.name));
 				}, 'trash'));
 
-			cbox.appendChild(row({ xray: 'Xray', geoview: 'Geoview', 'sing-box-lx': 'sing-box-lx', 'warp-plus': 'warp-plus', vwarp: 'Vwarp', 'xray-patterniha': _('Xray (patterniha)'), openvpn: 'OpenVPN' }[c.name] || c.name, value, actions, 'core:' + c.name));
+			cbox.appendChild(row({ xray: 'Xray', geoview: 'Geoview', 'sing-box-lx': 'sing-box-lx', 'warp-plus': 'warp-plus', vwarp: 'Vwarp', aether: 'Aether', 'xray-patterniha': _('Xray (patterniha)'), openvpn: 'OpenVPN' }[c.name] || c.name, value, actions, 'core:' + c.name));
 		});
 		cbox.appendChild(row(_('Free space'),
 			[ E('span', {}, bytes(cores.free)), E('code', { 'style': 'font-size:11.5px;color:var(--muted)' }, cores.dir || '') ]));
@@ -338,6 +338,9 @@ return view.extend({
 		o = s.option(form.Value, 'core_vwarp', _('Vwarp App Path'),
 			_('Only WARP nodes over MASQUE or with noize need it. Empty means this program’s own copy in the folder above.'));
 		o.placeholder = '/usr/libexec/zirgozar/vwarp';
+		o = s.option(form.Value, 'core_aether', _('Aether App Path'),
+			_('Aether carries aether:// configs, including WireGuard-over-MASQUE and Tor/Psiphon. Install it above.'));
+		o.placeholder = '/usr/libexec/zirgozar/aether/aether';
 
 		o = s.option(form.DummyValue, '_path_tip');
 		o.render = function() {

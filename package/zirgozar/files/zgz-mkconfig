@@ -157,6 +157,19 @@ if [ -n "$ovpn_via" ]; then
 	add_rule "{\"type\":\"field\",\"inboundTag\":[\"ovpn-via\"],\"outboundTag\":\"chain-$ovpn_via\"}"
 fi
 
+aether_via="$(aether_via)" || aether_via=""
+_aether_out=direct
+if [ -n "$aether_via" ]; then
+	if ! chain_outbound "$aether_via" >/dev/null 2>&1; then
+		say_message "The Aether exit-node is missing or cannot be used by Xray. Choose a usable exit-node on its config page."
+		exit 1
+	fi
+	_aether_out="chain-$aether_via"
+fi
+if bridge_is_aether; then
+	add_rule "{\"type\":\"field\",\"inboundTag\":[\"aether-via\"],\"outboundTag\":\"$_aether_out\"}"
+fi
+
 # Where each resolver's own queries go. The Direct DNS always straight out;
 # the Remote DNS through the tunnel, or straight out when the DNS tab says so.
 # First, so that nothing further down - a private range, the Iran split - can
@@ -357,6 +370,10 @@ fi
 if [ -n "$ovpn_via" ]; then
 	socks_inbounds="$socks_inbounds,
     { \"tag\": \"ovpn-via\", \"listen\": \"127.0.0.1\", \"port\": $(cfg bridge_port 10808), \"protocol\": \"socks\", \"settings\": { \"udp\": true } }"
+fi
+if bridge_is_aether; then
+	socks_inbounds="$socks_inbounds,
+    { \"tag\": \"aether-via\", \"listen\": \"127.0.0.1\", \"port\": $(cfg aether_upstream_port 10809), \"protocol\": \"socks\", \"settings\": { \"udp\": true } }"
 fi
 
 # And PassWall2's Socks Config: more SOCKS ports, each through a node of its
@@ -771,7 +788,7 @@ if [ "$(sed -n 's/^protocol=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)" = "bal
 		esac
 		[ -n "$_bal_row" ] || continue
 		case "$(printf '%s' "$_bal_row" | cut -f3)" in
-			hysteria2|hysteria|tuic|openvpn|amneziawg|balancing|shunt|interface) continue ;;
+			hysteria2|hysteria|tuic|openvpn|amneziawg|aether|balancing|shunt|interface) continue ;;
 		esac
 		_bal_payload="$(printf '%s\n' "$_bal_row" | warp_natives |
 			decorate "${preproxy:+chain-$preproxy}" "$pre_hp" | cut -f6-)" || continue
@@ -795,7 +812,7 @@ $_bal_item,"
 					*) _bal_fb_row="$(node_records "$_bal_fallback" 1 2>/dev/null | head -1)" ;;
 				esac
 				case "$(printf '%s' "$_bal_fb_row" | cut -f3)" in
-					hysteria2|hysteria|tuic|openvpn|amneziawg|balancing|shunt|interface) _bal_fb_row="" ;;
+					hysteria2|hysteria|tuic|openvpn|amneziawg|aether|balancing|shunt|interface) _bal_fb_row="" ;;
 				esac
 				if [ -n "$_bal_fb_row" ]; then
 					_bal_fb="$(printf '%s\n' "$_bal_fb_row" | warp_natives |
@@ -839,6 +856,7 @@ fi
 chain_outs="$(chain_outbounds "$proxy_out
 ${balancing_outbounds}
 ${ovpn_via:+\"dialerProxy\":\"chain-$ovpn_via\"}
+${aether_via:+\"dialerProxy\":\"chain-$aether_via\"}
 $acl_outbounds
 $socks_outbounds
 $shunt_outbounds" | awk 'NF { printf "%s%s,\n", "    ", $0 }')"
@@ -970,6 +988,20 @@ for _nsid in $(uci -q -X show zirgozar 2>/dev/null | sed -n 's/^zirgozar\.\([A-Z
 	node_dns_one "$_nsid"
 done
 
+if bridge_is_aether; then
+	# Enrollment, ECH and Tor bridge discovery run before Aether's SOCKS
+	# listener opens. Their DNS must leave by its entry node as well.
+	_ab_names='"domain:cloudflareclient.com","domain:torproject.org","full:cloudflare-ech.com","full:www.cloudflare.com","full:s3.amazonaws.com"'
+	_ab_extra="$(grep -oE '"(endpoint|outer|inner|ech_domain|ech_dns)":"[^"]*"' "$ZGZ_ETC/bridge.json" |
+		sed 's/^"[a-z_]*":"//; s/"$//; s|^https://||; s|/.*||; s|@.*||; s/:[0-9]*$//' |
+		grep -E '^[A-Za-z0-9.-]+$' | grep '[a-zA-Z]' | sort -u |
+		awk 'NF { printf ",\"full:%s\"", $0 }')"
+	_ab_names="$_ab_names$_ab_extra"
+	_ab_server="$(printf '%s\n' "$remote_server" | sed 's/"tag":"dns-remote"/"tag":"dns-aether-bootstrap"/' |
+		awk -v names="$_ab_names" '{ sub(/}$/, ",\"domains\":[" names "],\"skipFallback\":true,\"finalQuery\":true}"); print }')"
+	dns_servers="${dns_servers:+$dns_servers,}$_ab_server"
+	rules="{\"type\":\"field\",\"inboundTag\":[\"dns-aether-bootstrap\"],\"outboundTag\":\"$_aether_out\"}${rules:+,$rules}"
+fi
 if [ -n "$direct_names" ]; then
 	dns_servers="${dns_servers:+$dns_servers,}{\"tag\":\"dns-direct\",$direct_server,\"domains\":[$direct_names],\"skipFallback\":true,\"finalQuery\":true,\"queryStrategy\":\"$direct_qs\"}"
 fi

@@ -51,6 +51,8 @@ var SCHEMES = {
 SCHEMES.balancing = '_balancing';
 SCHEMES.shunt = '_shunt';
 SCHEMES.interface = '_iface';
+SCHEMES.aether = 'aether';
+var AETHER_FIELDS = 'protocol scan ip transport outer inner noize dns exit_loc fragment fragment_size fragment_delay ech ech_dns ech_domain fingerprint sni psiphon psiphon_mode region tor tor_bridges tor_relays bridges cdn_ips cdn_sni cdn_sets psiphon_bundled'.split(' ');
 
 /* Vwarp's disguises for the first packets, lightest first. */
 var NOIZE = [ 'minimal', 'light', 'medium', 'heavy', 'stealth', 'gfw', 'firewall' ];
@@ -150,6 +152,16 @@ function parseLink(link) {
 	/* host:port/?… - hysteria2's own form, and Shadowsocks' SIP002 - is the
 	   same link as host:port?…, and zgz-parse reads it so. */
 	body = body.replace(/\/+$/, '');
+	if (proto == 'aether') {
+		f.aether_endpoint = body;
+		AETHER_FIELDS.forEach(function(k) { f['aether_' + k] = q[k] || ''; delete q[k]; });
+		f.aether_protocol = f.aether_protocol || 'wg';
+		f.aether_scan = f.aether_scan || 'balanced';
+		f.aether_ip = f.aether_ip || 'v4';
+		f.aether_transport = f.aether_transport || 'h3';
+		f.rest = q;
+		return f;
+	}
 
 	/* warp://[licence@]endpoint-or-auto?mode=…#name - see zgz-parse. */
 	if (proto == 'warp') {
@@ -275,6 +287,12 @@ function buildLink(f, name) {
 	if (p == '_balancing') return 'balancing://config' + frag;
 	if (p == '_shunt') return 'shunt://config' + frag;
 	if (p == '_iface') return 'interface://config' + frag;
+	if (p == 'aether') {
+		AETHER_FIELDS.forEach(function(k) { q[k] = f['aether_' + k] || ''; });
+		q.protocol = q.protocol || 'wg'; q.scan = q.scan || 'balanced';
+		q.ip = q.ip || 'v4'; q.transport = q.transport || 'h3';
+		return 'aether://' + (f.aether_endpoint || '') + '?' + buildQuery(q) + frag;
+	}
 
 	if (p == 'vmess') {
 		var j = {
@@ -590,13 +608,13 @@ return view.extend({
 			[ [ 'vless', 'VLESS' ], [ 'vmess', 'VMess' ], [ 'trojan', 'Trojan' ], [ 'shadowsocks', 'Shadowsocks' ],
 			  [ 'socks', 'Socks' ], [ 'http', 'HTTP' ], [ 'hysteria2', 'Hysteria2' ], [ 'tuic', 'TUIC' ], [ 'warp', 'WARP' ],
 			  [ 'wireguard', 'WireGuard' ], [ 'openvpn', 'OpenVPN' ], [ '_balancing', 'Balancing' ],
-			  [ '_shunt', 'Shunt' ], [ '_iface', 'Custom Interface' ] ]
+			  [ '_shunt', 'Shunt' ], [ '_iface', 'Custom Interface' ], [ 'aether', 'Aether' ] ]
 				.forEach(function(v) { o.value(v[0], v[1]); });
 
 			var candidates = (data && data[1] && data[1].nodes) || [];
 			var origins = (data && data[3]) || {};
 			var nodes = candidates.filter(function(n) {
-				return !/^(hysteria2|hysteria|tuic|openvpn|amneziawg|balancing|shunt|interface)$/.test(n.protocol);
+				return !/^(hysteria2|hysteria|tuic|openvpn|amneziawg|balancing|shunt|interface|aether)$/.test(n.protocol);
 			}).map(function(n) {
 				var origin = origins[n.tag];
 				return origin ? { tag: origin, label: n.label || n.tag } : null;
@@ -699,6 +717,48 @@ return view.extend({
 				_('Only for an OpenVPN profile whose private key is encrypted.'));
 			o.password = true;
 			o.depends('_proto', 'openvpn');
+
+			var aetherChoices = {
+				protocol: [ 'wg', 'masque', 'gool', 'mim', 'wg-over-masque' ],
+				transport: [ 'h2', 'h3' ], scan: [ 'balanced', 'turbo', 'thorough', 'stealth', 'ironclad' ],
+				ip: [ 'v4', 'v6', 'both' ], tor: [ 'off', 'only', 'chain', 'reverse' ],
+				psiphon: [ 'off', 'only', 'chain', 'reverse' ], psiphon_mode: [ 'auto', 'cdn', 'direct' ],
+				noize: [ '', 'off', 'light', 'firewall', 'balanced', 'gfw', 'aggressive' ],
+				fingerprint: [ '', 'chrome', 'semi-python', 'firefox', 'go' ],
+				fragment: [ '', '0', '1' ], ech: [ '', '0', '1' ], psiphon_bundled: [ '', '0', '1' ],
+				tor_bridges: [ 'auto', 'first', 'never', 'own' ], tor_relays: [ 'auto', 'only', 'off' ]
+			};
+			var aetherTitles = { protocol: _('Aether protocol'), transport: _('MASQUE transport'),
+				scan: _('Scan mode'), ip: _('IP version'), outer: _('Outer endpoint'), inner: _('Inner endpoint'),
+				tor: _('Tor mode'), psiphon: _('Psiphon mode'), noize: _('Obfuscation profile'),
+				endpoint: _('Aether endpoint'), dns: _('Aether DNS'), exit_loc: _('Exit countries'),
+				fragment: _('TLS fragmentation'), fragment_size: _('Fragment size'), fragment_delay: _('Fragment delay'),
+				ech: 'ECH', ech_dns: _('ECH resolver'), ech_domain: _('ECH domain'), fingerprint: _('Fingerprint'), sni: 'SNI',
+				psiphon_mode: _('Psiphon connection mode'), region: _('Exit country'), tor_bridges: _('Tor bridges'),
+				tor_relays: _('Tor relay source'), bridges: _('Tor bridge lines'), psiphon_bundled: _('Psiphon bundled servers'),
+				cdn_ips: _('CDN addresses'), cdn_sni: _('CDN server names'), cdn_sets: _('CDN sets') };
+			var aetherBasic = [ 'protocol', 'transport', 'scan', 'ip', 'outer', 'inner', 'endpoint', 'tor', 'psiphon' ];
+			o = s.option(form.Flag, '_aether_advanced', _('Advanced Aether options'));
+			o.depends('_proto', 'aether');
+			o.cfgvalue = function() { return AETHER_FIELDS.some(function(k) { return aetherBasic.indexOf(k) < 0 && f['aether_' + k]; }) ? '1' : '0'; };
+			o.write = function() {};
+			AETHER_FIELDS.concat([ 'endpoint' ]).forEach(function(k) {
+				var values = aetherChoices[k];
+				var x = field(values ? form.ListValue : form.Value, 'aether_' + k, aetherTitles[k] || ('Aether ' + k));
+				if (aetherBasic.indexOf(k) >= 0) x.depends('_proto', 'aether');
+				else x.depends({ '_proto': 'aether', '_aether_advanced': '1' });
+				if (values) values.forEach(function(v) {
+					var label = v || _('Auto');
+					if (k == 'protocol') label = { wg: 'WireGuard', masque: 'MASQUE', gool: 'WARP in WARP (classic Gool)', mim: 'MASQUE in MASQUE', 'wg-over-masque': 'WireGuard over MASQUE (new Gool)' }[v];
+					x.value(v, label);
+				});
+			});
+			o = s.option(form.ListValue, 'aether_exit_node', _('Exit node'),
+				_('The selected config carries Aether: selected-config → WARP / Psiphon / Tor.'));
+			o.depends('_proto', 'aether');
+			o.value('_direct', _('Direct'));
+			nodes.filter(function(n) { return n.tag != sid; }).forEach(function(n) { o.value(n.tag, n.label); });
+			o.default = '_direct';
 
 			/* A server of its own for all but WARP and OpenVPN, whose profile
 			   names its own. */

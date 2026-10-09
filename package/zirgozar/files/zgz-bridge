@@ -307,6 +307,11 @@ EOF
 
 cmd_config() {
 	cmd_needed || { echo "no bridge needed" >&2; return 1; }
+	if bridge_is_aether; then
+		"$ZGZ_LIB/zgz-aether" check || return 1
+		echo "$NODE"
+		return 0
+	fi
 
 	if [ "$(jget type)" = "openvpn" ]; then
 		if ! find_openvpn >/dev/null; then
@@ -361,6 +366,11 @@ cmd_config() {
 # is a procd instance like any other and gets its respawning for free.
 cmd_command() {
 	cmd_needed || return 1
+	if bridge_is_aether; then
+		"$ZGZ_LIB/zgz-aether" check || return 1
+		echo "$ZGZ_LIB/zgz-aether run"
+		return 0
+	fi
 	if [ "$(jget type)" = "openvpn" ]; then
 		_ov="$(find_openvpn)" || return 1
 		ovpn_config || return 1

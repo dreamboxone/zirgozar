@@ -639,7 +639,7 @@ sub_records() {
 				_land="$(section_links "$to" 2>/dev/null | LC_ALL=C awk -v LIMIT=1 -f "$PARSE" 2>/dev/null | head -1 | warp_natives)"
 			fi
 			case "$(printf '%s' "$_land" | cut -f3)" in
-				hysteria2|hysteria|tuic|openvpn|amneziawg|'') _land="" ;;
+				hysteria2|hysteria|tuic|openvpn|amneziawg|aether|'') _land="" ;;
 			esac
 			if [ -n "$_land" ]; then
 				LAND="$_land" LAND_ID="x${_sec}_" LAND_SIDE="$CHAINS.new" \

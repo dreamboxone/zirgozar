@@ -674,6 +674,37 @@ function do_tuic(body,   label, cred, uuid, pass, query, p, q) {
 #
 # Which account the node uses is its id: the section of a node added by hand,
 # so that each has an account of its own, kept under /etc/zirgozar/warp.
+function do_aether(body,   label, query, p, proto, scan, ip, transport, outer, inner, id, payload, keys, n, i, k, v) {
+	p = index(body, "#")
+	if (p > 0) { label = clean_label(substr(body, p + 1)); body = substr(body, 1, p - 1) }
+	p = index(body, "?")
+	if (p > 0) { query = substr(body, p + 1); body = substr(body, 1, p - 1) }
+	proto = qs(query, "protocol"); if (proto == "") proto = "wg"
+	if (proto !~ /^(wg|masque|gool|mim|wg-over-masque)$/) return
+	scan = qs(query, "scan"); if (scan == "") scan = "balanced"
+	if (scan !~ /^(turbo|balanced|thorough|stealth|ironclad)$/) return
+	ip = qs(query, "ip"); if (ip == "") ip = "v4"
+	if (ip !~ /^(v4|v6|both)$/) return
+	transport = qs(query, "transport"); if (transport == "") transport = "h3"
+	if (transport !~ /^(h2|h3)$/) return
+	outer = qs(query, "outer"); inner = qs(query, "inner")
+	HOST = ""; PORT = 0
+	if (outer != "" && !hostport(outer)) return
+	if (inner != "" && !hostport(inner)) return
+	if (body != "" && !hostport(body)) return
+	if (outer != "") hostport(outer)
+	else if (body == "") { HOST = "auto"; PORT = 443 }
+	id = NX["aether_id"]; if (id !~ /^[A-Za-z0-9_]+$/) id = "aether"
+	payload = "{\"type\":\"aether\",\"id\":\"" id "\",\"protocol\":\"" proto "\",\"scan\":\"" scan "\",\"ip\":\"" ip "\",\"transport\":\"" transport "\",\"endpoint\":\"" jesc(body) "\",\"outer\":\"" jesc(outer) "\",\"inner\":\"" jesc(inner) "\""
+	n = split("noize dns exit_loc fragment fragment_size fragment_delay ech ech_dns ech_domain fingerprint sni psiphon psiphon_mode region tor tor_bridges tor_relays bridges cdn_ips cdn_sni cdn_sets psiphon_bundled", keys, " ")
+	for (i = 1; i <= n; i++) {
+		k = keys[i]; v = qs(query, k)
+		if (v != "") payload = payload ",\"" k "\":\"" jesc(v) "\""
+	}
+	if (label == "") label = "Aether"
+	emit(label, "aether", payload "}")
+}
+
 function do_warp(body,   label, query, p, key, ep, mode, country, scan, rtt, ipv, dns, res, id, noize, mt) {
 	p = index(body, "#")
 	if (p > 0) { label = clean_label(substr(body, p + 1)); body = substr(body, 1, p - 1) }
@@ -1704,7 +1735,7 @@ LANDING {
 	line = $0
 	gsub(/\r/, "", line)
 	if (line == "" || split(line, rec, "\t") < 6) next
-	if (rec[3] ~ /^(hysteria2|hysteria|tuic|openvpn|amneziawg|warp)$/) next
+	if (rec[3] ~ /^(hysteria2|hysteria|tuic|openvpn|amneziawg|warp|aether)$/) next
 	if (!lready) {
 		split(ENVIRON["LAND"], land, "\t")
 		lp = ENVIRON["LAND"]
@@ -1828,6 +1859,7 @@ function do_line(line) {
 	else if (index(line, "wireguard://") == 1) do_wireguard(substr(line, 13))
 	else if (index(line, "wg://")        == 1) do_wireguard(substr(line, 6))
 	else if (index(line, "warp://")      == 1) do_warp(substr(line, 8))
+	else if (index(line, "aether://")    == 1) do_aether(substr(line, 10))
 }
 
 # ------------------------------------------------------------------- YAML

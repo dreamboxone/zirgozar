@@ -313,7 +313,7 @@ core_engine() {
 # every directive of a profile works - see ovpn_conf in zgz-parse.
 wanted_engine() {
 	_we="$(core_engine)"
-	if [ "$_we" = "xray" ] && [ -s "$ZGZ_ETC/bridge.json" ] && ! bridge_is_warp && ! bridge_is_ovpn &&
+	if [ "$_we" = "xray" ] && [ -s "$ZGZ_ETC/bridge.json" ] && ! bridge_is_warp && ! bridge_is_ovpn && ! bridge_is_aether &&
 	   [ -x "$(engine_singbox_path)" ]; then
 		_we=singbox
 	fi
@@ -350,6 +350,23 @@ bridge_is_ovpn() {
 	return 1
 }
 
+bridge_is_aether() {
+	[ "$(bridge_type)" = "aether" ]
+}
+
+aether_path() {
+	echo "$(cfg core_aether "$(core_dir)/aether/aether")"
+}
+
+aether_via() {
+	bridge_is_aether || return 1
+	_av_id="$(sed -n 's/.*"id":"\([A-Za-z0-9_]*\)".*/\1/p' "$ZGZ_ETC/bridge.json" | head -1)"
+	_av_via="$(uci -q get "zirgozar.$_av_id.aether_exit_node" 2>/dev/null)" || _av_via=""
+	[ -n "$_av_via" ] && [ "$_av_via" != "_direct" ] || return 1
+	case "$_av_via" in *[!A-Za-z0-9_]*) return 1 ;; esac
+	echo "$_av_via"
+}
+
 # The node an OpenVPN node is reached through, if any: its own pre-proxy,
 # written into the record by node_records, or else the one every node dials
 # through. zgz-mkconfig offers OpenVPN a SOCKS port that leaves by it, and
@@ -370,6 +387,7 @@ bridge_wanted() {
 	[ -s "$ZGZ_ETC/bridge.json" ] || return 1
 	bridge_is_warp && return 0
 	bridge_is_ovpn && return 0
+	bridge_is_aether && return 0
 	[ "${1:-$(active_engine)}" = "xray" ] && return 0
 	return 1
 }
@@ -731,6 +749,7 @@ xray_installed() {
 core_version() {
 	[ -x "$1" ] || { echo ""; return 1; }
 	case "$1" in
+		*/aether) "$1" --version 2>/dev/null | awk 'NR == 1 { print $2 }' ;;
 		*hysteria*) "$1" version 2>/dev/null | sed -n 's/^Version:[[:space:]]*//p' | head -1 ;;
 		# "OpenVPN 2.7.7 arm-openwrt-linux-gnu [SSL (OpenSSL)] ..."
 		*openvpn*)  "$1" --version 2>/dev/null | awk 'NR == 1 && $1 == "OpenVPN" { print $2 }' ;;
@@ -1502,7 +1521,7 @@ chain_outbound() {
 	[ -n "$_co" ] || return 1
 	case "$(printf '%s' "$_co" | cut -f3)" in
 		# A pre-proxy Xray cannot speak cannot be dialled through by Xray.
-		hysteria2|hysteria|tuic|openvpn|amneziawg) return 1 ;;
+		hysteria2|hysteria|tuic|openvpn|amneziawg|aether) return 1 ;;
 	esac
 	printf '%s\n' "$_co" | cut -f6- | DOMSTRAT="${DOMSTRAT:-}" decorate |
 		sed -e "s/^{/{\"tag\":\"chain-$1\",/"
@@ -1599,6 +1618,7 @@ section_links() {
 	# A WARP node's account is its own, kept under its section's name.
 	case "$_sl_link" in
 		warp://*) printf '#!zgz-x.warp_id=%s\n' "$1" ;;
+		aether://*) printf '#!zgz-x.aether_id=%s\n' "$1" ;;
 	esac
 	printf '%s\n' "$_sl_link" | NAME="$_sl_name" LC_ALL=C awk '
 		{
@@ -1648,7 +1668,7 @@ node_records() {
 				esac
 				[ -n "$_nd_r" ] || continue
 				case "$(printf '%s' "$_nd_r" | cut -f3)" in
-					hysteria2|tuic|openvpn|amneziawg|balancing|shunt|interface) continue ;;
+					hysteria2|tuic|openvpn|amneziawg|aether|balancing|shunt|interface) continue ;;
 				esac
 				_nd_first="$_nd_r"
 				break
@@ -1691,7 +1711,7 @@ node_records() {
 				_nd_r="$(printf '%s\n' "$_nd_r" | warp_natives | head -1)"
 				[ -n "$_nd_r" ] || return 1
 				case "$(printf '%s' "$_nd_r" | cut -f3)" in
-					hysteria2|hysteria|tuic|openvpn|amneziawg|balancing|shunt|interface) return 1 ;;
+					hysteria2|hysteria|tuic|openvpn|amneziawg|aether|balancing|shunt|interface) return 1 ;;
 				esac
 				_nd_host="$(printf '%s' "$_nd_r" | cut -f4)"
 				_nd_port="$(printf '%s' "$_nd_r" | cut -f5)"
@@ -1733,13 +1753,13 @@ node_records() {
 				_nd_land="$(section_links "$_nd_to" | LC_ALL=C awk -v LIMIT=1 -f "$ZGZ_LIB/zgz-parse" 2>/dev/null | head -1 | warp_natives)"
 				_nd_first="$(printf '%s\n' "$_nd_recs" | head -1)"
 				case "$(printf '%s' "$_nd_first" | cut -f3)" in
-					hysteria2|hysteria|tuic|openvpn|amneziawg) _nd_land="" ;;
+					hysteria2|hysteria|tuic|openvpn|amneziawg|aether) _nd_land="" ;;
 					# The first hop is reached as chain-<this node>, which for
 					# WARP is its WireGuard outbound - when it has one.
 					warp) [ -n "$(printf '%s\n' "$_nd_first" | warp_natives)" ] || _nd_land="" ;;
 				esac
 				case "$(printf '%s' "$_nd_land" | cut -f3)" in
-					hysteria2|hysteria|tuic|openvpn|amneziawg|'') _nd_land="" ;;
+					hysteria2|hysteria|tuic|openvpn|amneziawg|aether|'') _nd_land="" ;;
 				esac
 				if [ -n "$_nd_land" ]; then
 					printf '%s\t%s → %s\t%s\t%s\t%s\t%s\n' \

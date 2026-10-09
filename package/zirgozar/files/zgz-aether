@@ -1,0 +1,114 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+# Part of Zirgozar - https://github.com/dreamboxone/zirgozar
+
+set -e
+MODE="${1:-}"
+. "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
+NODE="$ZGZ_ETC/bridge.json"
+get() { sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p" "$NODE" | head -1; }
+fail() { say_message "$1"; printf '%s\n' "$1" >&2; exit 1; }
+
+bridge_is_aether || fail 'No Aether config is selected.'
+BIN="$(aether_path)"
+[ -x "$BIN" ] || fail 'An Aether config needs Aether. Install it on the App Update page.'
+HELP="$("$BIN" --help 2>/dev/null)" || fail 'Aether cannot run on this router.'
+printf '%s\n' "$HELP" | grep -q -- '--gool-peer' || fail 'Aether 2.3.0 or later is required for WireGuard-over-MASQUE.'
+printf '%s\n' "$HELP" | grep -q -- '--upstream' || fail 'This Aether build does not support exit-node chaining.'
+ID="$(get id)"
+case "$ID" in ''|*[!A-Za-z0-9_]*) fail 'Invalid Aether account identifier.' ;; esac
+PORT="$(cfg bridge_port 10808)"
+UPORT="$(cfg aether_upstream_port 10809)"
+AUXPORT="$(cfg aether_aux_port 10810)"
+for _port in "$PORT" "$UPORT" "$AUXPORT"; do
+	case "$_port" in ''|*[!0-9]*) fail 'Invalid Aether SOCKS port.' ;; esac
+	[ "$_port" -ge 1 ] && [ "$_port" -le 65535 ] || fail 'Invalid Aether SOCKS port.'
+done
+[ "$PORT" != "$UPORT" ] || fail 'Aether and its exit-node need different SOCKS ports.'
+[ "$AUXPORT" != "$PORT" ] && [ "$AUXPORT" != "$UPORT" ] || fail 'Aether auxiliary and exit-node SOCKS ports must be different.'
+STATE="$ZGZ_ETC/aether/$ID"
+set -- "$BIN" --config "$STATE/identity.toml" --bind "127.0.0.1:$PORT" --mark "${ZGZ_OUT_MARK:-255}" --quick-reconnect
+PROTO="$(get protocol)"
+case "$PROTO" in
+	wg|masque|mim) set -- "$@" --protocol "$PROTO" ;;
+	wg-over-masque) set -- "$@" --protocol gool ;;
+	gool) set -- "$@" --gool-classic ;;
+	*) fail 'Unsupported Aether protocol.' ;;
+esac
+SCAN="$(get scan)"; IP="$(get ip)"; TRANSPORT="$(get transport)"
+case "$SCAN" in turbo|balanced|thorough|stealth|ironclad) : ;; *) fail 'Invalid Aether scan mode.' ;; esac
+case "$IP" in v4|v6|both) : ;; *) fail 'Invalid Aether IP version.' ;; esac
+case "$TRANSPORT" in h2|h3) set -- "$@" "--$TRANSPORT" ;; *) fail 'Invalid Aether transport.' ;; esac
+set -- "$@" --scan "$SCAN" --ip "$IP"
+OUTER="$(get outer)"; INNER="$(get inner)"; ENDPOINT="$(get endpoint)"
+case "$PROTO" in
+	wg-over-masque)
+		[ -z "$OUTER" ] || set -- "$@" --peer "$OUTER"
+		[ -z "$INNER" ] || set -- "$@" --gool-peer "$INNER" ;;
+	gool|mim)
+		HOP=wiw; [ "$PROTO" != mim ] || HOP=mim
+		[ -z "$OUTER" ] || set -- "$@" "--$HOP-outer" "$OUTER"
+		[ -z "$INNER" ] || set -- "$@" "--$HOP-inner" "$INNER" ;;
+	*) [ -z "$ENDPOINT" ] || set -- "$@" --peer "$ENDPOINT" ;;
+esac
+VIA="$(aether_via)" || VIA=""
+if [ -n "$VIA" ]; then
+	chain_outbound "$VIA" >/dev/null 2>&1 || fail 'The selected Aether exit-node is missing or unsupported.'
+fi
+# Tor and the external Psiphon process do not mark every socket themselves.
+# Even Direct therefore leaves through the core's marked direct outbound.
+set -- "$@" --upstream "socks5://127.0.0.1:$UPORT"
+TOR="$(get tor)"; PSIPHON="$(get psiphon)"
+case "$TOR" in ''|off) : ;; chain) set -- "$@" --tor --tor-bind "127.0.0.1:$PORT" --bind "127.0.0.1:$AUXPORT" ;; reverse) set -- "$@" --tor-reverse --tor-bind "127.0.0.1:$AUXPORT" ;; only) set -- "$@" --tor-only ;; *) fail 'Invalid Aether Tor mode.' ;; esac
+case "$PSIPHON" in ''|off) : ;; chain) set -- "$@" --psiphon --psiphon-bind "127.0.0.1:$PORT" --bind "127.0.0.1:$AUXPORT" ;; reverse) set -- "$@" --psiphon-reverse --psiphon-bind "127.0.0.1:$AUXPORT" ;; only) set -- "$@" --psiphon-only ;; *) fail 'Invalid Aether Psiphon mode.' ;; esac
+case "$TOR:$PSIPHON" in :*|off:*|*:|*:off) : ;; *) fail 'Choose Tor or Psiphon for one Aether config.' ;; esac
+if [ "$TOR" = reverse ] || [ "$PSIPHON" = reverse ]; then
+	case "$PROTO:$TRANSPORT" in masque:h2|wg-over-masque:h2|mim:h2) : ;; *) fail 'Tor/Psiphon reverse mode requires MASQUE over HTTP/2.' ;; esac
+fi
+# Values are separate argv entries, never executable shell text.
+for KEY in dns exit_loc fragment_size fragment_delay ech_dns ech_domain sni noize region psiphon_mode cdn_ips cdn_sni cdn_sets; do
+	VALUE="$(get "$KEY")"; [ -n "$VALUE" ] || continue
+	case "$KEY" in
+		exit_loc) FLAG=exit-loc ;; fragment_size) FLAG=fragment-size ;; fragment_delay) FLAG=fragment-delay ;;
+		ech_dns) FLAG=ech-dns ;; ech_domain) FLAG=ech-domain ;; sni) FLAG=masque-sni ;;
+		region) FLAG=psiphon-region ;; psiphon_mode) FLAG=psiphon-mode ;;
+		cdn_ips) FLAG=psiphon-cdn-ips ;; cdn_sni) FLAG=psiphon-cdn-sni ;; cdn_sets) FLAG=psiphon-cdn-sets ;;
+		*) FLAG="$KEY" ;;
+	esac
+	printf '%s\n' "$HELP" | grep -Fq -- "--$FLAG" || fail "The installed Aether does not support --$FLAG."
+	set -- "$@" "--$FLAG" "$VALUE"
+done
+# Match the cipher lists and GREASE choice of the shared Aether profiles.
+case "$(get fingerprint)" in
+	''|chrome) CIPHERS='' ;;
+	semi-python) CIPHERS='ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256' ;;
+	firefox) CIPHERS='ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA:AES256-SHA' ;;
+	go) CIPHERS='ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA' ;;
+	*) fail 'Invalid Aether TLS fingerprint.' ;;
+esac
+[ -z "$CIPHERS" ] || set -- "$@" --tls-ciphers "$CIPHERS" --disable-grease
+case "$(get fragment)" in 1) set -- "$@" --fragment ;; ''|0) set -- "$@" --no-fragment ;; *) fail 'Invalid Aether fragmentation setting.' ;; esac
+[ "$(get ech)" != 1 ] || set -- "$@" --ech auto
+case "$(get tor_bridges)" in
+	''|auto) : ;; first) set -- "$@" --tor-bridges ;; never) set -- "$@" --no-tor-bridges ;;
+	own)
+		BRIDGES="$(get bridges)"; [ -n "$BRIDGES" ] || fail 'The Aether config needs its Tor bridge lines.'
+		OLDIFS="$IFS"; IFS=';'
+		for LINE in $BRIDGES; do
+			IFS="$OLDIFS"; set -- "$@" --tor-bridge "$LINE"; IFS=';'
+		done
+		IFS="$OLDIFS" ;;
+	*) fail 'Invalid Aether Tor bridge mode.' ;;
+esac
+case "$(get tor_relays)" in ''|auto) : ;; only|off) set -- "$@" --tor-relays "$(get tor_relays)" ;; *) fail 'Invalid Aether Tor relay mode.' ;; esac
+if [ "$(get psiphon_bundled)" = 0 ]; then
+	printf '%s\n' "$HELP" | grep -q -- '--psiphon-no-bundled' || fail 'This Aether build cannot disable its bundled Psiphon list.'
+	set -- "$@" --psiphon-no-bundled
+fi
+[ ! -x "${BIN%/*}/pt/psiphon-tunnel-core" ] || set -- "$@" --psiphon-bin "${BIN%/*}/pt/psiphon-tunnel-core"
+[ ! -x "${BIN%/*}/pt/lyrebird" ] || set -- "$@" --tor-pt "${BIN%/*}/pt/lyrebird"
+case "$MODE" in check) exit 0 ;; run) : ;; *) fail 'Usage: zgz-aether check|run' ;; esac
+umask 077
+mkdir -p "$STATE"
+exec "$@"

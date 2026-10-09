@@ -55,10 +55,18 @@ VWARP_REPO=voidr3aper-anon/Vwarp
 # has no SNI for a filter to read. Kept beside the official one; whichever
 # accepts the configuration is the one run.
 PATTERNIHA_REPO=patterniha/Xray-core
+AETHER_REPO=CluvexStudio/Aether
 
 asset_for() {
 	_a="$(arch_assets)"
 	case "$1" in
+		aether)
+			case "$(printf '%s\n' "$_a" | awk '{print $2}')" in
+				arm64) echo aarch64-musl ;;
+				armv7) echo armv7-musl ;;
+				amd64) echo x86_64-musl ;;
+				*) echo - ;;
+			esac ;;
 		xray|xray-patterniha) echo "$_a" | awk '{print $1}' ;;
 		# The soft-float builds are the ones a MIPS router can run: the plain
 		# mips and mipsle archives are built for a hardware FPU that most of
@@ -157,6 +165,38 @@ install_xray() {
 	rm -f "$_zip"
 	install_binary "$ZGZ_RUN/xtract/xray" "$DIR/xray" xray
 	return $?
+}
+
+# Aether's release includes the Psiphon and Tor transport helpers. Check the
+# complete archive before replacing any of the installed programs.
+install_aether() {
+	_asset="$(asset_for aether)"
+	[ "$_asset" != - ] || { say_message "Aether has no supported build for $(openwrt_arch)."; return 1; }
+	_tag="$(latest_tag "$AETHER_REPO")"
+	[ -n "$_tag" ] || return 1
+	_url="https://github.com/$AETHER_REPO/releases/download/$_tag/aether-linux-$_asset.tar.gz"
+	_stage="$ZGZ_RUN/aether-install"
+	mkdir -p "$_stage"
+	need_room "$(( $(remote_size "$_url") * 6 ))" "$DIR" || return 1
+	curl -fsSL --connect-timeout 15 --max-time 180 --retry 2 -o "$_stage/core.tar.gz" "$_url" || return 1
+	curl -fsSL --connect-timeout 15 --max-time 45 -o "$_stage/checksum" "$_url.sha256" || return 1
+	_want="$(awk '{print $1; exit}' "$_stage/checksum")"
+	_got="$(sha256sum "$_stage/core.tar.gz" | awk '{print $1}')"
+	[ "${#_want}" = 64 ] && [ "$_want" = "$_got" ] || { say_message 'The Aether download failed its checksum check.'; return 1; }
+	tar -xzf "$_stage/core.tar.gz" -C "$_stage" aether pt/psiphon-tunnel-core pt/lyrebird || return 1
+	chmod 755 "$_stage/aether" "$_stage/pt/psiphon-tunnel-core" "$_stage/pt/lyrebird"
+	"$_stage/aether" --version >/dev/null 2>&1 || { say_message 'The downloaded Aether cannot run on this router.'; return 1; }
+	"$_stage/aether" --help 2>/dev/null | grep -q -- '--gool-peer' || { say_message 'This Aether build lacks WireGuard-over-MASQUE.'; return 1; }
+	_target="$DIR/aether"
+	mkdir -p "$_target/pt"
+	for _f in pt/psiphon-tunnel-core pt/lyrebird aether; do
+		cp "$_stage/$_f" "$_target/$_f.new" || return 1
+		chmod 755 "$_target/$_f.new"
+		mv -f "$_target/$_f.new" "$_target/$_f" || return 1
+	done
+	rm -f "$_stage/core.tar.gz" "$_stage/checksum" "$_stage/aether" "$_stage/pt/psiphon-tunnel-core" "$_stage/pt/lyrebird"
+	log "installed Aether $_tag"
+	return 0
 }
 
 # patterniha's Xray, beside the official one in a file of its own, from its
@@ -565,6 +605,7 @@ repo_of() {
 		geoview)  echo "$GEOVIEW_REPO" ;;
 		warp-plus) echo "$WARPPLUS_REPO" ;;
 		vwarp)    echo "$VWARP_REPO" ;;
+		aether)   echo "$AETHER_REPO" ;;
 		xray-patterniha) echo "$PATTERNIHA_REPO" ;;
 		zirgozar) echo "dreamboxone/zirgozar" ;;
 	esac
@@ -637,7 +678,7 @@ cmd_latest() {
 		_old="$(latest_of xray)"
 		[ -n "$_old" ] && printf 'xray\t%s\n' "$_old" >> "$_tmp"
 	fi
-	for _c in xray-patterniha sing-box sing-box-lx hysteria geoview warp-plus vwarp zirgozar; do
+	for _c in xray-patterniha sing-box sing-box-lx hysteria geoview warp-plus vwarp aether zirgozar; do
 		_repo="$(repo_of "$_c")"
 		[ -n "$_repo" ] || continue
 		# The tag is all that is wanted, so this is a small request and a
@@ -713,6 +754,8 @@ cmd_list() {
 	one geoview "$_g"; printf ","
 	one warp-plus "$_w"; printf ","
 	one vwarp "$_v"; printf ","
+	_aether="$(aether_path)"; [ -x "$_aether" ] || _aether=""
+	one aether "$_aether"; printf ","
 	one openvpn "$(openvpn_path)"
 	printf ']'
 	# This program itself, for the App Update page: what is installed and
@@ -854,7 +897,7 @@ install_self() {
 
 cmd_remove() {
 	case "$1" in
-		sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|xray-patterniha)
+		sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|xray-patterniha|aether)
 			# Only ever our own copy - the one at its App Path. Something
 			# else on this router installed anything else, and it is not
 			# ours to delete.
@@ -865,10 +908,14 @@ cmd_remove() {
 				warp-plus) _rm="$(warpplus_path)" ;;
 				vwarp) _rm="$(vwarp_path)" ;;
 				xray-patterniha) _rm="$DIR/xray-patterniha" ;;
+				aether) _rm="$(aether_path)" ;;
 				*)        _rm="$(geoview_path)" ;;
 			esac
 			if [ -e "$_rm" ]; then
 				rm -f "$_rm"
+				if [ "$1" = aether ] && [ "$_rm" = "$DIR/aether/aether" ]; then
+					rm -f "$DIR/aether/pt/psiphon-tunnel-core" "$DIR/aether/pt/lyrebird"
+				fi
 				log "$1 removed"
 			fi
 			;;
@@ -895,6 +942,7 @@ case "${1:-list}" in
 			geoview)  install_geoview ;;
 			warp-plus|vwarp) install_warpplus "$2" ;;
 			xray-patterniha) install_xray_patterniha ;;
+			aether) install_aether ;;
 			openvpn)  install_openvpn ;;
 			# This file is among those the install replaces, so nothing
 			# after it may be read from here: it ends the script outright.
