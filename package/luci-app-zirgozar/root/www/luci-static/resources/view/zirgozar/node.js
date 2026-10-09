@@ -609,7 +609,8 @@ return view.extend({
 			/* LuCI's MultiValue renderer reads .length. A newly added node has
 			   no balancing_node list yet, so give it the empty list explicitly. */
 			o.cfgvalue = function(section_id) {
-				return uci.get_list('zirgozar', section_id, 'balancing_node') || [];
+				var value = uci.get('zirgozar', section_id, 'balancing_node');
+				return value == null || value === '' ? [] : (Array.isArray(value) ? value : [ value ]);
 			};
 			nodes.forEach(function(n) { o.value(n.tag, n.label || n.tag); });
 			pui.checkboxes(o);
