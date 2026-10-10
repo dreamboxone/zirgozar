@@ -10,8 +10,9 @@ NODE="$ZGZ_ETC/bridge.json"
 get() { sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p" "$NODE" | head -1; }
 fail() { say_message "$1"; printf '%s\n' "$1" >&2; exit 1; }
 
-bridge_is_aether || fail 'No Aether config is selected.'
 BIN="$(aether_path)"
+case "$MODE" in version|--version) "$BIN" --version; exit $? ;; esac
+bridge_is_aether || fail 'No Aether config is selected.'
 [ -x "$BIN" ] || fail 'An Aether config needs Aether. Install it on the App Update page.'
 HELP="$("$BIN" --help 2>/dev/null)" || fail 'Aether cannot run on this router.'
 printf '%s\n' "$HELP" | grep -q -- '--gool-peer' || fail 'Aether 2.3.0 or later is required for WireGuard-over-MASQUE.'
@@ -28,6 +29,12 @@ done
 [ "$PORT" != "$UPORT" ] || fail 'Aether and its exit-node need different SOCKS ports.'
 [ "$AUXPORT" != "$PORT" ] && [ "$AUXPORT" != "$UPORT" ] || fail 'Aether auxiliary and exit-node SOCKS ports must be different.'
 STATE="$ZGZ_ETC/aether/$ID"
+API_ECH="$(get api_ech)"
+case "$API_ECH" in ''|auto|0|1) : ;; *) fail 'Invalid Aether account ECH setting.' ;; esac
+API_ADDRESS="$(get api_address)"
+API_DNS="$(get api_ech_dns)"; API_DNS="${API_DNS:-udp://8.8.8.8}"
+API_FLAG=--enroll-address
+if printf '%s\n' "$HELP" | grep -q -- '--api-address'; then API_FLAG=--api-address; fi
 set -- "$BIN" --config "$STATE/identity.toml" --bind "127.0.0.1:$PORT" --mark "${ZGZ_OUT_MARK:-255}" --quick-reconnect
 PROTO="$(get protocol)"
 case "$PROTO" in
@@ -108,7 +115,32 @@ if [ "$(get psiphon_bundled)" = 0 ]; then
 fi
 [ ! -x "${BIN%/*}/pt/psiphon-tunnel-core" ] || set -- "$@" --psiphon-bin "${BIN%/*}/pt/psiphon-tunnel-core"
 [ ! -x "${BIN%/*}/pt/lyrebird" ] || set -- "$@" --tor-pt "${BIN%/*}/pt/lyrebird"
-case "$MODE" in check) exit 0 ;; run) : ;; *) fail 'Usage: zgz-aether check|run' ;; esac
+case "$MODE" in check) exit 0 ;; run|prepare) : ;; *) fail 'Usage: zgz-aether check|prepare|run' ;; esac
 umask 077
 mkdir -p "$STATE"
+# Account provisioning has its own TLS settings. In particular, ECH can reach
+# the account API without requiring the MASQUE gateway to accept ECH too.
+# Keep existing identities; never replace working keys during a reconnect.
+REGISTER=''
+case "$PROTO" in
+	wg) [ -s "$STATE/identity.toml" ] || REGISTER=wg ;;
+	masque|wg-over-masque|mim) [ -s "$STATE/identity-masque.toml" ] || REGISTER=masque ;;
+esac
+if [ "$TOR" = only ] || [ "$PSIPHON" = only ]; then REGISTER=''; fi
+register_account() {
+	_ech="$1"
+	set -- "$BIN" --config "$STATE/identity.toml" --register "$REGISTER" --mark "${ZGZ_OUT_MARK:-255}" --upstream "socks5://127.0.0.1:$UPORT"
+	[ -z "$API_ADDRESS" ] || set -- "$@" "$API_FLAG" "$API_ADDRESS"
+	[ "$_ech" != 1 ] || set -- "$@" --ech auto --ech-dns "$API_DNS"
+	bounded 30 "$@"
+}
+if [ -n "$REGISTER" ]; then
+	case "$API_ECH" in
+		0) register_account 0 || fail 'Aether could not create its WARP account. Check the account API settings and Runtime Logs.' ;;
+		1) register_account 1 || fail 'Aether could not create its WARP account. Check the account API settings and Runtime Logs.' ;;
+		*) register_account 1 || register_account 0 || fail 'Aether could not create its WARP account. Check the account API settings and Runtime Logs.' ;;
+	esac
+fi
+[ "$MODE" != prepare ] || exit 0
+[ -z "$API_ADDRESS" ] || set -- "$@" "$API_FLAG" "$API_ADDRESS"
 exec "$@"

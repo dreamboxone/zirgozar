@@ -322,12 +322,16 @@ service_started() {
 		# in WARP or Psiphon - the second hop as well. Psiphon alone can take
 		# most of a minute.
 		_bwait=15
-		bridge_is_warp && _bwait=120
+		if bridge_is_warp || bridge_is_aether; then _bwait=120; fi
+		# A balanced Aether scan alone can take two minutes, after provisioning.
+		if bridge_is_aether; then _bwait=240; fi
 		if ! wait_for_port "$bridge_port" "$_bwait"; then
 			log "the bridge never started listening on $bridge_port"
 			say_status failed
 			if bridge_is_warp; then
 				say_message "WARP did not connect. The Runtime Logs page says how far it got. Without an account, press Register on the node's page while another node is connected; without an answer from WARP, turn Scan on or give another endpoint."
+			elif bridge_is_aether; then
+				[ -s "$ZGZ_MESSAGE" ] || say_message "Aether did not connect within four minutes. Check its endpoint and the Runtime Logs page."
 			else
 				say_message "The helper for this node's protocol would not start."
 			fi

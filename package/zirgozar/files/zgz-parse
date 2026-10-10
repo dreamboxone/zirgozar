@@ -696,7 +696,7 @@ function do_aether(body,   label, query, p, proto, scan, ip, transport, outer, i
 	else if (body == "") { HOST = "auto"; PORT = 443 }
 	id = NX["aether_id"]; if (id !~ /^[A-Za-z0-9_]+$/) id = "aether"
 	payload = "{\"type\":\"aether\",\"id\":\"" id "\",\"protocol\":\"" proto "\",\"scan\":\"" scan "\",\"ip\":\"" ip "\",\"transport\":\"" transport "\",\"endpoint\":\"" jesc(body) "\",\"outer\":\"" jesc(outer) "\",\"inner\":\"" jesc(inner) "\""
-	n = split("noize dns exit_loc fragment fragment_size fragment_delay ech ech_dns ech_domain fingerprint sni psiphon psiphon_mode region tor tor_bridges tor_relays bridges cdn_ips cdn_sni cdn_sets psiphon_bundled", keys, " ")
+	n = split("noize dns exit_loc fragment fragment_size fragment_delay ech ech_dns ech_domain api_address api_ech api_ech_dns fingerprint sni psiphon psiphon_mode region tor tor_bridges tor_relays bridges cdn_ips cdn_sni cdn_sets psiphon_bundled", keys, " ")
 	for (i = 1; i <= n; i++) {
 		k = keys[i]; v = qs(query, k)
 		if (v != "") payload = payload ",\"" k "\":\"" jesc(v) "\""

@@ -749,7 +749,8 @@ return view.extend({
 		s.anonymous = true;
 
 		o = s.option(form.ListValue, 'sources', _('Nodes to use'),
-			_('This decides who may be measured, not who wins: whichever node answers fastest is the one used, wherever it came from. A node added by hand joins the list rather than replacing it. To insist on one node, press “Use” beside it below.'));
+			_('This decides who may be measured, not who wins: whichever node answers fastest is the one used, wherever it came from. A node added by hand joins the list rather than replacing it. To insist on one node, press “Use” beside it below.') + ' ' +
+			_('If all subscriptions are off, enabled manually added configs are used.'));
 		o.value('own', _('Only manually added configs'));
 		o.value('both', _('All configs'));
 		o.value('subs', _('Only the subscriptions'));

@@ -17,7 +17,7 @@
 cd "$(dirname "$0")/.."
 
 rc=0
-for t in test/test-package.sh test/test-stats.sh test/test-rules.sh test/test-acl.sh test/test-config.sh test/test-config-modes.sh test/test-aether.sh test/test-probe.sh; do
+for t in test/test-package.sh test/test-stats.sh test/test-rules.sh test/test-acl.sh test/test-config.sh test/test-config-modes.sh test/test-nodes.sh test/test-aether.sh test/test-aether-init.sh test/test-probe.sh; do
 	echo
 	echo "######## $t"
 	sh "$t" || rc=1

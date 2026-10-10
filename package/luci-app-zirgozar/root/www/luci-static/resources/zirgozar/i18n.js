@@ -45,6 +45,38 @@ var FA = {
 	'Aether App Path': 'مسیر برنامهٔ اتر',
 	'Aether carries aether:// configs, including WireGuard-over-MASQUE and Tor/Psiphon. Install it above.': 'اتر کانفیگ‌های aether://، از جمله WireGuard روی MASQUE و تور/سایفون را اجرا می‌کند. از بخش بالا نصبش کنید.',
 	'Aether protocol': 'پروتکل اتر',
+	'Aether did not connect within two minutes. Check its exit-node and the Runtime Logs page.': 'اتر در دو دقیقه وصل نشد. نود خروجی آن و صفحهٔ گزارش‌های اجرا را بررسی کنید.',
+	'No Aether config is selected.': 'هیچ کانفیگ اتر انتخاب نشده است.',
+	'An Aether config needs Aether. Install it on the App Update page.': 'برای اجرای کانفیگ اتر، برنامهٔ اتر را از صفحهٔ به‌روزرسانی نصب کنید.',
+	'Aether cannot run on this router.': 'اتر روی این روتر قابل اجرا نیست.',
+	'Aether 2.3.0 or later is required for WireGuard-over-MASQUE.': 'برای وایرگارد روی MASQUE، اتر نسخهٔ ۲.۳.۰ یا جدیدتر لازم است.',
+	'This Aether build does not support exit-node chaining.': 'این نسخهٔ اتر از زنجیره کردن نود خروجی پشتیبانی نمی‌کند.',
+	'Invalid Aether account identifier.': 'شناسهٔ اکانت اتر معتبر نیست.',
+	'Invalid Aether SOCKS port.': 'پورت ساکس اتر معتبر نیست.',
+	'Aether and its exit-node need different SOCKS ports.': 'پورت ساکس اتر و نود خروجی آن باید متفاوت باشند.',
+	'Aether auxiliary and exit-node SOCKS ports must be different.': 'پورت کمکی اتر باید با پورت‌های ساکس اتر و نود خروجی متفاوت باشد.',
+	'Unsupported Aether protocol.': 'این پروتکل اتر پشتیبانی نمی‌شود.',
+	'Invalid Aether scan mode.': 'روش اسکن اتر معتبر نیست.',
+	'Invalid Aether IP version.': 'نسخهٔ IP اتر معتبر نیست.',
+	'Invalid Aether transport.': 'روش انتقال اتر معتبر نیست.',
+	'The selected Aether exit-node is missing or unsupported.': 'نود خروجی انتخاب‌شده برای اتر موجود نیست یا پشتیبانی نمی‌شود.',
+	'Invalid Aether Tor mode.': 'حالت تور در اتر معتبر نیست.',
+	'Invalid Aether Psiphon mode.': 'حالت سایفون در اتر معتبر نیست.',
+	'Choose Tor or Psiphon for one Aether config.': 'برای هر کانفیگ اتر یکی از تور یا سایفون را انتخاب کنید.',
+	'Tor/Psiphon reverse mode requires MASQUE over HTTP/2.': 'حالت معکوس تور یا سایفون به MASQUE روی HTTP/2 نیاز دارد.',
+	'The installed Aether does not support %s.': 'اتر نصب‌شده از گزینهٔ %s پشتیبانی نمی‌کند.',
+	'Invalid Aether TLS fingerprint.': 'فینگرپرینت TLS اتر معتبر نیست.',
+	'Invalid Aether fragmentation setting.': 'تنظیم فرگمنت اتر معتبر نیست.',
+	'The Aether config needs its Tor bridge lines.': 'خطوط پل تور را در کانفیگ اتر وارد کنید.',
+	'Invalid Aether Tor bridge mode.': 'حالت پل تور در اتر معتبر نیست.',
+	'Invalid Aether Tor relay mode.': 'حالت رلهٔ تور در اتر معتبر نیست.',
+	'This Aether build cannot disable its bundled Psiphon list.': 'این نسخهٔ اتر امکان غیرفعال کردن فهرست همراه سایفون را ندارد.',
+	'Usage: zgz-aether check|run': 'روش اجرای فرمان: zgz-aether check|run',
+	'The Aether exit-node is missing or cannot be used by Xray. Choose a usable exit-node on its config page.': 'نود خروجی اتر موجود نیست یا با ایکس‌ری قابل اجرا نیست. در صفحهٔ کانفیگ اتر یک نود خروجی قابل اجرا انتخاب کنید.',
+	'Aether has no supported build for %s.': 'برای معماری %s نسخهٔ قابل اجرای اتر منتشر نشده است.',
+	'The Aether download failed its checksum check.': 'چک‌سام فایل دانلودشدهٔ اتر معتبر نیست.',
+	'The downloaded Aether cannot run on this router.': 'فایل اتر دانلودشده روی این روتر قابل اجرا نیست.',
+	'This Aether build lacks WireGuard-over-MASQUE.': 'این نسخهٔ اتر از وایرگارد روی MASQUE پشتیبانی نمی‌کند.',
 	'MASQUE transport': 'انتقال MASQUE',
 	'Scan mode': 'روش اسکن',
 	'Outer endpoint': 'آدرس لایهٔ بیرونی',
@@ -57,6 +89,16 @@ var FA = {
 	'Advanced Aether options': 'تنظیمات پیشرفتهٔ اتر',
 	'Aether endpoint': 'آدرس اتر',
 	'Aether DNS': 'DNS اتر',
+	'The downloaded Aether lacks configurable MASQUE SNI. The installed core was kept.': 'نسخهٔ دانلودشدهٔ اتر امکان تنظیم SNI مربوط به MASQUE را ندارد. هستهٔ نصب‌شده حفظ شد.',
+	'Usage: zgz-aether check|prepare|run': 'دستور اتر باید با گزینهٔ بررسی، آماده‌سازی یا اجرا فراخوانی شود.',
+	'Aether did not connect within four minutes. Check its endpoint and the Runtime Logs page.': 'اتر در چهار دقیقه متصل نشد. آدرس مقصد و صفحهٔ گزارش‌های اجرا را بررسی کنید.',
+	'WARP account API address': 'آدرس API ساخت حساب وارپ',
+	'WARP account ECH': 'ECH ساخت حساب وارپ',
+	'WARP account ECH resolver': 'DNS دریافت ECH برای ساخت حساب وارپ',
+	'Used only to create WARP keys; it does not enable ECH on the tunnel.': 'فقط برای ساخت کلیدهای وارپ استفاده می‌شود و ECH تونل را فعال نمی‌کند.',
+	'Leave empty to scan automatically. A fixed endpoint disables automatic endpoint selection.': 'برای اسکن خودکار خالی بگذارید. با وارد کردن آدرس ثابت، انتخاب خودکار مقصد غیرفعال می‌شود.',
+	'Invalid Aether account ECH setting.': 'تنظیم ECH ساخت حساب اتر معتبر نیست.',
+	'Aether could not create its WARP account. Check the account API settings and Runtime Logs.': 'ساخت حساب وارپ اتر انجام نشد. تنظیمات API حساب و گزارش‌های اجرا را بررسی کنید.',
 	'Exit countries': 'کشورهای خروجی',
 	'TLS fragmentation': 'فرگمنت TLS',
 	'Fragment size': 'اندازهٔ فرگمنت',
@@ -903,6 +945,12 @@ var FA = {
 	'No node on the list can carry traffic, and neither can the one in use. The tunnel has been taken out of the way so that the network works without it. Add a node that works on the Configs page, or check the subscription.':
 		'هیچ کانفیگی در فهرست، و نه کانفیگ در حال استفاده، ترافیک را عبور نمی‌دهد. تونل کنار گذاشته شد تا شبکه بدون آن کار کند. در صفحه «کانفیگ‌ها» یک کانفیگ سالم اضافه کنید، یا اشتراک را بررسی کنید.',
 	'Nothing in the list could be read as a node': 'هیچ چیز در فهرست به‌عنوان کانفیگ خوانده نشد',
+	'If all subscriptions are off, enabled manually added configs are used.': 'اگر همهٔ اشتراک‌ها خاموش باشند، کانفیگ‌های دستیِ فعال استفاده می‌شوند.',
+	'No enabled manual configs are available. Add or enable a config on the Configs page.': 'کانفیگ دستیِ فعالی وجود ندارد. در صفحهٔ «کانفیگ‌ها» یک کانفیگ اضافه یا فعال کنید.',
+	'No configs are available from the enabled subscriptions. Update them or select manual configs.': 'اشتراک‌های فعال کانفیگی در اختیار برنامه نگذاشته‌اند. آن‌ها را به‌روز کنید یا کانفیگ‌های دستی را انتخاب کنید.',
+	'No enabled configs are available. Add or enable a manual config or a subscription.': 'هیچ کانفیگ فعالی وجود ندارد. یک کانفیگ دستی یا اشتراک اضافه یا فعال کنید.',
+	'There is no node list yet: no subscription could be read and none has been saved before. Add one node by hand on the Node List page - a single share link is enough - or check the subscription address on Node Subscribe.':
+		'فهرست کانفیگ خالی است. تنظیم منابع و فعال بودن کانفیگ‌های دستی یا اشتراک‌ها را بررسی کنید.',
 	'There is no node list yet: no subscription could be read and none has been saved before. Add one node by hand on the Configs page - a single share link is enough - or check the subscription address on Node Subscribe.':
 		'هنوز فهرست کانفیگی وجود ندارد: هیچ اشتراکی خوانده نشد و فهرست ذخیره‌شده‌ای هم نیست. در صفحه «کانفیگ‌ها» یک کانفیگ دستی اضافه کنید (یک لینک کافی است)، یا آدرس اشتراک را در صفحه «اشتراک کانفیگ‌ها» بررسی کنید.',
 	'The node chosen in Basic Settings cannot be read. Choose another there, or set it back to Auto.':
@@ -1316,6 +1364,12 @@ function patchLuci() {
 function tr(s) {
 	if (LANG !== 'fa') return s;
 	var v = FA[s];
+	if (v === undefined && typeof s === 'string') {
+		var m = /^The installed Aether does not support (--[a-z0-9-]+)\.$/.exec(s);
+		if (m) v = FA['The installed Aether does not support %s.'].replace('%s', m[1]);
+		m = /^Aether has no supported build for ([A-Za-z0-9_-]+)\.$/.exec(s);
+		if (m) v = FA['Aether has no supported build for %s.'].replace('%s', m[1]);
+	}
 	if (v === undefined && Object.prototype.hasOwnProperty.call(LUCI_FA, s))
 		v = LUCI_FA[s];
 	return (v === undefined) ? s : v;
