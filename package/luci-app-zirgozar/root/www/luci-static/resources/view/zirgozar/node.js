@@ -52,7 +52,7 @@ SCHEMES.balancing = '_balancing';
 SCHEMES.shunt = '_shunt';
 SCHEMES.interface = '_iface';
 SCHEMES.aether = 'aether';
-var AETHER_FIELDS = 'protocol scan ip transport outer inner noize dns exit_loc fragment fragment_size fragment_delay ech ech_dns ech_domain fingerprint sni psiphon psiphon_mode region tor tor_bridges tor_relays bridges cdn_ips cdn_sni cdn_sets psiphon_bundled'.split(' ');
+var AETHER_FIELDS = 'protocol scan ip transport outer inner noize dns exit_loc fragment fragment_size fragment_delay ech ech_dns ech_domain api_address api_ech api_ech_dns fingerprint sni psiphon psiphon_mode region tor tor_bridges tor_relays bridges cdn_ips cdn_sni cdn_sets psiphon_bundled'.split(' ');
 
 /* Vwarp's disguises for the first packets, lightest first. */
 var NOIZE = [ 'minimal', 'light', 'medium', 'heavy', 'stealth', 'gfw', 'firewall' ];
@@ -726,6 +726,7 @@ return view.extend({
 				noize: [ '', 'off', 'light', 'firewall', 'balanced', 'gfw', 'aggressive' ],
 				fingerprint: [ '', 'chrome', 'semi-python', 'firefox', 'go' ],
 				fragment: [ '', '0', '1' ], ech: [ '', '0', '1' ], psiphon_bundled: [ '', '0', '1' ],
+				api_ech: [ '', '0', '1' ],
 				tor_bridges: [ 'auto', 'first', 'never', 'own' ], tor_relays: [ 'auto', 'only', 'off' ]
 			};
 			var aetherTitles = { protocol: _('Aether protocol'), transport: _('MASQUE transport'),
@@ -734,6 +735,7 @@ return view.extend({
 				endpoint: _('Aether endpoint'), dns: _('Aether DNS'), exit_loc: _('Exit countries'),
 				fragment: _('TLS fragmentation'), fragment_size: _('Fragment size'), fragment_delay: _('Fragment delay'),
 				ech: 'ECH', ech_dns: _('ECH resolver'), ech_domain: _('ECH domain'), fingerprint: _('Fingerprint'), sni: 'SNI',
+				api_address: _('WARP account API address'), api_ech: _('WARP account ECH'), api_ech_dns: _('WARP account ECH resolver'),
 				psiphon_mode: _('Psiphon connection mode'), region: _('Exit country'), tor_bridges: _('Tor bridges'),
 				tor_relays: _('Tor relay source'), bridges: _('Tor bridge lines'), psiphon_bundled: _('Psiphon bundled servers'),
 				cdn_ips: _('CDN addresses'), cdn_sni: _('CDN server names'), cdn_sets: _('CDN sets') };
@@ -745,6 +747,10 @@ return view.extend({
 			AETHER_FIELDS.concat([ 'endpoint' ]).forEach(function(k) {
 				var values = aetherChoices[k];
 				var x = field(values ? form.ListValue : form.Value, 'aether_' + k, aetherTitles[k] || ('Aether ' + k));
+				if (k == 'api_ech') x.description = _('Used only to create WARP keys; it does not enable ECH on the tunnel.');
+				if (k == 'api_ech_dns') x.placeholder = 'udp://8.8.8.8';
+				if (k == 'api_address') x.placeholder = 'api.cloudflareclient.com';
+				if (k == 'outer' || k == 'endpoint') x.description = _('Leave empty to scan automatically. A fixed endpoint disables automatic endpoint selection.');
 				if (aetherBasic.indexOf(k) >= 0) x.depends('_proto', 'aether');
 				else x.depends({ '_proto': 'aether', '_aether_advanced': '1' });
 				if (values) values.forEach(function(v) {

@@ -653,6 +653,25 @@ sub_records() {
 	return 0
 }
 
+count_subscription() {
+	local enabled
+	_subscriptions=$((_subscriptions + 1))
+	config_get_bool enabled "$1" enabled 1
+	[ "$enabled" != "1" ] || _enabled_subscriptions=$((_enabled_subscriptions + 1))
+	return 0
+}
+
+clear_list_message() {
+	case "$(cat "$ZGZ_MESSAGE" 2>/dev/null)" in
+		'Nothing in the list could be read as a node'|\
+		'There is no node list yet:'*|\
+		'No enabled manual configs are available. Add or enable a config on the Configs page.'|\
+		'No configs are available from the enabled subscriptions. Update them or select manual configs.'|\
+		'No enabled configs are available. Add or enable a manual config or a subscription.')
+			clear_message ;;
+	esac
+}
+
 cmd_build() {
 	# both / own / subs. Which servers are allowed into the running, before
 	# anything is measured. A server added by hand does not replace the list,
@@ -660,6 +679,16 @@ cmd_build() {
 	_sources="$(cfg sources own)"
 	_limit="$(cfg max_nodes 300)"
 	config_load zirgozar
+	_subscriptions=0
+	_enabled_subscriptions=0
+	config_foreach count_subscription subscription
+	# Turning every subscription off leaves manual configs available. An
+	# enabled but temporarily unreadable subscription still obeys the user's
+	# subscription-only choice; it must not silently select a manual server.
+	if [ "$_sources" = "subs" ] && [ "$_enabled_subscriptions" -eq 0 ] &&
+	   { [ "$_subscriptions" -gt 0 ] || [ ! -s "$ZGZ_NODE_CACHE" ]; }; then
+		_sources=own
+	fi
 
 	# Hand-added nodes go in ahead of the subscriptions. They were typed in on
 	# purpose, so when a limit has to bite it should bite the free list first.
@@ -696,7 +725,7 @@ cmd_build() {
 		# The single list an earlier version kept, until anything is read.
 		if [ "$SUB_HAD" = "1" ]; then
 			rm -f "$ZGZ_NODE_CACHE"
-		elif [ -s "$ZGZ_NODE_CACHE" ]; then
+		elif [ "$_subscriptions" -eq 0 ] && [ -s "$ZGZ_NODE_CACHE" ]; then
 			LC_ALL=C awk -v LIMIT="$_limit" -f "$PARSE" < "$ZGZ_NODE_CACHE" >> "$SUB_TSV" 2>/dev/null || true
 			SUB_HAD=1
 		fi
@@ -724,16 +753,18 @@ cmd_build() {
 	rm -f "$ZGZ_RUN/merge.tsv"
 
 	if [ ! -s "$ZGZ_CANDIDATES.new" ]; then
-		rm -f "$ZGZ_CANDIDATES.new" "$CHAINS.new"
+		# Removed or disabled sources must not survive in the old candidate
+		# list. The running selected config has its own independent state.
+		mv -f "$ZGZ_CANDIDATES.new" "$ZGZ_CANDIDATES"
+		mv -f "$CHAINS.new" "$CHAINS"
 		if [ "$_had" = "1" ]; then
 			say_message "Nothing in the list could be read as a node"
 		else
-			# The one case that genuinely stops the user from connecting, and
-			# the only one this page says anything about. It names the way out,
-			# because on a censored connection the list address is unreachable
-			# until the tunnel is up and the tunnel needs a server first - and
-			# one link pasted in by hand breaks that circle.
-			say_message "There is no node list yet: no subscription could be read and none has been saved before. Add one node by hand on the Node List page - a single share link is enough - or check the subscription address on Node Subscribe."
+			case "$_sources" in
+				own) say_message "No enabled manual configs are available. Add or enable a config on the Configs page." ;;
+				subs) say_message "No configs are available from the enabled subscriptions. Update them or select manual configs." ;;
+				*) say_message "No enabled configs are available. Add or enable a manual config or a subscription." ;;
+			esac
 		fi
 		warn "no usable servers in the list"
 		return 1
@@ -741,6 +772,7 @@ cmd_build() {
 
 	mv -f "$ZGZ_CANDIDATES.new" "$ZGZ_CANDIDATES"
 	mv -f "$CHAINS.new" "$CHAINS"
+	clear_list_message
 	log "$(wc -l < "$ZGZ_CANDIDATES") servers to choose from"
 	return 0
 }

@@ -188,6 +188,14 @@ install_aether() {
 	"$_stage/aether" --version >/dev/null 2>&1 || { say_message 'The downloaded Aether cannot run on this router.'; return 1; }
 	"$_stage/aether" --help 2>/dev/null | grep -q -- '--gool-peer' || { say_message 'This Aether build lacks WireGuard-over-MASQUE.'; return 1; }
 	_target="$DIR/aether"
+	# Keep the configured SNI supported when switching between upstream builds
+	# that advertise the same version but expose different capabilities.
+	if [ -x "$_target/aether" ] && "$_target/aether" --help 2>/dev/null | grep -q -- '--masque-sni'; then
+		"$_stage/aether" --help 2>/dev/null | grep -q -- '--masque-sni' || {
+			say_message 'The downloaded Aether lacks configurable MASQUE SNI. The installed core was kept.'
+			return 1
+		}
+	fi
 	mkdir -p "$_target/pt"
 	for _f in pt/psiphon-tunnel-core pt/lyrebird aether; do
 		cp "$_stage/$_f" "$_target/$_f.new" || return 1
