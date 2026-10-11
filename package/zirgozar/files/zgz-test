@@ -275,6 +275,21 @@ cmd_current() {
 	return $?
 }
 
+cmd_live() {
+	_sp="$(cfg node_socks_port 1070)"
+	[ "$_sp" != 0 ] || { cmd_current; return $?; }
+	case "$_sp" in ''|*[!0-9]*) echo 0; return 1 ;; esac
+	[ "$_sp" -ge 1 ] && [ "$_sp" -le 65535 ] || { echo 0; return 1; }
+	if _time="$(curl -fsS -o /dev/null --socks5-hostname "127.0.0.1:$_sp" \
+		--connect-timeout 5 --max-time 10 -w '%{time_total}' \
+		"$(cfg test_url 'http://www.gstatic.com/generate_204')" 2>/dev/null)"; then
+		awk -v t="$_time" 'BEGIN { m=int(t*1000+0.5); print (m<1 ? 1 : m) }'
+		return 0
+	fi
+	echo 0
+	return 1
+}
+
 # ------------------------------------------------------------------ exit
 
 # Where the tunnel comes out: the address the rest of the internet sees and
@@ -436,6 +451,7 @@ case "${1:-json}" in
 		cmd_run "$1" "$2"
 		;;
 	current) cmd_current ;;
+	live)    cmd_live ;;
 	exit)    cmd_exit ;;
 	json)  cmd_json ;;
 	clear) rm -f "$DIR"/* 2>/dev/null || true ;;

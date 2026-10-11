@@ -122,6 +122,11 @@ cmd_schedule_sync() {
 	[ -f "$CRONTAB" ] || touch "$CRONTAB" 2>/dev/null || return 0
 	grep -v 'zgz-router schedule' "$CRONTAB" > "$CRONTAB.zgz" 2>/dev/null || true
 	if [ "$(cfg_bool enabled 0)" = "1" ]; then
+		if [ "$(cfg_bool start_daemon 1)" = "1" ]; then
+			_hi="$(cfg health_interval 3)"
+			case "$_hi" in 1|2|3|5|10|15|30) : ;; *) _hi=3 ;; esac
+			echo "*/$_hi * * * * $ZGZ_LIB/zgz-router schedule health >/dev/null 2>&1" >> "$CRONTAB.zgz"
+		fi
 		for _w in stop start restart; do
 			_week="$(cfg "${_w}_week_mode" '')"
 			[ -n "$_week" ] || continue
@@ -203,6 +208,9 @@ cmd_schedule_sync() {
 
 cmd_schedule() {
 	case "${1:-}" in
+		health)
+			"$ZGZ_LIB/zgz-refresh" health
+			;;
 		sync)
 			cmd_schedule_sync
 			;;

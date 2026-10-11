@@ -32,7 +32,17 @@ check "$(grep -c 'schedule sub' "$ZGZ_CRONTAB")" 2 'schedule sync does not dupli
 rig_set patterniha.enabled 0
 sh "$RIG/lib/zgz-router" schedule sync >/dev/null 2>&1
 check "$(grep -c 'schedule sub patterniha' "$ZGZ_CRONTAB")" 0 'disabled subscription loses its scheduled job'
-check "$(grep -c 'zgz-refresh' "$ZGZ_CRONTAB")" 1 'health check is preserved'
+check "$(grep -c 'zgz-refresh' "$ZGZ_CRONTAB")" 1 'subscription maintenance is preserved'
+rig_set enabled 1
+sh "$RIG/lib/zgz-router" schedule sync >/dev/null 2>&1
+check "$(grep 'schedule health' "$ZGZ_CRONTAB" | cut -d' ' -f1)" '*/3' 'health checks have an independent three-minute schedule'
+rig_set health_interval 5
+sh "$RIG/lib/zgz-router" schedule sync >/dev/null 2>&1
+check "$(grep 'schedule health' "$ZGZ_CRONTAB" | cut -d' ' -f1)" '*/5' 'changing the health interval replaces its job'
+check "$(grep -c 'schedule health' "$ZGZ_CRONTAB")" 1 'health jobs are not duplicated'
+rig_set start_daemon 0
+sh "$RIG/lib/zgz-router" schedule sync >/dev/null 2>&1
+check "$(grep -c 'schedule health' "$ZGZ_CRONTAB")" 0 'disabled daemon removes its health job'
 cat > "$RIG/lib/zgz-nodes" <<'EOF'
 #!/bin/sh
 printf '%s\n' "$*" >> "$ZGZ_RUN/fetched"

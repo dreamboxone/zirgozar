@@ -54,6 +54,36 @@ trap on_exit EXIT
 # PassWall2's Node setting. A node chosen in Basic Settings is the node: it is
 # used as it is, whatever mode this was called in, and nothing is measured.
 FIXED="$(cfg node '')"
+if [ "$MODE" = degraded ]; then
+	[ -z "$FIXED" ] || exit 0
+	[ "$(sha256sum "$ZGZ_BEST" 2>/dev/null)" = "${2:-}" ] || exit 0
+	pause_local
+	"$NODES" update >/dev/null 2>&1 || true
+	if ! "$PROBE" measure > "$ZGZ_RUN/health.choice" 2>/dev/null; then exit 0; fi
+	_choice="$(tail -1 "$ZGZ_RUN/health.choice")"
+	_tag="${_choice%%	*}"
+	_ms="${_choice#*	}"
+	case "$_ms" in ''|*[!0-9]*) exit 0 ;; esac
+	"$ZGZ_LIB/zgz-test" url "$_tag" >/dev/null 2>&1 || exit 0
+	_ms="$(cat "$ZGZ_RUN/tests/$_tag.url" 2>/dev/null)"
+	case "$_ms" in ''|*[!0-9]*) exit 0 ;; esac
+	[ "$_ms" -gt 0 ] || exit 0
+	# Compare both routes again after the sweep, using the same test URL.
+	_current="$("$ZGZ_LIB/zgz-test" live 2>/dev/null)" || exit 0
+	case "$_current" in ''|*[!0-9]*) exit 0 ;; esac
+	_min="$(cfg health_slow_ms 1500)"
+	case "$_min" in ''|*[!0-9]*) _min=1500 ;; esac
+	[ "$_min" -ge 500 ] && [ "$_min" -le 30000 ] || _min=1500
+	[ "$_current" -ge "$_min" ] || exit 0
+	[ $((_ms * 150)) -le $((_current * 100)) ] || exit 0
+	[ -z "$(cfg node '')" ] || exit 0
+	[ "$(sha256sum "$ZGZ_BEST" 2>/dev/null)" = "${2:-}" ] || exit 0
+	log "confirmed faster replacement: ${_current}ms to ${_ms}ms"
+	"$PROBE" pick "$_tag" >/dev/null 2>&1 || exit 0
+	[ "$(sha256sum "$ZGZ_BEST" 2>/dev/null)" != "${2:-}" ] || exit 0
+	MODE=fixed
+	rm -f "$ZGZ_RUN/health.slow"
+fi
 if [ -n "$FIXED" ]; then
 	say_status starting
 	if ! "$PROBE" use "$FIXED" >/dev/null 2>&1; then

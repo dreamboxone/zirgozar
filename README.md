@@ -7,7 +7,7 @@
 <h3 align="center">فیلترشکن سراسری برای روتر OpenWrt</h3>
 
 <p align="center">
-  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.19"></a>
+  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.19-r2"></a>
   <a href="https://github.com/dreamboxone/zirgozar/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/dreamboxone/zirgozar/total?style=for-the-badge&color=0ea5e9"></a>
   <img alt="OpenWrt" src="https://img.shields.io/badge/OpenWrt-23.05%20%7C%2024.10%20%7C%2025.12-00B5E2?style=for-the-badge&logo=openwrt&logoColor=white">
   <img alt="Xray" src="https://img.shields.io/badge/core-Xray-7c3aed?style=for-the-badge">
@@ -92,7 +92,7 @@
 
 به روتر SSH بزنید و دستور زیر را اجرا کنید. این دستور فایل‌های نسخه **5.7.19**
 را برای معماری روتر دانلود می‌کند و با مدیر بسته موجود نصب یا ارتقا می‌دهد.
-ابتدا باید این نسخه در [صفحه ریلیز](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.19) منتشر شده باشد.
+ابتدا باید این نسخه در [صفحه ریلیز](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.19-r2) منتشر شده باشد.
 
 <div dir="ltr">
 
@@ -100,8 +100,8 @@
 (
   set -eu
   . /etc/openwrt_release
-  version='5.7.19-r1'
-  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.19'
+  version='5.7.19-r2'
+  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.19-r2'
   install_dir="/tmp/zirgozar-install-$version"
   mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
@@ -135,11 +135,11 @@
 ```sh
 # OpenWrt 25.12 and later
 apk update
-apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.19-r1.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.19-r1.apk
+apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.19-r2.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.19-r2.apk
 
 # OpenWrt 24.10 / 23.05
 opkg update
-opkg install /tmp/zirgozar_5.7.19-r1_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.19-r1_all.ipk
+opkg install /tmp/zirgozar_5.7.19-r2_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.19-r2_all.ipk
 ```
 
 </div>
@@ -520,7 +520,10 @@ AmneziaWG عمدا کنار گذاشته شده: Xray آن را بلد نیست.
 
 | گزینه | در فایل | پیش‌فرض | کار آن |
 |---|---|---|---|
-| **بررسی و ترمیم خودکار** | `start_daemon` | روشن | هر ربع ساعت: وقتی تونل باید روشن باشد و نیست دوباره بالا می‌آورد، و وقتی کانفیگ فعلی چیزی جابه‌جا نمی‌کند به کانفیگ دیگری می‌رود |
+| **بررسی و ترمیم خودکار** | `start_daemon` | روشن | بررسی مستقل سلامت تونل؛ دو درخواست ناموفق پیاپی باعث ترمیم می‌شود. به‌روزرسانی اشتراک‌ها زمان‌بندی جدا دارد |
+| **فاصله بررسی سلامت** | `health_interval` | ۳ دقیقه | قابل انتخاب: ۱، ۲، ۳، ۵، ۱۰، ۱۵ یا ۳۰ دقیقه |
+| **تعویض کانفیگ با کندی مداوم** | `health_switch_slow` | روشن | فقط در حالت انتخاب خودکار: دو بررسی کند پیاپی و یک تایید دوباره، سپس تست جایگزین‌ها. جایگزین باید در تست دوباره موفق و دست‌کم ۱٫۵ برابر سریع‌تر باشد. بین بررسی جایگزین‌ها حداقل ۱۰ دقیقه فاصله است |
+| **حداقل تاخیر برای تشخیص کندی** | `health_slow_ms` | ۱۵۰۰ میلی‌ثانیه | درخواست باید هم از این مقدار و هم از دو برابر بهترین زمان ثبت‌شده کانفیگ فعلی بیشتر باشد. این سنجش زمان یک درخواست است، نه سرعت دانلود |
 | **تاخیر در شروع** | `start_delay` | 1 | چند ثانیه بعد از روشن شدن روتر صبر کند و بعد شروع کند |
 | **توقف خودکار** / **زمان توقف** | `stop_week_mode` / `stop_time_mode` | غیرفعال / 0:00 | تونل را هر روز یا یک روز از هفته در این ساعت متوقف می‌کند |
 | **شروع خودکار** / **زمان شروع** | `start_week_mode` / `start_time_mode` | غیرفعال / 0:00 | به همین شکل روشنش می‌کند |

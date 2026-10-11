@@ -734,6 +734,12 @@ var FA = {
 	'Other Settings': 'تنظیمات دیگر',
 	'Delay Settings': 'تنظیمات تاخیر',
 	'Open and close Daemon': 'بررسی و ترمیم خودکار',
+	'Checks the tunnel on its own schedule. Two consecutive failed checks trigger repair.': 'تونل را با فاصله زمانی مشخص بررسی می‌کند. دو بررسی ناموفق پیاپی باعث ترمیم اتصال می‌شود.',
+	'Health check interval (minutes)': 'فاصله بررسی سلامت (دقیقه)',
+	'Replace a repeatedly slow config': 'تعویض کانفیگ با کندی مداوم',
+	'In Auto mode, two slow checks and a confirmation trigger testing alternatives. A replacement must pass another test and be at least 1.5 times faster. Sweeps are at least 10 minutes apart. Manually selected configs are kept.': 'در حالت خودکار، دو بررسی کند پیاپی و یک تست تاییدی باعث بررسی کانفیگ‌های دیگر می‌شود. جایگزین باید در تست دوباره موفق و دست‌کم ۱٫۵ برابر سریع‌تر باشد. فاصله بررسی جایگزین‌ها حداقل ۱۰ دقیقه است. کانفیگ انتخاب‌شده دستی تغییر نمی‌کند.',
+	'Minimum slow delay (ms)': 'حداقل تاخیر برای تشخیص کندی (میلی‌ثانیه)',
+	'A request must exceed both this delay and twice the best observed delay of the current config to count as slow.': 'برای تشخیص کندی، زمان درخواست باید هم از این مقدار و هم از دو برابر بهترین زمان ثبت‌شده کانفیگ فعلی بیشتر باشد.',
 	'Checks every 15 minutes and, if the current config does not work, picks another.':
 		'هر 15 دقیقه بررسی می‌کند و اگر کانفیگ فعلی کار نکند، کانفیگ دیگری را انتخاب می‌کند.',
 	'Delay Start': 'تاخیر در شروع',

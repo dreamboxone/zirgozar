@@ -4,7 +4,7 @@
 # Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
 # Part of Zirgozar - https://github.com/dreamboxone/zirgozar
 #
-# zgz-refresh - what the router does every quarter of an hour.
+# zgz-refresh - subscription maintenance, or a separately scheduled health check.
 #
 # Two jobs, and the difference between them is the whole reason this is a
 # separate script.
@@ -30,10 +30,15 @@ CONNECT="${ZGZ_LIB:-/usr/libexec}/zgz-connect"
 
 # Read the sources. A failure here is not worth reporting: the list already on
 # disk stays, and the next quarter hour will try again.
-"$NODES" fetch >/dev/null 2>&1 || true
+if [ "${1:-}" != health ]; then
+	"$NODES" fetch >/dev/null 2>&1 || true
+fi
 
 # The runtime log lives in RAM; keep it to its last few hundred lines.
 log_trim
+
+# Subscription maintenance and tunnel health use independent schedules.
+[ "${1:-}" = health ] || exit 0
 
 # Is the web interface actually reachable?
 #
@@ -66,6 +71,21 @@ fi
 # or the main switch says otherwise.
 [ -f "$ZGZ_RUN/schedule.stopped" ] && exit 0
 
+zgz_lock || exit 0
+trap zgz_unlock EXIT
+trap 'exit 1' INT TERM
+repair() {
+	zgz_unlock
+	trap - EXIT INT TERM
+	exec "$CONNECT" "$@"
+}
+
+_key="$(sha256sum "$ZGZ_BEST" 2>/dev/null)" || _key=''
+if [ "$(cat "$ZGZ_RUN/health.key" 2>/dev/null)" != "$_key" ]; then
+	rm -f "$ZGZ_RUN/health.fail" "$ZGZ_RUN/health.slow" "$ZGZ_RUN/health.baseline" "$ZGZ_RUN/health.sweep"
+	printf '%s\n' "$_key" > "$ZGZ_RUN/health.key"
+fi
+
 # Already carrying traffic - leave it alone. Reconnecting a working tunnel to
 # chase a server that measured faster would drop every connection in progress
 # to win a few milliseconds.
@@ -88,8 +108,38 @@ if tunnel_running; then
 	#
 	# Twice before acting. One failed request is a blip, and reconnecting
 	# on a blip drops every connection in progress to fix nothing.
-	if "${ZGZ_LIB:-/usr/libexec}/zgz-test" current >/dev/null 2>&1; then
+	if _ms="$("$ZGZ_LIB/zgz-test" live 2>/dev/null)"; then
 		rm -f "$ZGZ_RUN/health.fail"
+		case "$_ms" in ''|*[!0-9]*) exit 0 ;; esac
+		_baseline="$(cat "$ZGZ_RUN/health.baseline" 2>/dev/null)" || _baseline=0
+		case "$_baseline" in ''|*[!0-9]*) _baseline=0 ;; esac
+		if [ "$_baseline" -eq 0 ] || [ "$_ms" -lt "$_baseline" ]; then
+			_baseline="$_ms"
+			echo "$_baseline" > "$ZGZ_RUN/health.baseline"
+		fi
+		_min="$(cfg health_slow_ms 1500)"
+		case "$_min" in ''|*[!0-9]*) _min=1500 ;; esac
+		[ "$_min" -ge 500 ] && [ "$_min" -le 30000 ] || _min=1500
+		if [ "$(cfg_bool health_switch_slow 1)" != 1 ] || [ -n "$(cfg node '')" ] ||
+		   [ "$_ms" -lt "$_min" ] || [ "$_ms" -le $((_baseline * 2)) ]; then
+			rm -f "$ZGZ_RUN/health.slow"
+			exit 0
+		fi
+		_slow="$(cat "$ZGZ_RUN/health.slow" 2>/dev/null)" || _slow=0
+		case "$_slow" in ''|*[!0-9]*) _slow=0 ;; esac
+		_slow=$((_slow + 1)); echo "$_slow" > "$ZGZ_RUN/health.slow"
+		[ "$_slow" -ge 2 ] || exit 0
+		_now="$(date +%s)"
+		_last="$(cat "$ZGZ_RUN/health.sweep" 2>/dev/null)" || _last=0
+		case "$_last" in ''|*[!0-9]*) _last=0 ;; esac
+		[ $((_now - _last)) -ge 600 ] || exit 0
+		# A transient spike must pass another request before a full sweep.
+		_confirm="$("$ZGZ_LIB/zgz-test" live 2>/dev/null)" || exit 0
+		case "$_confirm" in ''|*[!0-9]*) exit 0 ;; esac
+		[ "$_confirm" -ge "$_min" ] && [ "$_confirm" -gt $((_baseline * 2)) ] || exit 0
+		echo "$_now" > "$ZGZ_RUN/health.sweep"
+		log "the current node is repeatedly slow - checking alternatives"
+		repair degraded "$_key"
 		exit 0
 	fi
 
@@ -100,7 +150,7 @@ if tunnel_running; then
 	_fails=$((_fails + 1))
 	echo "$_fails" > "$ZGZ_RUN/health.fail"
 	if [ "$_fails" -lt 2 ]; then
-		log "the tunnel carried nothing this time - looking again in a quarter of an hour"
+		log "the tunnel carried nothing this time - waiting for the next health check"
 		exit 0
 	fi
 
@@ -109,8 +159,8 @@ if tunnel_running; then
 	# A subscription's node found again by testing its look-alikes is tested
 	# again: the one that worked then may be the one that does not now.
 	rm -f "$ZGZ_RUN/resolve.cache"
-	exec "$CONNECT" force
+	repair force
 fi
 
 log "the tunnel should be up and is not - repairing"
-exec "$CONNECT" next
+repair next

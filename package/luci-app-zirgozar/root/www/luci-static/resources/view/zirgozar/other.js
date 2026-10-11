@@ -65,9 +65,24 @@ return view.extend({
 		s.anonymous = true;
 
 		o = s.option(form.Flag, 'start_daemon', _('Open and close Daemon'),
-			_('Checks every 15 minutes and, if the current config does not work, picks another.'));
+			_('Checks the tunnel on its own schedule. Two consecutive failed checks trigger repair.'));
 		o.default = '1';
 		o.rmempty = false;
+
+		o = s.option(form.ListValue, 'health_interval', _('Health check interval (minutes)'));
+		[ 1, 2, 3, 5, 10, 15, 30 ].forEach(function(n) { o.value(String(n), String(n)); });
+		o.default = '3';
+		o.depends('start_daemon', '1');
+		o = s.option(form.Flag, 'health_switch_slow', _('Replace a repeatedly slow config'),
+			_('In Auto mode, two slow checks and a confirmation trigger testing alternatives. A replacement must pass another test and be at least 1.5 times faster. Sweeps are at least 10 minutes apart. Manually selected configs are kept.'));
+		o.default = '1';
+		o.rmempty = false;
+		o.depends('start_daemon', '1');
+		o = s.option(form.Value, 'health_slow_ms', _('Minimum slow delay (ms)'),
+			_('A request must exceed both this delay and twice the best observed delay of the current config to count as slow.'));
+		o.default = '1500';
+		o.datatype = 'range(500,30000)';
+		o.depends({ start_daemon: '1', health_switch_slow: '1' });
 
 		o = s.option(form.Value, 'start_delay', _('Delay Start'), _('Units:seconds'));
 		o.datatype = 'uinteger';

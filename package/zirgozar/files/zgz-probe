@@ -503,6 +503,10 @@ cmd_select() {
 	[ -n "$_bms" ] || _bms=0
 	_btag="${_best#*	}"
 
+	if [ "${1:-}" = measure ]; then
+		printf '%s\t%s\n' "$_btag" "$_bms"
+		return 0
+	fi
 	select_tag "$_btag" "$_bms" || return 1
 
 	progress done "$_total" "$_total" "$_alive" "$_tested" "$_bms"
@@ -626,6 +630,7 @@ cmd_next() {
 
 case "${1:-select}" in
 	select) cmd_select ;;
+	measure) cmd_select measure ;;
 	sift)   cmd_sift ;;
 	next)   cmd_next ;;
 	pick)   [ -n "${2:-}" ] || { echo "usage: $0 pick <tag>" >&2; exit 1; }

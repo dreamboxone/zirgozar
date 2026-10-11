@@ -382,6 +382,8 @@ jobs:
           sed -i 's/^          //' notes.md
           if [ -f ".github/release-notes/$tag.md" ]; then
             cp ".github/release-notes/$tag.md" notes.md
+          elif [ -f ".github/release-notes/${tag%-r*}.md" ]; then
+            cp ".github/release-notes/${tag%-r*}.md" notes.md
           fi
 
           if gh release view "$tag" >/dev/null 2>&1; then
