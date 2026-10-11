@@ -345,7 +345,7 @@ function toolbar(s) {
 				var keep = (d && d.active && d.section) ? d.section : '';
 				var go = ids.filter(function(id) { return id != keep; });
 				if (!go.length) {
-					pui.note(b, _('This is the node the tunnel is using at the moment. Press Disconnect, or Choose again, before deleting it.'), 'warn');
+					pui.note(b, _('This is the node the tunnel is using at the moment. Press Disconnect, or Choose fastest, before deleting it.'), 'warn');
 					return;
 				}
 				return nodeAct(b, 'delete_nodes', go.join(' '), true);
@@ -696,7 +696,7 @@ return view.extend({
 			var b = ev && ev.currentTarget;
 			return callInuse().catch(function() { return {}; }).then(function(d) {
 				if (d && d.active && d.section && d.section == section_id) {
-					pui.note(b, _('This is the node the tunnel is using at the moment. Press Disconnect, or Choose again, before deleting it.'), 'warn');
+					pui.note(b, _('This is the node the tunnel is using at the moment. Press Disconnect, or Choose fastest, before deleting it.'), 'warn');
 					return Promise.resolve();
 				}
 				return form.GridSection.prototype.handleRemove.apply(section, [ section_id, ev ]);
@@ -750,7 +750,7 @@ return view.extend({
 
 		o = s.option(form.ListValue, 'sources', _('Nodes to use'),
 			_('This decides who may be measured, not who wins: whichever node answers fastest is the one used, wherever it came from. A node added by hand joins the list rather than replacing it. To insist on one node, press “Use” beside it below.') + ' ' +
-			_('If all subscriptions are off, enabled manually added configs are used.'));
+			_('If all subscriptions are off or have no readable configs, enabled manually added configs are used.'));
 		o.value('own', _('Only manually added configs'));
 		o.value('both', _('All configs'));
 		o.value('subs', _('Only the subscriptions'));
@@ -793,7 +793,7 @@ return view.extend({
 				.format(batch, most, good);
 		}
 		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Node selection'),
-			selectionText(parseInt(uci.get('zirgozar', 'config', 'batch_size')) || 10,
+			selectionText(parseInt(uci.get('zirgozar', 'config', 'batch_size')) || 30,
 				parseInt(uci.get('zirgozar', 'config', 'good_ms')) || 1000,
 				parseInt(uci.get('zirgozar', 'config', 'max_batches')) || 5));
 		s.anonymous = true;
@@ -813,7 +813,7 @@ return view.extend({
 		o = s.option(form.Value, 'batch_size', _('Measured at a time'),
 			_('How many nodes are measured properly in one go.'));
 		o.datatype = 'range(1,50)';
-		o.default = '10';
+		o.default = '30';
 
 		o = s.option(form.Value, 'max_batches', _('Batches at most'),
 			_('How far down the list to keep going when nothing is fast enough.'));

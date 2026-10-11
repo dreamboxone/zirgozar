@@ -508,7 +508,7 @@ return baseclass.extend({
 					'click': ui.createHandlerFn(null, function() {
 						return callAction('reselect', '').then(refreshState);
 					})
-				}, [ pui.icon('refresh'), E('span', {}, _('Choose again')) ])
+				}, [ pui.icon('refresh'), E('span', {}, _('Choose fastest')) ])
 			])
 		]));
 

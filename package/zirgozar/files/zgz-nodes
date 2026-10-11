@@ -682,9 +682,7 @@ cmd_build() {
 	_subscriptions=0
 	_enabled_subscriptions=0
 	config_foreach count_subscription subscription
-	# Turning every subscription off leaves manual configs available. An
-	# enabled but temporarily unreadable subscription still obeys the user's
-	# subscription-only choice; it must not silently select a manual server.
+	# Turning every subscription off leaves manual configs available.
 	if [ "$_sources" = "subs" ] && [ "$_enabled_subscriptions" -eq 0 ] &&
 	   { [ "$_subscriptions" -gt 0 ] || [ ! -s "$ZGZ_NODE_CACHE" ]; }; then
 		_sources=own
@@ -734,6 +732,18 @@ cmd_build() {
 	if [ "$SUB_HAD" = "1" ]; then
 		_had=1
 	fi
+	# Subscription-only falls back to enabled manual nodes when none of the
+	# selected subscriptions yielded records, including empty or unreadable
+	# lists. Keep the saved source preference so later updates can use them.
+	if [ "$_sources" = "subs" ] && [ ! -s "$SUB_TSV" ]; then
+		: > "$ZGZ_RUN/manual.txt"
+		config_foreach add_node node
+		if grep -q '://' "$ZGZ_RUN/manual.txt" 2>/dev/null || [ -s "$CHAIN_TSV" ]; then
+			_had=1
+		fi
+		LC_ALL=C awk -v LIMIT="$_limit" -f "$PARSE" < "$ZGZ_RUN/manual.txt" > "$ZGZ_RUN/links.tsv" 2>/dev/null || true
+		rm -f "$ZGZ_RUN/manual.txt"
+	fi
 
 	# Hand-added first, then the subscriptions. Separate parser runs cannot
 	# know about each other, so the tags they hand out collide and the same
@@ -751,6 +761,11 @@ cmd_build() {
 			m++
 		}' "$ZGZ_RUN/merge.tsv" > "$ZGZ_CANDIDATES.new" 2>/dev/null || true
 	rm -f "$ZGZ_RUN/merge.tsv"
+	# Tags are positions in this list, not permanent node identities. A
+	# changed list can assign a rejected tag to a different, working node.
+	if ! cmp -s "$ZGZ_CANDIDATES.new" "$ZGZ_CANDIDATES"; then
+		rm -f "$ZGZ_RUN/rejected"
+	fi
 
 	if [ ! -s "$ZGZ_CANDIDATES.new" ]; then
 		# Removed or disabled sources must not survive in the old candidate

@@ -154,8 +154,8 @@ var FA = {
 	'Open Traffic Rules': 'باز کردن قوانین عبور',
 	'in use': 'در حال استفاده',
 	'Use': 'استفاده',
-	'This is the node the tunnel is using at the moment. Press Disconnect, or Choose again, before deleting it.':
-		'این همان کانفیگی است که تونل الان از آن استفاده می‌کند. قبل از حذفش «قطع» یا «انتخاب دوباره» را بزنید.',
+	'This is the node the tunnel is using at the moment. Press Disconnect, or Choose fastest, before deleting it.':
+		'این همان کانفیگی است که تونل الان از آن استفاده می‌کند. قبل از حذفش «قطع» یا «انتخاب سریع‌ترین» را بزنید.',
 	'Connecting through %s…': 'در حال اتصال از راه %s…',
 	'Nothing read yet. Read the subscriptions on Node Subscribe, or turn on the main switch in Basic Settings.':
 		'هنوز چیزی خوانده نشده. اشتراک‌ها را در صفحه «اشتراک کانفیگ‌ها» بخوانید، یا کلید اصلی را در «تنظیمات پایه» روشن کنید.',
@@ -215,7 +215,7 @@ var FA = {
 	/* ---------------------------------------------------------- the status */
 	'Connect': 'اتصال',
 	'Disconnect': 'قطع',
-	'Choose again': 'انتخاب دوباره',
+	'Choose fastest': 'انتخاب سریع‌ترین',
 	'Connected': 'متصل',
 	'Disconnected': 'قطع',
 	'Ready to connect': 'آماده اتصال',
@@ -945,7 +945,7 @@ var FA = {
 	'No node on the list can carry traffic, and neither can the one in use. The tunnel has been taken out of the way so that the network works without it. Add a node that works on the Configs page, or check the subscription.':
 		'هیچ کانفیگی در فهرست، و نه کانفیگ در حال استفاده، ترافیک را عبور نمی‌دهد. تونل کنار گذاشته شد تا شبکه بدون آن کار کند. در صفحه «کانفیگ‌ها» یک کانفیگ سالم اضافه کنید، یا اشتراک را بررسی کنید.',
 	'Nothing in the list could be read as a node': 'هیچ چیز در فهرست به‌عنوان کانفیگ خوانده نشد',
-	'If all subscriptions are off, enabled manually added configs are used.': 'اگر همهٔ اشتراک‌ها خاموش باشند، کانفیگ‌های دستیِ فعال استفاده می‌شوند.',
+	'If all subscriptions are off or have no readable configs, enabled manually added configs are used.': 'اگر همهٔ اشتراک‌ها خاموش باشند یا کانفیگ قابل‌خواندن نداشته باشند، کانفیگ‌های دستیِ فعال استفاده می‌شوند.',
 	'No enabled manual configs are available. Add or enable a config on the Configs page.': 'کانفیگ دستیِ فعالی وجود ندارد. در صفحهٔ «کانفیگ‌ها» یک کانفیگ اضافه یا فعال کنید.',
 	'No configs are available from the enabled subscriptions. Update them or select manual configs.': 'اشتراک‌های فعال کانفیگی در اختیار برنامه نگذاشته‌اند. آن‌ها را به‌روز کنید یا کانفیگ‌های دستی را انتخاب کنید.',
 	'No enabled configs are available. Add or enable a manual config or a subscription.': 'هیچ کانفیگ فعالی وجود ندارد. یک کانفیگ دستی یا اشتراک اضافه یا فعال کنید.',
