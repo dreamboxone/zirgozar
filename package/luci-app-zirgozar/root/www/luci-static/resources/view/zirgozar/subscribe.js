@@ -154,6 +154,70 @@ function filterModes(o, withGlobal) {
 	if (withGlobal) o.value('5', _('Use global config'));
 }
 
+/* Subscription addresses in a file someone else wrote: another program's
+   backup or export, a list kept by hand. Every http(s) address in it is one,
+   wherever it sits, and its name is the one written beside it if there is
+   one. Not JSON, it is read as text: one address a line. */
+var NAME_KEYS = [ 'name', 'remarks', 'remark', 'title', 'label', 'tag', 'group' ];
+var URL_KEYS = /^(\d+|url|uri|link|href|address|sub|subs?url|subscribe|subscription|subscribe_?url|subscription_?url)$/i;
+
+function subsInFile(text) {
+	var out = [], seen = {};
+	function add(url, name) {
+		url = String(url).trim();
+		if (!/^https?:\/\/\S+$/.test(url) || seen[url]) return;
+		seen[url] = true;
+		out.push({ url: url, name: String(name || '').trim() });
+	}
+	function walk(v, name) {
+		if (typeof v == 'string') return add(v, name);
+		if (Array.isArray(v)) return v.forEach(function(x) { walk(x, name); });
+		if (!v || typeof v != 'object') return;
+		var own = '';
+		NAME_KEYS.some(function(k) {
+			if (typeof v[k] == 'string' && v[k].trim() && !/^https?:\/\//.test(v[k])) own = v[k];
+			return !!own;
+		});
+		Object.keys(v).forEach(function(k) {
+			/* { "my list": "https://…" } names it by its key; "url" and the
+			   like are not names. */
+			if (NAME_KEYS.indexOf(k) < 0)
+				walk(v[k], own || (typeof v[k] == 'string' && !URL_KEYS.test(k) ? k : name));
+		});
+	}
+	var json;
+	try { json = JSON.parse(text); } catch (e) { json = undefined; }
+	if (json !== undefined) walk(json, '');
+	else String(text).split(/\s+/).forEach(function(l) { add(l, ''); });
+	return out;
+}
+
+/* What was found, added as subscriptions of their own - those already here
+   left alone - and a name made up from the address for any that came
+   without one. Added the same way the + button adds one: waiting to be saved
+   and applied. */
+function importSubs(found) {
+	var have = {}, names = {}, added = 0;
+	uci.sections('zirgozar', 'subscription').forEach(function(x) {
+		if (x.url) have[String(x.url).trim()] = true;
+		names[String(x.name || '').toLowerCase()] = true;
+	});
+	found.forEach(function(f) {
+		if (have[f.url]) return;
+		have[f.url] = true;
+		var base = f.name || f.url.replace(/^https?:\/\//, '').split(/[\/?#]/)[0], name = base, i = 2;
+		while (names[name.toLowerCase()]) name = base + ' ' + i++;
+		names[name.toLowerCase()] = true;
+		var sid = sectionName('s');
+		uci.add('zirgozar', 'subscription', sid);
+		uci.set('zirgozar', sid, 'name', name);
+		uci.set('zirgozar', sid, 'url', f.url);
+		uci.set('zirgozar', sid, 'enabled', '1');
+		added++;
+	});
+	return added;
+}
+
 function done(b, r, ok) {
 	if (r && r.error) pui.note(b, _(r.error), 'error');
 	else pui.note(b, ok, 'ok');
@@ -403,6 +467,42 @@ return view.extend({
 
 		o = s.option(form.DummyValue, '_all');
 		o.render = function() {
+			var importBtn;
+			var picker = E('input', {
+				'type': 'file',
+				'accept': '.json,.txt,application/json,text/plain',
+				'style': 'display:none',
+				'change': function(ev) {
+					var f = ev.target.files && ev.target.files[0];
+					ev.target.value = '';
+					if (!f) return;
+					var reader = new FileReader();
+					reader.onload = function() {
+						var found = subsInFile(String(reader.result || ''));
+						if (!found.length)
+							return pui.note(importBtn, _('No subscription address was found in that file.'), 'error');
+						var added = importSubs(found);
+						if (!added)
+							return pui.note(importBtn, _('Every subscription in that file is already here.'), 'info');
+						return uci.save().then(function() { return m.reset(); }).then(function() {
+							/* The table is drawn again, and this button with it. */
+							pui.note(document.getElementById('zgz-import-subs') || importBtn,
+								_('%d subscriptions added. Save and apply, then update them.').format(added), 'ok');
+						}).catch(function(e) {
+							pui.note(importBtn, String(e && e.message || e), 'error');
+						});
+					};
+					reader.onerror = function() {
+						pui.note(importBtn, _('That file could not be read.'), 'error');
+					};
+					reader.readAsText(f);
+				}
+			});
+			importBtn = pui.btn(_('Import subscriptions from a file'), 'soft-blue mk-small', function(ev) {
+				ev.preventDefault();
+				picker.click();
+			}, 'plus');
+			importBtn.id = 'zgz-import-subs';
 			return E('div', { 'class': 'cbi-value' }, [
 				E('label', { 'class': 'cbi-value-title' }, ''),
 				E('div', { 'class': 'cbi-value-field', 'style': 'display:flex;gap:10px;flex-wrap:wrap;align-items:center' }, [
@@ -421,7 +521,9 @@ return view.extend({
 							done(b, r, _('Deleted.'));
 							return callSubs().then(renderInfo);
 						});
-					}, 'trash')
+					}, 'trash'),
+					importBtn,
+					picker
 				])
 			]);
 		};

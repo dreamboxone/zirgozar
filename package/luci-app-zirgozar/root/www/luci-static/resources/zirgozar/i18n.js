@@ -146,6 +146,7 @@ var FA = {
 	'%d h ago': '%d ساعت پیش',
 	'%d days ago': '%d روز پیش',
 	'Router uptime': 'مدت فعالیت',
+	'Available: %s': 'آماده نصب: %s',
 	'days': 'روز',
 	'day': 'روز',
 
@@ -233,6 +234,10 @@ var FA = {
 	'Instead of an address: a configuration file — Xray, sing-box, Clash, a WireGuard .conf, or a plain list of links. Leave the address empty when you use this.':
 		'به‌جای آدرس: یک فایل کانفیگ — Xray، sing-box، Clash، یک فایل ‎.conf وایرگارد، یا فقط لیستی از لینک‌ها. وقتی از این استفاده می‌کنید آدرس را خالی بگذارید.',
 	'That file could not be read.': 'آن فایل خوانده نشد.',
+	'Import subscriptions from a file': 'افزودن اشتراک‌ها از فایل',
+	'No subscription address was found in that file.': 'در آن فایل هیچ لینک اشتراکی پیدا نشد.',
+	'Every subscription in that file is already here.': 'همه اشتراک‌های آن فایل از قبل اضافه شده‌اند.',
+	'%d subscriptions added. Save and apply, then update them.': '%d اشتراک اضافه شد. ذخیره و اعمال کنید، سپس به‌روزرسانی کنید.',
 	'That does not look like a share link': 'این شبیه یک لینک اشتراک‌گذاری نیست',
 	'Last time the sources were read': 'آخرین باری که منابع خوانده شدند',
 	'Reading the subscriptions. This page will fill in shortly.':

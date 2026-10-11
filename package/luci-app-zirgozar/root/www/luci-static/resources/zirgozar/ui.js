@@ -314,6 +314,47 @@ function uptimeText(seconds) {
 		pad(Math.floor(total / 3600) % 24) + ':' + pad(Math.floor(total / 60) % 60) + ':' + pad(total % 60);
 }
 
+/* A one-second timer of its own, not LuCI's poll: the poll can be paused
+   from the LuCI header and is not running on every page, and the clock in
+   the header has to keep going wherever it is shown. */
+var secondTimer = {
+	ids: [],
+	add: function(fn) { this.ids.push([ fn, window.setInterval(fn, 1000) ]); },
+	remove: function(fn) {
+		this.ids = this.ids.filter(function(e) {
+			if (e[0] !== fn) return true;
+			window.clearInterval(e[1]);
+			return false;
+		});
+	}
+};
+
+/* The router's uptime, counted on in the page every second and asked of the
+   router again once a minute - so it runs on every page, by itself, and a
+   reboot shows within the minute. */
+function uptimeTicker(node, read, clock, scheduler) {
+	var seconds = null, sampled = 0, synced = clock(), attached = false, pending = false;
+	function sync(value) {
+		if (value == null || !isFinite(Number(value)) || Number(value) < 0) return;
+		seconds = Number(value); sampled = clock(); synced = sampled;
+		node.textContent = uptimeText(seconds);
+	}
+	function tick() {
+		if (!node.isConnected) {
+			if (attached) scheduler.remove(tick);
+			return;
+		}
+		attached = true;
+		var now = clock();
+		if (seconds != null) node.textContent = uptimeText(seconds + (now - sampled) / 1000);
+		if (pending || now - synced < 60000) return;
+		pending = true; synced = now;
+		return read().then(function(st) { if (st) sync(st.uptime); }).catch(function() {}).then(function() { pending = false; });
+	}
+	scheduler.add(tick, 1);
+	return sync;
+}
+
 function hero(root, version) {
 	var fa = i18n.get() === 'fa';
 
@@ -345,8 +386,9 @@ function hero(root, version) {
 
 	var ver = E('span', { 'class': 'mk-version', 'id': 'pwp-version' }, versionText(version));
 	var uptime = E('span', { 'class': 'mk-uptime-value', 'id': 'pwp-uptime', 'dir': 'auto' }, '-');
+	var syncUptime = uptimeTicker(uptime, callState, function() { return Date.now(); }, secondTimer);
 	callState().then(function(st) {
-		if (st) uptime.textContent = uptimeText(st.uptime);
+		if (st) syncUptime(st.uptime);
 		if (!st || !st.version) return;
 		if (!version) ver.textContent = versionText(st.version);
 		freshen(st.version, st.ui);
@@ -518,6 +560,7 @@ return baseclass.extend({
 	ms: ms,
 	versionText: versionText,
 	uptimeText: uptimeText,
+	uptimeTicker: uptimeTicker,
 	note: note,
 	sortable: sortable,
 	page: page

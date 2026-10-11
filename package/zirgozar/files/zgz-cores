@@ -798,7 +798,7 @@ cmd_list() {
 	' "$( [ -s "$XRAY_VERSIONS" ] && echo "$XRAY_VERSIONS" || echo "$ZGZ_RUN/xray.versions.none" )"
 	rm -f "$ZGZ_RUN/xray.versions.none"
 	printf ']'
-	_mine="$(zgz_version)"; _mine="${_mine%-r*}"
+	_mine="$(zgz_version)"
 	_pub="$(latest_of zirgozar)"
 	printf ',"app":{"version":"%s","latest":"%s","update":%s}}\n' \
 		"$(json_escape "$_mine")" "$(json_escape "${_pub#v}")" \
@@ -915,7 +915,7 @@ install_self() {
 	/etc/init.d/zirgozar restart >/dev/null 2>&1 || true
 	rm -rf "$SELF_DIR"
 	_now="$(zgz_version)"
-	printf 'ok %s\n' "${_now%-r*}" > "$SELF_RESULT"
+	printf 'ok %s\n' "$_now" > "$SELF_RESULT"
 	log "update: now version $_now"
 	return 0
 }

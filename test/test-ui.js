@@ -75,4 +75,23 @@ async function cacheCase(installed, stamp, seen, repeats = 1) {
 	assert.deepEqual(await cacheCase('5.7.19-r3', 'first', null), { fetched: 2, reloaded: 1 });
 	assert.deepEqual(await cacheCase('', '', null), { fetched: 0, reloaded: 0 });
 	console.log('UI cache refresh passed: current revision, package suffix, update, hotpatch, first visit and unknown version');
+	let now = 0, tick, reads = 0, removed = false;
+	const uptimeNode = { isConnected: true, textContent: '' };
+	const sync = ui.uptimeTicker(uptimeNode,
+		() => { reads++; return reads === 1 ? Promise.resolve({ uptime: 8 }) : Promise.reject(new Error('offline')); },
+		() => now, { add: (callback, interval) => { tick = callback; assert.equal(interval, 1); },
+			remove: callback => { assert.equal(callback, tick); removed = true; } });
+	sync(100);
+	now = 1000; await tick();
+	assert.equal(uptimeNode.textContent, '00:01:41');
+	assert.equal(reads, 0);
+	now = 61000; await tick();
+	assert.equal(uptimeNode.textContent, '00:00:08');
+	now = 121000; await tick();
+	assert.equal(uptimeNode.textContent, '00:01:08');
+	now = 124000; await tick();
+	assert.equal(uptimeNode.textContent, '00:01:11');
+	uptimeNode.isConnected = false; await tick();
+	assert.equal(removed, true);
+	console.log('Live uptime passed: advances without page refresh, resyncs after reboot, survives RPC failure and stops on navigation');
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -194,15 +194,15 @@ function render(d) {
 	if (abox) {
 		var app = cores.app || {};
 		while (abox.firstChild) abox.removeChild(abox.firstChild);
-		var value = [ chip('【 ' + (app.version || '?') + ' 】', 'ok') ];
+		var value = [ chip(pui.versionText(app.version) || '?', 'ok') ];
 		if (app.update && app.latest)
-			value.push(chip(_('%s is available').format(app.latest), 'info'));
+			value.push(chip(_('Available: %s').format(pui.versionText(app.latest)), 'info'));
 		else if (app.latest)
 			value.push(E('span', { 'style': 'color:var(--muted)' }, _('It is the latest version')));
 		abox.appendChild(row('Zirgozar', value, [
 			pui.btn(_('Check update'), 'primary mk-small', checkUpdate('app'), 'refresh'),
 			app.update && app.latest
-				? pui.btn(_('Update to %s').format(app.latest), 'success mk-small', function() {
+				? pui.btn(_('Update to %s').format(pui.versionText(app.latest)), 'success mk-small', function() {
 					return act('app', 'app_update', '',
 						_('Downloading and installing the new version. This takes a minute or two; the page reloads by itself when it is done.'));
 				}, 'download')

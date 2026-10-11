@@ -42,6 +42,9 @@ jobs:
       - name: Check empty config choices
         run: node test/test-ui.js
 
+      - name: Check subscription import
+        run: node test/test-subs-ui.js
+
       - name: Fetch a core to check against
         run: |
           set -euo pipefail
