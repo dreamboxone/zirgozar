@@ -45,3 +45,34 @@ assert.equal(render({ keylist: ['node-a'], default: ['node-a'] }, undefined)
 	.children[0].children[0].attrs.checked, '');
 
 console.log('Config checkbox rendering passed: missing, empty, populated and default choices');
+assert.equal(ui.uptimeText(0), '00:00:00');
+assert.equal(ui.uptimeText(90061.9), '1 day 01:01:01');
+assert.equal(ui.uptimeText(null), '-');
+assert.equal(ui.uptimeText(-1), '-');
+
+// Entering the app in a new session must not reload an already current UI.
+const freshenSource = source.match(/function freshen\(installed, stamp\) \{[\s\S]*?\n\}/)[0];
+async function cacheCase(installed, stamp, seen, repeats = 1) {
+	const local = new Map(seen ? [['zirgozar-ui', seen]] : []), session = new Map();
+	const storage = map => ({ getItem: key => map.get(key) || null,
+		setItem: (key, value) => map.set(key, value) });
+	let fetched = 0, reloaded = 0;
+	const freshen = new Function('BUILD', 'OWN_FILES', 'window', 'L', 'fetch', 'location',
+		freshenSource + '; return freshen;')('5.7.19-r3', ['zirgozar/ui'],
+		{ localStorage: storage(local), sessionStorage: storage(session) },
+		{ env: { base_url: '/resources', resource_version: 'test' }, resource: file => file },
+		() => { fetched++; return Promise.resolve({ ok: true }); },
+		{ reload: () => { reloaded++; } });
+	for (let i = 0; i < repeats; i++) freshen(installed, stamp);
+	await new Promise(resolve => setImmediate(resolve));
+	return { fetched, reloaded };
+}
+(async () => {
+	assert.deepEqual(await cacheCase('5.7.19-r3', 'same', 'same'), { fetched: 0, reloaded: 0 });
+	assert.deepEqual(await cacheCase('5.7.19-3', 'same', 'same'), { fetched: 0, reloaded: 0 });
+	assert.deepEqual(await cacheCase('5.7.19-r4', 'same', 'same'), { fetched: 2, reloaded: 1 });
+	assert.deepEqual(await cacheCase('5.7.19-r3', 'new', 'old', 2), { fetched: 2, reloaded: 1 });
+	assert.deepEqual(await cacheCase('5.7.19-r3', 'first', null), { fetched: 2, reloaded: 1 });
+	assert.deepEqual(await cacheCase('', '', null), { fetched: 0, reloaded: 0 });
+	console.log('UI cache refresh passed: current revision, package suffix, update, hotpatch, first visit and unknown version');
+})().catch(error => { console.error(error); process.exitCode = 1; });

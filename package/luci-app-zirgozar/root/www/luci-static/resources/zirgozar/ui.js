@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.7.19-r3';
+var BUILD = '5.7.19-r4';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -102,7 +102,8 @@ var OWN_FILES = [ 'zirgozar/ui', 'zirgozar/i18n', 'zirgozar/status', 'zirgozar/q
    are, and a fingerprint this browser has not seen is a reason to fetch them
    again too. */
 function freshen(installed, stamp) {
-	var have = String(BUILD).replace(/-\d+$/, ''), want = String(installed).replace(/-r\d+$/, '');
+	var have = String(BUILD).replace(/-(?:r)?(\d+)$/, '-r$1');
+	var want = String(installed || '').replace(/-(?:r)?(\d+)$/, '-r$1');
 	var seen = null;
 	try { seen = window.localStorage.getItem('zirgozar-ui'); } catch (e) {}
 	var stale = (want && have != want) || (stamp && seen != stamp);
@@ -305,6 +306,14 @@ function prefersDark() {
 	return m ? (0.299 * m[0] + 0.587 * m[1] + 0.114 * m[2]) < 128 : false;
 }
 
+function uptimeText(seconds) {
+	if (seconds == null || !isFinite(Number(seconds)) || Number(seconds) < 0) return '-';
+	var total = Math.floor(Number(seconds)), days = Math.floor(total / 86400);
+	var pad = function(n) { return ('0' + n).slice(-2); };
+	return (days ? days + ' ' + _(days === 1 ? 'day' : 'days') + ' ' : '') +
+		pad(Math.floor(total / 3600) % 24) + ':' + pad(Math.floor(total / 60) % 60) + ':' + pad(total % 60);
+}
+
 function hero(root, version) {
 	var fa = i18n.get() === 'fa';
 
@@ -335,7 +344,9 @@ function hero(root, version) {
 	}, [ icon('globe'), E('span', {}, fa ? 'English' : 'فارسی') ]);
 
 	var ver = E('span', { 'class': 'mk-version', 'id': 'pwp-version' }, versionText(version));
+	var uptime = E('span', { 'class': 'mk-uptime-value', 'id': 'pwp-uptime', 'dir': 'auto' }, '-');
 	callState().then(function(st) {
+		if (st) uptime.textContent = uptimeText(st.uptime);
 		if (!st || !st.version) return;
 		if (!version) ver.textContent = versionText(st.version);
 		freshen(st.version, st.ui);
@@ -348,9 +359,11 @@ function hero(root, version) {
 			E('h2', { 'aria-label': 'Zirgozar' }, [ heroLogo, ver ]),
 			E('p', {}, _('Complete tunnel management on your router'))
 		]) ]),
-		E('div', { 'class': 'mk-row' }, [
+		E('div', { 'class': 'mk-row mk-hero-controls' }, [
 			E('div', { 'class': 'mk-seg', 'role': 'group', 'aria-label': _('Display mode') }, [ light, dark ]),
-			lang
+			E('div', { 'class': 'mk-language-column' }, [ lang,
+				E('div', { 'class': 'mk-uptime' }, [ E('span', {}, _('Router uptime')), uptime ])
+			])
 		])
 	]);
 }
@@ -504,6 +517,7 @@ return baseclass.extend({
 	bytes: bytes,
 	ms: ms,
 	versionText: versionText,
+	uptimeText: uptimeText,
 	note: note,
 	sortable: sortable,
 	page: page

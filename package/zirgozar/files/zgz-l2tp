@@ -64,7 +64,11 @@ connect() {
 	_host="$(sed -n 's/.*"server":"\([^"]*\)".*/\1/p' "$NODE" | head -1)"
 	_ip="$(resolve_direct "$_host" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
 	[ -n "$_ip" ] || fail 'The L2TP server has no reachable IPv4 address.'
-	ucode "$ZGZ_LIB/zgz-l2tpconfig" config "$NODE" "$STATE" "$DEV" "$_ip"
+	# Query the direct route before installing IPsec policies. Automatic IKE
+	# source selection can otherwise choose loopback on a router with TProxy.
+	_src="$(ip -4 route get "$_ip" mark 255 | sed -n 's/.* src \([^ ]*\).*/\1/p' | head -1)"
+	[ -n "$_src" ] || fail 'The L2TP server has no direct IPv4 route.'
+	ucode "$ZGZ_LIB/zgz-l2tpconfig" config "$NODE" "$STATE" "$DEV" "$_ip" "$_src"
 	if grep -q '"ipsec":true' "$NODE"; then
 		[ -S /var/run/charon.vici ] || /etc/init.d/swanctl start
 		_n=0

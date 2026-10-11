@@ -183,6 +183,7 @@ method_state() {
 			bb = C["bridge"]; sub(/.*\//, "", bb)
 			"date +%s" | getline now; close("date +%s")
 			printf "{\"version\":\"%s\"", esc(ver)
+			getline uptime < "/proc/uptime"; close("/proc/uptime"); int_("uptime", int(uptime + 0))
 			bool("running", running); bool("connected", connected); bool("enabled", en); bool("autostart", autostart)
 			str("status", whole(sfile)); str("message", whole(mfile)); str("job", whole(jfile))
 			str("server", M["label"]); str("protocol", M["protocol"]); str("host", M["host"]); int_("latency_ms", M["latency_ms"])

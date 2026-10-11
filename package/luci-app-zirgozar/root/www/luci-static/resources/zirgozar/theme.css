@@ -45,6 +45,10 @@
 .mk-version{font-size:13px;font-weight:700;background:#ffffff2e;border:1px solid #ffffff4d;border-radius:30px;padding:3px 10px;letter-spacing:.5px}
 .mk-hero p{opacity:.9;margin:4px 0 0}
 .mk-hero .mk-row{position:relative;z-index:1}
+.mk-hero .mk-hero-controls{align-items:flex-start}
+.mk-language-column{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
+.mk-uptime{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;line-height:1.5;opacity:.9;white-space:nowrap}
+.mk-uptime-value{font-variant-numeric:tabular-nums;font-size:12px;font-weight:600;unicode-bidi:plaintext}
 
 /* Buttons */
 .mk-btn{display:inline-flex;align-items:center;gap:8px;border:0;border-radius:12px;padding:10px 16px;cursor:pointer;font-weight:700;font-size:14px;line-height:1.2;color:#fff;

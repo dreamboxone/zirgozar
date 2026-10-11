@@ -334,6 +334,7 @@ function renderState(st) {
 	window.requestAnimationFrame(updateTickers);
 	st = st || {};
 	setNode('pwp-version', pui.versionText(st.version));
+	setNode('pwp-uptime', pui.uptimeText(st.uptime));
 	setNode('pwp-state', badge(st));
 	setNode('pwp-node', st.server || '-');
 	setNode('pwp-proto', st.protocol ? st.protocol : '-');

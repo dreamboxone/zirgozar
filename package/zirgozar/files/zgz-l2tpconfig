@@ -28,6 +28,10 @@ if (mode == 'config') {
 		if (!match(ARGV[4], /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/)) fail('Invalid L2TP server IPv4 address.');
 		node.server = ARGV[4];
 	}
+	if (ARGV[5]) {
+		if (!match(ARGV[5], /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/)) fail('Invalid L2TP local IPv4 address.');
+		node.local_address = ARGV[5];
+	}
 	writefile(dir + '/runtime.json', sprintf('%J', node));
 	let ppp = [ 'noauth', 'noipdefault', 'nodefaultroute', 'noproxyarp', 'refuse-eap',
 		'ipcp-accept-local', 'ipcp-accept-remote', 'lcp-echo-interval 5', 'lcp-echo-failure 3',
@@ -105,7 +109,7 @@ if (mode == 'stop') {
 if (mode != 'ipsec' && mode != 'ipsec-load') fail('Invalid L2TP config command.');
 let connection = {};
 connection[name] = {
-	version: '1', local_addrs: [ '%any' ], remote_addrs: [ node.server ],
+	version: '1', local_addrs: [ node.local_address ?? '%any' ], remote_addrs: [ node.server ],
 	proposals: [ 'aes256-sha256-modp2048', 'aes256-sha1-modp2048', 'aes128-sha1-modp2048', 'aes256-sha1-modp1024', 'aes128-sha1-modp1024' ],
 	encap: 'yes', reauth_time: '0', dpd_delay: '20s',
 	local: { auth: 'psk' }, remote: { auth: 'psk', id: '%any' },
