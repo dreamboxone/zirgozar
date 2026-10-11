@@ -24,7 +24,7 @@ echo "== every shell script parses"
 for f in "$ROOT"/package/zirgozar/files/zgz-* "$ROOT"/package/zirgozar/files/zirgozar.init "$ROOT"/package/zirgozar/files/zirgozar-server.init \
          "$ROOT"/package/zirgozar/files/zirgozar-killswitch.init "$ROOT"/package/zirgozar/files/zirgozar-killswitch.hotplug \
          "$ROOT"/package/zirgozar/files/luci.zirgozar "$ROOT"/build/*.sh "$ROOT"/test/*.sh; do
-	case "$f" in *zgz-parse|*zgz-sbconfig|*zgz-sbstats) continue ;; esac
+	case "$f" in *zgz-parse|*zgz-sbconfig|*zgz-sbstats|*zgz-l2tpconfig) continue ;; esac
 	if sh -n "$f" 2>/dev/null; then
 		ok "$(basename "$f")"
 	else

@@ -59,6 +59,12 @@ wanted() {
 	esac
 	# only needed to install a core later, so not worth failing over
 	echo "unzip"
+	if uci -q show zirgozar 2>/dev/null | grep -qE "l2tp(\+ipsec)?://"; then
+		echo "xl2tpd ppp-mod-pppol2tp ucode-mod-socket"
+		if uci -q show zirgozar 2>/dev/null | grep -qE "l2tp\+ipsec://|[?&](psk=|ipsec=1)"; then
+			echo "strongswan-default strongswan-swanctl"
+		fi
+	fi
 	# An OpenVPN config is carried by OpenVPN itself, and by nothing else.
 	# Any build of it will do; the OpenSSL one when there is none.
 	if [ ! -x /usr/sbin/openvpn ] && ! command -v openvpn >/dev/null 2>&1 && has_ovpn_node; then

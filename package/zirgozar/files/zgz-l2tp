@@ -1,0 +1,148 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+# Part of Zirgozar - https://github.com/dreamboxone/zirgozar
+
+set -e
+. "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
+MODE="${1:-check}"
+NODE="${ZGZ_L2TP_NODE:-$ZGZ_ETC/bridge.json}"
+DEV=zgzl2tp
+TABLE=19010
+STATE="$ZGZ_RUN/l2tp"
+fail() {
+	[ "$MODE" = test ] || say_message "$1"
+	echo "$1" >&2
+	exit 1
+}
+check() {
+	command -v xl2tpd >/dev/null 2>&1 && command -v pppd >/dev/null 2>&1 ||
+		fail 'L2TP needs xl2tpd and PPP. Install dependencies under Router requirements.'
+	ucode "$ZGZ_LIB/zgz-l2tpconfig" check "$NODE" "$STATE" "$DEV" ||
+		fail 'Invalid L2TP account or missing ucode socket module. Install dependencies and check the account.'
+	if grep -q '"ipsec":true' "$NODE"; then
+		command -v swanctl >/dev/null 2>&1 && [ -x /etc/init.d/swanctl ] ||
+			fail 'L2TP/IPsec needs strongSwan. Install dependencies under Router requirements.'
+	fi
+}
+cleanup() {
+	trap - EXIT INT TERM
+	[ -z "${PID:-}" ] || { kill "$PID" 2>/dev/null || true; wait "$PID" 2>/dev/null || true; }
+	# The PPP pid is owned by our linkname, not by other PPP connections.
+	_ppp="$(cat "/var/run/ppp-$DEV.pid" 2>/dev/null)" || _ppp=''
+	case "$_ppp" in ''|*[!0-9]*) : ;; *)
+		if [ -r "/proc/$_ppp/cmdline" ] && tr '\000' ' ' < "/proc/$_ppp/cmdline" | grep -Fq "$STATE/ppp.options"; then
+			kill "$_ppp" 2>/dev/null || true
+		fi ;;
+	esac
+	if [ "${ROUTES:-0}" = 1 ]; then
+		ip -4 rule del pref "$TABLE" oif "$DEV" lookup "$TABLE" 2>/dev/null || true
+		ip -4 route flush table "$TABLE" 2>/dev/null || true
+		ip -6 rule del pref "$TABLE" oif "$DEV" lookup "$TABLE" 2>/dev/null || true
+		ip -6 route flush table "$TABLE" 2>/dev/null || true
+	fi
+	if [ "${IPSEC:-0}" = 1 ]; then
+		ucode "$ZGZ_LIB/zgz-l2tpconfig" stop "$STATE/runtime.json" "$STATE" "$DEV" >/dev/null 2>&1 || true
+	fi
+	[ "${PAUSED:-0}" != 1 ] || "$ZGZ_LIB/zgz-rules" local resume >/dev/null 2>&1 || true
+	rm -rf "$STATE"
+	[ "${TEST_LOCK:-0}" != 1 ] || rmdir "$ZGZ_RUN/.l2tp-test-lock" 2>/dev/null || true
+}
+connect() {
+	check
+	# Do not overwrite a table or interface owned by another program.
+	[ ! -d "/sys/class/net/$DEV" ] || fail 'The L2TP device is already in use.'
+	[ -z "$(ip -4 route show table "$TABLE" 2>/dev/null)" ] || fail 'The L2TP routing table is already in use.'
+	ROUTES=1
+	# A dead PPP link must fail closed, rather than fall back to the WAN.
+	ip -4 route add unreachable default metric 32767 table "$TABLE"
+	ip -4 rule add pref "$TABLE" oif "$DEV" lookup "$TABLE"
+	ip -6 route add unreachable default metric 32767 table "$TABLE" 2>/dev/null || true
+	ip -6 rule add pref "$TABLE" oif "$DEV" lookup "$TABLE" 2>/dev/null || true
+	umask 077
+	mkdir -p "$STATE"
+	_host="$(sed -n 's/.*"server":"\([^"]*\)".*/\1/p' "$NODE" | head -1)"
+	_ip="$(resolve_direct "$_host" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
+	[ -n "$_ip" ] || fail 'The L2TP server has no reachable IPv4 address.'
+	ucode "$ZGZ_LIB/zgz-l2tpconfig" config "$NODE" "$STATE" "$DEV" "$_ip"
+	if grep -q '"ipsec":true' "$NODE"; then
+		[ -S /var/run/charon.vici ] || /etc/init.d/swanctl start
+		_n=0
+		while [ ! -S /var/run/charon.vici ] && [ "$_n" -lt 10 ]; do sleep 1; _n=$((_n+1)); done
+		IPSEC=1
+		ucode "$ZGZ_LIB/zgz-l2tpconfig" ipsec "$STATE/runtime.json" "$STATE" "$DEV" ||
+			fail 'L2TP/IPsec negotiation failed. Check PSK and Runtime Logs.'
+	fi
+	xl2tpd -D -c "$STATE/xl2tpd.conf" -C "$STATE/control" -p "$STATE/xl2tpd.pid" > "$STATE/log" 2>&1 &
+	PID=$!
+	_n=0
+	while [ "$_n" -lt 45 ]; do
+		if ! kill -0 "$PID" 2>/dev/null; then
+			[ ! -s "$STATE/log" ] || tail -20 "$STATE/log" >&2
+			fail 'The L2TP client stopped. Check Runtime Logs.'
+		fi
+		if ip -4 addr show dev "$DEV" 2>/dev/null | grep -q 'inet '; then
+			ip -4 route replace default dev "$DEV" metric 10 table "$TABLE"
+			return 0
+		fi
+		sleep 1; _n=$((_n+1))
+	done
+	# Authentication diagnostics contain no account password with PPP debug off.
+	[ ! -s "$STATE/log" ] || tail -20 "$STATE/log" >&2
+	fail 'L2TP did not connect. Check server, account password and IPsec settings.'
+}
+measure() {
+	_url="$(cfg test_url 'http://www.gstatic.com/generate_204')"
+	# Resolve outside the tunnel, then make the measured connection on PPP.
+	_authority="${_url#*://}"; _authority="${_authority%%/*}"
+	_host="${_authority%%:*}"; _port="${_authority##*:}"
+	case "$_url" in http://*) _default=80 ;; https://*) _default=443 ;; *) fail 'Invalid test URL.' ;; esac
+	[ "$_port" != "$_authority" ] || _port="$_default"
+	_ip="$(resolve_direct "$_host" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
+	[ -n "$_ip" ] || { echo 0; return 1; }
+	if [ "$KIND" = tcp ]; then
+		_t="$(curl -4 -sS --noproxy '*' --interface "$DEV" --resolve "$_host:$_port:$_ip" \
+			--connect-timeout 8 --max-time 10 -o /dev/null -w '%{time_connect}' "$_url" 2>/dev/null)" || true
+	else
+		_t="$(curl -4 -fsS --noproxy '*' --interface "$DEV" --resolve "$_host:$_port:$_ip" \
+			--connect-timeout 8 --max-time 10 -o /dev/null -w '%{time_total}' "$_url" 2>/dev/null)" || _t=0
+	fi
+	awk -v t="${_t:-0}" 'BEGIN { print (t > 0 ? (t*1000 < 1 ? 1 : int(t*1000+0.5)) : 0) }'
+}
+case "$MODE" in
+	check) check ;;
+	run)
+		trap cleanup EXIT
+		trap 'exit 1' INT TERM
+		connect
+		# procd respawns the complete handshake when xl2tpd exits or PPP disappears.
+		while kill -0 "$PID" 2>/dev/null; do
+			ip -4 addr show dev "$DEV" 2>/dev/null | grep -q 'inet ' || exit 1
+			sleep 5
+		done
+		exit 1 ;;
+	test)
+		KIND="${2:-url}"
+		case "$KIND" in tcp|url) : ;; *) exit 1 ;; esac
+		mkdir "$ZGZ_RUN/.l2tp-test-lock" 2>/dev/null || { echo -2; exit 1; }
+		TEST_LOCK=1
+		DEV=zgzl2tpt; TABLE=19011; STATE="$ZGZ_RUN/l2tp-test"
+		trap cleanup EXIT
+		trap 'exit 1' INT TERM
+		umask 077; mkdir -p "$STATE"
+		cat > "$STATE/node.json"
+		NODE="$STATE/node.json"
+		# An already connected identical account can be measured without reconnecting.
+		if cmp -s "$NODE" "$ZGZ_ETC/bridge.json" && ip -4 addr show dev zgzl2tp 2>/dev/null | grep -q 'inet '; then
+			DEV=zgzl2tp
+			measure
+			DEV=zgzl2tpt
+			exit 0
+		fi
+		if [ "$(cfg_bool localhost_proxy 1)" = 1 ]; then
+			"$ZGZ_LIB/zgz-rules" local pause >/dev/null 2>&1; PAUSED=1
+		fi
+		connect
+		measure ;;
+	*) echo 'usage: zgz-l2tp check|run|test tcp|url' >&2; exit 1 ;;
+esac

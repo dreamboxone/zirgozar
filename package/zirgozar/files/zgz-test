@@ -227,6 +227,10 @@ do_url() {
 	# would be a second core, a second port and a second thing to leave
 	# running. Say so rather than reporting a working node as broken.
 	case "$_proto" in
+		l2tp)
+			_l2tp_ms="$(printf '%s\n' "$_payload2" | "$ZGZ_LIB/zgz-l2tp" test url 2>/dev/null)" || _l2tp_ms=0
+			printf '%s\n' "$_l2tp_ms" > "$_out"
+			return 0 ;;
 		aether)
 			_aether_ms="$(printf '%s\n' "$_payload2" | "$ZGZ_LIB/zgz-aether" test "$1" 2>/dev/null)" || _aether_ms=0
 			printf '%s\n' "$_aether_ms" > "$_out"
@@ -301,6 +305,7 @@ cmd_live() {
 EXIT="$ZGZ_RUN/exit"
 
 cmd_exit() {
+	_identity="$(exit_identity)" || return 0
 	# A lock left by a run that was killed is not one anybody holds.
 	[ -z "$(find "$EXIT.lock" -maxdepth 0 -mmin +1 2>/dev/null)" ] || rmdir "$EXIT.lock" 2>/dev/null || true
 	mkdir "$EXIT.lock" 2>/dev/null || return 0
@@ -311,14 +316,12 @@ cmd_exit() {
 		*) _tr="$(curl -s --connect-timeout 8 --max-time 12 --socks5-hostname "127.0.0.1:$_sp" \
 			https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null)" || _tr="" ;;
 	esac
-	# No SOCKS port: the router's own way out, which with Localhost Proxy on
-	# is the tunnel too.
-	[ -n "$_tr" ] || [ "$(cfg_bool localhost_proxy 1)" != "1" ] ||
-		_tr="$(curl -s --connect-timeout 8 --max-time 12 https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null)" || _tr=""
 	_cc="$(printf '%s\n' "$_tr" | sed -n 's/^loc=\([A-Z][A-Z]\)$/\1/p' | head -1)"
 	_ip="$(printf '%s\n' "$_tr" | sed -n 's/^ip=\([0-9A-Fa-f:.]*\)$/\1/p' | head -1)"
-	cp -f "$ZGZ_BEST_META" "$EXIT.meta" 2>/dev/null || : > "$EXIT.meta"
-	printf 'cc=%s\nip=%s\n' "$_cc" "$_ip" > "$EXIT"
+	if [ "$(exit_identity)" = "$_identity" ]; then
+		printf 'identity=%s\ncc=%s\nip=%s\n' "$_identity" "$_cc" "$_ip" > "$EXIT.$$"
+		mv -f "$EXIT.$$" "$EXIT"
+	fi
 	rmdir "$EXIT.lock" 2>/dev/null || true
 	return 0
 }
@@ -361,6 +364,11 @@ cmd_run() {
 	# A TCP handshake to a port that only speaks UDP can never be answered, and
 	# a cross would say the node is dead when it is not.
 	case "$_kind:$_proto" in
+		tcp:l2tp)
+			put "$_id.tcp" -1
+			_l2tp_ms="$(printf '%s\n' "$_payload" | "$ZGZ_LIB/zgz-l2tp" test tcp 2>/dev/null)" || _l2tp_ms=0
+			put "$_id.tcp" "$_l2tp_ms"
+			return 0 ;;
 		ping:aether)
 			case "$_host" in ''|auto) put "$_id.ping" -2; return 0 ;; esac
 			;;

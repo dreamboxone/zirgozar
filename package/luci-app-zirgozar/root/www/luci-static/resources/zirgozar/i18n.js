@@ -196,6 +196,21 @@ var FA = {
 	'Only manually added configs': 'فقط کانفیگ‌های دستی',
 	'Only the subscriptions': 'فقط اشتراک‌ها',
 	'Subscriptions': 'اشتراک‌ها',
+	'Use IPsec': 'استفاده از IPsec',
+	'IPsec shared key (PSK)': 'کلید مشترک IPsec (PSK)',
+	'Enable only for an L2TP/IPsec account. Enter the shared key supplied by the provider. Plain L2TP does not encrypt traffic.': 'فقط برای اکانت L2TP/IPsec روشن کنید و کلید مشترک دریافتی از فروشنده را وارد کنید. L2TP ساده ترافیک را رمزگذاری نمی‌کند.',
+	'Default: 1400. Reduce it if the tunnel connects but some pages do not load.': 'پیش فرض ۱۴۰۰ است. اگر تونل وصل شد اما بعضی صفحه‌ها باز نشدند، این مقدار را کاهش دهید.',
+	'L2TP tests': 'تست‌های L2TP',
+	'Enter the L2TP server IPv4 address or domain name.': 'آدرس IPv4 یا نام دامنه سرور L2TP را وارد کنید.',
+	'L2TP requires a username and password.': 'برای L2TP نام کاربری و رمز عبور لازم است.',
+	'A handshake to the port the tunnel will use. For L2TP, a TCP connection through the tunnel to the test URL.': 'زمان برقراری اتصال به پورت سرور. برای L2TP، زمان اتصال TCP از داخل تونل به مقصد تست.',
+	'L2TP normally uses UDP port 1701. Ping measures the server address. TCPing measures a TCP connection through the tunnel to the test URL; URL Test measures the full request. Iran routing and traffic rules are applied by the routing core.': 'پورت معمول L2TP برابر ۱۷۰۱ و از نوع UDP است. پینگ زمان پاسخ آدرس سرور را می‌سنجد. TCPing زمان اتصال TCP از داخل تونل به مقصد تست و URL Test زمان درخواست کامل را می‌سنجد. تفکیک ایران و قوانین ترافیک در هسته مسیریابی اعمال می‌شوند.',
+	'L2TP needs xl2tpd and PPP. Install dependencies under Router requirements.': 'L2TP به xl2tpd و PPP نیاز دارد. وابستگی‌ها را در بخش نیازمندی‌های روتر نصب کنید.',
+	'L2TP/IPsec needs strongSwan. Install dependencies under Router requirements.': 'L2TP/IPsec به strongSwan نیاز دارد. وابستگی‌ها را در بخش نیازمندی‌های روتر نصب کنید.',
+	'Invalid L2TP account or missing ucode socket module. Install dependencies and check the account.': 'اطلاعات اکانت L2TP درست نیست یا ماژول socket نصب نشده است. وابستگی‌ها و اطلاعات اکانت را بررسی کنید.',
+	'L2TP/IPsec negotiation failed. Check PSK and Runtime Logs.': 'برقراری IPsec ناموفق بود. کلید مشترک و گزارش‌های اجرا را بررسی کنید.',
+	'L2TP did not connect. Check server, account password and IPsec settings.': 'L2TP وصل نشد. آدرس سرور، رمز اکانت و تنظیمات IPsec را بررسی کنید.',
+	'L2TP did not connect. The Runtime Logs page says how far it got.': 'L2TP وصل نشد. جزئیات اتصال در برگه گزارش‌های اجرا موجود است.',
 	'Fetched every fifteen minutes. Xray, sing-box, Hysteria, Clash and WireGuard files are accepted, as are a plain list of links and a single base64 block.':
 		'هر پانزده دقیقه یک بار خوانده می‌شود. فایل‌های Xray، sing-box، Hysteria، Clash و وایرگارد پذیرفته می‌شوند، و همین‌طور لیست ساده‌ای از لینک‌ها یا یک بلوک base64.',
 	'Name': 'نام',
@@ -261,7 +276,7 @@ var FA = {
 	'PassWall2 is also redirecting traffic — turn one of them off.':
 		'پسوال هم در روتر شما فعال است. پسوال را خاموش نمایید.',
 	'Checking which of %d nodes answer at all — %d so far':
-		'بررسی اینکه از %d کانفیگ کدام‌ها اصلا جواب می‌دهند — تا اینجا %d',
+		'از %d کانفیگ %d عدد پاسخ دادند',
 	'Measuring the %d that answered, best first — %d done':
 		'اندازه‌گیری %d کانفیگی که جواب دادند، بهترین اول — %d انجام شد',
 	'%d of %d nodes answered, but none completed a request':
@@ -686,6 +701,7 @@ var FA = {
 
 	/* ------------------------------------------------- Basic Settings */
 	'Basic Settings': 'تنظیمات پایه',
+	'Home': 'خانه',
 	'The tunnel on or off - the same switch as on the Status page. It holds across a reboot.':
 		'روشن یا خاموش بودن تونل — همان کلید صفحه وضعیت. بعد از ریستارت هم همان‌طور می‌ماند.',
 	'Auto measures the nodes and uses the fastest. A node added by hand is used as it is, and nothing is measured.':

@@ -80,6 +80,7 @@ start_service() {
 	# core - and this one is a fresh attempt. Whatever this start finds wrong,
 	# it says again; a message it does not repeat is no longer true.
 	clear_message
+	say_status starting
 
 	# A node chosen in Basic Settings is the node, at every start - including
 	# the one that follows saving it there. Reading one link is quick enough
@@ -300,20 +301,22 @@ service_started() {
 	tproxy_port="$(cfg tproxy_port 1082)"
 	bridge_port="$(cfg bridge_port 10808)"
 
-	if bridge_wanted && bridge_is_ovpn; then
+	if bridge_wanted && { bridge_is_ovpn || bridge_is_l2tp; }; then
+		_tunnel_dev="$ZGZ_OVPN_DEV"; _tunnel_name=OpenVPN
+		if bridge_is_l2tp; then _tunnel_dev=zgzl2tp; _tunnel_name=L2TP; fi
 		# OpenVPN opens no port: what it makes is its tunnel device, with an
 		# address on it once the server has answered. Waited for, so that the
 		# rules do not send the network into a way out that is not there yet.
 		_ovw=0
 		while [ "$_ovw" -lt 120 ]; do
-			ip -4 addr show dev "$ZGZ_OVPN_DEV" 2>/dev/null | grep -q inet && break
+			ip -4 addr show dev "$_tunnel_dev" 2>/dev/null | grep -q inet && break
 			sleep 1
 			_ovw=$((_ovw + 1))
 		done
 		if [ "$_ovw" -ge 120 ]; then
-			log "OpenVPN did not connect within two minutes"
+			log "$_tunnel_name did not connect within two minutes"
 			say_status failed
-			say_message "OpenVPN did not connect. The Runtime Logs page says how far it got."
+			say_message "$_tunnel_name did not connect. The Runtime Logs page says how far it got."
 			return 1
 		fi
 	elif bridge_wanted; then
@@ -447,6 +450,7 @@ reload_service() {
 	# by the OpenVPN node's description, and swapped the core alone - for a
 	# node that needs warp-plus running beside Xray.
 	"$ZGZ_LIB/zgz-nodes" fixnames >/dev/null 2>&1 || true
+	say_status starting
 	_fixed="$(cfg node '')"
 	if [ -n "$_fixed" ] && [ "$(cfg_bool enabled 0)" = "1" ]; then
 		"$ZGZ_LIB/zgz-probe" use "$_fixed" >/dev/null 2>&1 || true
@@ -496,6 +500,7 @@ reload_service() {
 			rm -f "$_next"
 			log "the new settings were refused by the core - the tunnel is left as it was: $(grep -v '^[[:space:]]*$' "$ZGZ_RUN/core-test.out" 2>/dev/null | tail -1)"
 			say_message "The core refused the new settings, so the tunnel was left running as it was. Check the Runtime Logs page."
+			say_status failed
 			return 1
 		fi
 		rm -f "$_next"
@@ -522,6 +527,7 @@ reload_service() {
 	else
 		log "Settings saved - the firewall rules or DNS were updated, the core was left running"
 	fi
+	say_status ready
 	return 0
 }
 

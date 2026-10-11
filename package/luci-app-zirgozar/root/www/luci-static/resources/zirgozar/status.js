@@ -38,6 +38,8 @@ var UP = '#f59e0b', DOWN = '#3b82f6';
    as the page is open, which is exactly as long as it needs to be: a reload
    is a fresh look at the router and the message ought to be shown again. */
 var dismissed = '';
+var stateRequest = 0;
+var refreshListeners = false;
 
 /* The three sites' marks, drawn in one colour like every other icon on the
    page - white on the tile's own colour - rather than in their makers'. */
@@ -441,7 +443,10 @@ function renderTraffic(t) {
 }
 
 function refreshState() {
-	return callState().then(renderState).catch(function() {});
+	var request = ++stateRequest;
+	return callState().then(function(st) {
+		if (request === stateRequest) renderState(st);
+	}).catch(function() {});
 }
 
 /* PassWall2's connection check: press the tile, one request, timed. */
@@ -546,6 +551,13 @@ return baseclass.extend({
 		]));
 
 		poll.add(refreshState, 3);
+		if (!refreshListeners) {
+			refreshListeners = true;
+			window.addEventListener('focus', refreshState);
+			document.addEventListener('visibilitychange', function() {
+				if (!document.hidden) refreshState();
+			});
+		}
 		/* Traffic moves in five-minute steps. */
 		var statsOn = st ? st.stats_enabled !== false : uci.get('zirgozar', 'config', 'stats_enabled') != '0';
 		if (statsOn) poll.add(function() {

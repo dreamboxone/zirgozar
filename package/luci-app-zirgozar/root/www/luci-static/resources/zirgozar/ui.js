@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '2.4.19-1';
+var BUILD = '5.7.19-r3';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -359,9 +359,9 @@ function hero(root, version) {
    row of tabs above the page says the same thing and is hidden by the
    stylesheet, so there is one way between pages and it looks like Makhzan's. */
 var PAGES = [
-	[ 'settings',  'home',     'Basic Settings' ],
+	[ 'settings',  'home',     'Home' ],
 	[ 'nodes',     'server',   'Configs' ],
-	[ 'subscribe', 'rss',      'Node Subscribe' ],
+	[ 'subscribe', 'rss',      'Subscriptions' ],
 	[ 'other',     'grid',     'Other Settings' ],
 	[ 'update',    'download', 'App Update' ],
 	[ 'traffic',   'shield',   'Rule Manage' ],

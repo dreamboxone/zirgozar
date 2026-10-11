@@ -108,6 +108,9 @@ method_state() {
 		if [ "$bridge_on" = "0" ]; then
 			_bb="$(sed -n 's/^bridge=//p' "$ZGZ_RUN/core.info" 2>/dev/null | head -1)"
 			[ -n "$_bb" ] && pgrep -f "^$_bb --bind" >/dev/null 2>&1 && bridge_on=1
+			case "$_bb" in */zgz-l2tp|*/zgz-aether)
+				pgrep -f "$_bb run" >/dev/null 2>&1 && bridge_on=1 ;;
+			esac
 		fi
 	fi
 
@@ -116,15 +119,16 @@ method_state() {
 	# the last answer was no answer, and every quarter of an hour - a node's
 	# way out can move. Only while connected, when there is a way out to ask.
 	_ex=""
-	if [ "$connected" = "1" ]; then
+	_identity="$(exit_identity)" || _identity=""
+	if [ "$connected" = "1" ] && [ -n "$_identity" ]; then
 		_ex="$ZGZ_RUN/exit"
-		if ! cmp -s "$ZGZ_BEST_META" "$_ex.meta" 2>/dev/null ||
+		if [ "$(sed -n 's/^identity=//p' "$_ex" 2>/dev/null)" != "$_identity" ] ||
 		   [ -n "$(find "$_ex" -mmin +15 2>/dev/null)" ] ||
 		   { ! grep -q '^cc=..$' "$_ex" 2>/dev/null && [ -n "$(find "$_ex" -mmin +1 2>/dev/null)" ]; }; then
 			[ -d "$_ex.lock" ] || detach "$TEST" exit
 		fi
 		# The answer about another node is not shown at all.
-		cmp -s "$ZGZ_BEST_META" "$_ex.meta" 2>/dev/null || _ex=""
+		[ "$(sed -n 's/^identity=//p' "$_ex" 2>/dev/null)" = "$_identity" ] || _ex=""
 	fi
 
 	# A fingerprint of the web pages as they are on the router, for the pages
@@ -388,7 +392,7 @@ method_nodeconfig() {
 	[ -n "$rec" ] || { fail "not xray"; return; }
 	proto="$(printf '%s' "$rec" | cut -f3)"
 	case "$proto" in
-		hysteria2|hysteria|tuic|openvpn|amneziawg|warp) fail "not xray"; return ;;
+		hysteria2|hysteria|tuic|openvpn|amneziawg|warp|l2tp) fail "not xray"; return ;;
 	esac
 	out="$(printf '%s\n' "$rec" | DOMSTRAT="" decorate | cut -f6- | sed 's/^{/{"tag":"proxy",/')"
 	chains="$(chain_outbounds "$out" | while read -r _co; do [ -n "$_co" ] && printf ',%s' "$_co"; done)"

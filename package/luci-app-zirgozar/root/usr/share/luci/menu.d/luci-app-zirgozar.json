@@ -11,7 +11,7 @@
 	},
 
 	"admin/services/zirgozar/settings": {
-		"title": "Basic Settings",
+		"title": "Home",
 		"order": 10,
 		"action": {
 			"type": "view",
@@ -43,7 +43,7 @@
 	},
 
 	"admin/services/zirgozar/subscribe": {
-		"title": "Node Subscribe",
+		"title": "Subscriptions",
 		"order": 30,
 		"action": {
 			"type": "view",

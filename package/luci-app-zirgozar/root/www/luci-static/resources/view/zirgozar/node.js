@@ -52,6 +52,8 @@ SCHEMES.balancing = '_balancing';
 SCHEMES.shunt = '_shunt';
 SCHEMES.interface = '_iface';
 SCHEMES.aether = 'aether';
+SCHEMES.l2tp = 'l2tp';
+SCHEMES['l2tp+ipsec'] = 'l2tp';
 var AETHER_FIELDS = 'protocol scan ip transport outer inner noize dns exit_loc fragment fragment_size fragment_delay ech ech_dns ech_domain api_address api_ech api_ech_dns fingerprint sni psiphon psiphon_mode region tor tor_bridges tor_relays bridges cdn_ips cdn_sni cdn_sets psiphon_bundled psiphon_servers'.split(' ');
 
 /* Vwarp's disguises for the first packets, lightest first. */
@@ -120,7 +122,7 @@ function buildQuery(q) {
 function parseLink(link) {
 	var s = String(link || '').trim();
 	if (/\s/.test(s)) return null;
-	var m = s.match(/^([a-z0-9]+):\/\/(.*)$/i);
+	var m = s.match(/^([a-z0-9+.-]+):\/\/(.*)$/i);
 	if (!m || !SCHEMES[m[1].toLowerCase()]) return null;
 	var proto = SCHEMES[m[1].toLowerCase()], body = m[2], f = { proto: proto, rest: {} };
 	var h = body.indexOf('#');
@@ -188,6 +190,7 @@ function parseLink(link) {
 	}
 
 	var at = body.lastIndexOf('@'), cred = '', hp;
+	if (proto == 'l2tp' && !/:[0-9]+$/.test(body)) body += ':1701';
 	if (at >= 0) { cred = body.slice(0, at); hp = splitHostPort(body.slice(at + 1)); }
 	else if (proto == 'shadowsocks') {
 		var d = b64dec(body) || '', a2 = d.lastIndexOf('@');
@@ -201,7 +204,15 @@ function parseLink(link) {
 
 	function take(k) { var v = q[k]; delete q[k]; return v == null ? '' : v; }
 
-	if (proto == 'vless' || proto == 'trojan') {
+	if (proto == 'l2tp') {
+		var li = cred.indexOf(':');
+		if (li < 0) return null;
+		f.user = dec(cred.slice(0, li)); f.password = dec(cred.slice(li + 1));
+		f.l2tp_psk = take('psk');
+		var lipsec = take('ipsec');
+		f.l2tp_ipsec = /^l2tp\+ipsec:/i.test(link) || lipsec == '1' || (!!f.l2tp_psk && lipsec != '0') ? '1' : '0';
+		f.l2tp_mtu = take('mtu') || '1400';
+	} else if (proto == 'vless' || proto == 'trojan') {
 		if (proto == 'vless') {
 			f.uuid = dec(cred); f.encryption = take('encryption') || 'none'; f.flow = take('flow');
 		} else {
@@ -341,6 +352,12 @@ function buildLink(f, name) {
 		var qs2 = buildQuery(q);
 		return 'ss://' + b64enc((f.ss_method || '') + ':' + (f.password || '')).replace(/=+$/, '') + '@' + hp +
 			(qs2 ? '?' + qs2 : '') + frag;
+	}
+	if (p == 'l2tp') {
+		q.ipsec = f.l2tp_ipsec == '1' ? '1' : '0';
+		q.psk = f.l2tp_ipsec == '1' ? f.l2tp_psk : '';
+		q.mtu = f.l2tp_mtu || '1400';
+		return 'l2tp://' + enc(f.user || '') + ':' + enc(f.password || '') + '@' + joinHostPort(f.address, f.port || '1701') + '?' + buildQuery(q) + frag;
 	}
 	if (p == 'socks' || p == 'http') {
 		var auth = f.user ? enc(f.user) + ':' + enc(f.password) + '@' : '';
@@ -607,14 +624,14 @@ return view.extend({
 			o = field(form.ListValue, 'proto', _('Protocol'));
 			[ [ 'vless', 'VLESS' ], [ 'vmess', 'VMess' ], [ 'trojan', 'Trojan' ], [ 'shadowsocks', 'Shadowsocks' ],
 			  [ 'socks', 'Socks' ], [ 'http', 'HTTP' ], [ 'hysteria2', 'Hysteria2' ], [ 'tuic', 'TUIC' ], [ 'warp', 'WARP' ],
-			  [ 'wireguard', 'WireGuard' ], [ 'openvpn', 'OpenVPN' ], [ '_balancing', 'Balancing' ],
+			  [ 'wireguard', 'WireGuard' ], [ 'openvpn', 'OpenVPN' ], [ 'l2tp', 'L2TP / IPsec' ], [ '_balancing', 'Balancing' ],
 			  [ '_shunt', 'Shunt' ], [ '_iface', 'Custom Interface' ], [ 'aether', 'Aether' ] ]
 				.forEach(function(v) { o.value(v[0], v[1]); });
 
 			var candidates = (data && data[1] && data[1].nodes) || [];
 			var origins = (data && data[3]) || {};
 			var nodes = candidates.filter(function(n) {
-				return !/^(hysteria2|hysteria|tuic|openvpn|amneziawg|balancing|shunt|interface|aether)$/.test(n.protocol);
+				return !/^(hysteria2|hysteria|tuic|openvpn|amneziawg|l2tp|balancing|shunt|interface|aether)$/.test(n.protocol);
 			}).map(function(n) {
 				var origin = origins[n.tag];
 				return origin ? { tag: origin, label: n.label || n.tag } : null;
@@ -813,14 +830,29 @@ return view.extend({
 
 			/* A server of its own for all but WARP and OpenVPN, whose profile
 			   names its own. */
-			var SERVERS = XR.concat([ 'hysteria2', 'tuic', 'wireguard' ]);
+			var SERVERS = XR.concat([ 'hysteria2', 'tuic', 'wireguard', 'l2tp' ]);
 			o = field(form.Value, 'address', _('Address (Support Domain Name)'));
 			o.rmempty = false;
+			o.validate = function(section_id, value) {
+				return this.section.formvalue(section_id, '_proto') != 'l2tp' || /^[A-Za-z0-9_.-]+$/.test(value || '') ? true : _('Enter the L2TP server IPv4 address or domain name.');
+			};
 			SERVERS.forEach(function(p) { o.depends('_proto', p); });
 			o = field(form.Value, 'port', _('Port'));
 			o.datatype = 'port';
 			o.rmempty = false;
 			SERVERS.forEach(function(p) { o.depends('_proto', p); });
+
+			o = field(form.Flag, 'l2tp_ipsec', _('Use IPsec'),
+				_('Enable only for an L2TP/IPsec account. Enter the shared key supplied by the provider. Plain L2TP does not encrypt traffic.'));
+			o.depends('_proto', 'l2tp');
+			o = field(form.Value, 'l2tp_psk', _('IPsec shared key (PSK)'));
+			o.password = true; o.rmempty = false;
+			o.depends({ '_proto': 'l2tp', '_l2tp_ipsec': '1' });
+			o = field(form.Value, 'l2tp_mtu', 'MTU', _('Default: 1400. Reduce it if the tunnel connects but some pages do not load.'));
+			o.datatype = 'range(576,1460)'; o.placeholder = '1400'; o.depends('_proto', 'l2tp');
+			o = s.option(form.DummyValue, '_l2tp_help', _('L2TP tests'));
+			o.depends('_proto', 'l2tp');
+			o.cfgvalue = function() { return _('L2TP normally uses UDP port 1701. Ping measures the server address. TCPing measures a TCP connection through the tunnel to the test URL; URL Test measures the full request. Iran routing and traffic rules are applied by the routing core.'); };
 
 			/* ------------------------------------------------- WireGuard
 			   The fields of a [Interface] and [Peer] pair, entered by hand.
@@ -944,11 +976,17 @@ return view.extend({
 			[ 'vless', 'vmess', 'tuic' ].forEach(function(p) { o.depends('_proto', p); });
 
 			o = field(form.Value, 'user', _('Username'));
-			[ 'socks', 'http' ].forEach(function(p) { o.depends('_proto', p); });
+			o.validate = function(section_id, value) {
+				return this.section.formvalue(section_id, '_proto') != 'l2tp' || !!value ? true : _('L2TP requires a username and password.');
+			};
+			[ 'socks', 'http', 'l2tp' ].forEach(function(p) { o.depends('_proto', p); });
 
 			o = field(form.Value, 'password', _('Password'));
 			o.password = true;
-			[ 'trojan', 'shadowsocks', 'socks', 'http', 'hysteria2', 'tuic' ].forEach(function(p) { o.depends('_proto', p); });
+			o.validate = function(section_id, value) {
+				return this.section.formvalue(section_id, '_proto') != 'l2tp' || !!value ? true : _('L2TP requires a username and password.');
+			};
+			[ 'trojan', 'shadowsocks', 'socks', 'http', 'hysteria2', 'tuic', 'l2tp' ].forEach(function(p) { o.depends('_proto', p); });
 
 			o = field(form.Flag, 'uot', _('UDP over TCP'),
 				_('UDP is carried inside the TCP connection, for a SOCKS server that takes it that way. Only sing-box does this, so a node with it on is carried by sing-box when there is one.'));

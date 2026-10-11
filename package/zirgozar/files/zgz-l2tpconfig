@@ -1,0 +1,122 @@
+#!/usr/bin/ucode
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+// Part of Zirgozar - https://github.com/dreamboxone/zirgozar
+
+import { readfile, writefile } from 'fs';
+import * as socket from 'socket';
+
+let mode = ARGV[0], file = ARGV[1], dir = ARGV[2], dev = ARGV[3];
+let node = json(readfile(file) ?? '{}');
+function fail(message) { warn(message + '\n'); exit(1); }
+function quote(value) {
+	value = '' + value;
+	if (match(value, /[[:cntrl:]]/)) fail('Invalid control character in L2TP account.');
+	return '"' + replace(replace(value, /\\/g, '\\\\'), /"/g, '\\"') + '"';
+}
+if (node.type != 'l2tp' || !match(node.server ?? '', /^[A-Za-z0-9_.-]+$/) ||
+	!node.username || !node.password || int(node.port) < 1 || int(node.port) > 65535 ||
+	int(node.mtu) < 576 || int(node.mtu) > 1460 || (node.ipsec && !node.psk))
+	fail('Invalid L2TP account. Check server, username, password and IPsec PSK.');
+quote(node.username); quote(node.password); quote(node.psk ?? '');
+if (!match(dev ?? '', /^zgzl2tp(t)?$/)) fail('Invalid L2TP device.');
+let localport = dev == 'zgzl2tpt' ? 11702 : 11701;
+let name = 'zirgozar-' + dev;
+
+if (mode == 'config') {
+	if (ARGV[4]) {
+		if (!match(ARGV[4], /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/)) fail('Invalid L2TP server IPv4 address.');
+		node.server = ARGV[4];
+	}
+	writefile(dir + '/runtime.json', sprintf('%J', node));
+	let ppp = [ 'noauth', 'noipdefault', 'nodefaultroute', 'noproxyarp', 'refuse-eap',
+		'ipcp-accept-local', 'ipcp-accept-remote', 'lcp-echo-interval 5', 'lcp-echo-failure 3',
+		'lcp-max-terminate 0', 'mtu ' + node.mtu, 'mru ' + node.mtu,
+		'ifname ' + dev, 'linkname ' + dev, 'ipparam ' + dev,
+		'ip-up-script /bin/true', 'ip-down-script /bin/true',
+		'user ' + quote(node.username), 'password ' + quote(node.password) ];
+	if (node.ipsec) push(ppp, 'nomppe');
+	if (writefile(dir + '/ppp.options', join('\n', ppp) + '\n') == null) fail('Cannot write L2TP options.');
+	let config = '[global]\nport = ' + localport + '\naccess control = no\n' +
+		'[lac zirgozar]\nlns = ' + node.server + ':' + node.port + '\n' +
+		'autodial = yes\nredial = yes\nredial timeout = 5\nmax redials = 9999\n' +
+		'length bit = yes\nppp debug = no\npppoptfile = ' + dir + '/ppp.options\n';
+	if (writefile(dir + '/xl2tpd.conf', config) == null) fail('Cannot write L2TP config.');
+	exit(0);
+}
+if (mode == 'check') exit(0);
+
+// Selective VICI commands preserve unrelated strongSwan connections and keys.
+function byte(n) { return sprintf('%c', n & 255); }
+function uint(n, size) {
+	let out = '';
+	for (let i = size - 1; i >= 0; i--) out += byte(n >> (i * 8));
+	return out;
+}
+function named(kind, key) { return byte(kind) + byte(length(key)) + key; }
+function encode(data) {
+	let out = '';
+	for (let key, value in data) {
+		if (type(value) == 'object') out += named(1, key) + encode(value) + byte(2);
+		else if (type(value) == 'array') {
+			out += named(4, key);
+			for (let item in value) out += byte(5) + uint(length('' + item), 2) + item;
+			out += byte(6);
+		}
+		else { value = '' + value; out += named(3, key) + uint(length(value), 2) + value; }
+	}
+	return out;
+}
+function readn(sock, size) {
+	let out = '';
+	while (length(out) < size) {
+		let part = sock.recv(size - length(out));
+		if (!part) fail('IPsec control connection closed.');
+		out += part;
+	}
+	return out;
+}
+function request(command, data, optional) {
+	let sock = socket.create(socket.AF_UNIX, socket.SOCK_STREAM, 0);
+	if (!sock || !sock.connect('/var/run/charon.vici')) fail('IPsec service is unavailable.');
+	sock.setopt(socket.SOL_SOCKET, socket.SO_RCVTIMEO, 40);
+	sock.setopt(socket.SOL_SOCKET, socket.SO_SNDTIMEO, 5);
+	let body = named(0, command) + encode(data), packet = uint(length(body), 4) + body;
+	while (length(packet)) {
+		let sent = sock.send(packet);
+		if (!sent) fail('Cannot send IPsec control request.');
+		packet = substr(packet, sent);
+	}
+	let header = readn(sock, 4), size = 0;
+	for (let i = 0; i < 4; i++) size = size * 256 + ord(header, i);
+	if (size < 1 || size > 524288) fail('Invalid IPsec response.');
+	let response = readn(sock, size); sock.close();
+	let success = index(response, named(3, 'success') + uint(3, 2) + 'yes') >= 0;
+	if (!success && !optional) fail('IPsec ' + command + ' failed. Check Runtime Logs.');
+	return success;
+}
+if (!node.ipsec) exit(0);
+if (mode == 'stop') {
+	request('terminate', { ike: name, force: 'yes', timeout: '3000' }, true);
+	request('unload-conn', { name }, true);
+	request('unload-shared', { id: name }, true);
+	exit(0);
+}
+if (mode != 'ipsec' && mode != 'ipsec-load') fail('Invalid L2TP config command.');
+let connection = {};
+connection[name] = {
+	version: '1', local_addrs: [ '%any' ], remote_addrs: [ node.server ],
+	proposals: [ 'aes256-sha256-modp2048', 'aes256-sha1-modp2048', 'aes128-sha1-modp2048', 'aes256-sha1-modp1024', 'aes128-sha1-modp1024' ],
+	encap: 'yes', reauth_time: '0', dpd_delay: '20s',
+	local: { auth: 'psk' }, remote: { auth: 'psk', id: '%any' },
+	children: { l2tp: {
+		mode: 'transport', local_ts: [ 'dynamic[udp/' + localport + ']' ],
+		remote_ts: [ 'dynamic[udp/' + node.port + ']' ],
+		esp_proposals: [ 'aes256-sha256', 'aes256-sha1', 'aes128-sha1' ],
+		start_action: 'trap', dpd_action: 'trap', close_action: 'trap'
+	} }
+};
+request('load-shared', { id: name, type: 'IKE', data: node.psk, owners: [ node.server ] });
+request('load-conn', connection);
+if (mode == 'ipsec-load') exit(0);
+request('initiate', { ike: name, child: 'l2tp', timeout: '30000' });
