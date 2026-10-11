@@ -900,6 +900,10 @@ space_for() {
 	_free="$(free_bytes "$_dir")"
 	[ "$_need" -gt 0 ] 2>/dev/null || _need=0
 	if [ "$_free" -lt $((_need + ZGZ_SPACE_MARGIN)) ]; then
+		# What was needed and what there was, in bytes, for the page to say
+		# beside the button that asked - see zgz-cores install.
+		printf '%s %s
+' "$((_need + ZGZ_SPACE_MARGIN))" "$_free" > "$ZGZ_RUN/no-room" 2>/dev/null || true
 		say_message "Not enough room in $_dir: needs $(human_size $((_need + ZGZ_SPACE_MARGIN))), $(human_size "$_free") free"
 		warn "refusing download: needs $(human_size $((_need + ZGZ_SPACE_MARGIN))) in $_dir, $(human_size "$_free") free"
 		return 1

@@ -95,7 +95,7 @@ var FA = {
 	'Psiphon mode': 'حالت سایفون',
 	'Obfuscation profile': 'روش مبهم‌سازی',
 	'Exit node': 'نود خروجی',
-	'The selected config carries Aether: selected-config → WARP / Psiphon / Tor.': 'اتصال اتر از کانفیگ انتخاب‌شده عبور می‌کند: کانفیگ انتخاب‌شده ← وارپ / سایفون / تور.',
+	'The selected config carries Aether: selected-node → WARP / Psiphon / Tor.': 'اتصال اتر از کانفیگ انتخاب‌شده عبور می‌کند: کانفیگ انتخاب‌شده ← وارپ / سایفون / تور.',
 	'Advanced Aether options': 'تنظیمات پیشرفته اتر',
 	'Aether endpoint': 'آدرس اتر',
 	'Aether DNS': 'DNS اتر',
@@ -108,7 +108,7 @@ var FA = {
 	'Used only to create WARP keys; it does not enable ECH on the tunnel.': 'فقط برای ساخت کلیدهای وارپ استفاده می‌شود و ECH تونل را فعال نمی‌کند.',
 	'Leave empty to scan automatically. A fixed endpoint disables automatic endpoint selection.': 'برای اسکن خودکار خالی بگذارید. با وارد کردن آدرس ثابت، انتخاب خودکار مقصد غیرفعال می‌شود.',
 	'Invalid Aether account ECH setting.': 'تنظیم ECH ساخت حساب اتر معتبر نیست.',
-	'Aether could not create its WARP account. Check the account API settings and Runtime Logs.': 'ساخت حساب وارپ اتر انجام نشد. تنظیمات API حساب و گزارش‌های اجرا را بررسی کنید.',
+	'Aether could not create its WARP account. On the Configs page, edit this config, turn on Advanced Aether options and change the WARP account API address or WARP account ECH. Runtime Logs has the details.': 'ساخت حساب وارپ اتر انجام نشد. در صفحه «کانفیگ‌ها» این کانفیگ را ویرایش کنید، «تنظیمات پیشرفته اتر» را روشن کنید و «آدرس API ساخت حساب وارپ» یا «ECH ساخت حساب وارپ» را تغییر دهید. جزئیات در «لاگ‌های اجرا» است.',
 	'Exit countries': 'کشورهای خروجی',
 	'Germany': 'آلمان',
 	'Sweden': 'سوید',
@@ -209,8 +209,8 @@ var FA = {
 		'کانفیگ‌ها از کجا می‌آیند، و کدام‌ها را دستی اضافه می‌کنید. تغییرات از دفعه بعدی که لیست خوانده شود اعمال می‌شوند.',
 	'Which nodes to use': 'از کدام کانفیگ‌ها استفاده شود',
 	'Nodes to use': 'کانفیگ‌های مورد استفاده',
-	'This decides who may be measured, not who wins: whichever node answers fastest is the one used, wherever it came from. A node added by hand joins the list rather than replacing it. To insist on one node, press “Use” beside it below.':
-		'تعیین می‌کند کدام کانفیگ‌ها آزمایش شوند؛ از بین آن‌ها هر کدام سریع‌تر باشد استفاده می‌شود. برای استفاده از یک کانفیگ مشخص، کنارش در پایین صفحه «استفاده» را بزنید.',
+	'The configs chosen here are measured to find the fastest one.':
+		'کانفیگ‌های انتخابی در این بخش، برای سریع‌ترین کانفیگ سنجش می‌شوند.',
 	'All configs': 'همه کانفیگ‌ها',
 	'Only manually added configs': 'فقط کانفیگ‌های دستی',
 	'Only the subscriptions': 'فقط اشتراک‌ها',
@@ -583,7 +583,7 @@ var FA = {
 	'GitHub Connection': 'اتصال گیت‌هاب',
 
 	/* ------------------------------------------------ the settings tabs */
-	'Node selection': 'انتخاب کانفیگ',
+	'How the fastest node is chosen': 'روش انتخاب سریع‌ترین کانفیگ',
 	'DNS': 'DNS',
 	'Xray': 'Xray',
 	'Maintain': 'نگهداری',
@@ -951,8 +951,8 @@ var FA = {
 	'None of those could be read as a node.': 'هیچ‌کدام از این‌ها به‌عنوان کانفیگ خوانده نشد.',
 	'No node is selected.': 'هیچ کانفیگی انتخاب نشده است.',
 	'Reassign Group': 'تغییر گروه',
-	'The group for the %d nodes selected. Empty is the default group.': 'گروه برای %d کانفیگ انتخاب‌شده. خالی یعنی گروه پیش‌فرض.',
-	'Letters, digits, space, dot, dash and underscore only.': 'فقط حروف، عدد، فاصله، نقطه، خط تیره و زیرخط.',
+	'The group for the %d nodes selected. Empty is the default group.': 'نام گروه برای این %d کانفیگ. خالی یعنی گروه پیش‌فرض.',
+	'Letters, digits, space, dot, dash and underscore only.': 'فقط حروف (فارسی یا انگلیسی)، عدد، فاصله، نقطه، خط تیره و زیرخط.',
 	'Select all': 'انتخاب همه',
 	'DeSelect all': 'لغو انتخاب همه',
 	'Delete select nodes': 'حذف کانفیگ‌های انتخاب‌شده',
@@ -997,7 +997,10 @@ var FA = {
 		'برای همه سایت‌هایی که از فیلترشکن می‌روند آدرس ساختگی داده می‌شود. فقط وقتی کار می‌کند که در برگه DNS، «روش پیدا کردن دامنه‌ها» روی «مستقیم داخل تونل» باشد.',
 	'When the Default row goes to a hand-added node, it is reached through this node first.':
 		'اگر ردیف پیش‌فرض به یک کانفیگ دستی می‌رود، اتصال اول از این کانفیگ رد می‌شود.',
-	'Delete the subscribed node': 'حذف',
+	'Delete the subscribed node': 'حذف کانفیگ‌ها',
+	'Delete subscription': 'حذف اشتراک',
+	'Not enough free space on the router: %s needed, %s free. Nothing was installed.': 'فضای خالی روتر کافی نیست: %s لازم است و %s خالی است. نصب انجام نشد.',
+	'Not enough free space on the router: %s free. Nothing was installed.': 'فضای خالی روتر کافی نیست: فقط %s خالی است. نصب انجام نشد.',
 	'Manual subscription': 'به‌روزرسانی',
 	'Reading it now. The count will change when it is done.': 'در حال خواندن. پس از پایان، تعداد به‌روز می‌شود.',
 	'Cloudflare Connection': 'اتصال کلادفلر',
@@ -1019,7 +1022,6 @@ var FA = {
 	'No node on the list can carry traffic, and neither can the one in use. The tunnel has been taken out of the way so that the network works without it. Add a node that works on the Configs page, or check the subscription.':
 		'هیچ کانفیگی در فهرست، و نه کانفیگ در حال استفاده، ترافیک را عبور نمی‌دهد. تونل کنار گذاشته شد تا شبکه بدون آن کار کند. در صفحه «کانفیگ‌ها» یک کانفیگ سالم اضافه کنید، یا اشتراک را بررسی کنید.',
 	'Nothing in the list could be read as a node': 'هیچ چیز در فهرست به‌عنوان کانفیگ خوانده نشد',
-	'If all subscriptions are off or have no readable configs, enabled manually added configs are used.': 'اگر همه اشتراک‌ها خاموش باشند یا کانفیگ قابل‌خواندن نداشته باشند، کانفیگ‌های دستی فعال استفاده می‌شوند.',
 	'No enabled manual configs are available. Add or enable a config on the Configs page.': 'کانفیگ دستی فعالی وجود ندارد. در صفحه «کانفیگ‌ها» یک کانفیگ اضافه یا فعال کنید.',
 	'No configs are available from the enabled subscriptions. Update them or select manual configs.': 'اشتراک‌های فعال کانفیگی در اختیار برنامه نگذاشته‌اند. آن‌ها را به‌روز کنید یا کانفیگ‌های دستی را انتخاب کنید.',
 	'No enabled configs are available. Add or enable a manual config or a subscription.': 'هیچ کانفیگ فعالی وجود ندارد. یک کانفیگ دستی یا اشتراک اضافه یا فعال کنید.',
@@ -1435,8 +1437,29 @@ function patchLuci() {
 /* Our own words first, then LuCI's: a page that draws a button of its own
    with a word LuCI also uses - Save, Add - finds it there rather than coming
    out in English. */
+/* In English a server on the list is a node, as PassWall2 calls it; the
+   strings say config, the word the Persian text uses. Where config means a
+   file of settings, it stays. */
+var CONFIG_KEPT = {
+	'Use global config': true,
+	'Keyword filter method inside the config': true,
+	'Export Config File': true,
+	'Node Config': true,
+	'Socks Config': true,
+	'Xray does not speak this protocol, so there is no Xray config file for it.': true,
+	'Invalid L2TP config command.': true
+};
+
+function nodeWord(s) {
+	if (typeof s !== 'string' || CONFIG_KEPT[s]) return s;
+	/* Not inside a path or a name: /etc/config, zirgozar.config, config.json. */
+	return s.replace(/(^|[^\w\/.-])([Cc])onfig(s?)(?![\w\/-]|\.\w)/g, function(w, before, c, plural) {
+		return before + (c === 'C' ? 'Node' : 'node') + plural;
+	});
+}
+
 function tr(s) {
-	if (LANG !== 'fa') return s;
+	if (LANG !== 'fa') return nodeWord(s);
 	var v = FA[s];
 	if (v === undefined && typeof s === 'string') {
 		var m = /^The installed Aether does not support (--[a-z0-9-]+)\.$/.exec(s);

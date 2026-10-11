@@ -256,9 +256,9 @@ register_account() {
 }
 if [ -n "$REGISTER" ]; then
 	case "$API_ECH" in
-		0) register_account 0 || fail 'Aether could not create its WARP account. Check the account API settings and Runtime Logs.' ;;
-		1) register_account 1 || fail 'Aether could not create its WARP account. Check the account API settings and Runtime Logs.' ;;
-		*) register_account 1 || register_account 0 || fail 'Aether could not create its WARP account. Check the account API settings and Runtime Logs.' ;;
+		0) register_account 0 || fail 'Aether could not create its WARP account. On the Configs page, edit this config, turn on Advanced Aether options and change the WARP account API address or WARP account ECH. Runtime Logs has the details.' ;;
+		1) register_account 1 || fail 'Aether could not create its WARP account. On the Configs page, edit this config, turn on Advanced Aether options and change the WARP account API address or WARP account ECH. Runtime Logs has the details.' ;;
+		*) register_account 1 || register_account 0 || fail 'Aether could not create its WARP account. On the Configs page, edit this config, turn on Advanced Aether options and change the WARP account API address or WARP account ECH. Runtime Logs has the details.' ;;
 	esac
 fi
 [ "$MODE" != prepare ] || exit 0

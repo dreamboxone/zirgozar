@@ -811,7 +811,7 @@ return view.extend({
 				});
 			});
 			o = s.option(form.ListValue, 'aether_exit_node', _('Exit node'),
-				_('The selected config carries Aether: selected-config → WARP / Psiphon / Tor.'));
+				_('The selected config carries Aether: selected-node → WARP / Psiphon / Tor.'));
 			o.depends('_proto', 'aether');
 			o.value('_direct', _('Direct'));
 			nodes.filter(function(n) { return n.tag != sid; }).forEach(function(n) { o.value(n.tag, n.label); });

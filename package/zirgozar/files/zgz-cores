@@ -820,9 +820,18 @@ cmd_list() {
 # restarts the very service it would be asking.
 SELF_REPO=dreamboxone/zirgozar
 SELF_RESULT="$ZGZ_RUN/self-update"
+CORE_RESULT="$ZGZ_RUN/core-result"
 SELF_DIR=/tmp/zirgozar-update
 
 self_fail() {
+	# Short of room, the page is told how short rather than only that it
+	# failed: "error room <needed> <free>", in bytes.
+	if [ -s "$ZGZ_RUN/no-room" ]; then
+		printf 'error room %s\n' "$(cat "$ZGZ_RUN/no-room")" > "$SELF_RESULT"
+		warn "update: $1 (not enough room)"
+		rm -rf "$SELF_DIR"
+		return 1
+	fi
 	printf 'error %s\n' "$1" > "$SELF_RESULT"
 	warn "update: $1"
 	rm -rf "$SELF_DIR"
@@ -830,7 +839,7 @@ self_fail() {
 }
 
 install_self() {
-	rm -f "$SELF_RESULT"
+	rm -f "$SELF_RESULT" "$ZGZ_RUN/no-room"
 	_arch="$(openwrt_arch)"
 	[ -n "$_arch" ] || { self_fail "This router does not say what processor it has."; return 1; }
 	if command -v apk >/dev/null 2>&1; then
@@ -881,6 +890,12 @@ install_self() {
 		fi
 	done
 
+	# The packages are unpacked onto flash, not into /tmp where they were
+	# downloaded: room for them there too, with some over for what unpacks
+	# larger than it came.
+	_psize=$(( $(wc -c < "$SELF_DIR/$(basename "$_main")") + $(wc -c < "$SELF_DIR/$(basename "$_luci")") ))
+	space_for $((_psize * 3)) / || { self_fail "Not enough room."; return 1; }
+
 	log "update: installing with $_pm"
 	# The release is not signed with a key this router knows, so apk has to
 	# be told to take it; the checksums above are what vouch for it. The
@@ -896,6 +911,11 @@ install_self() {
 	fi
 	if [ "$_rc" != "0" ]; then
 		log "update: $_pm said: $(tail -n 3 "$SELF_DIR/log" | tr '\n' ' ')"
+		if grep -qi 'no space left' "$SELF_DIR/log" 2>/dev/null; then
+			printf '0 %s\n' "$(free_bytes /)" > "$ZGZ_RUN/no-room"
+			self_fail "Not enough room."
+			return 1
+		fi
 		self_fail "The package manager refused the new version. The Log page has the details."
 		return 1
 	fi
@@ -960,20 +980,34 @@ case "${1:-list}" in
 	list) cmd_list ;;
 	install)
 		clear_message
+		# How a core's install went, for the page to say under that core:
+		# "<core> room <needed> <free>" when it was short of room. Nothing
+		# when it went through or failed for another reason.
+		rm -f "$CORE_RESULT" "$ZGZ_RUN/no-room"
+		_rc=0
 		case "${2:-}" in
-			xray)     install_xray "${3:-}" ;;
-			sing-box|sing-box-lx) install_singbox "$2" ;;
-			hysteria) install_hysteria ;;
-			geoview)  install_geoview ;;
-			warp-plus|vwarp) install_warpplus "$2" ;;
-			xray-patterniha) install_xray_patterniha ;;
-			aether) install_aether ;;
-			openvpn)  install_openvpn ;;
+			xray)     install_xray "${3:-}" || _rc=$? ;;
+			sing-box|sing-box-lx) install_singbox "$2" || _rc=$? ;;
+			hysteria) install_hysteria || _rc=$? ;;
+			geoview)  install_geoview || _rc=$? ;;
+			warp-plus|vwarp) install_warpplus "$2" || _rc=$? ;;
+			xray-patterniha) install_xray_patterniha || _rc=$? ;;
+			aether) install_aether || _rc=$? ;;
+			openvpn)
+				install_openvpn || _rc=$?
+				if [ "$_rc" != 0 ] && grep -qi 'no space left' "$ZGZ_RUN/ovpn-install.log" 2>/dev/null; then
+					printf '0 %s\n' "$(free_bytes /)" > "$ZGZ_RUN/no-room"
+				fi
+				;;
 			# This file is among those the install replaces, so nothing
 			# after it may be read from here: it ends the script outright.
 			zirgozar) install_self; exit $? ;;
 			*) echo "usage: $0 install xray|xray-patterniha|sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|openvpn|zirgozar" >&2; exit 1 ;;
 		esac
+		if [ "$_rc" != 0 ] && [ -s "$ZGZ_RUN/no-room" ]; then
+			printf '%s room %s\n' "$2" "$(cat "$ZGZ_RUN/no-room")" > "$CORE_RESULT"
+		fi
+		exit "$_rc"
 		;;
 	remove) clear_message; cmd_remove "${2:-}" ;;
 	latest) cmd_latest "${2:-}" ;;

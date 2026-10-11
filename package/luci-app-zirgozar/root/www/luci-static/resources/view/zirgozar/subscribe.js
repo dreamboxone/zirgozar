@@ -231,15 +231,16 @@ return view.extend({
 		]);
 	},
 
-	/* Saved and applied, the list is put together again from what has been
-	   read already - a subscription switched off drops out at once. */
-	handleSave: function(ev) {
-		return view.prototype.handleSave.apply(this, [ ev ]).then(function() {
-			return callAction('rebuild_nodes', '').catch(function() {});
-		});
-	},
-
 	render: function(data) {
+		/* Once applied, the list is put together again from what has been read
+		   already - a subscription switched off drops out at once. Not on save:
+		   the change is only committed by the apply that follows it, and a
+		   rebuild started before that still read the subscription as on. */
+		document.addEventListener('uci-applied', function() {
+			callAction('rebuild_nodes', '').catch(function() {});
+		}, { once: true });
+
+
 		i18n.setLang(uci.get('zirgozar', 'config', 'lang'));
 		renderInfo(data[0]);
 
@@ -268,6 +269,14 @@ return view.extend({
 		s.sortable = true;
 		s.handleAdd = function(ev) {
 			return form.GridSection.prototype.handleAdd.apply(this, [ ev, sectionName('s') ]);
+		};
+		/* Two buttons in a row delete something: this one the subscription,
+		   the column's only what it brought. Each says which. */
+		s.renderRowActions = function(section_id) {
+			var td = form.GridSection.prototype.renderRowActions.apply(this, [ section_id ]);
+			var del = td.querySelector('.cbi-button-remove');
+			if (del) del.textContent = _('Delete subscription');
+			return td;
 		};
 
 		/* The table shows what PassWall2's does; everything else is in the

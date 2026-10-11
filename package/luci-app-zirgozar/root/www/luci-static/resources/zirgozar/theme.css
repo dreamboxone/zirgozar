@@ -431,7 +431,8 @@ body.pwp-fa #modal_overlay>.modal textarea,body.pwp-fa #modal_overlay>.modal inp
    right-to-left page. */
 .mk .cbi-section-table,.mk table.table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel)}
 .mk .cbi-section-table .tr.table-titles,.mk table.table .tr.table-titles,.mk .cbi-section-table .cbi-section-table-titles{background:var(--soft)!important}
-.mk :is(.cbi-section-table,table.table) :is(.th,.td){vertical-align:middle!important;text-align:start!important;padding:10px 12px!important}
+.mk :is(.cbi-section-table,table.table) :is(.th,.td){vertical-align:middle!important;text-align:center!important;padding:10px 12px!important}
+.mk :is(.cbi-section-table,table.table) .td.cbi-section-actions{text-align:end!important}
 .mk .cbi-section-table .th,.mk table.table .th{color:var(--muted);font-weight:700;border-bottom:1px solid var(--line)!important;background:transparent!important;padding-top:10px!important}
 .mk .cbi-section-table .td,.mk table.table .td{border-top:1px solid var(--line)!important;background:transparent!important;color:var(--text)}
 .mk .cbi-section-table .td>*{margin-top:0!important;margin-bottom:0!important}

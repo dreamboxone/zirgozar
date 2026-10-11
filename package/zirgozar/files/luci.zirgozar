@@ -554,13 +554,14 @@ method_system() {
 		[ -n "$_deps" ] && printf '%s\n' "$_deps" > "$_dc" 2>/dev/null
 	fi
 
-	printf '{"geo":%s,"cores":%s,"deps":%s,"interfaces":%s,"job":"%s","self":"%s"}\n' \
+	printf '{"geo":%s,"cores":%s,"deps":%s,"interfaces":%s,"job":"%s","self":"%s","core_result":"%s"}\n' \
 		"$("$GEO" status 2>/dev/null || echo '{}')" \
 		"$("$CORES" list 2>/dev/null || echo '{}')" \
 		"${_deps:-{\}}" \
 		"$(interfaces_json)" \
 		"$(cat "$JOB" 2>/dev/null)" \
-		"$(json_escape "$(cat "$ZGZ_RUN/self-update" 2>/dev/null)")"
+		"$(json_escape "$(cat "$ZGZ_RUN/self-update" 2>/dev/null)")" \
+		"$(json_escape "$(cat "$ZGZ_RUN/core-result" 2>/dev/null)")"
 }
 
 # -------------------------------------------------------------------- action
@@ -690,11 +691,13 @@ method_action() {
 		delete_nodes|clear_nodes|copy_node|top_node|group_nodes|use_node)
 			# The rest of its Node List. Node ids only, and a group name
 			# without anything a shell or uci would read as more than a name.
+			# Any byte past ASCII is let through, so that a group can be
+			# named in Persian: the name is only ever quoted and shown.
 			_ids="${arg#*;}"
 			_grp=""
 			[ "$name" = "group_nodes" ] && _grp="${arg%%;*}"
 			if [ -n "$(printf '%s' "$_ids" | tr -d 'A-Za-z0-9_ ')" ] ||
-			   [ -n "$(printf '%s' "$_grp" | tr -d 'A-Za-z0-9_ .-')" ]; then
+			   [ -n "$(printf '%s' "$_grp" | LC_ALL=C tr -d 'A-Za-z0-9_ .\200-\377-')" ]; then
 				fail "unknown node"
 				return
 			fi

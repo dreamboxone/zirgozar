@@ -79,15 +79,57 @@ function act(key, name, arg, note) {
 	});
 }
 
+/* Checking for new versions says so in one place only: the Check update
+   buttons turn until the router has an answer. The rows are drawn afresh
+   every few seconds, so the turning is drawn from this, not kept on a button;
+   and the job may not have begun yet when the next drawing comes. */
+var CHECK_JOB = 'Checking for new versions';
+var checkAsked = 0;
+var refreshNow = function() {};
+var quickRefresh = 0;
+
+function checking(d) {
+	return (d && d.job == CHECK_JOB) || (checkAsked && Date.now() - checkAsked < 5000);
+}
+
 function checkUpdate(key) {
 	return function() {
-		return act(key, 'cores_latest', '', _('Checking the latest version. It will be shown in a moment.'));
+		checkAsked = Date.now();
+		return callAction('cores_latest', '').then(function(r) {
+			if (r && r.error) {
+				checkAsked = 0;
+				say(key, _(r.error), 'error');
+			}
+		}).catch(function(e) {
+			checkAsked = 0;
+			say(key, String(e && e.message || e), 'error');
+		}).then(function() { return refreshNow(); });
 	};
+}
+
+function checkBtn(tone, key, busy) {
+	var b = pui.btn(_('Check update'), tone + ' mk-small', checkUpdate(key), 'refresh');
+	if (busy) {
+		b.classList.add('mk-running');
+		b.disabled = true;
+	}
+	return b;
 }
 
 /* The version the page was opened with, and the last update result seen. */
 var firstVersion = '';
 var lastSelf = '';
+var lastCore = '';
+
+/* An install the router stopped because the flash or memory it was going to
+   land on was too full - said under its own row, so the reader knows why
+   nothing changed. The router says how much was needed when it knows. */
+function noRoom(need, free) {
+	need = +need; free = +free;
+	return need > 0
+		? _('Not enough free space on the router: %s needed, %s free. Nothing was installed.').format(pui.bytes(need), pui.bytes(free))
+		: _('Not enough free space on the router: %s free. Nothing was installed.').format(pui.bytes(free));
+}
 
 /* What the router says it is busy with, in the page's language. */
 function jobName(j) {
@@ -167,8 +209,9 @@ function render(d) {
 
 	var job = document.getElementById('pwp-job');
 	if (job) {
-		job.style.display = d.job ? 'flex' : 'none';
-		job.textContent = d.job ? jobName(d.job) + '…' : '';
+		var shown = d.job && d.job != CHECK_JOB;
+		job.style.display = shown ? 'flex' : 'none';
+		job.textContent = shown ? jobName(d.job) + '…' : '';
 	}
 
 	/* This program's own update. The install restarts the services the page
@@ -179,9 +222,18 @@ function render(d) {
 	var app0 = (d.cores || {}).app || {};
 	if (app0.version && !firstVersion) firstVersion = app0.version;
 	var res = String(d.self || '');
-	if (res.indexOf('error ') == 0 && res != lastSelf)
-		say('app', _(res.slice(6)), 'error');
+	if (res.indexOf('error ') == 0 && res != lastSelf) {
+		var room = /^error room (\d+) (\d+)$/.exec(res);
+		say('app', room ? noRoom(room[1], room[2]) : _(res.slice(6)), 'error');
+	}
 	lastSelf = res;
+
+	var cres = String(d.core_result || '');
+	if (cres && cres != lastCore) {
+		var lack = /^(\S+) room (\d+) (\d+)$/.exec(cres);
+		if (lack) say('core:' + lack[1], noRoom(lack[2], lack[3]), 'error');
+	}
+	lastCore = cres;
 	if (!d.job && app0.version && firstVersion && app0.version != firstVersion) {
 		say('app', _('Updated to %s.').format(app0.version), 'info');
 		window.setTimeout(function() { location.reload(); }, 1500);
@@ -189,19 +241,26 @@ function render(d) {
 
 	renderDeps(d.deps);
 
+	/* While a check runs, what was known before it is not shown as an
+	   answer, and the page asks again sooner than its usual ten seconds. */
+	var busy = checking(d);
+	if (busy && !quickRefresh)
+		quickRefresh = window.setTimeout(function() { quickRefresh = 0; refreshNow(); }, 2000);
+	if (!busy) checkAsked = 0;
+
 	/* ------------------------------------------------------ this program */
 	var abox = document.getElementById('pwp-app');
 	if (abox) {
 		var app = cores.app || {};
 		while (abox.firstChild) abox.removeChild(abox.firstChild);
 		var value = [ chip(pui.versionText(app.version) || '?', 'ok') ];
-		if (app.update && app.latest)
+		if (!busy && app.update && app.latest)
 			value.push(chip(_('Available: %s').format(pui.versionText(app.latest)), 'info'));
-		else if (app.latest)
+		else if (!busy && app.latest)
 			value.push(E('span', { 'style': 'color:var(--muted)' }, _('It is the latest version')));
 		abox.appendChild(row('Zirgozar', value, [
-			pui.btn(_('Check update'), 'primary mk-small', checkUpdate('app'), 'refresh'),
-			app.update && app.latest
+			checkBtn('primary', 'app', busy),
+			!busy && app.update && app.latest
 				? pui.btn(_('Update to %s').format(pui.versionText(app.latest)), 'success mk-small', function() {
 					return act('app', 'app_update', '',
 						_('Downloading and installing the new version. This takes a minute or two; the page reloads by itself when it is done.'));
@@ -224,9 +283,9 @@ function render(d) {
 				   installed. Two different strings, not "newer" - version
 				   numbers written by three different projects are a way to be
 				   confidently wrong about which way round they go. */
-				if (c.update && c.latest)
+				if (!busy && c.update && c.latest)
 					value.push(chip((i18n.dir() === 'rtl' ? '← ' : '→ ') + c.latest, 'info'));
-				else if (c.latest)
+				else if (!busy && c.latest)
 					value.push(E('span', { 'style': 'color:var(--muted)' }, _('It is the latest version')));
 				value.push(E('code', { 'style': 'font-size:11.5px;color:var(--muted)' }, c.path));
 				if (!c.ours)
@@ -242,7 +301,7 @@ function render(d) {
 
 			var actions = [];
 			if (c.arch_ok) {
-				actions.push(pui.btn(_('Check update'), 'soft-blue mk-small', checkUpdate('core:' + c.name), 'refresh'));
+				actions.push(checkBtn('soft-blue', 'core:' + c.name, busy));
 				actions.push(pui.btn(c.installed
 					? (c.update && c.latest ? _('Update to %s').format(c.latest) : _('Force update'))
 					: _('Install'), 'primary mk-small', function() {
@@ -366,6 +425,7 @@ return view.extend({
 			];
 			/* Asked at once, and then every ten seconds while the page is open -
 			   often enough to see a download finish. */
+			refreshNow = refresh;
 			function refresh() {
 				return callSystem().then(render).catch(function() {});
 			}

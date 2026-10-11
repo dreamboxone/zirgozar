@@ -298,7 +298,9 @@ function reassign(b) {
 				'class': 'btn cbi-button cbi-button-positive',
 				'click': ui.createHandlerFn(null, function(ev) {
 					var g = input.value.trim();
-					if (/[^A-Za-z0-9_ .-]/.test(g)) {
+					/* Letters of any script, Persian among them, with the
+					   half-space Persian writes inside words. */
+					if (/[^\p{L}\p{M}\p{N}\u200c_ .-]/u.test(g)) {
 						pui.note(ev.currentTarget, _('Letters, digits, space, dot, dash and underscore only.'), 'error');
 						return;
 					}
@@ -443,7 +445,7 @@ function renderNodes(d) {
 	nodes.forEach(function(n) {
 		rows.push(E('tr', { 'class': 'tr' }, [
 			E('td', { 'class': 'td' }, [
-				E('div', { 'style': 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, [
+				E('div', { 'style': 'display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap' }, [
 					E('span', { 'style': n.current ? 'font-weight:700' : '' }, n.label || n.host),
 					n.current ? pill(_('in use'), '#10b981') : E('span')
 				]),
@@ -559,7 +561,7 @@ return view.extend({
 			if (!addr) return '%h'.format(name);
 			/* One block, the address under the name: the cell lays its
 			   children out side by side. */
-			return E('div', { 'style': 'display:flex;flex-direction:column;align-items:flex-start;gap:2px' }, [
+			return E('div', { 'style': 'display:flex;flex-direction:column;align-items:center;gap:2px' }, [
 				E('div', {}, '%h'.format(name)), address(addr)
 			]);
 		};
@@ -749,8 +751,7 @@ return view.extend({
 		s.anonymous = true;
 
 		o = s.option(form.ListValue, 'sources', _('Nodes to use'),
-			_('This decides who may be measured, not who wins: whichever node answers fastest is the one used, wherever it came from. A node added by hand joins the list rather than replacing it. To insist on one node, press “Use” beside it below.') + ' ' +
-			_('If all subscriptions are off or have no readable configs, enabled manually added configs are used.'));
+			_('The configs chosen here are measured to find the fastest one.'));
 		o.value('own', _('Only manually added configs'));
 		o.value('both', _('All configs'));
 		o.value('subs', _('Only the subscriptions'));
@@ -792,7 +793,7 @@ return view.extend({
 			return _('Two passes. A quick handshake to every node, then a real request through the ones that answered — %d at a time (at most %d batches), best first, stopping at the first node faster than %d ms. Connecting therefore takes seconds, not a minute. WireGuard has no TCP port and skips the first pass; hysteria2, tuic and OpenVPN are not part of the automatic choice.')
 				.format(batch, most, good);
 		}
-		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Node selection'),
+		s = m.section(form.NamedSection, 'config', 'zirgozar', _('How the fastest node is chosen'),
 			selectionText(parseInt(uci.get('zirgozar', 'config', 'batch_size')) || 30,
 				parseInt(uci.get('zirgozar', 'config', 'good_ms')) || 1000,
 				parseInt(uci.get('zirgozar', 'config', 'max_batches')) || 5));
