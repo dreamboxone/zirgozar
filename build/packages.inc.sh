@@ -7,7 +7,7 @@
 # packages.inc.sh - what goes into a package, shared by the .apk and .ipk
 # builders so the two formats can never drift apart.
 
-VERSION=2.4.20
+VERSION=5.7.19
 RELEASE=1
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
@@ -170,6 +170,7 @@ sed -i '\|/usr/libexec/zgz-|d' /etc/crontabs/root
 sed -i '\|/usr/libexec/pwplus-|d' /etc/crontabs/root
 echo '$CRON_LIST' >> /etc/crontabs/root
 echo '$CRON_STATS' >> /etc/crontabs/root
+bounded 15 /usr/libexec/zgz-router schedule sync >/dev/null 2>&1 || true
 # Every one of these takes a procd lock, and a lock held by something that
 # died leaves the call waiting for good - which would strand the install half
 # done and make the package impossible to remove afterwards. Bound them: none

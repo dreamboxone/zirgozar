@@ -309,6 +309,13 @@ return view.extend({
 		o.value('8', _('Loop Mode'));
 		WEEK.forEach(function(d) { o.value(d[0], _(d[1])); });
 
+		o = s.taboption('sched', form.Value, 'update_minute_offset', _('Update offset (minutes)'),
+			_('For every 15 minutes: 0 runs at :00, :15, :30 and :45; 5 runs five minutes later.'));
+		o.modalonly = true;
+		o.default = '0';
+		o.datatype = 'range(0,14)';
+		o.depends('update_week_mode', 'refresh');
+
 		o = s.taboption('sched', form.Value, 'update_time_mode', _('Update Time'));
 		o.modalonly = true;
 		for (var h = 0; h < 24; h++)

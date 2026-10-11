@@ -401,7 +401,8 @@ sub_due() {
 	local sched boot
 	config_get sched "$1" update_week_mode ""
 	if [ "$sched" = "refresh" ]; then
-		return 0
+		# A dedicated cron entry handles its quarter-hourly offset.
+		return 1
 	fi
 	sub_restore "$1"
 	if ! sub_has "$1"; then

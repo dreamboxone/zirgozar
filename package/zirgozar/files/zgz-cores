@@ -190,11 +190,16 @@ install_aether() {
 	_target="$DIR/aether"
 	# Keep the configured SNI supported when switching between upstream builds
 	# that advertise the same version but expose different capabilities.
-	if [ -x "$_target/aether" ] && "$_target/aether" --help 2>/dev/null | grep -q -- '--masque-sni'; then
-		"$_stage/aether" --help 2>/dev/null | grep -q -- '--masque-sni' || {
-			say_message 'The downloaded Aether lacks configurable MASQUE SNI. The installed core was kept.'
-			return 1
-		}
+	if [ -x "$_target/aether" ]; then
+		_old_help="$("$_target/aether" --help 2>/dev/null)"
+		_new_help="$("$_stage/aether" --help 2>/dev/null)"
+		for _cap in masque-sni tls-ciphers disable-grease psiphon-cdn-sets psiphon-server-entries upstream; do
+			printf '%s\n' "$_old_help" | grep -Fq -- "--$_cap" || continue
+			printf '%s\n' "$_new_help" | grep -Fq -- "--$_cap" || {
+				say_message "The downloaded Aether lacks --$_cap. The installed core was kept."
+				return 1
+			}
+		done
 	fi
 	mkdir -p "$_target/pt"
 	for _f in pt/psiphon-tunnel-core pt/lyrebird aether; do

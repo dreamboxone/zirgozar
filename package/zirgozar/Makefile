@@ -5,7 +5,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zirgozar
-PKG_VERSION:=2.4.20
+PKG_VERSION:=5.7.19
 PKG_RELEASE:=1
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
@@ -135,6 +135,7 @@ uci -q commit zirgozar
 sed -i '\|/usr/libexec/zgz-|d' /etc/crontabs/root
 echo '*/15 * * * * /usr/libexec/zgz-refresh >/dev/null 2>&1' >> /etc/crontabs/root
 echo '*/5 * * * * /usr/libexec/zgz-stats sample >/dev/null 2>&1' >> /etc/crontabs/root
+bounded 15 /usr/libexec/zgz-router schedule sync >/dev/null 2>&1 || true
 /etc/init.d/cron reload >/dev/null 2>&1
 # rpcd has to be told there is a new object, and telling it once is not
 # reliable. On a fresh install this reload has been seen to return success

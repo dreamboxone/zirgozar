@@ -52,7 +52,7 @@ SCHEMES.balancing = '_balancing';
 SCHEMES.shunt = '_shunt';
 SCHEMES.interface = '_iface';
 SCHEMES.aether = 'aether';
-var AETHER_FIELDS = 'protocol scan ip transport outer inner noize dns exit_loc fragment fragment_size fragment_delay ech ech_dns ech_domain api_address api_ech api_ech_dns fingerprint sni psiphon psiphon_mode region tor tor_bridges tor_relays bridges cdn_ips cdn_sni cdn_sets psiphon_bundled'.split(' ');
+var AETHER_FIELDS = 'protocol scan ip transport outer inner noize dns exit_loc fragment fragment_size fragment_delay ech ech_dns ech_domain api_address api_ech api_ech_dns fingerprint sni psiphon psiphon_mode region tor tor_bridges tor_relays bridges cdn_ips cdn_sni cdn_sets psiphon_bundled psiphon_servers'.split(' ');
 
 /* Vwarp's disguises for the first packets, lightest first. */
 var NOIZE = [ 'minimal', 'light', 'medium', 'heavy', 'stealth', 'gfw', 'firewall' ];
@@ -738,7 +738,8 @@ return view.extend({
 				api_address: _('WARP account API address'), api_ech: _('WARP account ECH'), api_ech_dns: _('WARP account ECH resolver'),
 				psiphon_mode: _('Psiphon connection mode'), region: _('Exit country'), tor_bridges: _('Tor bridges'),
 				tor_relays: _('Tor relay source'), bridges: _('Tor bridge lines'), psiphon_bundled: _('Psiphon bundled servers'),
-				cdn_ips: _('CDN addresses'), cdn_sni: _('CDN server names'), cdn_sets: _('CDN sets') };
+				cdn_ips: _('CDN addresses'), cdn_sni: _('CDN server names'), cdn_sets: _('CDN sets'),
+				psiphon_servers: _('Psiphon server list file') };
 			var aetherBasic = [ 'protocol', 'transport', 'scan', 'ip', 'outer', 'inner', 'endpoint', 'tor', 'psiphon' ];
 			o = s.option(form.Flag, '_aether_advanced', _('Advanced Aether options'));
 			o.depends('_proto', 'aether');
@@ -747,6 +748,30 @@ return view.extend({
 			AETHER_FIELDS.concat([ 'endpoint' ]).forEach(function(k) {
 				var values = aetherChoices[k];
 				var x = field(values ? form.ListValue : form.Value, 'aether_' + k, aetherTitles[k] || ('Aether ' + k));
+				if (k == 'exit_loc' || k == 'region') {
+					x.value('', _('Auto'));
+					[ ['DE', 'Germany'], ['SE', 'Sweden'], ['FI', 'Finland'], ['NL', 'Netherlands'],
+						['FR', 'France'], ['GB', 'United Kingdom'], ['US', 'United States'], ['CA', 'Canada'],
+						['TR', 'Turkey'], ['JP', 'Japan'], ['SG', 'Singapore'] ].forEach(function(c) {
+						x.value(c[0], _(c[1]) + ' (' + c[0] + ')');
+					});
+					if (k == 'exit_loc') {
+						x.value('DE,SE', _('Only Germany and Sweden'));
+						x.value('!IR,AZ,RU', _('Exclude Iran, Azerbaijan and Russia'));
+						x.placeholder = 'DE,SE / !IR,AZ,RU';
+						x.description = _('Exit country filter, not a country changer. Empty accepts any country. DE,SE accepts only Germany or Sweden; !IR,AZ,RU rejects these countries. You can enter comma-separated two-letter country codes. If no allowed exit is found, the tunnel will not connect.');
+						x.validate = function(section, value) {
+							return !value || /^!?[A-Z]{2}(,[A-Z]{2})*$/.test(value) || _('Use uppercase two-letter country codes separated by commas, optionally starting with !.');
+						};
+					} else {
+						x.description = _('Requests a Psiphon exit country. Empty selects automatically. You can enter another uppercase two-letter country code; availability depends on Psiphon servers.');
+						x.validate = function(section, value) {
+							return !value || /^[A-Z]{2}$/.test(value) || _('Use one uppercase two-letter country code, such as DE.');
+						};
+					}
+				}
+				if (k == 'psiphon_servers') x.description = _('Plain server entries file under /etc/zirgozar. Empty uses the core’s saved servers and discovery.');
+				if (k == 'cdn_sets') x.description = 'cloudflare, fastly, cloudfront, psiphon-akamai, psiphon-bunny, vercel, github, curated-fronting, legacy-android-overrides';
 				if (k == 'api_ech') x.description = _('Used only to create WARP keys; it does not enable ECH on the tunnel.');
 				if (k == 'api_ech_dns') x.placeholder = 'udp://8.8.8.8';
 				if (k == 'api_address') x.placeholder = 'api.cloudflareclient.com';
@@ -765,6 +790,26 @@ return view.extend({
 			o.value('_direct', _('Direct'));
 			nodes.filter(function(n) { return n.tag != sid; }).forEach(function(n) { o.value(n.tag, n.label); });
 			o.default = '_direct';
+			o = s.option(form.TextValue, 'aether_exit_finalmask', _('Exit-node FinalMask JSON'));
+			o.depends('_proto', 'aether');
+			o.rows = 3;
+			o.description = _('Applied to the direct entry of Aether. When an exit node is selected, edit that node’s own settings.');
+			o.validate = function(section, value) {
+				if (!value || !value.trim()) return true;
+				try { var parsed = JSON.parse(value); return parsed && typeof parsed == 'object' && !Array.isArray(parsed) ? true : _('Expected a JSON object.'); }
+				catch (e) { return _('Expected a JSON object.'); }
+			};
+			o = s.option(form.Value, 'aether_exit_dial_mode', _('Exit-node dialMode'));
+			o.depends('_proto', 'aether');
+			o.description = _('Requires an Xray build supporting dialMode. Leave empty for the default.');
+			o = s.option(form.Button, '_aether_clear_psiphon', _('Clear Psiphon data'));
+			o.depends('_proto', 'aether');
+			o.inputtitle = _('Clear Psiphon data');
+			o.onclick = function() {
+				return callAction('aether_clear_psiphon', sid).then(function(r) {
+					ui.addNotification(null, E('p', {}, r.ok ? _('Psiphon data cleared.') : (r.error || _('Could not clear Psiphon data.'))));
+				});
+			};
 
 			/* A server of its own for all but WARP and OpenVPN, whose profile
 			   names its own. */

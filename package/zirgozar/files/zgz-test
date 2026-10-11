@@ -117,7 +117,7 @@ do_tcp() {
 	echo -1 > "$_out"
 	case "$_host" in *:*) _host="[$_host]" ;; esac
 	_t="$(curl -s -o /dev/null --connect-timeout 5 --max-time 5 \
-		-w '%{time_connect}' "http://$_host:$_port/" 2>/dev/null)" || _t=""
+		-w '%{time_connect}' "http://$_host:$_port/" 2>/dev/null)" || true
 	if [ -z "$_t" ]; then
 		echo 0 > "$_out"
 		return 0
@@ -227,7 +227,11 @@ do_url() {
 	# would be a second core, a second port and a second thing to leave
 	# running. Say so rather than reporting a working node as broken.
 	case "$_proto" in
-		hysteria2|hysteria|tuic|openvpn|amneziawg|aether) echo -2 > "$_out"; return 0 ;;
+		aether)
+			_aether_ms="$(printf '%s\n' "$_payload2" | "$ZGZ_LIB/zgz-aether" test "$1" 2>/dev/null)" || _aether_ms=0
+			printf '%s\n' "$_aether_ms" > "$_out"
+			return 0 ;;
+		hysteria2|hysteria|tuic|openvpn|amneziawg) echo -2 > "$_out"; return 0 ;;
 		# WARP is the exception: warp-plus is one small program and is stood
 		# up for the test, because without it the column could only ever
 		# say that it cannot say.
@@ -342,6 +346,17 @@ cmd_run() {
 	# A TCP handshake to a port that only speaks UDP can never be answered, and
 	# a cross would say the node is dead when it is not.
 	case "$_kind:$_proto" in
+		ping:aether)
+			case "$_host" in ''|auto) put "$_id.ping" -2; return 0 ;; esac
+			;;
+		tcp:aether)
+			case "$_host" in ''|auto) put "$_id.tcp" -2; return 0 ;; esac
+			case "$_payload" in *'"transport":"h2"'*) : ;; *) put "$_id.tcp" -2; return 0 ;; esac
+			case "$_payload" in
+				*'"protocol":"masque"'*|*'"protocol":"wg-over-masque"'*|*'"protocol":"mim"'*) : ;;
+				*) put "$_id.tcp" -2; return 0 ;;
+			esac
+			;;
 		tcp:wireguard)
 			# There is no TCP port to shake hands with, so the column holds
 			# the next best thing that is true: how long a request takes to
@@ -350,7 +365,7 @@ cmd_run() {
 			URL_REPEAT=1 url_ms "$_payload" "$_host" "$_port" > "$DIR/$_id.tcp" 2>/dev/null || true
 			return 0
 			;;
-		tcp:hysteria2|tcp:hysteria|tcp:tuic|tcp:openvpn|tcp:amneziawg|tcp:warp|tcp:aether|ping:aether)
+		tcp:hysteria2|tcp:hysteria|tcp:tuic|tcp:openvpn|tcp:amneziawg|tcp:warp)
 			# Not something Xray can carry, and the column has no other
 			# honest answer for them.
 			put "$_id.tcp" -2

@@ -159,6 +159,24 @@ fi
 
 aether_via="$(aether_via)" || aether_via=""
 _aether_out=direct
+_aether_entry=''
+if bridge_is_aether && [ -z "$aether_via" ]; then
+	_ae_id="$(sed -n 's/.*"id":"\([A-Za-z0-9_]*\)".*/\1/p' "$ZGZ_ETC/bridge.json")"
+	_ae_mask="$(uci -q get "zirgozar.$_ae_id.aether_exit_finalmask")" || _ae_mask=''
+	_ae_mode="$(uci -q get "zirgozar.$_ae_id.aether_exit_dial_mode")" || _ae_mode=''
+	if [ -n "$_ae_mask$_ae_mode" ]; then
+		_ae_stream="\"sockopt\":{\"mark\":${ZGZ_OUT_MARK}"
+		if [ -n "$_ae_mode" ]; then _ae_stream="$_ae_stream,\"dialMode\":\"$(json_escape "$_ae_mode")\""; fi
+		_ae_stream="$_ae_stream}"
+		if [ -n "$_ae_mask" ]; then
+			case "$_ae_mask" in *'{'*'}'*) : ;; *) echo 'Aether FinalMask must be a JSON object.' >&2; exit 1 ;; esac
+			printf '%s\n' "$_ae_mask" | jsonfilter -e '@' >/dev/null 2>&1 || { echo 'Invalid Aether FinalMask JSON.' >&2; exit 1; }
+			_ae_stream="$_ae_stream,\"finalmask\":$_ae_mask"
+		fi
+		_aether_out=aether-entry
+		_aether_entry="{\"tag\":\"aether-entry\",\"protocol\":\"freedom\",\"settings\":{\"domainStrategy\":\"UseIP\"},\"streamSettings\":{$_ae_stream}},"
+	fi
+fi
 if [ -n "$aether_via" ]; then
 	if ! chain_outbound "$aether_via" >/dev/null 2>&1; then
 		say_message "The Aether exit-node is missing or cannot be used by Xray. Choose a usable exit-node on its config page."
@@ -1076,6 +1094,7 @@ ${acl_outbounds}
 ${socks_outbounds}
 ${shunt_outbounds}
 ${chain_outs}
+    $_aether_entry
     { "tag": "direct", "protocol": "freedom", "settings": { "domainStrategy": "UseIP" }, "streamSettings": { "sockopt": { "mark": ${ZGZ_OUT_MARK} } } },
     { "tag": "dns-out", "protocol": "dns", "streamSettings": { "sockopt": { "mark": ${ZGZ_OUT_MARK} } } },
     { "tag": "block", "protocol": "blackhole" }

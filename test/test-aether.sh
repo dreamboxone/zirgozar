@@ -15,7 +15,11 @@ case "$1" in
  --help) printf '%s\n' '--gool-peer --upstream --h2 --tor-only --psiphon-only'; exit 0 ;;
  --version) echo 'aether 2.3.0'; exit 0 ;;
 esac
+for arg in "$@"; do
+	case "$arg" in --no-fragment|--psiphon-no-bundled) echo "unsupported option: $arg" >&2; exit 1 ;; esac
+done
 printf '%s\n' "$@" > "$ZGZ_RUN/aether-argv"
+printf '%s\n' "${AETHER_MASQUE_H2_FRAGMENT:-}" > "$ZGZ_RUN/aether-fragment"
 CORE
 chmod +x "$WORK/aether"
 rig_set core_aether "$WORK/aether"
@@ -63,4 +67,41 @@ if "$ZGZ_LIB/zgz-aether" check >/dev/null 2>&1; then bad 'Aether accepted overla
 for LINK in 'aether://?protocol=unknown' 'aether://?protocol=masque&scan=unknown' 'aether://?protocol=masque&transport=h9'; do
  check "$(printf '%s\n' "$LINK" | LC_ALL=C awk -f "$ZGZ_LIB/zgz-parse")" '' 'invalid Aether options are ignored without a partial record'
 done
+rig_set aether_upstream_port 10809
+rig_set a1.aether_exit_node _direct
+rig_set a1.link 'aether://?protocol=masque&transport=h2&fragment=0&psiphon=chain&psiphon_bundled=0#test'
+"$ZGZ_LIB/zgz-probe" use a1 >/dev/null 2>&1
+if "$ZGZ_LIB/zgz-aether" run; then ok 'core without negative switches runs with fragmentation and bundled list off'; else bad 'unsupported switches prevent execution'; fi
+check "$(cat "$ZGZ_RUN/aether-fragment")" 0 'fragmentation is explicitly disabled through the supported environment'
+rig_set a1.link 'aether://?protocol=masque&transport=h2&psiphon_servers=%2Ftmp%2Funsafe#test'
+"$ZGZ_LIB/zgz-probe" use a1 >/dev/null 2>&1
+if "$ZGZ_LIB/zgz-aether" check 2>/dev/null; then bad 'external server list path accepted'; else ok 'server list is restricted to persistent application storage'; fi
+rig_set a1.link 'aether://?protocol=masque&transport=h2#auto'
+mkdir -p "$ZGZ_RUN/tests"
+echo 123 > "$ZGZ_RUN/tests/a1.tcp"
+"$ZGZ_LIB/zgz-test" ping a1
+check "$(cat "$ZGZ_RUN/tests/a1.ping")" -2 'automatic Aether endpoint has no fixed ICMP target'
+check "$(cat "$ZGZ_RUN/tests/a1.tcp")" 123 'Aether ping does not overwrite the TCP result'
+"$ZGZ_LIB/zgz-test" tcp a1
+check "$(cat "$ZGZ_RUN/tests/a1.tcp")" -2 'automatic Aether endpoint has no fixed TCP target'
+cat > "$RIG/bin/curl" <<'CURL'
+#!/bin/sh
+printf '0.123'
+exit 56
+CURL
+chmod +x "$RIG/bin/curl"
+rig_set a1.link 'aether://?protocol=wg-over-masque&transport=h2&outer=162.159.198.204%3A443#fixed'
+"$ZGZ_LIB/zgz-test" tcp a1
+check "$(cat "$ZGZ_RUN/tests/a1.tcp")" 123 'TCP timing is kept when the TLS port rejects a plain HTTP request'
+cat > "$ZGZ_LIB/zgz-aether" <<'HELPER'
+#!/bin/sh
+[ "$1" = test ] && [ "$2" = a1 ] || exit 1
+[ "$(cat "$ZGZ_RUN/tests/a1.url")" = -1 ] || exit 1
+cat > "$ZGZ_RUN/aether-url-payload"
+echo 321
+HELPER
+chmod +x "$ZGZ_LIB/zgz-aether"
+"$ZGZ_LIB/zgz-test" url a1
+check "$(cat "$ZGZ_RUN/tests/a1.url")" 321 'URL Test measures the Aether helper while retaining the running marker'
+grep -q '"type":"aether"' "$ZGZ_RUN/aether-url-payload" && ok 'URL Test receives the selected Aether configuration' || bad 'URL Test lost the Aether configuration'
 rig_report

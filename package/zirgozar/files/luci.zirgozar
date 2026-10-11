@@ -735,6 +735,10 @@ method_action() {
 		cores_latest)
 			run_job "Checking for new versions" "$CORES latest force"
 			;;
+		aether_clear_psiphon)
+			case "$arg" in ''|*[!A-Za-z0-9_]*) fail 'Unknown Aether node.'; return ;; esac
+			_clear_error="$("$ZGZ_LIB/zgz-aether" clear-psiphon "$arg" 2>&1)" || { fail "$_clear_error"; return; }
+			;;
 		geo_update)
 			# WHICH;GEOIP-URL;GEOSITE-URL - the addresses as the page shows
 			# them, which may not be saved yet. Until Save & Apply the router

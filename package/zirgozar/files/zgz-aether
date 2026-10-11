@@ -12,6 +12,108 @@ fail() { say_message "$1"; printf '%s\n' "$1" >&2; exit 1; }
 
 BIN="$(aether_path)"
 case "$MODE" in version|--version) "$BIN" --version; exit $? ;; esac
+if [ "$MODE" = test ]; then
+	SID="${2:-}"
+	case "$SID" in ''|*[!A-Za-z0-9_]*) echo -2; exit 0 ;; esac
+	[ -x "$BIN" ] || { echo -2; exit 0; }
+	LOCK="$ZGZ_RUN/aether-url.lock"
+	if ! mkdir "$LOCK" 2>/dev/null; then
+		_owner="$(cat "$LOCK/pid" 2>/dev/null)"
+		case "$_owner" in ''|*[!0-9]*) echo -2; exit 0 ;; esac
+		if kill -0 "$_owner" 2>/dev/null; then echo -2; exit 0; fi
+		rm -f "$LOCK/pid"
+		rmdir "$LOCK" 2>/dev/null && mkdir "$LOCK" 2>/dev/null || { echo -2; exit 0; }
+	fi
+	echo "$$" > "$LOCK/pid"
+	WORK="$ZGZ_RUN/aether-url.$SID.$$"
+	TEST_RUN="$ZGZ_RUN"
+	REAL_STATE="$ZGZ_ETC/aether"
+	XP=''; AP=''
+	cleanup_test() {
+		for _log in "$WORK/build.log" "$WORK/upstream.log" "$WORK/aether.log"; do
+			[ ! -f "$_log" ] || cat "$_log" >> "$TEST_RUN/aether-url-$SID.log"
+		done
+		[ -z "$AP" ] || kill "$AP" 2>/dev/null || true
+		[ -z "$XP" ] || kill "$XP" 2>/dev/null || true
+		for _proc in /proc/[0-9]*/cmdline; do
+			[ -r "$_proc" ] || continue
+			if tr '\000' '\n' < "$_proc" | grep -Fq "$WORK/etc/aether/"; then
+				_pp="${_proc#/proc/}"; _pp="${_pp%/cmdline}"
+				[ "$_pp" = "$$" ] || kill "$_pp" 2>/dev/null || true
+			fi
+		done
+		[ -z "$AP" ] || wait "$AP" 2>/dev/null || true
+		[ -z "$XP" ] || wait "$XP" 2>/dev/null || true
+		rm -rf "$WORK"
+		rm -f "$LOCK/pid"
+		rmdir "$LOCK" 2>/dev/null || true
+	}
+	trap cleanup_test EXIT
+	trap 'exit 1' INT TERM
+	if awk '$2 ~ /:615[89A]$/ && $4 == "0A" { found=1 } END { exit !found }' /proc/net/tcp; then echo -2; exit 0; fi
+	umask 077
+	: > "$TEST_RUN/aether-url-$SID.log"
+	mkdir -p "$WORK/config" "$WORK/bin" "$WORK/etc" "$WORK/run"
+	cat > "$WORK/etc/bridge.json"
+	jsonfilter -i "$WORK/etc/bridge.json" -e '@.type' | grep -qx aether || { echo -2; exit 0; }
+	ID="$(jsonfilter -i "$WORK/etc/bridge.json" -e '@.id')"
+	case "$ID" in ''|*[!A-Za-z0-9_]*) echo -2; exit 0 ;; esac
+	UCI_BIN="$(command -v uci)"
+	uci export zirgozar > "$WORK/config/zirgozar"
+	printf '#!/bin/sh\nexec "%s" -c "%s/config" "$@"\n' "$UCI_BIN" "$WORK" > "$WORK/bin/uci"
+	chmod 700 "$WORK/bin/uci"
+	export PATH="$WORK/bin:$PATH" ZGZ_ETC="$WORK/etc" ZGZ_RUN="$WORK/run" ZGZ_LOG="$WORK/test.log"
+	uci set "zirgozar.config.node=$ID"
+	uci set zirgozar.config.bridge_port=24920
+	uci set zirgozar.config.aether_aux_port=24921
+	uci set zirgozar.config.aether_upstream_port=24922
+	uci commit zirgozar
+	mkdir -p "$ZGZ_ETC/aether/$ID"
+	if [ -d "$REAL_STATE/$ID" ]; then cp -R "$REAL_STATE/$ID/." "$ZGZ_ETC/aether/$ID/"; fi
+	printf '%s\n' '{"protocol":"socks","settings":{"servers":[{"address":"127.0.0.1","port":24920}]}}' > "$ZGZ_ETC/best.json"
+	"$ZGZ_LIB/zgz-mkconfig" nogeo > "$WORK/full.json" 2> "$WORK/build.log" || { echo -2; exit 0; }
+	printf '{"log":{"loglevel":"warning"},"inbounds":[{"tag":"aether-via","listen":"127.0.0.1","port":24922,"protocol":"socks","settings":{"udp":true}}],"outbounds":%s,"dns":%s,"routing":%s}' \
+		"$(jsonfilter -i "$WORK/full.json" -e '@.outbounds')" "$(jsonfilter -i "$WORK/full.json" -e '@.dns')" "$(jsonfilter -i "$WORK/full.json" -e '@.routing')" > "$WORK/upstream.json"
+	X="$(find_xray "$WORK/upstream.json")" || { echo -2; exit 0; }
+	"$X" run -config "$WORK/upstream.json" > "$WORK/upstream.log" 2>&1 &
+	XP=$!
+	"$ZGZ_LIB/zgz-aether" run > "$WORK/aether.log" 2>&1 &
+	AP=$!
+	MS=0
+	for _try in $(seq 1 60); do
+		sleep 2
+		kill -0 "$AP" 2>/dev/null || break
+		awk '$2 ~ /:6158$/ && $4 == "0A" { found=1 } END { exit !found }' /proc/net/tcp || continue
+		if _time="$(curl -fsS -o /dev/null -x socks5h://127.0.0.1:24920 --connect-timeout 3 --max-time 5 -w '%{time_total}' "$(cfg test_url 'http://www.gstatic.com/generate_204')" 2>/dev/null)"; then
+			MS="$(awk -v t="$_time" 'BEGIN { m=int(t*1000+0.5); if(m<1)m=1; print m }')"
+			break
+		fi
+	done
+	if [ "$MS" -gt 0 ]; then
+		mkdir -p "$REAL_STATE/$ID"
+		for _key in "$ZGZ_ETC/aether/$ID"/identity*.toml; do
+			[ -s "$_key" ] || continue
+			_target="$REAL_STATE/$ID/${_key##*/}"
+			[ -s "$_target" ] || cp "$_key" "$_target"
+		done
+	fi
+	echo "$MS"
+	exit 0
+fi
+if [ "$MODE" = clear-psiphon ]; then
+	ID="${2:-}"
+	case "$ID" in ''|*[!A-Za-z0-9_]*) fail 'Invalid Aether account identifier.' ;; esac
+	[ "$(uci -q get "zirgozar.$ID")" = node ] || fail 'Unknown Aether node.'
+	case "$(uci -q get "zirgozar.$ID.link")" in aether://*) : ;; *) fail 'Unknown Aether node.' ;; esac
+	STATE="$ZGZ_ETC/aether/$ID/identity.toml-psiphon"
+	for _proc in /proc/[0-9]*/cmdline; do
+		[ -r "$_proc" ] || continue
+		tr '\000' '\n' < "$_proc" | grep -Fxq -e "$STATE/" -e "$STATE" -e "$STATE/aether-psiphon.json" -e "$ZGZ_ETC/aether/$ID/identity.toml" && fail 'Stop this Aether connection before clearing Psiphon data.'
+	done
+	[ ! -L "$ZGZ_ETC/aether/$ID" ] && [ ! -L "$STATE" ] || fail 'Invalid Aether data directory.'
+	rm -rf "$STATE"
+	exit 0
+fi
 bridge_is_aether || fail 'No Aether config is selected.'
 [ -x "$BIN" ] || fail 'An Aether config needs Aether. Install it on the App Update page.'
 HELP="$("$BIN" --help 2>/dev/null)" || fail 'Aether cannot run on this router.'
@@ -95,7 +197,13 @@ case "$(get fingerprint)" in
 	*) fail 'Invalid Aether TLS fingerprint.' ;;
 esac
 [ -z "$CIPHERS" ] || set -- "$@" --tls-ciphers "$CIPHERS" --disable-grease
-case "$(get fragment)" in 1) set -- "$@" --fragment ;; ''|0) set -- "$@" --no-fragment ;; *) fail 'Invalid Aether fragmentation setting.' ;; esac
+case "$(get fragment)" in
+	1) printf '%s\n' "$HELP" | grep -q -- '--fragment' || fail 'This Aether build does not support TLS fragmentation.'; set -- "$@" --fragment ;;
+	''|0)
+		export AETHER_MASQUE_H2_FRAGMENT=0
+		if printf '%s\n' "$HELP" | grep -q -- '--no-fragment'; then set -- "$@" --no-fragment; fi ;;
+	*) fail 'Invalid Aether fragmentation setting.' ;;
+esac
 [ "$(get ech)" != 1 ] || set -- "$@" --ech auto
 case "$(get tor_bridges)" in
 	''|auto) : ;; first) set -- "$@" --tor-bridges ;; never) set -- "$@" --no-tor-bridges ;;
@@ -109,10 +217,20 @@ case "$(get tor_bridges)" in
 	*) fail 'Invalid Aether Tor bridge mode.' ;;
 esac
 case "$(get tor_relays)" in ''|auto) : ;; only|off) set -- "$@" --tor-relays "$(get tor_relays)" ;; *) fail 'Invalid Aether Tor relay mode.' ;; esac
-if [ "$(get psiphon_bundled)" = 0 ]; then
-	printf '%s\n' "$HELP" | grep -q -- '--psiphon-no-bundled' || fail 'This Aether build cannot disable its bundled Psiphon list.'
-	set -- "$@" --psiphon-no-bundled
-fi
+PSIPHON_ENTRIES="$(get psiphon_servers)"
+case "$PSIPHON_ENTRIES" in ''|/etc/zirgozar/*) : ;; *) fail 'The Psiphon server list must be under /etc/zirgozar.' ;; esac
+case "$(get psiphon_bundled)" in
+	0)
+		unset AETHER_PSIPHON_SERVER_ENTRIES
+		if printf '%s\n' "$HELP" | grep -q -- '--psiphon-no-bundled'; then set -- "$@" --psiphon-no-bundled; fi ;;
+	''|1)
+		if [ -n "$PSIPHON_ENTRIES" ]; then
+			[ -s "$PSIPHON_ENTRIES" ] || fail 'The Psiphon server list is missing or empty.'
+			printf '%s\n' "$HELP" | grep -q -- '--psiphon-server-entries' || fail 'This Aether build does not support a Psiphon server list.'
+			set -- "$@" --psiphon-server-entries "$PSIPHON_ENTRIES"
+		fi ;;
+	*) fail 'Invalid Psiphon server list setting.' ;;
+esac
 [ ! -x "${BIN%/*}/pt/psiphon-tunnel-core" ] || set -- "$@" --psiphon-bin "${BIN%/*}/pt/psiphon-tunnel-core"
 [ ! -x "${BIN%/*}/pt/lyrebird" ] || set -- "$@" --tor-pt "${BIN%/*}/pt/lyrebird"
 case "$MODE" in check) exit 0 ;; run|prepare) : ;; *) fail 'Usage: zgz-aether check|prepare|run' ;; esac
@@ -130,6 +248,8 @@ if [ "$TOR" = only ] || [ "$PSIPHON" = only ]; then REGISTER=''; fi
 register_account() {
 	_ech="$1"
 	set -- "$BIN" --config "$STATE/identity.toml" --register "$REGISTER" --mark "${ZGZ_OUT_MARK:-255}" --upstream "socks5://127.0.0.1:$UPORT"
+	[ -z "$CIPHERS" ] || set -- "$@" --tls-ciphers "$CIPHERS" --disable-grease
+	[ "$(get fragment)" != 1 ] || set -- "$@" --fragment
 	[ -z "$API_ADDRESS" ] || set -- "$@" "$API_FLAG" "$API_ADDRESS"
 	[ "$_ech" != 1 ] || set -- "$@" --ech auto --ech-dns "$API_DNS"
 	bounded 30 "$@"

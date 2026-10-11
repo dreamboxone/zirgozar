@@ -116,7 +116,7 @@ cmd_clock() {
 # switch, clears it. As in PassWall2, the schedule only exists while the main
 # switch is on.
 SCHEDULE_STOPPED="$ZGZ_RUN/schedule.stopped"
-CRONTAB=/etc/crontabs/root
+CRONTAB="${ZGZ_CRONTAB:-/etc/crontabs/root}"
 
 cmd_schedule_sync() {
 	[ -f "$CRONTAB" ] || touch "$CRONTAB" 2>/dev/null || return 0
@@ -160,13 +160,21 @@ cmd_schedule_sync() {
 		fi
 	fi
 	# Node Subscribe's schedule for each subscription, as PassWall2 has it.
-	# The quarter-hourly read - the default list's - is zgz-refresh's
-	# and has no line of its own here.
+	# Quarter-hourly subscriptions have separate entries so their downloads
+	# can be staggered without delaying the tunnel health check.
 	for _s in $(uci -q -X show zirgozar 2>/dev/null |
 	            sed -n "s/^zirgozar\.\([A-Za-z0-9_]*\)=subscription\$/\1/p"); do
 		[ "$(uci -q get "zirgozar.$_s.enabled")" = "0" ] && continue
 		_week="$(uci -q get "zirgozar.$_s.update_week_mode")" || _week=""
 		case "$_week" in
+			refresh)
+				_offset="$(uci -q get "zirgozar.$_s.update_minute_offset")" || _offset=0
+				case "$_offset" in ''|*[!0-9]*) _offset=0 ;; esac
+				_offset="$(printf '%s' "$_offset" | sed 's/^0*//')"
+				[ -n "$_offset" ] || _offset=0
+				[ "$_offset" -lt 15 ] || _offset=0
+				echo "$_offset,$((_offset + 15)),$((_offset + 30)),$((_offset + 45)) * * * * $ZGZ_LIB/zgz-router schedule sub $_s >/dev/null 2>&1" >> "$CRONTAB.zgz"
+				;;
 			8)
 				_h="$(uci -q get "zirgozar.$_s.update_interval_mode")" || _h=2
 				case "$_h" in ''|*[!0-9]*) _h=2 ;; esac
@@ -237,6 +245,8 @@ cmd_schedule() {
 			# One subscription, read on its own schedule, and the list
 			# rebuilt from it. Not while only nodes added by hand are used.
 			case "${2:-}" in ''|*[!A-Za-z0-9_]*) return 1 ;; esac
+			[ "$(uci -q get "zirgozar.$2")" = "subscription" ] || return 0
+			[ "$(uci -q get "zirgozar.$2.enabled")" != "0" ] || return 0
 			if [ "$(cfg sources own)" = "own" ]; then
 				return 0
 			fi

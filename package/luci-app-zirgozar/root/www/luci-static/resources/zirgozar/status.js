@@ -211,13 +211,15 @@ function protoLine() {
 			eye.appendChild(pui.icon(shown ? 'eye' : 'eye-off'));
 		}
 	}, [ pui.icon(shown ? 'eye' : 'eye-off') ]);
-	return E('div', { 'style': 'display:flex;gap:10px;padding:4px 0;align-items:baseline' }, [
+	return E('div', { 'class': 'pwp-detail-row', 'style': 'display:flex;gap:10px;padding:4px 0;align-items:baseline' }, [
 		E('span', { 'style': 'flex:0 0 130px;color:var(--muted);font-size:13px' }, _('Protocol')),
-		E('span', { 'style': 'flex:1 1 auto;font-weight:600;display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap' }, [
+		E('span', { 'class': 'pwp-ticker', 'style': 'flex:1 1 auto;font-weight:600' }, [
+			E('span', { 'class': 'pwp-ticker-track' }, [
 			E('span', { 'id': 'pwp-proto' }, '-'),
 			E('span', { 'id': 'pwp-hostwrap', 'style': 'display:none;gap:6px;align-items:center' }, [
 				E('span', { 'style': 'color:var(--muted)' }, '·'), host, eye,
 				E('span', { 'id': 'pwp-exit', 'style': 'display:none;gap:6px;align-items:center' })
+			])
 			])
 		])
 	]);
@@ -262,9 +264,11 @@ function renderExit(st) {
 }
 
 function line(label, id) {
-	return E('div', { 'style': 'display:flex;gap:10px;padding:4px 0;align-items:baseline' }, [
+	return E('div', { 'class': 'pwp-detail-row', 'style': 'display:flex;gap:10px;padding:4px 0;align-items:baseline' }, [
 		E('span', { 'style': 'flex:0 0 130px;color:var(--muted);font-size:13px' }, label),
-		E('span', { 'style': 'flex:1 1 auto;font-weight:600', 'id': id }, '-')
+		E('span', { 'class': 'pwp-ticker', 'style': 'flex:1 1 auto;font-weight:600' }, [
+			E('span', { 'class': 'pwp-ticker-track' }, [ E('span', { 'id': id }, '-') ])
+		])
 	]);
 }
 
@@ -316,6 +320,8 @@ function coreTile(id, word, name, version, running) {
 	var t = byId(id + '-t'), v = byId(id + '-v'), box = byId(id);
 	if (t) t.textContent = word + ' ' + name;
 	if (box) box.setAttribute('title', name + (version ? ' ' + version : ''));
+	if (t && version)
+		t.appendChild(E('div', { 'class': 'pwp-core-version' }, version));
 	if (v) {
 		v.className = 'mk-big ' + (running ? 'mk-on' : 'mk-bad');
 		v.textContent = running ? _('RUNNING') : _('NOT RUNNING');
@@ -323,6 +329,7 @@ function coreTile(id, word, name, version, running) {
 }
 
 function renderState(st) {
+	window.requestAnimationFrame(updateTickers);
 	st = st || {};
 	setNode('pwp-version', pui.versionText(st.version));
 	setNode('pwp-state', badge(st));
@@ -398,6 +405,21 @@ function renderState(st) {
 	setNode('pwp-pct', label);
 }
 
+function updateTickers() {
+	document.querySelectorAll('.pwp-status-card .pwp-ticker').forEach(function(box) {
+		var track = box.firstElementChild;
+		if (!track) return;
+		var distance = Math.max(0, track.scrollWidth - box.clientWidth);
+		var moving = distance > 2;
+		box.classList.toggle('pwp-ticker-moving', moving);
+		if (moving) {
+			var shift = (window.getComputedStyle(box).direction == 'rtl' ? 1 : -1) * distance;
+			track.style.setProperty('--ticker-shift', shift + 'px');
+			track.style.setProperty('--ticker-duration', Math.max(8, distance / 22 + 4) + 's');
+		}
+	});
+}
+
 function renderTraffic(t) {
 	t = t || {};
 	var box = byId('pwp-donuts');
@@ -456,7 +478,7 @@ return baseclass.extend({
 		var st = (data && data[0]) || null;
 		var tr = (data && data[1]) || null;
 
-		var tiles = E('div', { 'class': 'mk-grid mk-metrics', 'style': 'margin-bottom:18px' }, [
+		var tiles = E('div', { 'class': 'mk-grid mk-metrics pwp-status-row', 'style': 'margin-bottom:18px' }, [
 			tile('pwp-core', pui.icon('cpu'), '#3b82f6', _('Core'), '-'),
 			tile('pwp-chk-cf', brand('cloudflare'), '#f59e0b', _('Cloudflare Connection'), _('Touch Check'),
 				function() { check('pwp-chk-cf', 'https://www.cloudflare.com/cdn-cgi/trace'); }),
@@ -467,11 +489,6 @@ return baseclass.extend({
 		]);
 
 		var status = pui.card(_('Status'), 'pulse', '#10b981', E('div', {}, [
-			E('div', { 'class': 'mk-row', 'style': 'justify-content:space-between;margin:0 0 12px' }, [
-				E('span', { 'style': 'font-size:13px;color:var(--muted)' },
-					_('The main switch is in the Main tab below.')),
-				E('span', { 'id': 'pwp-state' }, '-')
-			]),
 			E('div', { 'id': 'pwp-msg', 'class': 'mk-alert', 'style': 'display:none' }, [
 				E('span', { 'id': 'pwp-msg-text', 'style': 'flex:1 1 200px' }, ''),
 				E('button', {
@@ -498,8 +515,6 @@ return baseclass.extend({
 			]),
 			line(_('Node name'), 'pwp-node'),
 			protoLine(),
-			line(_('Latency'), 'pwp-latency'),
-			line(_('Routing'), 'pwp-route'),
 			E('div', { 'class': 'mk-row', 'style': 'margin-top:14px' }, [
 				E('button', {
 					'id': 'pwp-reselect',
@@ -511,6 +526,10 @@ return baseclass.extend({
 				}, [ pui.icon('refresh'), E('span', {}, _('Choose fastest')) ])
 			])
 		]));
+
+		status.classList.add('pwp-status-card');
+		status.querySelector('.mk-card-title').appendChild(E('span', { 'id': 'pwp-state', 'style': 'font-size:13px;white-space:nowrap' }, '-'));
+		tiles.insertBefore(status, tiles.firstChild);
 
 		var traffic = pui.card(_('Traffic through the tunnel'), 'chart', '#3b82f6', E('div', {}, [
 			E('div', {
@@ -553,6 +572,6 @@ return baseclass.extend({
 			})();
 		}
 
-		return { top: [ tiles, status ], bottom: statsOn ? [ traffic ] : [], version: st ? st.version : null };
+		return { top: [ tiles ], bottom: statsOn ? [ traffic ] : [], version: st ? st.version : null };
 	}
 });

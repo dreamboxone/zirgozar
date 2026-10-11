@@ -243,7 +243,7 @@ function addViaLinks() {
 	var box = E('textarea', {
 		'rows': 8, 'wrap': 'off',
 		'style': 'width:100%;direction:ltr;text-align:left;font-family:monospace',
-		'placeholder': 'vless://…\nvmess://…'
+		'placeholder': 'vless://…\nvmess://…\naether://…'
 	});
 	ui.showModal(_('Add the node via the link'), [
 		E('p', {}, _('Enter share links, one per line. Subscription links are not supported!')),
