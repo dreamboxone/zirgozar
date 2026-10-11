@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../package/luci-app-zirgozar/root/www/luci-static/resources/view/zirgozar/node.js'), 'utf8');
-const api = new Function('rpc', 'i18n', source.slice(0, source.indexOf('\nreturn view.extend(')) + '\nreturn { parseLink, buildLink };')(
+const api = new Function('rpc', 'i18n', source.slice(0, source.indexOf('\nreturn view.extend(')) + '\nreturn { parseLink, buildLink, l2tpServer };')(
 	{ declare: () => () => Promise.resolve({}) }, { tr: value => value });
 for (const link of [
 	'l2tp://name:password@example.com:1701?ipsec=0#test',
@@ -23,4 +23,12 @@ assert.equal(imported.port, '1701');
 assert.equal(imported.l2tp_ipsec, '1');
 assert.equal(imported.l2tp_mtu, '1400');
 assert.equal(api.parseLink('l2tp://missing@example.com:1701'), null);
+// Providers give the server without a port: the form saves it empty.
+const bare = api.parseLink('l2tp+ipsec://a:b@1.example.click/?psk=x');
+assert.equal(bare.address, '1.example.click');
+assert.equal(bare.port, '1701');
+assert.match(api.buildLink(Object.assign({}, bare, { port: '' }), 'x'), /@1\.example\.click:1701\?/);
+for (const [typed, server] of [ [ 'http://tp.example.net/', 'tp.example.net' ], [ ' tp.example.net ', 'tp.example.net' ],
+	[ '1.example.click', '1.example.click' ], [ '192.0.2.10', '192.0.2.10' ], [ 'https://666.example.click/x?y', '666.example.click' ] ])
+	assert.equal(api.l2tpServer(typed), server);
 console.log('L2TP form import/export passed for both account types and escaped credentials');

@@ -723,6 +723,18 @@ method_action() {
 					;;
 			esac
 			;;
+		backup_create)
+			# Made at once - two small files - and then fetched by the
+			# browser through LuCI's own download.
+			_why="$("$ROUTER" backup 2>/dev/null)" || { fail "${_why:-The backup file could not be made.}"; return; }
+			;;
+		backup_restore)
+			# Checked and put in place here, so a file that is not a
+			# backup is answered at once; the restart that follows runs
+			# on after this answer.
+			_why="$("$ROUTER" restore 2>/dev/null)" || { fail "${_why:-This is not a Zirgozar backup file.}"; return; }
+			detach /bin/sh -c "'$NODES' build; /etc/init.d/zirgozar restart; [ -x /etc/init.d/zirgozar-server ] && /etc/init.d/zirgozar-server restart"
+			;;
 		rebuild_nodes)
 			# The list rebuilt from what has already been fetched. No
 			# subscription is re-read, so this costs no network and is

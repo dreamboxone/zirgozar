@@ -17,6 +17,8 @@ check "$(cut -f3 "$WORK/plain.tsv")" l2tp 'L2TP record is recognized'
 check "$(cut -f4,5 "$WORK/secure.tsv")" "$(printf '192.0.2.1\t1701')" 'IPsec account has default UDP port'
 if grep -q '"username":"user@domain","password":"p:a@ss"' "$WORK/plain.tsv"; then ok 'credentials decode without corruption'; else bad 'credentials corrupted'; fi
 if grep -q '"ipsec":true,"psk":"key&x","mtu":1380' "$WORK/secure.tsv"; then ok 'IPsec key and MTU are parsed'; else bad 'IPsec fields missing'; fi
+check "$(printf '%s
+' 'l2tp://a:b@3.example.click/?ipsec=0' | LC_ALL=C awk -f "$ZGZ_LIB/zgz-parse" | cut -f4,5)" "$(printf '3.example.click	1701')" 'server without a port, ending in a slash, uses 1701'
 for link in 'l2tp://a:b@host?ipsec=1' 'l2tp://a:b@host?mtu=10' 'l2tp://a:b@host?mtu=x' 'l2tp://a:%0Ap@host' 'l2tp://a:b@host?ipsec=invalid'; do
 	if [ -z "$(printf '%s\n' "$link" | LC_ALL=C awk -f "$ZGZ_LIB/zgz-parse")" ]; then ok 'invalid account rejected'; else bad "invalid account accepted: $link"; fi
 done

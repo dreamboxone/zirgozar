@@ -329,12 +329,113 @@ cmd_quicmove() {
 	return 0
 }
 
+# PassWall2's Backup and Restore: the settings of both sides - every config,
+# subscription, rule and setting is in the two files under /etc/config - and
+# the WARP accounts, which cannot be made again with the same keys. What can
+# be fetched again is left out: the routing data, the cores, Aether's data,
+# what the subscriptions last brought and the traffic history.
+#
+# The archive is handed to and taken from the browser by LuCI's own file
+# transfer, at these two addresses and nowhere else.
+BACKUP_OUT="${ZGZ_BACKUP_OUT:-/tmp/zirgozar-backup.tar.gz}"
+RESTORE_IN="${ZGZ_RESTORE_IN:-/tmp/zirgozar-restore.tar.gz}"
+UCI_DIR="${ZGZ_UCI_DIR:-/etc/config}"
+BACKUP_MARK=zirgozar-backup
+
+cmd_backup() {
+	_d="$(mktemp -d /tmp/zgz-backup.XXXXXX)" || return 1
+	mkdir -p "$_d/etc/config" "$_d/etc/zirgozar"
+	printf '%s\nversion %s\ndate %s\n' "$BACKUP_MARK" "$(zgz_version)" "$(date '+%Y-%m-%d %H:%M')" > "$_d/$BACKUP_MARK"
+	for _f in zirgozar zirgozar_server; do
+		if [ -f "$UCI_DIR/$_f" ]; then cp -p "$UCI_DIR/$_f" "$_d/etc/config/$_f"; fi
+	done
+	if [ -d "$ZGZ_ETC/warp" ]; then cp -pR "$ZGZ_ETC/warp" "$_d/etc/zirgozar/warp"; fi
+	rm -f "$BACKUP_OUT"
+	_rc=0
+	( cd "$_d" && tar -czf "$BACKUP_OUT" "$BACKUP_MARK" etc ) 2>/dev/null || _rc=1
+	rm -rf "$_d"
+	if [ "$_rc" != 0 ] || [ ! -s "$BACKUP_OUT" ]; then
+		echo "The backup file could not be made."
+		return 1
+	fi
+	chmod 0600 "$BACKUP_OUT"
+	log "Backup made"
+	return 0
+}
+
+# Only an archive this program made, holding only the files it puts in one -
+# looked at before anything is unpacked, so nothing else on the router can be
+# written by a file someone was handed.
+cmd_restore() {
+	_in="$RESTORE_IN"
+	if [ ! -s "$_in" ]; then
+		echo "No backup file was received."
+		return 1
+	fi
+	_list="$(tar -tvzf "$_in" 2>/dev/null)" || _list=""
+	if [ -z "$_list" ]; then
+		rm -f "$_in"
+		echo "This is not a Zirgozar backup file."
+		return 1
+	fi
+	# Plain files and folders only, at the paths a backup has.
+	_bad="$(printf '%s\n' "$_list" | awk '
+		{ t = substr($1, 1, 1); n = $NF; sub(/^\.\//, "", n); sub(/\/$/, "", n) }
+		t != "-" && t != "d" { print; next }
+		n == "" || n == "'"$BACKUP_MARK"'" || n == "etc" || n == "etc/config" || n == "etc/zirgozar" || n == "etc/zirgozar/warp" { next }
+		n == "etc/config/zirgozar" || n == "etc/config/zirgozar_server" { next }
+		n ~ /^etc\/zirgozar\/warp(\/[A-Za-z0-9_.-]+)+$/ && n !~ /\.\./ { next }
+		{ print }')"
+	if [ -n "$_bad" ]; then
+		rm -f "$_in"
+		echo "This is not a Zirgozar backup file."
+		return 1
+	fi
+	_d="$(mktemp -d /tmp/zgz-restore.XXXXXX)" || return 1
+	if ! tar -xzf "$_in" -C "$_d" 2>/dev/null || [ "$(head -n 1 "$_d/$BACKUP_MARK" 2>/dev/null)" != "$BACKUP_MARK" ] ||
+	   [ ! -s "$_d/etc/config/zirgozar" ]; then
+		rm -rf "$_d" "$_in"
+		echo "This is not a Zirgozar backup file."
+		return 1
+	fi
+	if ! uci -q -c "$_d/etc/config" show zirgozar >/dev/null 2>&1; then
+		rm -rf "$_d" "$_in"
+		echo "The settings in this backup file are damaged."
+		return 1
+	fi
+
+	log "Restoring the backup of $(sed -n 's/^date //p' "$_d/$BACKUP_MARK") (version $(sed -n 's/^version //p' "$_d/$BACKUP_MARK"))"
+	# Anything changed on the pages and not yet applied belongs to the
+	# settings being replaced.
+	uci -q revert zirgozar || true
+	uci -q revert zirgozar_server || true
+	cp -f "$_d/etc/config/zirgozar" "$UCI_DIR/zirgozar"
+	if [ -f "$_d/etc/config/zirgozar_server" ]; then cp -f "$_d/etc/config/zirgozar_server" "$UCI_DIR/zirgozar_server"; fi
+	if [ -d "$_d/etc/zirgozar/warp" ]; then
+		rm -rf "$ZGZ_ETC/warp"
+		cp -pR "$_d/etc/zirgozar/warp" "$ZGZ_ETC/warp"
+	fi
+	rm -rf "$_d" "$_in"
+	if uci -q delete zirgozar.config.factory_reset; then uci -q commit zirgozar || true; fi
+	# The node in use and what was measured belong to the old settings.
+	rm -f "$ZGZ_ETC/best.json" "$ZGZ_ETC/best.meta" "$ZGZ_ETC/bridge.json" "$ZGZ_ETC/nodes.cache"
+	if [ -n "$ZGZ_RUN" ] && [ -d "$ZGZ_RUN" ]; then
+		rm -rf "$ZGZ_RUN"/*.tsv "$ZGZ_RUN/tests" "$ZGZ_RUN/message" \
+		       "$ZGZ_RUN/attempts" "$ZGZ_RUN/rejected" "$ZGZ_RUN/progress"
+	fi
+	cmd_rebind || true
+	cmd_schedule sync || true
+	return 0
+}
+
 case "${1:-}" in
 	reset)    cmd_reset ;;
+	backup)   cmd_backup ;;
+	restore)  cmd_restore ;;
 	rebind)   cmd_rebind ;;
 	dnsmove)  cmd_dnsmove ;;
 	quicmove) cmd_quicmove ;;
 	clock)    cmd_clock ;;
 	schedule) cmd_schedule "${2:-}" "${3:-}" ;;
-	*) echo "usage: $0 reset|rebind|dnsmove|quicmove|clock|schedule sync|stop|start|restart|geo|sub <section>" >&2; exit 1 ;;
+	*) echo "usage: $0 reset|backup|restore|rebind|dnsmove|quicmove|clock|schedule sync|stop|start|restart|geo|sub <section>" >&2; exit 1 ;;
 esac

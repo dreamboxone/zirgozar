@@ -146,6 +146,21 @@ var FA = {
 	'%d h ago': '%d ساعت پیش',
 	'%d days ago': '%d روز پیش',
 	'Router uptime': 'مدت فعالیت',
+	'Backup and Restore': 'پشتیبان‌گیری و بازگردانی',
+	'Create Backup File': 'ساخت فایل پشتیبان',
+	'Restore Backup File': 'بازگردانی فایل پشتیبان',
+	'Backup or Restore Client and Server Configurations.': 'پشتیبان‌گیری یا بازگردانی تنظیمات کلاینت و سرور.',
+	'The file holds every config, subscription, rule and setting, and the WARP accounts. The routing data, the cores and the traffic history are not in it; they are downloaded again.': 'این فایل همه کانفیگ‌ها، اشتراک‌ها، قوانین و تنظیمات و حساب‌های WARP را در خود دارد. داده‌های مسیریابی، هسته‌ها و تاریخچه ترافیک در آن نیستند و دوباره دانلود می‌شوند.',
+	'Note: Restoring configurations across different versions may cause compatibility issues.': 'توجه: بازگردانی تنظیمات یک نسخه دیگر ممکن است مشکل سازگاری ایجاد کند.',
+	'Every config, subscription and setting will be replaced by the ones in the backup file. Continue?': 'همه کانفیگ‌ها، اشتراک‌ها و تنظیمات با محتوای فایل پشتیبان جایگزین می‌شوند. ادامه می‌دهید؟',
+	'Restored. The program is restarting with these settings; the page reloads in a moment.': 'بازگردانی انجام شد. برنامه با این تنظیمات دوباره راه‌اندازی می‌شود و صفحه تا چند لحظه دیگر دوباره بارگذاری می‌شود.',
+	'The file could not be sent to the router.': 'فایل به روتر فرستاده نشد.',
+	'The backup file could not be made.': 'فایل پشتیبان ساخته نشد.',
+	'No backup file was received.': 'فایل پشتیبانی دریافت نشد.',
+	'This is not a Zirgozar backup file.': 'این فایل، فایل پشتیبان زیرگذر نیست.',
+	'The settings in this backup file are damaged.': 'تنظیمات داخل این فایل پشتیبان خراب است.',
+	'For L2TP it can be left empty: the standard port 1701 is used.': 'برای L2TP می‌توان خالی گذاشت؛ پورت استاندارد 1701 استفاده می‌شود.',
+	'Expecting: non-empty value': 'این فیلد نباید خالی باشد',
 	'Available: %s': 'آماده نصب: %s',
 	'days': 'روز',
 	'day': 'روز',
@@ -357,13 +372,13 @@ var FA = {
 
 	'Choosing a node': 'انتخاب کانفیگ',
 	'Two passes. A quick handshake to every node, then a real request through the ones that answered — %d at a time (at most %d batches), best first, stopping at the first node faster than %d ms. Connecting therefore takes seconds, not a minute. WireGuard has no TCP port and skips the first pass; hysteria2, tuic and OpenVPN are not part of the automatic choice.':
-		'انتخاب در دو مرحله است: اول یک آزمایش سریع روی کانفیگ‌ها، بعد آزمایش واقعی روی آن‌هایی که جواب داده‌اند، هر بار %d کانفیگ (حداکثر %d دسته) و بهترین‌ها اول. با پیدا شدن اولین کانفیگ سریع‌تر از %d میلی‌ثانیه کار تمام می‌شود؛ برای همین اتصال چند ثانیه طول می‌کشد، نه یک دقیقه. وایرگارد پورت TCP ندارد و مرحله اول را رد می‌کند؛ hysteria2 و tuic و OpenVPN در انتخاب خودکار شرکت نمی‌کنند.',
+		'انتخاب در دو مرحله است: اول یک آزمایش سریع روی کانفیگ‌ها، بعد آزمایش واقعی روی آن‌هایی که جواب داده‌اند، هر بار %d کانفیگ (حداکثر %d دسته) و بهترین‌ها اول. با پیدا شدن اولین کانفیگ سریع‌تر از %d م‌ثانیه کار تمام می‌شود؛ برای همین اتصال چند ثانیه طول می‌کشد، نه یک دقیقه. وایرگارد پورت TCP ندارد و مرحله اول را رد می‌کند؛ hysteria2 و tuic و OpenVPN در انتخاب خودکار شرکت نمی‌کنند.',
 	'First pass': 'مرحله اول',
 	'A TCP handshake to the node’s real port is the right test. A ping is quicker and wrong often enough to matter: a node behind a CDN answers pings at the edge whatever state it is in, and plenty of working nodes drop ICMP entirely.':
 		'روش آزمایش سریع. «هندشیک TCP» اتصال به پورت واقعی کانفیگ است و دقیق‌تر است. «پینگ» سریع‌تر است ولی اشتباه زیاد دارد: کانفیگ‌های پشت CDN همیشه جواب می‌دهند و خیلی از کانفیگ‌های سالم به پینگ جواب نمی‌دهند.',
 	'TCP handshake (recommended)': 'هندشیک TCP (پیشنهادی)',
 	'Ping, then handshake': 'پینگ، بعد هندشیک',
-	'Good enough (ms)': 'به‌قدر کافی خوب (میلی‌ثانیه)',
+	'Good enough (ms)': 'به‌قدر کافی خوب (م‌ثانیه)',
 	'The first node measured faster than this is the one used. Lower means a better node and a longer wait.':
 		'اولین کانفیگی که زمانش کمتر از این عدد باشد انتخاب می‌شود. عدد کمتر یعنی کانفیگ سریع‌تر، ولی پیدا کردنش بیشتر طول می‌کشد.',
 	'Measured at a time': 'اندازه‌گیری همزمان کانفیگ',
@@ -615,7 +630,7 @@ var FA = {
 	'Fragment Length': 'طول فرگمنت',
 	'Fragmented packet length (byte)': 'طول هر تکه (بایت)',
 	'Fragment Delay': 'تاخیر فرگمنت',
-	'Fragmentation interval (ms)': 'فاصله بین تکه‌ها (میلی‌ثانیه)',
+	'Fragmentation interval (ms)': 'فاصله بین تکه‌ها (م‌ثانیه)',
 	'Max Split': 'حداکثر تکه',
 	'Limit the maximum number of splits.': 'حداکثر تعداد تکه‌ها را محدود می‌کند.',
 	'Noise': 'نویز',
@@ -636,7 +651,7 @@ var FA = {
 		'برای فرستادن بسته‌های نویز، «نویز» را در زبانه Xray روشن کنید.',
 	'Type': 'نوع',
 	'Packet | Rand Length': 'بسته | طول تصادفی',
-	'Delay (ms)': 'تاخیر (میلی‌ثانیه)',
+	'Delay (ms)': 'تاخیر (م‌ثانیه)',
 
 	/* -------------------------------------------------------- App Update */
 	'App Update': 'به‌روزرسانی',
@@ -752,7 +767,7 @@ var FA = {
 	'MB': 'مگابایت',
 	'KB': 'کیلوبایت',
 	'B': 'بایت',
-	'ms': 'میلی‌ثانیه',
+	'ms': 'م‌ثانیه',
 
 	/* ------------------------------------------------- Other Settings */
 	'Other Settings': 'تنظیمات دیگر',
@@ -762,7 +777,7 @@ var FA = {
 	'Health check interval (minutes)': 'فاصله بررسی سلامت (دقیقه)',
 	'Replace a repeatedly slow config': 'تعویض کانفیگ با کندی مداوم',
 	'In Auto mode, two slow checks and a confirmation trigger testing alternatives. A replacement must pass another test and be at least 1.5 times faster. Sweeps are at least 10 minutes apart. Manually selected configs are kept.': 'در حالت خودکار، دو بررسی کند پیاپی و یک تست تاییدی باعث بررسی کانفیگ‌های دیگر می‌شود. جایگزین باید در تست دوباره موفق و دست‌کم ۱٫۵ برابر سریع‌تر باشد. فاصله بررسی جایگزین‌ها حداقل ۱۰ دقیقه است. کانفیگ انتخاب‌شده دستی تغییر نمی‌کند.',
-	'Minimum slow delay (ms)': 'حداقل تاخیر برای تشخیص کندی (میلی‌ثانیه)',
+	'Minimum slow delay (ms)': 'حداقل تاخیر برای تشخیص کندی (م‌ثانیه)',
 	'A request must exceed both this delay and twice the best observed delay of the current config to count as slow.': 'برای تشخیص کندی، زمان درخواست باید هم از این مقدار و هم از دو برابر بهترین زمان ثبت‌شده کانفیگ فعلی بیشتر باشد.',
 	'Checks every 15 minutes and, if the current config does not work, picks another.':
 		'هر 15 دقیقه بررسی می‌کند و اگر کانفیگ فعلی کار نکند، کانفیگ دیگری را انتخاب می‌کند.',
@@ -1218,7 +1233,7 @@ var FA = {
 	'Scan for an address': 'اسکن آدرس',
 	'Try the WARP addresses and use one that answers from here. Most of them are blocked in Iran, so leave this on.':
 		'آدرس‌های وارپ را امتحان می‌کند و یکی را که از اینجا جواب بدهد برمی‌دارد. بیشترشان در ایران بسته‌اند، پس روشن بماند.',
-	'Scan: slowest answer (ms)': 'اسکن: کندترین جواب (میلی‌ثانیه)',
+	'Scan: slowest answer (ms)': 'اسکن: کندترین جواب (م‌ثانیه)',
 	'Addresses that answer more slowly than this are passed over.': 'آدرس‌هایی که دیرتر از این جواب بدهند کنار گذاشته می‌شوند.',
 	'IP version': 'نسخه IP',
 	'Which WARP addresses to use: IPv4 is the one most connections in Iran have.':

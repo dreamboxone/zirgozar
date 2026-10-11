@@ -483,4 +483,13 @@ case "$(sh "$RIG/ul/luci.zirgozar" call nodes 2>/dev/null)" in
 	*) bad "and nodes with a list is that list" ;;
 esac
 
+echo "== one version everywhere"
+_pv="$(sed -n 's/^VERSION=//p' "$ROOT/build/packages.inc.sh")-r$(sed -n 's/^RELEASE=//p' "$ROOT/build/packages.inc.sh")"
+for mk in "$ROOT/package/zirgozar/Makefile" "$ROOT/package/luci-app-zirgozar/Makefile"; do
+	check "$(sed -n 's/^PKG_VERSION:=//p' "$mk")-r$(sed -n 's/^PKG_RELEASE:=//p' "$mk")" "$_pv" "$(basename "$(dirname "$mk")") Makefile is $_pv"
+done
+# The web pages compare this with the installed version; left behind, every
+# visit reloads them once more.
+check "$(sed -n "s/^var BUILD = '\(.*\)';$/\1/p" "$ROOT/package/luci-app-zirgozar/root/www/luci-static/resources/zirgozar/ui.js")" "$_pv" "ui.js BUILD is $_pv"
+
 rig_report

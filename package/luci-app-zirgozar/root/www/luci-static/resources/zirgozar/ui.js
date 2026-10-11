@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.7.19-r4';
+var BUILD = '5.7.19-r6';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -100,14 +100,20 @@ var OWN_FILES = [ 'zirgozar/ui', 'zirgozar/i18n', 'zirgozar/status', 'zirgozar/q
    a new version - a fix put in place by hand - left the browser with the old
    one for days. So the router also gives a fingerprint of the files as they
    are, and a fingerprint this browser has not seen is a reason to fetch them
-   again too. */
+   again too.
+
+   Only another version reloads the page: these very pages are then older than
+   the router, and have to be replaced before they are used. A fingerprint not
+   seen before - a first visit, another browser, a file put in by hand - is
+   fetched quietly, and the next page opened is the new one; reloading for it
+   reloaded the page on the first visit of every new browser. */
 function freshen(installed, stamp) {
 	var have = String(BUILD).replace(/-(?:r)?(\d+)$/, '-r$1');
 	var want = String(installed || '').replace(/-(?:r)?(\d+)$/, '-r$1');
 	var seen = null;
 	try { seen = window.localStorage.getItem('zirgozar-ui'); } catch (e) {}
-	var stale = (want && have != want) || (stamp && seen != stamp);
-	if (!stale) return;
+	var older = !!(want && have != want);
+	if (!older && !(stamp && seen != stamp)) return;
 	var key = 'zirgozar-freshened-' + want + '-' + (stamp || '');
 	try {
 		if (window.sessionStorage.getItem(key)) return;
@@ -117,7 +123,9 @@ function freshen(installed, stamp) {
 	var v = L.env.resource_version ? '?v=' + L.env.resource_version : '';
 	Promise.all(OWN_FILES.map(function(f) {
 		return fetch(L.env.base_url + '/' + f + '.js' + v, { cache: 'reload' }).catch(function() {});
-	}).concat([ fetch(L.resource('zirgozar/theme.css') + '?v=' + BUILD, { cache: 'reload' }).catch(function() {}) ])).then(function() { location.reload(); });
+	}).concat([ fetch(L.resource('zirgozar/theme.css') + '?v=' + BUILD, { cache: 'reload' }).catch(function() {}) ])).then(function() {
+		if (older) location.reload();
+	});
 }
 
 /* Not ui.createHandlerFn: that marks a busy button with LuCI's own spinner,

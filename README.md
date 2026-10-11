@@ -7,7 +7,7 @@
 <h3 align="center">فیلترشکن سراسری برای روتر OpenWrt</h3>
 
 <p align="center">
-  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.19-r5"></a>
+  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.19-r6"></a>
   <a href="https://github.com/dreamboxone/zirgozar/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/dreamboxone/zirgozar/total?style=for-the-badge&color=0ea5e9"></a>
   <img alt="OpenWrt" src="https://img.shields.io/badge/OpenWrt-23.05%20%7C%2024.10%20%7C%2025.12-00B5E2?style=for-the-badge&logo=openwrt&logoColor=white">
   <img alt="Xray" src="https://img.shields.io/badge/core-Xray-7c3aed?style=for-the-badge">
@@ -92,7 +92,7 @@
 
 به روتر SSH بزنید و دستور زیر را اجرا کنید. این دستور فایل‌های نسخه **5.7.19**
 را برای معماری روتر دانلود می‌کند و با مدیر بسته موجود نصب یا ارتقا می‌دهد.
-ابتدا باید این نسخه در [صفحه ریلیز](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.19-r5) منتشر شده باشد.
+ابتدا باید این نسخه در [صفحه ریلیز](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.19-r6) منتشر شده باشد.
 
 <div dir="ltr">
 
@@ -100,8 +100,8 @@
 (
   set -eu
   . /etc/openwrt_release
-  version='5.7.19-r5'
-  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.19-r5'
+  version='5.7.19-r6'
+  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.19-r6'
   install_dir="/tmp/zirgozar-install-$version"
   mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
@@ -135,11 +135,11 @@
 ```sh
 # OpenWrt 25.12 and later
 apk update
-apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.19-r5.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.19-r5.apk
+apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.19-r6.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.19-r6.apk
 
 # OpenWrt 24.10 / 23.05
 opkg update
-opkg install /tmp/zirgozar_5.7.19-r5_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.19-r5_all.ipk
+opkg install /tmp/zirgozar_5.7.19-r6_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.19-r6_all.ipk
 ```
 
 </div>
@@ -342,7 +342,7 @@ Geo، کنترل دسترسی، لاگ‌های اجرا**.
 | گزینه | در فایل | پیش‌فرض | کار آن |
 |---|---|---|---|
 | **مرحله اول** | `prefilter` | هندشیک TCP | اینکه کانفیگی ارزش اندازه‌گیری کامل دارد یا نه چطور تعیین شود: هندشیک TCP به پورت واقعی‌اش، پینگ، یا هر دو. پینگ آن‌قدر اشتباه می‌کند که مهم باشد: کانفیگ پشت CDN در هر حالی از لبه جواب می‌دهد، و خیلی از کانفیگ‌های سالم اصلا ICMP را جواب نمی‌دهند |
-| **به‌قدر کافی خوب (میلی‌ثانیه)** | `good_ms` | 1000 | اولین کانفیگی که اندازه‌اش از این کمتر دربیاید همان استفاده می‌شود. عدد کمتر یعنی کانفیگ بهتر و انتظار بیشتر |
+| **به‌قدر کافی خوب (م‌ثانیه)** | `good_ms` | 1000 | اولین کانفیگی که اندازه‌اش از این کمتر دربیاید همان استفاده می‌شود. عدد کمتر یعنی کانفیگ بهتر و انتظار بیشتر |
 | **اندازه‌گیری همزمان کانفیگ** | `batch_size` | 10 | در هر نوبت چند کانفیگ به‌طور کامل اندازه‌گیری شوند |
 | **حداکثر تعداد دسته** | `max_batches` | 5 | وقتی هیچ‌کدام به‌قدر کافی سریع نیستند، تا کجای فهرست ادامه داده شود |
 | **بررسی همزمان کانفیگ** | `sift_parallel` | 30 | در مرحله اول چند هندشیک هم‌زمان اجرا شود. **روی روتر کم‌رم این عدد را کم کنید** |
@@ -444,7 +444,7 @@ aether://?protocol=wg-over-masque&scan=balanced&ip=v4&transport=h2&outer=162.159
 | **کشور خروجی** | `country` | فقط برای سایفون: یکی از ۳۱ کشوری که warp-plus دارد |
 | **اندپوینت** | پیش از `?` | آدرس و پورت وارپ، مثل `162.159.192.1:2408`. خالی یعنی warp-plus خودش انتخاب کند |
 | **اسکن آدرس** | `scan` | آدرس‌های وارپ را امتحان می‌کند و یکی را که جواب بدهد برمی‌دارد. بیشترشان در ایران بسته‌اند؛ روشن بماند. فقط وقتی اندپوینت خالی است |
-| **اسکن: کندترین جواب** | `rtt` | آدرس‌هایی که دیرتر از این (میلی‌ثانیه) جواب بدهند کنار گذاشته می‌شوند. پیش‌فرض ۱۰۰۰ |
+| **اسکن: کندترین جواب** | `rtt` | آدرس‌هایی که دیرتر از این (م‌ثانیه) جواب بدهند کنار گذاشته می‌شوند. پیش‌فرض ۱۰۰۰ |
 | **نسخه IP** | `ipv` | هر دو، فقط IPv4 یا فقط IPv6 |
 | **لایسنس WARP+** | پیش از `@` | اختیاری؛ اکانت را WARP+ می‌کند. هر لایسنس روی پنج دستگاه کار می‌کند |
 | **DNS داخل وارپ** | `dns` | پیش‌فرض `1.1.1.1` |
@@ -525,7 +525,7 @@ AmneziaWG عمدا کنار گذاشته شده: Xray آن را بلد نیست.
 | **بررسی و ترمیم خودکار** | `start_daemon` | روشن | بررسی مستقل سلامت تونل؛ دو درخواست ناموفق پیاپی باعث ترمیم می‌شود. به‌روزرسانی اشتراک‌ها زمان‌بندی جدا دارد |
 | **فاصله بررسی سلامت** | `health_interval` | ۳ دقیقه | قابل انتخاب: ۱، ۲، ۳، ۵، ۱۰، ۱۵ یا ۳۰ دقیقه |
 | **تعویض کانفیگ با کندی مداوم** | `health_switch_slow` | روشن | فقط در حالت انتخاب خودکار: دو بررسی کند پیاپی و یک تایید دوباره، سپس تست جایگزین‌ها. جایگزین باید در تست دوباره موفق و دست‌کم ۱٫۵ برابر سریع‌تر باشد. بین بررسی جایگزین‌ها حداقل ۱۰ دقیقه فاصله است |
-| **حداقل تاخیر برای تشخیص کندی** | `health_slow_ms` | ۱۵۰۰ میلی‌ثانیه | درخواست باید هم از این مقدار و هم از دو برابر بهترین زمان ثبت‌شده کانفیگ فعلی بیشتر باشد. این سنجش زمان یک درخواست است، نه سرعت دانلود |
+| **حداقل تاخیر برای تشخیص کندی** | `health_slow_ms` | ۱۵۰۰ م‌ثانیه | درخواست باید هم از این مقدار و هم از دو برابر بهترین زمان ثبت‌شده کانفیگ فعلی بیشتر باشد. این سنجش زمان یک درخواست است، نه سرعت دانلود |
 | **تاخیر در شروع** | `start_delay` | 1 | چند ثانیه بعد از روشن شدن روتر صبر کند و بعد شروع کند |
 | **توقف خودکار** / **زمان توقف** | `stop_week_mode` / `stop_time_mode` | غیرفعال / 0:00 | تونل را هر روز یا یک روز از هفته در این ساعت متوقف می‌کند |
 | **شروع خودکار** / **زمان شروع** | `start_week_mode` / `start_time_mode` | غیرفعال / 0:00 | به همین شکل روشنش می‌کند |
@@ -556,7 +556,7 @@ AmneziaWG عمدا کنار گذاشته شده: Xray آن را بلد نیست.
 | **فرگمنت** | `fragment` | خاموش | تکه‌تکه کردن TCP، که در بعضی موارد سیستم فیلترینگ را فریب می‌دهد، مثلا برای رد شدن از لیست سیاه SNI |
 | **بسته‌های فرگمنت** | `fragment_packets` | tlshello | *tlshello* پیام client hello در TLS را تکه می‌کند؛ *1-3* و مانند آن در لایه TCP، یعنی چند نوشتن اول دستگاه |
 | **طول فرگمنت** | `fragment_lengths` | 3-5,6-8,10-20 | طول هر تکه، به بایت |
-| **تاخیر فرگمنت** | `fragment_delays` | 10-20 | فاصله بین تکه‌ها، به میلی‌ثانیه |
+| **تاخیر فرگمنت** | `fragment_delays` | 10-20 | فاصله بین تکه‌ها، به م‌ثانیه |
 | **حداکثر تکه** | `fragment_maxSplit` | 3-6 | حداکثر تعداد تکه‌ها |
 | **نویز** | `noise` | خاموش | نویز UDP، که در بعضی شرایط از محدودیت‌های UDP رد می‌شود. Xray آن را روی کانفیگ‌های mKCP و xhttp روی HTTP/3 می‌فرستد. بسته‌ها در جدول پایین‌اند |
 | **Mux** | `mux` | خاموش | چند اتصال داخل یک اتصال. روی کانفیگ VLESS با flow، xhttp و وایرگارد استفاده نمی‌شود، چون آنجا کار نمی‌کند |
@@ -573,7 +573,7 @@ AmneziaWG عمدا کنار گذاشته شده: Xray آن را بلد نیست.
 | **فعال** | `enabled` | روشن یا خاموش بودن این بسته |
 | **نوع** | `type` | rand (طول تصادفی)، str، hex، base64 یا array |
 | **بسته \| طول تصادفی** | `packet` | خود بسته، یا برای rand طول یا بازه آن، مثل `10-20` |
-| **تاخیر (میلی‌ثانیه)** | `delay` | فاصله بعد از آن، یا یک بازه |
+| **تاخیر (م‌ثانیه)** | `delay` | فاصله بعد از آن، یا یک بازه |
 
 **تاریخچه مصرف**
 

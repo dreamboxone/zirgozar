@@ -98,6 +98,11 @@ function splitHostPort(s) {
 	return m ? { host: m[1], port: m[2] } : null;
 }
 
+/* The server name in what was typed for an L2TP server: no scheme, no path. */
+function l2tpServer(v) {
+	return String(v || '').trim().replace(/^[A-Za-z][A-Za-z0-9+.-]*:\/\//, '').replace(/[\/?#].*$/, '');
+}
+
 function joinHostPort(h, p) {
 	return (String(h).indexOf(':') >= 0 ? '[' + h + ']' : h) + ':' + p;
 }
@@ -190,7 +195,11 @@ function parseLink(link) {
 	}
 
 	var at = body.lastIndexOf('@'), cred = '', hp;
-	if (proto == 'l2tp' && !/:[0-9]+$/.test(body)) body += ':1701';
+	/* L2TP has one port, and providers give the server without it. */
+	if (proto == 'l2tp') {
+		body = body.replace(/\/+$/, '');
+		if (!/:[0-9]+$/.test(body)) body += ':1701';
+	}
 	if (at >= 0) { cred = body.slice(0, at); hp = splitHostPort(body.slice(at + 1)); }
 	else if (proto == 'shadowsocks') {
 		var d = b64dec(body) || '', a2 = d.lastIndexOf('@');
@@ -834,12 +843,22 @@ return view.extend({
 			o = field(form.Value, 'address', _('Address (Support Domain Name)'));
 			o.rmempty = false;
 			o.validate = function(section_id, value) {
-				return this.section.formvalue(section_id, '_proto') != 'l2tp' || /^[A-Za-z0-9_.-]+$/.test(value || '') ? true : _('Enter the L2TP server IPv4 address or domain name.');
+				return this.section.formvalue(section_id, '_proto') != 'l2tp' || /^[A-Za-z0-9_.-]+$/.test(l2tpServer(value)) ? true : _('Enter the L2TP server IPv4 address or domain name.');
+			};
+			/* An L2TP server is often handed out as a web address -
+			   "http://tp.example.com/" - and only the name in it is meant. */
+			o.write = function(section_id, value) {
+				f.address = this.section.formvalue(section_id, '_proto') == 'l2tp' ? l2tpServer(value) : value;
 			};
 			SERVERS.forEach(function(p) { o.depends('_proto', p); });
-			o = field(form.Value, 'port', _('Port'));
+			/* Required, except for L2TP: its port is always 1701 and the
+			   accounts are handed out without one. */
+			o = field(form.Value, 'port', _('Port'), _('For L2TP it can be left empty: the standard port 1701 is used.'));
 			o.datatype = 'port';
-			o.rmempty = false;
+			o.validate = function(section_id, value) {
+				if (value || this.section.formvalue(section_id, '_proto') == 'l2tp') return true;
+				return _('Expecting: non-empty value');
+			};
 			SERVERS.forEach(function(p) { o.depends('_proto', p); });
 
 			o = field(form.Flag, 'l2tp_ipsec', _('Use IPsec'),

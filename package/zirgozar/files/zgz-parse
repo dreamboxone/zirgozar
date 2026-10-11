@@ -620,6 +620,7 @@ function do_l2tp(body, secure,   label, query, p, cred, user, pass, psk, mtu, mo
 	cred = substr(body, 1, p - 1); body = substr(body, p + 1)
 	p = index(cred, ":"); if (p <= 0) return
 	user = urldec(substr(cred, 1, p - 1)); pass = urldec(substr(cred, p + 1))
+	sub(/\/+$/, "", body)
 	if (body !~ /:[0-9]+$/) body = body ":1701"
 	if (!hostport(body) || HOST !~ /^[A-Za-z0-9_.-]+$/) return
 	psk = qs(query, "psk"); mode = qs(query, "ipsec")

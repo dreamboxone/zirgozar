@@ -24,6 +24,56 @@
 'require zirgozar.status as status';
 
 var callSubNodes = rpc.declare({ object: 'luci.zirgozar', method: 'subnodes', expect: { '': {} } });
+var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
+                               params: [ 'name', 'arg' ], expect: { '': {} } });
+
+/* PassWall2's Backup and Restore. The archive goes to and from the browser
+   through LuCI's own file transfer, at the two paths the ACL allows. */
+var BACKUP_PATH = '/tmp/zirgozar-backup.tar.gz';
+var RESTORE_PATH = '/tmp/zirgozar-restore.tar.gz';
+
+function backupDownload() {
+	var d = new Date(), pad = function(n) { return ('0' + n).slice(-2); };
+	var name = 'zirgozar-backup-' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + '.tar.gz';
+	var form = E('form', { 'method': 'post', 'action': L.env.cgi_base + '/cgi-download', 'style': 'display:none' }, [
+		E('input', { 'type': 'hidden', 'name': 'sessionid', 'value': rpc.getSessionID() }),
+		E('input', { 'type': 'hidden', 'name': 'path', 'value': BACKUP_PATH }),
+		E('input', { 'type': 'hidden', 'name': 'filename', 'value': name }),
+		E('input', { 'type': 'hidden', 'name': 'mimetype', 'value': 'application/gzip' })
+	]);
+	document.body.appendChild(form);
+	form.submit();
+	window.setTimeout(function() { if (form.parentNode) form.parentNode.removeChild(form); }, 1000);
+}
+
+function backupUpload(file) {
+	var data = new FormData();
+	data.append('sessionid', rpc.getSessionID());
+	data.append('filename', RESTORE_PATH);
+	data.append('filedata', file);
+	return fetch(L.env.cgi_base + '/cgi-upload', { method: 'POST', body: data }).then(function(r) {
+		if (!r.ok) throw new Error(_('The file could not be sent to the router.'));
+	});
+}
+
+/* Asks for the file, and for a yes, before anything is sent. Resolves with
+   the router's answer, or null when nothing was chosen. */
+function backupRestore() {
+	var picker = E('input', { 'type': 'file', 'accept': '.tar.gz,.tgz,.gz,application/gzip', 'style': 'display:none' });
+	return new Promise(function(resolve, reject) {
+		picker.addEventListener('change', function() {
+			var f = picker.files && picker.files[0];
+			if (picker.parentNode) picker.parentNode.removeChild(picker);
+			if (!f || !window.confirm(_('Every config, subscription and setting will be replaced by the ones in the backup file. Continue?')))
+				return resolve(null);
+			backupUpload(f).then(function() {
+				return callAction('backup_restore', '');
+			}).then(resolve, reject);
+		});
+		document.body.appendChild(picker);
+		picker.click();
+	});
+}
 
 /* Our own strings, in the language the setting names. The global _()
    is shadowed for this file only: LuCI translates through .lmo
@@ -214,6 +264,7 @@ return view.extend({
 		s.tab('shunt', _('Shunt Rule'));
 		s.tab('dns', _('DNS'));
 		s.tab('log', _('Log'));
+		s.tab('maintain', _('Maintain'));
 
 		/* ---------------------------------------------------------- main */
 		o = s.taboption('main', form.Flag, 'enabled', _('Main switch'),
@@ -620,6 +671,40 @@ return view.extend({
 		o.value('error');
 		o.default = 'warning';
 		o.depends('log_node', '1');
+
+		/* ------------------------------------------------------ maintain */
+		o = s.taboption('maintain', form.DummyValue, '_backup', _('Backup and Restore'));
+		o.render = function() {
+			var down = pui.btn(_('Create Backup File'), 'primary mk-small', function(ev) {
+				var b = ev.currentTarget;
+				return callAction('backup_create', '').then(function(r) {
+					if (r && r.error) return pui.note(b, _(r.error), 'error');
+					backupDownload();
+				}).catch(function(e) { pui.note(b, String(e && e.message || e), 'error'); });
+			}, 'download');
+			/* Not returned to the button: the file chooser can be closed
+			   without a word, and the button would turn for ever. */
+			var up = pui.btn(_('Restore Backup File'), 'soft-blue mk-small', function(ev) {
+				var b = ev.currentTarget;
+				backupRestore().then(function(r) {
+					if (!r) return;
+					if (r.error) return pui.note(b, _(r.error), 'error');
+					pui.note(b, _('Restored. The program is restarting with these settings; the page reloads in a moment.'), 'ok');
+					window.setTimeout(function() { location.reload(); }, 5000);
+				}).catch(function(e) { pui.note(b, String(e && e.message || e), 'error'); });
+			}, 'refresh');
+			return E('div', { 'class': 'cbi-value' }, [
+				E('label', { 'class': 'cbi-value-title' }, _('Backup and Restore')),
+				E('div', { 'class': 'cbi-value-field' }, [
+					E('div', { 'style': 'display:flex;gap:10px;flex-wrap:wrap;align-items:center' }, [ down, up ]),
+					E('div', { 'class': 'cbi-value-description' },
+						_('Backup or Restore Client and Server Configurations.') + ' ' +
+						_('The file holds every config, subscription, rule and setting, and the WARP accounts. The routing data, the cores and the traffic history are not in it; they are downloaded again.')),
+					E('div', { 'class': 'cbi-value-description', 'style': 'color:#dc2626;font-weight:600' },
+						_('Note: Restoring configurations across different versions may cause compatibility issues.'))
+				])
+			]);
+		};
 
 		o = s.taboption('log', form.DummyValue, '_traffic');
 		o.render = function() {

@@ -6,11 +6,17 @@
 				"luci.zirgozar": [ "state", "traffic", "nodes", "nodeorigins", "subs", "subnodes", "system", "tests", "inuse", "log", "lan", "check", "geo", "geoview", "nodeconfig", "server", "warp" ],
 				"luci-rpc": [ "getHostHints" ]
 			},
+			"file": {
+				"/tmp/zirgozar-backup.tar.gz": [ "read" ]
+			},
 			"uci": [ "zirgozar", "zirgozar_server" ]
 		},
 		"write": {
 			"ubus": {
 				"luci.zirgozar": [ "action" ]
+			},
+			"file": {
+				"/tmp/zirgozar-restore.tar.gz": [ "write" ]
 			},
 			"uci": [ "zirgozar", "zirgozar_server" ]
 		}
