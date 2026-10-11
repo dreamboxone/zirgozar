@@ -78,10 +78,9 @@ manager in 25.12. Take the pair that matches your router:
 Your architecture is on the `DISTRIB_ARCH` line of `/etc/openwrt_release`. The
 `luci-app-zirgozar` package has no architecture and fits every router.
 
-Packages are built for `arm_cortex-a7_neon-vfpv4`, `aarch64_cortex-a53`,
-`aarch64_cortex-a72`, `aarch64_cortex-a76`, `aarch64_generic`, `mipsel_24kc` and
-`x86_64`. The four `aarch64` ones carry the same program: the package manager
-installs only the one whose name is the router's own.
+Packages are built for 29 architectures across ARM, ARM64, MIPS, x86, RISC-V
+and LoongArch, including `arm_cortex-a7_neon-vfpv4`, `aarch64_cortex-a53`,
+`mipsel_24kc` and `x86_64`. The main package must match the router's architecture.
 
 ### The easy way: from LuCI itself
 
@@ -91,18 +90,50 @@ install the main file first, then the `luci-app-…` one. After the second, pres
 
 ### The other way: from a terminal
 
-First **put both files in `/tmp` on the router yourself** — with WinSCP, with
-FileZilla, or through **System → Software → Upload Package…** in LuCI. Then SSH
-in, and on 25.12 or later:
+SSH into the router and run the command below to download and install or upgrade
+version **5.7.19** for its architecture. The version must first be published on
+the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.19).
 
 ```sh
-apk add --allow-untrusted /tmp/zirgozar-*.apk /tmp/luci-app-zirgozar-*.apk
+(
+  set -eu
+  . /etc/openwrt_release
+  version='5.7.19-r1'
+  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.19'
+  install_dir="/tmp/zirgozar-install-$version"
+  mkdir -p "$install_dir"
+  if command -v apk >/dev/null 2>&1; then
+    main="zirgozar-$version.$DISTRIB_ARCH.apk"
+    luci="luci-app-zirgozar-$version.apk"
+    wget -O "$install_dir/$main" "$base/$main"
+    wget -O "$install_dir/$luci" "$base/$luci"
+    apk update
+    apk add --allow-untrusted --upgrade "$install_dir/$main" "$install_dir/$luci"
+  elif command -v opkg >/dev/null 2>&1; then
+    main="zirgozar_${version}_${DISTRIB_ARCH}.ipk"
+    luci="luci-app-zirgozar_${version}_all.ipk"
+    wget -O "$install_dir/$main" "$base/$main"
+    wget -O "$install_dir/$luci" "$base/$luci"
+    opkg update
+    opkg install "$install_dir/$main" "$install_dir/$luci"
+  else
+    echo 'apk or opkg was not found.' >&2
+    exit 1
+  fi
+)
 ```
 
-On 24.10 and 23.05:
+If you already copied the files to `/tmp` with WinSCP, install them directly.
+These examples use `arm_cortex-a7_neon-vfpv4`; replace it with your router's architecture:
 
 ```sh
-opkg install /tmp/zirgozar_*.ipk /tmp/luci-app-zirgozar_*.ipk
+# OpenWrt 25.12 and later
+apk update
+apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.19-r1.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.19-r1.apk
+
+# OpenWrt 24.10 / 23.05
+opkg update
+opkg install /tmp/zirgozar_5.7.19-r1_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.19-r1_all.ipk
 ```
 
 > [!IMPORTANT]

@@ -78,10 +78,9 @@
 معماری روتر شما در `/etc/openwrt_release` جلوی `DISTRIB_ARCH` نوشته شده. پکیج
 `luci-app-zirgozar` معماری ندارد و به همه روترها می‌خورد.
 
-بسته برای `arm_cortex-a7_neon-vfpv4`، `aarch64_cortex-a53`، `aarch64_cortex-a72`،
-`aarch64_cortex-a76`، `aarch64_generic`، `mipsel_24kc` و `x86_64` ساخته می‌شود. چهار
-بسته‌ی `aarch64` یک برنامه‌ی یکسان دارند: مدیر بسته فقط آن را نصب می‌کند که نامش
-دقیقا همان معماری روتر باشد.
+بسته برای ۲۹ معماری از خانواده‌های ARM، ARM64، MIPS، x86، RISC-V و LoongArch
+ساخته می‌شود؛ از جمله `arm_cortex-a7_neon-vfpv4`، `aarch64_cortex-a53`،
+`mipsel_24kc` و `x86_64`. بسته اصلی باید دقیقا با معماری روتر مطابقت داشته باشد.
 
 ### راه ساده: از خود LuCI
 
@@ -91,24 +90,56 @@
 
 ### راه دوم: از ترمینال
 
-اول **هر دو فایل را خودتان در پوشه `/tmp` روتر بگذارید** — با WinSCP، با
-FileZilla، یا از راه **System ← Software ← Upload Package…** در خود LuCI. بعد به
-روتر SSH بزنید و روی ۲۵.۱۲ و بالاتر:
+به روتر SSH بزنید و دستور زیر را اجرا کنید. این دستور فایل‌های نسخه **5.7.19**
+را برای معماری روتر دانلود می‌کند و با مدیر بسته موجود نصب یا ارتقا می‌دهد.
+ابتدا باید این نسخه در [صفحه ریلیز](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.19) منتشر شده باشد.
 
 <div dir="ltr">
 
 ```sh
-apk add --allow-untrusted /tmp/zirgozar-*.apk /tmp/luci-app-zirgozar-*.apk
+(
+  set -eu
+  . /etc/openwrt_release
+  version='5.7.19-r1'
+  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.19'
+  install_dir="/tmp/zirgozar-install-$version"
+  mkdir -p "$install_dir"
+  if command -v apk >/dev/null 2>&1; then
+    main="zirgozar-$version.$DISTRIB_ARCH.apk"
+    luci="luci-app-zirgozar-$version.apk"
+    wget -O "$install_dir/$main" "$base/$main"
+    wget -O "$install_dir/$luci" "$base/$luci"
+    apk update
+    apk add --allow-untrusted --upgrade "$install_dir/$main" "$install_dir/$luci"
+  elif command -v opkg >/dev/null 2>&1; then
+    main="zirgozar_${version}_${DISTRIB_ARCH}.ipk"
+    luci="luci-app-zirgozar_${version}_all.ipk"
+    wget -O "$install_dir/$main" "$base/$main"
+    wget -O "$install_dir/$luci" "$base/$luci"
+    opkg update
+    opkg install "$install_dir/$main" "$install_dir/$luci"
+  else
+    echo 'apk or opkg was not found.' >&2
+    exit 1
+  fi
+)
 ```
 
 </div>
 
-روی ۲۴.۱۰ و ۲۳.۰۵:
+اگر فایل‌ها را با WinSCP در `/tmp` گذاشته‌اید، فقط نصب را انجام دهید.
+در مثال زیر معماری روتر `arm_cortex-a7_neon-vfpv4` است؛ برای روتر دیگر نام معماری را عوض کنید:
 
 <div dir="ltr">
 
 ```sh
-opkg install /tmp/zirgozar_*.ipk /tmp/luci-app-zirgozar_*.ipk
+# OpenWrt 25.12 and later
+apk update
+apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.19-r1.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.19-r1.apk
+
+# OpenWrt 24.10 / 23.05
+opkg update
+opkg install /tmp/zirgozar_5.7.19-r1_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.19-r1_all.ipk
 ```
 
 </div>
