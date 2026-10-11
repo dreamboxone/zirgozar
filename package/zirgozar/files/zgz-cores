@@ -980,6 +980,7 @@ case "${1:-list}" in
 	list) cmd_list ;;
 	install)
 		clear_message
+		ZGZ_ROOM_QUIET=1
 		# How a core's install went, for the page to say under that core:
 		# "<core> room <needed> <free>" when it was short of room. Nothing
 		# when it went through or failed for another reason.
