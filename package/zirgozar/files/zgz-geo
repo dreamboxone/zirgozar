@@ -191,6 +191,35 @@ cmd_rollback() {
 	return 0
 }
 
+# Advertising served from Iran that geosite's category-ads-all does not carry,
+# blocked beside it when ads are blocked. A few hundred names, kept as a plain
+# list and written into the rule as names: a second geosite file of several
+# megabytes for this is room a small router does not have. It is refreshed with
+# the routing data, and also whenever a configuration is written and it is more
+# than three days old; nothing depends on it, so a failure leaves the copy
+# there is, or none, and says nothing.
+EXTRA_ADS_URL="https://github.com/bootmortis/iran-hosted-domains/releases/latest/download/clash_rules_ads.txt"
+EXTRA_ADS="$DIR/ads-extra.list"
+EXTRA_MAX_AGE=259200
+
+fetch_extra() {
+	if [ "${1:-}" != "force" ] && [ -s "$EXTRA_ADS" ]; then
+		_age=$(( $(date +%s) - $(date -r "$EXTRA_ADS" +%s 2>/dev/null || echo 0) ))
+		[ "$_age" -ge 0 ] && [ "$_age" -lt "$EXTRA_MAX_AGE" ] && return 0
+	fi
+	mkdir -p "$DIR" 2>/dev/null || return 0
+	_xt="$EXTRA_ADS.$$"
+	# "+.name" a line; anything else in it is not a name and is left out.
+	if curl -fsSL --connect-timeout 8 --max-time 30 "$EXTRA_ADS_URL" 2>/dev/null |
+		sed -n 's/^+\.\([a-z0-9][a-z0-9.-]*\.[a-z][a-z0-9-]*\)$/\1/p' | sort -u > "$_xt" 2>/dev/null &&
+		[ "$(wc -l < "$_xt")" -ge 50 ]; then
+		mv -f "$_xt" "$EXTRA_ADS" 2>/dev/null || rm -f "$_xt"
+	else
+		rm -f "$_xt"
+	fi
+	return 0
+}
+
 cmd_update() {
 	clear_message
 	_rc=0
@@ -217,6 +246,7 @@ cmd_update() {
 		# this file, which is now out of date.
 		if ks_on; then "${ZGZ_LIB:-/usr/libexec}/zgz-rules" ks sync >/dev/null 2>&1 || true; fi
 	fi
+	fetch_extra force || true
 	return "$_rc"
 }
 
@@ -330,7 +360,7 @@ cmd_view() {
 }
 
 cmd_remove() {
-	rm -f "$DIR/geoip.dat" "$DIR/geosite.dat" "$DIR/geoip.stamp" "$DIR/geosite.stamp"
+	rm -f "$DIR/geoip.dat" "$DIR/geosite.dat" "$DIR/geoip.stamp" "$DIR/geosite.stamp" "$EXTRA_ADS"
 	log "routing data removed"
 	return 0
 }
@@ -341,5 +371,6 @@ case "${1:-status}" in
 	status)   cmd_status ;;
 	view)     cmd_view "${2:-}" "${3:-}" ;;
 	remove)   cmd_remove ;;
+	extra)    fetch_extra "${2:-}" ;;
 	*) echo "usage: $0 update [geoip|geosite|all]|rollback geoip|geosite|status|remove" >&2; exit 1 ;;
 esac

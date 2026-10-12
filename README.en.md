@@ -5,7 +5,7 @@
 <h3 align="center">A router-wide tunnel for OpenWrt</h3>
 
 <p align="center">
-  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.19-r8"></a>
+  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.19-r9"></a>
   <a href="https://github.com/dreamboxone/zirgozar/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/dreamboxone/zirgozar/total?style=for-the-badge&color=0ea5e9"></a>
   <img alt="OpenWrt" src="https://img.shields.io/badge/OpenWrt-23.05%20%7C%2024.10%20%7C%2025.12-00B5E2?style=for-the-badge&logo=openwrt&logoColor=white">
   <img alt="Xray" src="https://img.shields.io/badge/core-Xray-7c3aed?style=for-the-badge">
@@ -92,14 +92,14 @@ install the main file first, then the `luci-app-…` one. After the second, pres
 
 SSH into the router and run the command below to download and install or upgrade
 version **5.7.19** for its architecture. The version must first be published on
-the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.19-r8).
+the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.19-r9).
 
 ```sh
 (
   set -eu
   . /etc/openwrt_release
-  version='5.7.19-r8'
-  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.19-r8'
+  version='5.7.19-r9'
+  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.19-r9'
   install_dir="/tmp/zirgozar-install-$version"
   mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
@@ -129,11 +129,11 @@ These examples use `arm_cortex-a7_neon-vfpv4`; replace it with your router's arc
 ```sh
 # OpenWrt 25.12 and later
 apk update
-apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.19-r8.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.19-r8.apk
+apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.19-r9.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.19-r9.apk
 
 # OpenWrt 24.10 / 23.05
 opkg update
-opkg install /tmp/zirgozar_5.7.19-r8_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.19-r8_all.ipk
+opkg install /tmp/zirgozar_5.7.19-r9_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.19-r9_all.ipk
 ```
 
 > [!IMPORTANT]
@@ -203,7 +203,7 @@ At the top, PassWall2's row of tiles:
 | Tile | What it shows |
 |---|---|
 | **Core Xray** | The core's name beside the word, and under it **RUNNING** in green or **NOT RUNNING** in red. Rest the pointer on it for its version |
-| **Cloudflare / Google / GitHub Connection** | Press one: a single request is made through whatever the router's traffic goes through, and the time it took is shown — green under a second, amber under two, red above, or *Problem detected!* |
+| **Instagram / Reddit / X Connection** | Press one: a single request is made through whatever the router's traffic goes through, and the time it took is shown — green under a second, amber under two, red above, or *Problem detected!* |
 
 Under them the **Status** card: whether the tunnel is connected, which config
 it is using, its protocol, its latency, and how routing is set. The server's
@@ -582,7 +582,7 @@ be made.
 | Card | What it shows |
 |---|---|
 | **App Update** | This program's version and whether a newer one is published. **Update to …** downloads the new version from GitHub, checks it against that release's checksums and installs it with the router's own package manager (apk or opkg); the settings are kept, the tunnel comes back if it was on, and the page reloads by itself |
-| **Cores** | Xray, Xray (patterniha), sing-box, hysteria, Geoview, warp-plus and Vwarp: what is installed, what each project has published, **Check update**, **Install / Update to …**, **Remove**. An update is only offered for something actually newer. Beside Xray is a list of its recent releases, pre-releases included, with **Install this version**. Of the Xray cores on the router the **newest** is always used; to pin one, put its path in Xray App Path. sing-box and hysteria are only for configs that speak hysteria2 or tuic, which Xray does not; Geoview only for the Geoview page; warp-plus only for WARP configs, and its download is checked against the checksum its release publishes; Vwarp only for WARP over MASQUE or with noize. **Xray (patterniha)** is [patterniha/Xray-core](https://github.com/patterniha/Xray-core): since 26.7 the official Xray refuses VLESS and Trojan without TLS to a public address - the configs that go over Cloudflare's plain-HTTP ports such as 80 and 8080, with no SNI for a filter to read - and this build takes them. It is installed beside the official one; every configuration is offered to every Xray on the router, and the first that accepts it runs it |
+| **Cores** | Xray, Xray (patterniha), sing-box, hysteria, Geoview, warp-plus and Vwarp: what is installed, what each project has published, **Check update**, **Install / Update to …**, **Remove**. An update is only offered for something actually newer; for Xray, only a stable release, never a pre-release. Beside Xray is a list of its recent releases, pre-releases included, with **Install this version**. Of the Xray cores on the router the **newest** is used, unless Xray App Path names one. A release installed with **Install this version** is written into Xray App Path itself, and a running tunnel is restarted onto it; the Xray row always shows the one that runs. Empty Xray App Path to go back to the newest. sing-box and hysteria are only for configs that speak hysteria2 or tuic, which Xray does not; Geoview for the Geoview page, and for sing-box whenever the Iran split or ad blocking is on - sing-box cannot read the geo files without it, and it is installed by itself when missing; warp-plus only for WARP configs, and its download is checked against the checksum its release publishes; Vwarp only for WARP over MASQUE or with noize. **Xray (patterniha)** is [patterniha/Xray-core](https://github.com/patterniha/Xray-core): since 26.7 the official Xray refuses VLESS and Trojan without TLS to a public address - the configs that go over Cloudflare's plain-HTTP ports such as 80 and 8080, with no SNI for a filter to read - and this build takes them. It is installed beside the official one; every configuration is offered to every Xray on the router, and the first that accepts it runs it |
 | **Router requirements** | One line: everything is ready, or how many things are missing. **Details** opens the questions put to the running system — transparent proxy, policy routing, HTTPS, the firewall in use, missing packages — with **Install them**. They open by themselves when something is missing |
 
 **App Path**

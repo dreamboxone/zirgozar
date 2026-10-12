@@ -36,6 +36,39 @@ boot() {
 	start "$@"
 }
 
+# sing-box cannot read geoip.dat and geosite.dat: Geoview turns the
+# categories the Iran split and ad blocking use into something it can, and
+# without it both are quietly left out - the tunnel runs, everything goes
+# through it, and no advert is stopped. So when sing-box carries the tunnel
+# with either switched on and Geoview is not there, it is fetched in the
+# background and the tunnel reloaded onto it. Tried once until the next
+# reboot; when it cannot be installed, the front page says so.
+geoview_for_singbox() {
+	[ "$(cfg_bool route_ir 0)" = "1" ] || [ "$(cfg_bool block_ads 0)" = "1" ] || return 0
+	[ -x "$(geoview_path)" ] && return 0
+	geo_dir >/dev/null 2>&1 || return 0
+	mkdir "$ZGZ_RUN/geoview.auto" 2>/dev/null || return 0
+	log_step "sing-box needs Geoview to read the routing data - installing it"
+	# Not before the tunnel is up: the router's own traffic is already being
+	# sent to it, and a download started now asks a core that is not yet
+	# listening. Asked twice, a little apart, before giving up.
+	_gv=". '$ZGZ_LIB/zgz-common.sh'
+_n=0
+while [ \$_n -lt 90 ] && [ \"\$(cat \"\$ZGZ_STATUS\" 2>/dev/null)\" != ready ]; do sleep 2; _n=\$((_n + 1)); done
+if '$ZGZ_LIB/zgz-cores' install geoview || { sleep 20; '$ZGZ_LIB/zgz-cores' install geoview; }; then
+	rmdir '$ZGZ_RUN/geoview.auto' 2>/dev/null
+	[ \"\$(cfg_bool enabled 0)\" = 1 ] && /etc/init.d/zirgozar reload
+else
+	say_message 'sing-box needs Geoview to read the routing data, and it could not be installed, so the Iran split and ad blocking are off. Install Geoview on the App Update page, or choose Xray under Active core in Basic Settings.'
+fi"
+	if command -v setsid >/dev/null 2>&1; then
+		setsid /bin/sh -c "$_gv" </dev/null >/dev/null 2>&1 &
+	else
+		( /bin/sh -c "$_gv" </dev/null >/dev/null 2>&1 & ) &
+	fi
+	return 0
+}
+
 start_service() {
 	rm -f "$STARTED_FLAG"
 
@@ -120,6 +153,7 @@ start_service() {
 			_sbw="$(grep '^warn:' "$ZGZ_RUN/sbconfig.err" 2>/dev/null | sed 's/^warn: //')"
 			[ -z "$_sbw" ] || printf '%s
 ' "$_sbw" | while IFS= read -r _l; do log_step "sing-box: $_l"; done
+			geoview_for_singbox
 		else
 			_why="$(grep -v '^warn:' "$ZGZ_RUN/sbconfig.err" 2>/dev/null | sed 's/^error: //' | head -1)"
 			[ -x "$(engine_singbox_path)" ] || _why="sing-box is not installed"

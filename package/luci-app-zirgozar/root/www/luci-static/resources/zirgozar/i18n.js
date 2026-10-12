@@ -579,8 +579,8 @@ var FA = {
 	'Helper core': 'هسته کمکی',
 	'Iranian site': 'سایت ایرانی',
 	'Touch Check': 'برای بررسی بزنید',
-	'Google Connection': 'اتصال گوگل',
-	'GitHub Connection': 'اتصال گیت‌هاب',
+	'Reddit Connection': 'اتصال ردیت',
+	'X Connection': 'اتصال ایکس',
 
 	/* ------------------------------------------------ the settings tabs */
 	'How the fastest node is chosen': 'روش انتخاب سریع‌ترین کانفیگ',
@@ -908,8 +908,12 @@ var FA = {
 	'Default Preproxy': 'پیش‌پراکسی پیش‌فرض',
 	'Geoview': 'موقعیت‌یاب',
 	'Geoview App Path': 'مسیر برنامه Geoview',
-	'Only the Geoview page needs it. Empty means this program’s own copy in the folder above.':
-		'فقط صفحه «موقعیت‌یاب» به آن نیاز دارد. خالی یعنی نسخه خود این برنامه در پوشه بالا.',
+	'The Geoview page needs it, and so does sing-box whenever the Iran split or ad blocking is on - it is then installed by itself. Empty means this program’s own copy in the folder above.':
+		'صفحه «موقعیت‌یاب» به آن نیاز دارد، و sing-box هم وقتی تفکیک ایران یا مسدود کردن تبلیغات روشن است — آن وقت خودش نصب می‌شود. خالی یعنی نسخه خود این برنامه در پوشه بالا.',
+	'Geoview shows where a name or an address belongs, on the Geoview page. sing-box cannot read the routing data without it: when sing-box carries the tunnel with the Iran split or ad blocking on, Geoview is installed by itself if it is missing.':
+		'Geoview در صفحه «موقعیت‌یاب» نشان می‌دهد یک نام یا آدرس به کجا تعلق دارد. sing-box بدون آن داده‌های مسیریابی را نمی‌تواند بخواند: وقتی sing-box تونل را می‌برد و تفکیک ایران یا مسدود کردن تبلیغات روشن است، اگر Geoview نصب نباشد خودش نصب می‌شود.',
+	'sing-box needs Geoview to read the routing data, and it could not be installed, so the Iran split and ad blocking are off. Install Geoview on the App Update page, or choose Xray under Active core in Basic Settings.':
+		'sing-box برای خواندن داده‌های مسیریابی به Geoview نیاز دارد و نصب آن ممکن نشد، پس تفکیک ایران و مسدود کردن تبلیغات خاموش است. Geoview را از صفحه «به‌روزرسانی» نصب کنید، یا در تنظیمات پایه زیر «هسته فعال» Xray را انتخاب کنید.',
 	'Enter something to look for first.': 'اول چیزی برای جست‌وجو وارد کنید.',
 	'Processing, please wait…': 'در حال پردازش، لطفا صبر کنید…',
 	'Geoview is not installed. Install it with the button below, or on the App Update page.':
@@ -1003,7 +1007,7 @@ var FA = {
 	'Not enough free space on the router: %s free. Nothing was installed.': 'فضای خالی روتر کافی نیست: فقط %s خالی است. نصب انجام نشد.',
 	'Manual subscription': 'به‌روزرسانی',
 	'Reading it now. The count will change when it is done.': 'در حال خواندن. پس از پایان، تعداد به‌روز می‌شود.',
-	'Cloudflare Connection': 'اتصال کلادفلر',
+	'Instagram Connection': 'اتصال اینستاگرام',
 	'The main switch is in the Main tab below.': 'کلید اصلی در زبانه «اصلی» پایین همین صفحه است.',
 
 	/* What the router says back about a subscription. */

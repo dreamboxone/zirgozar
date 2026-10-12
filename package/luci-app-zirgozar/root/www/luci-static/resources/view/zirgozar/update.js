@@ -151,6 +151,11 @@ function renderDeps(deps) {
 	var box = document.getElementById('zgz-deps');
 	if (!box) return;
 	while (box.firstChild) box.removeChild(box.firstChild);
+	/* The router is still finding out; it has been asked already. */
+	if (deps.pending) {
+		box.appendChild(E('p', { 'class': 'mk-muted', 'style': 'margin:0' }, _('Waiting for the router…')));
+		return;
+	}
 
 	/* One line when everything is there; the details open by themselves
 	   when something is missing, and otherwise only when asked for. */
@@ -203,9 +208,48 @@ function renderDeps(deps) {
 			: [], 'deps'));
 }
 
-function render(d) {
+/* The page is drawn whole the moment it opens, from what the router said
+   the last time it was opened here - or, the very first time, with every row
+   in place and its version still to come - and filled in when the router
+   answers. Waiting for the answer left three empty cards on the screen. */
+var KEPT = 'zirgozar.update.last';
+var CORE_NAMES = [ 'xray', 'xray-patterniha', 'sing-box', 'sing-box-lx', 'hysteria',
+                   'geoview', 'warp-plus', 'vwarp', 'aether', 'openvpn' ];
+
+var answered = false;
+
+function keep(d) {
+	try {
+		window.localStorage.setItem(KEPT, JSON.stringify({ cores: d.cores, deps: d.deps }));
+	} catch (e) {}
+}
+
+function kept() {
+	var d = null;
+	try { d = JSON.parse(window.localStorage.getItem(KEPT) || 'null'); } catch (e) {}
+	if (d && d.cores && d.cores.cores) return d;
+	/* Where the files go is in the settings, already loaded with the page,
+	   so it is shown from the start rather than waited for. */
+	var dir = uci.get('zirgozar', 'config', 'core_dir') || '/usr/libexec/zirgozar';
+	var set = { xray: 'core_xray', 'sing-box': 'core_singbox', 'sing-box-lx': 'core_singbox_lx',
+	            hysteria: 'core_hysteria', geoview: 'core_geoview', 'warp-plus': 'core_warpplus',
+	            vwarp: 'core_vwarp', aether: 'core_aether' };
+	var own = { aether: 'aether/aether' };
+	return {
+		cores: { app: { unknown: true }, unknown: true, dir: dir,
+		         cores: CORE_NAMES.map(function(n) {
+		             var path = n == 'openvpn' ? '/usr/sbin/openvpn'
+		                 : (set[n] && uci.get('zirgozar', 'config', set[n])) || dir + '/' + (own[n] || n);
+		             return { name: n, arch_ok: true, unknown: true, path: path };
+		         }) },
+		deps: { pending: true }
+	};
+}
+
+function render(d, early) {
 	d = d || {};
 	var cores = d.cores || {};
+	if (!early) { answered = true; keep(d); }
 
 	var job = document.getElementById('pwp-job');
 	if (job) {
@@ -219,16 +263,16 @@ function render(d) {
 	   behind: a failure is shown under the row, and success - a different
 	   version from the one this page was opened with - reloads the page, whose
 	   own files have just been replaced. */
-	var app0 = (d.cores || {}).app || {};
+	var app0 = early ? {} : ((d.cores || {}).app || {});
 	if (app0.version && !firstVersion) firstVersion = app0.version;
-	var res = String(d.self || '');
+	var res = early ? lastSelf : String(d.self || '');
 	if (res.indexOf('error ') == 0 && res != lastSelf) {
 		var room = /^error room (\d+) (\d+)$/.exec(res);
 		say('app', room ? noRoom(room[1], room[2]) : _(res.slice(6)), 'error');
 	}
 	lastSelf = res;
 
-	var cres = String(d.core_result || '');
+	var cres = early ? lastCore : String(d.core_result || '');
 	if (cres && cres != lastCore) {
 		var lack = /^(\S+) room (\d+) (\d+)$/.exec(cres);
 		if (lack) say('core:' + lack[1], noRoom(lack[2], lack[3]), 'error');
@@ -244,7 +288,7 @@ function render(d) {
 	/* While a check runs, what was known before it is not shown as an
 	   answer, and the page asks again sooner than its usual ten seconds. */
 	var busy = checking(d);
-	if (busy && !quickRefresh)
+	if (!early && (busy || (d.deps || {}).pending) && !quickRefresh)
 		quickRefresh = window.setTimeout(function() { quickRefresh = 0; refreshNow(); }, 2000);
 	if (!busy) checkAsked = 0;
 
@@ -253,7 +297,7 @@ function render(d) {
 	if (abox) {
 		var app = cores.app || {};
 		while (abox.firstChild) abox.removeChild(abox.firstChild);
-		var value = [ chip(pui.versionText(app.version) || '?', 'ok') ];
+		var value = [ app.unknown ? chip('…') : chip(pui.versionText(app.version) || '?', 'ok') ];
 		if (!busy && app.update && app.latest)
 			value.push(chip(_('Available: %s').format(pui.versionText(app.latest)), 'info'));
 		else if (!busy && app.latest)
@@ -277,7 +321,10 @@ function render(d) {
 		while (cbox.firstChild) cbox.removeChild(cbox.firstChild);
 		(cores.cores || []).forEach(function(c) {
 			var value = [];
-			if (c.installed) {
+			if (c.unknown) {
+				value.push(chip('…'));
+				value.push(E('code', { 'style': 'font-size:11.5px;color:var(--muted)' }, c.path));
+			} else if (c.installed) {
 				value.push(chip('【 ' + (c.version || _('installed')) + ' 】', 'ok'));
 				/* What the project has published, when it is not what is
 				   installed. Two different strings, not "newer" - version
@@ -302,7 +349,7 @@ function render(d) {
 			var actions = [];
 			if (c.arch_ok) {
 				actions.push(checkBtn('soft-blue', 'core:' + c.name, busy));
-				actions.push(pui.btn(c.installed
+				if (!c.unknown) actions.push(pui.btn(c.installed
 					? (c.update && c.latest ? _('Update to %s').format(c.latest) : _('Force update'))
 					: _('Install'), 'primary mk-small', function() {
 					return act('core:' + c.name, 'core_install', c.name, _('Downloading %s.').format(c.name));
@@ -329,9 +376,11 @@ function render(d) {
 			cbox.appendChild(row({ xray: 'Xray', geoview: 'Geoview', 'sing-box-lx': 'sing-box-lx', 'warp-plus': 'warp-plus', vwarp: 'Vwarp', aether: 'Aether', 'xray-patterniha': _('Xray (patterniha)'), openvpn: 'OpenVPN' }[c.name] || c.name, value, actions, 'core:' + c.name));
 		});
 		cbox.appendChild(row(_('Free space'),
-			[ E('span', {}, bytes(cores.free)), E('code', { 'style': 'font-size:11.5px;color:var(--muted)' }, cores.dir || '') ]));
+			[ E('span', {}, cores.unknown ? '…' : bytes(cores.free)), E('code', { 'style': 'font-size:11.5px;color:var(--muted)' }, cores.dir || '') ]));
 		cbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:8px 0 0' },
 			_('Xray carries the traffic. sing-box and hysteria are only needed for nodes that speak hysteria2 or tuic, which Xray does not — one of them is then run as a local helper for that one node, and everything else works exactly as before.')));
+		cbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:6px 0 0' },
+			_('Geoview shows where a name or an address belongs, on the Geoview page. sing-box cannot read the routing data without it: when sing-box carries the tunnel with the Iran split or ad blocking on, Geoview is installed by itself if it is missing.')));
 		cbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:6px 0 0' },
 			_('warp-plus is only needed for WARP nodes: Cloudflare WARP, WARP in WARP, Psiphon behind WARP, and WireGuard nodes set to be carried by it.')));
 		cbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:6px 0 0' },
@@ -387,7 +436,7 @@ return view.extend({
 		o.placeholder = '/usr/libexec/zirgozar/hysteria';
 
 		o = s.option(form.Value, 'core_geoview', _('Geoview App Path'),
-			_('Only the Geoview page needs it. Empty means this program’s own copy in the folder above.'));
+			_('The Geoview page needs it, and so does sing-box whenever the Iran split or ad blocking is on - it is then installed by itself. Empty means this program’s own copy in the folder above.'));
 		o.placeholder = '/usr/libexec/zirgozar/geoview';
 
 		o = s.option(form.Value, 'core_warpplus', _('warp-plus App Path'),
@@ -412,15 +461,11 @@ return view.extend({
 
 
 		return m.render().then(function(mapEl) {
-			function waiting() {
-				return E('p', { 'class': 'mk-muted', 'style': 'margin:0' }, _('Waiting for the router…'));
-			}
 			var content = [
 				E('div', { 'id': 'pwp-job', 'class': 'mk-alert', 'style': 'display:none' }, ''),
-				pui.card(_('App Update'), 'download', '#1e88e5', E('div', { 'id': 'pwp-app' }, [ waiting() ])),
-				pui.card(_('Cores'), 'cpu', '#8b5cf6', E('div', { 'id': 'pwp-cores' }, [ waiting() ])),
-				pui.card(_('Router requirements'), 'shield', '#f59e0b',
-					E('div', { 'id': 'zgz-deps' }, [ waiting() ])),
+				pui.card(_('App Update'), 'download', '#1e88e5', E('div', { 'id': 'pwp-app' })),
+				pui.card(_('Cores'), 'cpu', '#8b5cf6', E('div', { 'id': 'pwp-cores' })),
+				pui.card(_('Router requirements'), 'shield', '#f59e0b', E('div', { 'id': 'zgz-deps' })),
 				mapEl
 			];
 			/* Asked at once, and then every ten seconds while the page is open -
@@ -431,7 +476,19 @@ return view.extend({
 			}
 			poll.add(refresh, 10);
 			window.setTimeout(refresh, 0);
-			return pui.page(content);
+			/* Opening the page also has the router look for new releases when
+			   it has not lately; that takes a few seconds, and what it finds
+			   is shown without waiting for the next ten-second turn. */
+			window.setTimeout(refresh, 4000);
+			var page = pui.page(content);
+			/* render() finds its boxes by id, so it draws into the page once
+			   the page is in the document - which is right after this. */
+			(function early() {
+				if (answered) return;
+				if (!document.getElementById('pwp-app')) return window.setTimeout(early, 20);
+				render(kept(), true);
+			})();
+			return page;
 		});
 	}
 });

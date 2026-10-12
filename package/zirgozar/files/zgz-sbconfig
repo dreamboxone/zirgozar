@@ -141,6 +141,13 @@ function geo_tag(kind, name) {
 		geo_failed[key] = true;
 		return null;
 	}
+	/* Said as what it is: the category is in the file, there is just
+	   nothing here to read it with. */
+	if (!stat(GEOVIEW)) {
+		warn(`${kind}:${name} is left out - Geoview, which reads it for sing-box, is not installed`);
+		geo_failed[key] = true;
+		return null;
+	}
 	let src = `${GEODIR}/${kind}.dat`;
 	let out = `${RSDIR}/${key}.srs`;
 	let ss = stat(src), os = stat(out);

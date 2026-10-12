@@ -543,16 +543,25 @@ method_system() {
 	# file over HTTPS - a second and more, and a request to GitHub on every
 	# poll of a page left open. What it finds changes when something is
 	# installed, so it is kept for ten minutes and thrown away by an install.
+	# Nor is it waited for: an old answer is given while a new one is made in
+	# the background, and with none at all the page is told it is coming -
+	# the whole App Update page used to wait the second and a half for it.
 	_dc="$ZGZ_RUN/deps.json"
-	_deps=""
-	if [ -s "$_dc" ]; then
-		_age=$(( $(date +%s) - $(date -r "$_dc" +%s 2>/dev/null || echo 0) ))
-		[ "$_age" -ge 0 ] && [ "$_age" -lt 600 ] && _deps="$(cat "$_dc" 2>/dev/null)"
+	_deps="$(cat "$_dc" 2>/dev/null)"
+	_age=600
+	[ -n "$_deps" ] && _age=$(( $(date +%s) - $(date -r "$_dc" +%s 2>/dev/null || echo 0) ))
+	if [ "$_age" -lt 0 ] || [ "$_age" -ge 600 ]; then
+		# One check at a time; a lock left by a check that died is let go
+		# after two minutes.
+		_dl="$ZGZ_RUN/deps.lock"
+		if [ -d "$_dl" ] && [ $(( $(date +%s) - $(date -r "$_dl" +%s 2>/dev/null || echo 0) )) -ge 120 ]; then
+			rmdir "$_dl" 2>/dev/null
+		fi
+		if mkdir "$_dl" 2>/dev/null; then
+			detach /bin/sh -c "\"$DEPS\" check > '$_dc.new' 2>/dev/null && [ -s '$_dc.new' ] && mv -f '$_dc.new' '$_dc'; rm -f '$_dc.new'; rmdir '$_dl'"
+		fi
 	fi
-	if [ -z "$_deps" ]; then
-		_deps="$("$DEPS" check 2>/dev/null)" || _deps=""
-		[ -n "$_deps" ] && printf '%s\n' "$_deps" > "$_dc" 2>/dev/null
-	fi
+	[ -n "$_deps" ] || _deps='{"pending":true}'
 
 	printf '{"geo":%s,"cores":%s,"deps":%s,"interfaces":%s,"job":"%s","self":"%s","core_result":"%s"}\n' \
 		"$("$GEO" status 2>/dev/null || echo '{}')" \

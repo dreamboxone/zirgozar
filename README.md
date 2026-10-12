@@ -7,7 +7,7 @@
 <h3 align="center">فیلترشکن سراسری برای روتر OpenWrt</h3>
 
 <p align="center">
-  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.19-r8"></a>
+  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.19-r9"></a>
   <a href="https://github.com/dreamboxone/zirgozar/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/dreamboxone/zirgozar/total?style=for-the-badge&color=0ea5e9"></a>
   <img alt="OpenWrt" src="https://img.shields.io/badge/OpenWrt-23.05%20%7C%2024.10%20%7C%2025.12-00B5E2?style=for-the-badge&logo=openwrt&logoColor=white">
   <img alt="Xray" src="https://img.shields.io/badge/core-Xray-7c3aed?style=for-the-badge">
@@ -92,7 +92,7 @@
 
 به روتر SSH بزنید و دستور زیر را اجرا کنید. این دستور فایل‌های نسخه **5.7.19**
 را برای معماری روتر دانلود می‌کند و با مدیر بسته موجود نصب یا ارتقا می‌دهد.
-ابتدا باید این نسخه در [صفحه ریلیز](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.19-r8) منتشر شده باشد.
+ابتدا باید این نسخه در [صفحه ریلیز](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.19-r9) منتشر شده باشد.
 
 <div dir="ltr">
 
@@ -100,8 +100,8 @@
 (
   set -eu
   . /etc/openwrt_release
-  version='5.7.19-r8'
-  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.19-r8'
+  version='5.7.19-r9'
+  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.19-r9'
   install_dir="/tmp/zirgozar-install-$version"
   mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
@@ -135,11 +135,11 @@
 ```sh
 # OpenWrt 25.12 and later
 apk update
-apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.19-r8.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.19-r8.apk
+apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.19-r9.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.19-r9.apk
 
 # OpenWrt 24.10 / 23.05
 opkg update
-opkg install /tmp/zirgozar_5.7.19-r8_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.19-r8_all.ipk
+opkg install /tmp/zirgozar_5.7.19-r9_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.19-r9_all.ipk
 ```
 
 </div>
@@ -208,7 +208,7 @@ Geo، کنترل دسترسی، لاگ‌های اجرا**.
 | کاشی | چه نشان می‌دهد |
 |---|---|
 | **هسته Xray** | نام هسته کنار کلمه «هسته»، و زیرش **اجرا می‌شود** به رنگ سبز یا **اجرا نمی‌شود** به رنگ قرمز. نشانگر ماوس را رویش نگه دارید تا نسخه‌اش را ببینید |
-| **اتصال کلادفلر / گوگل / گیت‌هاب** | با زدن هر کدام یک درخواست از همان راهی که ترافیک روتر می‌رود فرستاده می‌شود و زمانش نشان داده می‌شود — زیر یک ثانیه سبز، زیر دو ثانیه نارنجی، بیشتر قرمز، یا *مشکلی پیدا شد!* |
+| **اتصال اینستاگرام / ردیت / ایکس** | با زدن هر کدام یک درخواست از همان راهی که ترافیک روتر می‌رود فرستاده می‌شود و زمانش نشان داده می‌شود — زیر یک ثانیه سبز، زیر دو ثانیه نارنجی، بیشتر قرمز، یا *مشکلی پیدا شد!* |
 
 زیر آن‌ها کارت **وضعیت**: تونل وصل است یا نه، از کدام کانفیگ استفاده می‌کند،
 پروتکلش، تاخیرش، و مسیریابی چطور تنظیم شده. آدرس IP سرور **تار** نشان داده
@@ -590,7 +590,7 @@ AmneziaWG عمدا کنار گذاشته شده: Xray آن را بلد نیست.
 | کارت | چه نشان می‌دهد |
 |---|---|
 | **به‌روزرسانی** | نسخه همین برنامه و اینکه نسخه تازه‌تری منتشر شده یا نه. دکمه **به‌روزرسانی به …** نسخه تازه را از گیت‌هاب دانلود می‌کند، با چک‌سام‌های همان انتشار بررسی می‌کند و با مدیر پکیج خود روتر (apk یا opkg) نصب می‌کند؛ تنظیمات حفظ می‌شوند، تونل اگر روشن بود دوباره روشن می‌شود و صفحه خودش دوباره بارگذاری می‌شود |
-| **هسته‌ها** | Xray، Xray (پترنیها)، sing-box، hysteria، Geoview، warp-plus و Vwarp: چه نسخه‌ای نصب است، هر پروژه چه نسخه‌ای منتشر کرده، **بررسی به‌روزرسانی**، **نصب / به‌روزرسانی به …**، **حذف**. «به‌روزرسانی» فقط وقتی پیشنهاد می‌شود که نسخه واقعا جدیدتر باشد. کنار Xray فهرستی از نسخه‌های اخیر هست، از جمله پیش‌انتشارها، با دکمه **نصب این نسخه**. از بین هسته‌های Xray روی روتر همیشه **جدیدترین** استفاده می‌شود؛ برای یک نسخه مشخص، مسیرش را در «مسیر Xray» بنویسید. sing-box و hysteria فقط برای کانفیگ‌هایی لازم‌اند که hysteria2 یا tuic دارند و Xray بلد نیست؛ Geoview فقط برای صفحه موقعیت‌یاب؛ warp-plus فقط برای کانفیگ‌های وارپ، و فایل دانلودشده‌اش با چک‌سام منتشرشده همان نسخه بررسی می‌شود؛ Vwarp فقط برای وارپ با MASQUE یا با پوشش. **Xray (پترنیها)** نسخه [patterniha/Xray-core](https://github.com/patterniha/Xray-core) است: Xray رسمی از نسخه ۲۶.۷ کانفیگ VLESS و Trojan بدون TLS به آدرس عمومی را رد می‌کند — همان کانفیگ‌هایی که از پورت‌های HTTP ساده کلودفلر (مثل ۸۰ و ۸۰۸۰) می‌روند و SNI ندارند که فیلتر ببیند — و این نسخه قبولشان می‌کند. کنار Xray رسمی نصب می‌شود؛ هر کانفیگ به همه Xrayهای روتر داده می‌شود و اولی که قبولش کند اجرایش می‌کند |
+| **هسته‌ها** | Xray، Xray (پترنیها)، sing-box، hysteria، Geoview، warp-plus و Vwarp: چه نسخه‌ای نصب است، هر پروژه چه نسخه‌ای منتشر کرده، **بررسی به‌روزرسانی**، **نصب / به‌روزرسانی به …**، **حذف**. «به‌روزرسانی» فقط وقتی پیشنهاد می‌شود که نسخه واقعا جدیدتر باشد؛ برای Xray فقط نسخه پایدار پیشنهاد می‌شود، نه پیش‌انتشار. کنار Xray فهرستی از نسخه‌های اخیر هست، از جمله پیش‌انتشارها، با دکمه **نصب این نسخه**. از بین هسته‌های Xray روی روتر همیشه **جدیدترین** استفاده می‌شود، مگر اینکه «مسیر Xray» یکی را مشخص کرده باشد. نسخه‌ای که با **نصب این نسخه** نصب شود خودش در «مسیر Xray» نوشته می‌شود و اگر تونل روشن باشد با همان دوباره راه می‌افتد؛ ردیف Xray هم همیشه نسخه‌ای را نشان می‌دهد که اجرا می‌شود. برای برگشتن به جدیدترین، «مسیر Xray» را خالی کنید. sing-box و hysteria فقط برای کانفیگ‌هایی لازم‌اند که hysteria2 یا tuic دارند و Xray بلد نیست؛ Geoview برای صفحه موقعیت‌یاب، و برای sing-box وقتی تفکیک ایران یا مسدود کردن تبلیغات روشن است — sing-box بدون آن فایل‌های geo را نمی‌خواند و اگر نصب نباشد خودش نصب می‌شود؛ warp-plus فقط برای کانفیگ‌های وارپ، و فایل دانلودشده‌اش با چک‌سام منتشرشده همان نسخه بررسی می‌شود؛ Vwarp فقط برای وارپ با MASQUE یا با پوشش. **Xray (پترنیها)** نسخه [patterniha/Xray-core](https://github.com/patterniha/Xray-core) است: Xray رسمی از نسخه ۲۶.۷ کانفیگ VLESS و Trojan بدون TLS به آدرس عمومی را رد می‌کند — همان کانفیگ‌هایی که از پورت‌های HTTP ساده کلودفلر (مثل ۸۰ و ۸۰۸۰) می‌روند و SNI ندارند که فیلتر ببیند — و این نسخه قبولشان می‌کند. کنار Xray رسمی نصب می‌شود؛ هر کانفیگ به همه Xrayهای روتر داده می‌شود و اولی که قبولش کند اجرایش می‌کند |
 | **پیش‌نیازهای روتر** | در یک خط: همه چیز آماده است یا چند مورد کم است. **جزییات** سوال‌هایی از خود سیستم را باز می‌کند — پروکسی شفاف، policy routing، HTTPS، فایروال در حال استفاده، پکیج‌های کم — با دکمه **نصبشان کن**. اگر چیزی کم باشد جزییات خودشان باز می‌شوند |
 
 **مسیر برنامه‌ها**

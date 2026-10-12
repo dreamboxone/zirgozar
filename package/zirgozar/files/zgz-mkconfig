@@ -206,7 +206,16 @@ if [ "$block_torrent" = "1" ]; then
 fi
 
 if [ "$block_ads" = "1" ]; then
-	add_rule '{"type":"field","domain":["geosite:category-ads-all"],"outboundTag":"block"}'
+	# The Iranian advertising the category leaves out goes in beside it,
+	# from the list zgz-geo keeps; asked for again in the background when it
+	# is missing or old, for the next configuration to use.
+	_xads="$(cfg geo_dir "$ZGZ_ETC/geo")/ads-extra.list"
+	( "$ZGZ_LIB/zgz-geo" extra </dev/null >/dev/null 2>&1 & ) || true
+	_xdom=""
+	if [ -s "$_xads" ]; then
+		_xdom="$(awk '/^[a-z0-9][a-z0-9.-]*$/ { printf ",\"domain:%s\"", $0 }' "$_xads" 2>/dev/null)" || _xdom=""
+	fi
+	add_rule "{\"type\":\"field\",\"domain\":[\"geosite:category-ads-all\"$_xdom],\"outboundTag\":\"block\"}"
 fi
 
 # Anything addressed to this network stays on this network, always. This is

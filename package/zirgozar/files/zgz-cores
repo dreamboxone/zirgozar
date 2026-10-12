@@ -123,6 +123,7 @@ install_xray() {
 	# A version may be named - v26.9.30 - or left out for the newest there is,
 	# pre-releases included: see cmd_latest.
 	_xtag="${1:-}"
+	_xnamed="$_xtag"
 	case "$_xtag" in
 		'') : ;;
 		v[0-9]*.[0-9]*) case "$_xtag" in *[!0-9v.]*) say_message "Not a version: $_xtag"; return 1 ;; esac ;;
@@ -163,8 +164,21 @@ install_xray() {
 		return 1
 	fi
 	rm -f "$_zip"
-	install_binary "$ZGZ_RUN/xtract/xray" "$DIR/xray" xray
-	return $?
+	install_binary "$ZGZ_RUN/xtract/xray" "$DIR/xray" xray || return $?
+	# A version picked from the list is the one wanted, not merely one more
+	# on the router: left to itself the service runs the newest Xray it can
+	# find, and an older one picked here would sit unused beside it. So it
+	# becomes the Xray App Path.
+	if [ -n "$_xnamed" ] && [ "$(cfg core_xray '')" != "$DIR/xray" ]; then
+		uci -q set zirgozar.config.core_xray="$DIR/xray" && uci -q commit zirgozar
+		log "Xray App Path set to $DIR/xray"
+	fi
+	# The tunnel is still running the Xray it started with; when the one just
+	# installed is the one it is told to use, it is restarted onto it.
+	if [ "$(cfg core_xray '')" = "$DIR/xray" ] && [ "$(cfg_bool enabled 0)" = "1" ]; then
+		bounded 180 /etc/init.d/zirgozar restart >/dev/null 2>&1 || true
+	fi
+	return 0
 }
 
 # Aether's release includes the Psiphon and Tor transport helpers. Check the
@@ -692,13 +706,20 @@ cmd_latest() {
 
 	_tmp="$LATEST_CACHE.new"
 	: > "$_tmp"
-	# Xray's newest is the newest of its recent releases, pre-releases
-	# included: its "latest" has been six months behind what everyone runs.
+	# The recent releases, pre-releases included, are offered on the page as
+	# a list to pick from. What is offered as an update is only ever a stable
+	# release: the newest among the recent ones, or GitHub's own "latest"
+	# when every recent one is a pre-release.
 	_xr="$(xray_releases)"
 	if [ -n "$_xr" ]; then
 		printf '%s\n' "$_xr" > "$XRAY_VERSIONS.new" && mv -f "$XRAY_VERSIONS.new" "$XRAY_VERSIONS"
-		_xn="$(printf '%s\n' "$_xr" | while read -r _t _k; do echo "$(ver_key "$_t") $_t"; done | sort -r | head -1 | cut -d' ' -f2)"
-		[ -n "$_xn" ] && printf 'xray\t%s\n' "$(tag_version "$_xn")" >> "$_tmp"
+	fi
+	_xn="$(printf '%s\n' "$_xr" | while read -r _t _k; do [ "$_k" = stable ] && echo "$(ver_key "$_t") $_t"; done | sort -r | head -1 | cut -d' ' -f2)"
+	[ -n "$_xn" ] || _xn="$(curl -fsSL --connect-timeout 8 --max-time 20 \
+		"https://api.github.com/repos/$XRAY_REPO/releases/latest" 2>/dev/null |
+		sed -n 's/.*"tag_name"[ \t]*:[ \t]*"\([^"]*\)".*/\1/p' | head -1)"
+	if [ -n "$_xn" ]; then
+		printf 'xray\t%s\n' "$(tag_version "$_xn")" >> "$_tmp"
 	else
 		_old="$(latest_of xray)"
 		[ -n "$_old" ] && printf 'xray\t%s\n' "$_old" >> "$_tmp"
@@ -760,7 +781,12 @@ one() {
 cmd_list() {
 	# Found without starting any of them - see xray_installed. The versions
 	# come from the cache in core_version_cached for the same reason.
-	_x="$(xray_official 2>/dev/null)" || _x=""
+	# The Xray the service runs: the one the settings name when they name one
+	# that is there, and otherwise the newest.
+	_x="$(xray_preferred)"
+	if [ -z "$_x" ] || [ ! -x "$_x" ] || [ "$_x" = "$DIR/xray-patterniha" ]; then
+		_x="$(xray_official 2>/dev/null)" || _x=""
+	fi
 	_s="$(singbox_path)"; [ -x "$_s" ] || _s=""
 	_l="$(singbox_lx_path)"; [ -x "$_l" ] || _l=""
 	_h="$(hysteria_path)"; [ -x "$_h" ] || _h=""
@@ -803,6 +829,30 @@ cmd_list() {
 	printf ',"app":{"version":"%s","latest":"%s","update":%s}}\n' \
 		"$(json_escape "$_mine")" "$(json_escape "${_pub#v}")" \
 		"$([ -n "$_pub" ] && ver_newer "${_pub#v}" "$_mine" && echo true || echo false)"
+	return 0
+}
+
+# The list above, kept from the last time it was made. Making it starts some
+# hundred small programs - a second and a half on a small router, which the
+# App Update page sat blank through every time it was opened. What it says
+# changes only when a core file, a published version or a core setting does,
+# so those are what the kept copy is checked against; the free space is the
+# one thing read fresh every time.
+cmd_list_cached() {
+	_lc="$ZGZ_RUN/cores.list"
+	_cset="$(grep "option core_" /etc/config/zirgozar 2>/dev/null)"
+	_cpaths="$(printf '%s\n' "$_cset" | sed -n "s/.*option core_[a-z_]* '\(\/[^']*\)'.*/\1/p")"
+	_key="$( { printf '%s\n' "$_cset"
+		ls -lLi "$ZGZ_OWN_DIR" "$DIR" "$DIR/aether" /usr/bin/xray /usr/local/bin/xray /usr/sbin/openvpn \
+			$_cpaths "$LATEST_CACHE" "$XRAY_VERSIONS" "$ZGZ_VERSION_FILE" 2>/dev/null; } | md5sum)"
+	_key="${_key%% *}"
+	if [ -n "$_key" ] && [ "$(head -1 "$_lc" 2>/dev/null)" = "$_key" ]; then
+		sed -n "2{s/\"free\":[0-9]*/\"free\":$(free_bytes "$DIR")/;p}" "$_lc"
+		return 0
+	fi
+	_out="$(cmd_list)"
+	printf '%s\n%s\n' "$_key" "$_out" > "$_lc.new" 2>/dev/null && mv -f "$_lc.new" "$_lc" 2>/dev/null
+	printf '%s\n' "$_out"
 	return 0
 }
 
@@ -977,7 +1027,7 @@ cmd_remove() {
 }
 
 case "${1:-list}" in
-	list) cmd_list ;;
+	list) cmd_list_cached ;;
 	install)
 		clear_message
 		ZGZ_ROOM_QUIET=1
