@@ -925,6 +925,24 @@ case "$remote_proto" in
 		_boot=""
 		case "$remote_doh" in *,*) _boot="${remote_doh#*,}" ;; esac
 		_dohhost="$(printf '%s' "$_url" | sed -n 's|^https://\([^/:]*\).*|\1|p')"
+		# A name with no address after it: Xray cannot reach it at all - it
+		# has only the server itself to ask where the server is, says "tries
+		# to resolve itself" and gives up, and every name it was to look up
+		# goes unanswered or is answered by something else. So the address is
+		# looked up here, outside the tunnel, and kept for when that fails.
+		if [ -z "$_boot" ] && [ -n "$_dohhost" ]; then
+			case "$_dohhost" in
+				*[!0-9.]*)
+					_bootf="$ZGZ_RUN/doh-boot.$(printf '%s' "$_dohhost" | tr -c 'A-Za-z0-9.-' '_')"
+					_boot="$(resolve_direct "$_dohhost" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)" || _boot=""
+					if [ -n "$_boot" ]; then
+						printf '%s\n' "$_boot" > "$_bootf" 2>/dev/null || true
+					else
+						_boot="$(cat "$_bootf" 2>/dev/null)" || _boot=""
+					fi
+					;;
+			esac
+		fi
 		if [ -n "$_boot" ] && [ -n "$_dohhost" ]; then
 			case "$_dohhost" in
 				*[!0-9.]*) add_host "$_dohhost" "$_boot" ;;

@@ -603,7 +603,7 @@ return view.extend({
 		o.depends('remote_dns_protocol', 'udp');
 
 		o = s.taboption('dns', form.Value, 'remote_dns_doh', _('Remote DNS DoH'),
-			_('An address, or an address and the server’s own IP after a comma so its name is never itself a lookup.'));
+			_('An address, such as the one a DNS service gives you. When it has a name, the server’s IP is looked up for it outside the tunnel; it can also be written after a comma.'));
 		o.default = 'https://8.8.8.8/dns-query';
 		o.value('https://1.1.1.1/dns-query', 'CloudFlare');
 		o.value('https://1.1.1.2/dns-query', 'CloudFlare-Security');

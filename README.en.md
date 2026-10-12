@@ -5,7 +5,7 @@
 <h3 align="center">A router-wide tunnel for OpenWrt</h3>
 
 <p align="center">
-  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.20-r2"></a>
+  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.20-r3"></a>
   <a href="https://github.com/dreamboxone/zirgozar/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/dreamboxone/zirgozar/total?style=for-the-badge&color=0ea5e9"></a>
   <img alt="OpenWrt" src="https://img.shields.io/badge/OpenWrt-23.05%20%7C%2024.10%20%7C%2025.12-00B5E2?style=for-the-badge&logo=openwrt&logoColor=white">
   <img alt="Xray" src="https://img.shields.io/badge/core-Xray-7c3aed?style=for-the-badge">
@@ -92,14 +92,14 @@ install the main file first, then the `luci-app-…` one. After the second, pres
 
 SSH into the router and run the command below to download and install or upgrade
 version **5.7.20** for its architecture. The version must first be published on
-the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.20-r2).
+the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.20-r3).
 
 ```sh
 (
   set -eu
   . /etc/openwrt_release
-  version='5.7.20-r2'
-  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.20-r2'
+  version='5.7.20-r3'
+  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.20-r3'
   install_dir="/tmp/zirgozar-install-$version"
   mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
@@ -129,11 +129,11 @@ These examples use `arm_cortex-a7_neon-vfpv4`; replace it with your router's arc
 ```sh
 # OpenWrt 25.12 and later
 apk update
-apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.20-r2.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.20-r2.apk
+apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.20-r3.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.20-r3.apk
 
 # OpenWrt 24.10 / 23.05
 opkg update
-opkg install /tmp/zirgozar_5.7.20-r2_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.20-r2_all.ipk
+opkg install /tmp/zirgozar_5.7.20-r3_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.20-r3_all.ipk
 ```
 
 > [!IMPORTANT]
@@ -300,7 +300,7 @@ a **Remote DNS** for everything that goes through the tunnel.
 | **Direct Query Strategy** | `direct_dns_query_strategy` | UseIPv4 | Which address families to ask the direct resolver for |
 | **Remote DNS Protocol** | `remote_dns_protocol` | TCP | TCP, UDP or DoH. TCP is the default because a great many free configs carry no UDP, and a lookup sent as UDP through one of them is simply lost |
 | **Remote DNS** | `remote_dns` | 8.8.8.8 | The resolver for TCP or UDP. Cloudflare, Google, Quad9 and OpenDNS are offered. Google and not Cloudflare by default: configs built on Cloudflare Workers - patterniha's list, for one - cannot reach 1.1.1.1, and through them no name was ever found. A router left on the old 1.1.1.1 default is moved to 8.8.8.8 once |
-| **Remote DNS DoH** | `remote_dns_doh` | `https://8.8.8.8/dns-query` | For DoH: an address, or an address and the server's own IP after a comma so its name is never itself a lookup |
+| **Remote DNS DoH** | `remote_dns_doh` | `https://8.8.8.8/dns-query` | For DoH: an address, such as the one a DNS service like NextDNS or uBlockDNS gives you. When it has a name, the server's IP is looked up for it outside the tunnel; it can also be written after a comma |
 | **Remote DNS EDNS Client Subnet** | `remote_dns_client_ip` | — | Tells the DNS server where the client is, so a CDN can answer with an edge near it. Not a private address, and the server must support RFC 7871 |
 | **Remote DNS Outbound** | `remote_dns_detour` | Remote | Whether the remote resolver is reached through the tunnel or straight out |
 | **FakeDNS** | `remote_fakedns` | off | Answers with made-up addresses and lets the tunnel find the real one at the far end, saving a lookup on every new site. Only with *Straight into the tunnel*: with dnsmasq in front, the router's own lookups would be made up too |

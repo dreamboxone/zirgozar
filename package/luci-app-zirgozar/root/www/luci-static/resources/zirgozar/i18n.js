@@ -624,8 +624,8 @@ var FA = {
 		'TCP پیشنهاد می‌شود، چون بسیاری از کانفیگ‌های رایگان UDP را عبور نمی‌دهند و جواب DNS با UDP نمی‌رسد.',
 	'Remote DNS': 'DNS راه دور',
 	'Remote DNS DoH': 'DoH برای DNS راه دور',
-	'An address, or an address and the server’s own IP after a comma so its name is never itself a lookup.':
-		'آدرس DoH را وارد کنید. می‌توانید بعد از آن یک کاما و IP همان سرور را بنویسید تا برای پیدا کردن خود سرور DNS نیازی به درخواست نباشد.',
+	'An address, such as the one a DNS service gives you. When it has a name, the server’s IP is looked up for it outside the tunnel; it can also be written after a comma.':
+		'آدرس DoH را وارد کنید، مثلاً همان آدرسی که سرویس DNS به شما داده. اگر آدرس نام دارد، IP سرورش خودکار و بیرون از تونل پیدا می‌شود؛ می‌توانید آن را بعد از یک کاما هم خودتان بنویسید.',
 	'DoH request address': 'آدرس درخواست DoH',
 	'Format must be:': 'قالب باید این باشد:',
 	'Remote DNS EDNS Client Subnet': 'EDNS Client Subnet برای DNS راه دور',
