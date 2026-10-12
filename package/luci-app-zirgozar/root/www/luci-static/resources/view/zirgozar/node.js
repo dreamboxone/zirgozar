@@ -54,6 +54,11 @@ SCHEMES.interface = '_iface';
 SCHEMES.aether = 'aether';
 SCHEMES.l2tp = 'l2tp';
 SCHEMES['l2tp+ipsec'] = 'l2tp';
+SCHEMES.pptp = 'pptp';
+SCHEMES.sstp = 'sstp';
+/* The PPP accounts, each with the port its servers listen on: providers hand
+   them out with only a server name. */
+var PPP_PORT = { l2tp: '1701', pptp: '1723', sstp: '443' };
 var AETHER_FIELDS = 'protocol scan ip transport outer inner noize dns exit_loc fragment fragment_size fragment_delay ech ech_dns ech_domain api_address api_ech api_ech_dns fingerprint sni psiphon psiphon_mode region tor tor_bridges tor_relays bridges cdn_ips cdn_sni cdn_sets psiphon_bundled psiphon_servers'.split(' ');
 
 /* Vwarp's disguises for the first packets, lightest first. */
@@ -195,10 +200,11 @@ function parseLink(link) {
 	}
 
 	var at = body.lastIndexOf('@'), cred = '', hp;
-	/* L2TP has one port, and providers give the server without it. */
-	if (proto == 'l2tp') {
+	/* L2TP, PPTP and SSTP have one port each, and providers give the
+	   server without it. */
+	if (PPP_PORT[proto]) {
 		body = body.replace(/\/+$/, '');
-		if (!/:[0-9]+$/.test(body)) body += ':1701';
+		if (!/:[0-9]+$/.test(body)) body += ':' + PPP_PORT[proto];
 	}
 	if (at >= 0) { cred = body.slice(0, at); hp = splitHostPort(body.slice(at + 1)); }
 	else if (proto == 'shadowsocks') {
@@ -221,6 +227,12 @@ function parseLink(link) {
 		var lipsec = take('ipsec');
 		f.l2tp_ipsec = /^l2tp\+ipsec:/i.test(link) || lipsec == '1' || (!!f.l2tp_psk && lipsec != '0') ? '1' : '0';
 		f.l2tp_mtu = take('mtu') || '1400';
+	} else if (proto == 'pptp' || proto == 'sstp') {
+		var pi = cred.indexOf(':');
+		if (pi < 0) return null;
+		f.user = dec(cred.slice(0, pi)); f.password = dec(cred.slice(pi + 1));
+		f.l2tp_mtu = take('mtu') || '1400';
+		f.pptp_mppe = take('mppe') == '0' ? '0' : '1';
 	} else if (proto == 'vless' || proto == 'trojan') {
 		if (proto == 'vless') {
 			f.uuid = dec(cred); f.encryption = take('encryption') || 'none'; f.flow = take('flow');
@@ -367,6 +379,11 @@ function buildLink(f, name) {
 		q.psk = f.l2tp_ipsec == '1' ? f.l2tp_psk : '';
 		q.mtu = f.l2tp_mtu || '1400';
 		return 'l2tp://' + enc(f.user || '') + ':' + enc(f.password || '') + '@' + joinHostPort(f.address, f.port || '1701') + '?' + buildQuery(q) + frag;
+	}
+	if (p == 'pptp' || p == 'sstp') {
+		q.mtu = f.l2tp_mtu || '1400';
+		if (p == 'pptp') q.mppe = f.pptp_mppe == '0' ? '0' : '1';
+		return p + '://' + enc(f.user || '') + ':' + enc(f.password || '') + '@' + joinHostPort(f.address, f.port || PPP_PORT[p]) + '?' + buildQuery(q) + frag;
 	}
 	if (p == 'socks' || p == 'http') {
 		var auth = f.user ? enc(f.user) + ':' + enc(f.password) + '@' : '';
@@ -633,14 +650,14 @@ return view.extend({
 			o = field(form.ListValue, 'proto', _('Protocol'));
 			[ [ 'vless', 'VLESS' ], [ 'vmess', 'VMess' ], [ 'trojan', 'Trojan' ], [ 'shadowsocks', 'Shadowsocks' ],
 			  [ 'socks', 'Socks' ], [ 'http', 'HTTP' ], [ 'hysteria2', 'Hysteria2' ], [ 'tuic', 'TUIC' ], [ 'warp', 'WARP' ],
-			  [ 'wireguard', 'WireGuard' ], [ 'openvpn', 'OpenVPN' ], [ 'l2tp', 'L2TP / IPsec' ], [ '_balancing', 'Balancing' ],
+			  [ 'wireguard', 'WireGuard' ], [ 'openvpn', 'OpenVPN' ], [ 'l2tp', 'L2TP / IPsec' ], [ 'pptp', 'PPTP' ], [ 'sstp', 'SSTP' ], [ '_balancing', 'Balancing' ],
 			  [ '_shunt', 'Shunt' ], [ '_iface', 'Custom Interface' ], [ 'aether', 'Aether' ] ]
 				.forEach(function(v) { o.value(v[0], v[1]); });
 
 			var candidates = (data && data[1] && data[1].nodes) || [];
 			var origins = (data && data[3]) || {};
 			var nodes = candidates.filter(function(n) {
-				return !/^(hysteria2|hysteria|tuic|openvpn|amneziawg|l2tp|balancing|shunt|interface|aether)$/.test(n.protocol);
+				return !/^(hysteria2|hysteria|tuic|openvpn|amneziawg|l2tp|pptp|sstp|balancing|shunt|interface|aether)$/.test(n.protocol);
 			}).map(function(n) {
 				var origin = origins[n.tag];
 				return origin ? { tag: origin, label: n.label || n.tag } : null;
@@ -839,24 +856,24 @@ return view.extend({
 
 			/* A server of its own for all but WARP and OpenVPN, whose profile
 			   names its own. */
-			var SERVERS = XR.concat([ 'hysteria2', 'tuic', 'wireguard', 'l2tp' ]);
+			var SERVERS = XR.concat([ 'hysteria2', 'tuic', 'wireguard', 'l2tp', 'pptp', 'sstp' ]);
 			o = field(form.Value, 'address', _('Address (Support Domain Name)'));
 			o.rmempty = false;
 			o.validate = function(section_id, value) {
-				return this.section.formvalue(section_id, '_proto') != 'l2tp' || /^[A-Za-z0-9_.-]+$/.test(l2tpServer(value)) ? true : _('Enter the L2TP server IPv4 address or domain name.');
+				return !PPP_PORT[this.section.formvalue(section_id, '_proto')] || /^[A-Za-z0-9_.-]+$/.test(l2tpServer(value)) ? true : _('Enter the server IPv4 address or domain name.');
 			};
 			/* An L2TP server is often handed out as a web address -
 			   "http://tp.example.com/" - and only the name in it is meant. */
 			o.write = function(section_id, value) {
-				f.address = this.section.formvalue(section_id, '_proto') == 'l2tp' ? l2tpServer(value) : value;
+				f.address = PPP_PORT[this.section.formvalue(section_id, '_proto')] ? l2tpServer(value) : value;
 			};
 			SERVERS.forEach(function(p) { o.depends('_proto', p); });
 			/* Required, except for L2TP: its port is always 1701 and the
 			   accounts are handed out without one. */
-			o = field(form.Value, 'port', _('Port'), _('For L2TP it can be left empty: the standard port 1701 is used.'));
+			o = field(form.Value, 'port', _('Port'), _('For L2TP, PPTP and SSTP it can be left empty: the standard port is used (1701, 1723 and 443).'));
 			o.datatype = 'port';
 			o.validate = function(section_id, value) {
-				if (value || this.section.formvalue(section_id, '_proto') == 'l2tp') return true;
+				if (value || PPP_PORT[this.section.formvalue(section_id, '_proto')]) return true;
 				return _('Expecting: non-empty value');
 			};
 			SERVERS.forEach(function(p) { o.depends('_proto', p); });
@@ -868,10 +885,25 @@ return view.extend({
 			o.password = true; o.rmempty = false;
 			o.depends({ '_proto': 'l2tp', '_l2tp_ipsec': '1' });
 			o = field(form.Value, 'l2tp_mtu', 'MTU', _('Default: 1400. Reduce it if the tunnel connects but some pages do not load.'));
-			o.datatype = 'range(576,1460)'; o.placeholder = '1400'; o.depends('_proto', 'l2tp');
+			o.datatype = 'range(576,1460)'; o.placeholder = '1400';
+			[ 'l2tp', 'pptp', 'sstp' ].forEach(function(p) { o.depends('_proto', p); });
 			o = s.option(form.DummyValue, '_l2tp_help', _('L2TP tests'));
 			o.depends('_proto', 'l2tp');
 			o.cfgvalue = function() { return _('L2TP normally uses UDP port 1701. Ping measures the server address. TCPing measures a TCP connection through the tunnel to the test URL; URL Test measures the full request. Iran routing and traffic rules are applied by the routing core.'); };
+
+			/* PPTP and SSTP: the same account fields as L2TP, carried by
+			   zgz-pppvpn. On unless the link says otherwise - a new node has
+			   no value yet, and almost every PPTP server needs it. */
+			o = field(form.Flag, 'pptp_mppe', _('MPPE encryption'),
+				_('Almost every PPTP server requires it. Turn it off only if the provider says the server does not encrypt.'));
+			o.cfgvalue = function() { return f.pptp_mppe == '0' ? '0' : '1'; };
+			o.depends('_proto', 'pptp');
+			o = s.option(form.DummyValue, '_pptp_help', _('PPTP tests'));
+			o.depends('_proto', 'pptp');
+			o.cfgvalue = function() { return _('PPTP uses TCP port 1723 and GRE. Its encryption is weak: use it only when nothing else gets through. Ping measures the server address. TCPing measures a TCP connection through the tunnel to the test URL; URL Test measures the full request.'); };
+			o = s.option(form.DummyValue, '_sstp_help', _('SSTP tests'));
+			o.depends('_proto', 'sstp');
+			o.cfgvalue = function() { return _('SSTP runs inside HTTPS, normally on port 443, so it gets through most firewalls. The server certificate is not checked. Ping measures the server address. TCPing measures a TCP connection through the tunnel to the test URL; URL Test measures the full request.'); };
 
 			/* ------------------------------------------------- WireGuard
 			   The fields of a [Interface] and [Peer] pair, entered by hand.
@@ -996,16 +1028,16 @@ return view.extend({
 
 			o = field(form.Value, 'user', _('Username'));
 			o.validate = function(section_id, value) {
-				return this.section.formvalue(section_id, '_proto') != 'l2tp' || !!value ? true : _('L2TP requires a username and password.');
+				return !PPP_PORT[this.section.formvalue(section_id, '_proto')] || !!value ? true : _('This account requires a username and password.');
 			};
-			[ 'socks', 'http', 'l2tp' ].forEach(function(p) { o.depends('_proto', p); });
+			[ 'socks', 'http', 'l2tp', 'pptp', 'sstp' ].forEach(function(p) { o.depends('_proto', p); });
 
 			o = field(form.Value, 'password', _('Password'));
 			o.password = true;
 			o.validate = function(section_id, value) {
-				return this.section.formvalue(section_id, '_proto') != 'l2tp' || !!value ? true : _('L2TP requires a username and password.');
+				return !PPP_PORT[this.section.formvalue(section_id, '_proto')] || !!value ? true : _('This account requires a username and password.');
 			};
-			[ 'trojan', 'shadowsocks', 'socks', 'http', 'hysteria2', 'tuic', 'l2tp' ].forEach(function(p) { o.depends('_proto', p); });
+			[ 'trojan', 'shadowsocks', 'socks', 'http', 'hysteria2', 'tuic', 'l2tp', 'pptp', 'sstp' ].forEach(function(p) { o.depends('_proto', p); });
 
 			o = field(form.Flag, 'uot', _('UDP over TCP'),
 				_('UDP is carried inside the TCP connection, for a SOCKS server that takes it that way. Only sing-box does this, so a node with it on is carried by sing-box when there is one.'));

@@ -93,7 +93,7 @@ function testTitle(kind) {
 
 function testHint(kind) {
 	return kind == 'ping' ? _('ICMP round trip to the address. Says nothing about the server behind it, which may not answer pings at all.')
-	     : kind == 'tcp'  ? _('A handshake to the port the tunnel will use. For L2TP, a TCP connection through the tunnel to the test URL.')
+	     : kind == 'tcp'  ? _('A handshake to the port the tunnel will use. For L2TP, PPTP and SSTP, a TCP connection through the tunnel to the test URL.')
 	     :                  _('One whole request carried by this node. The only one that proves it works.');
 }
 
@@ -243,7 +243,7 @@ function addViaLinks() {
 	var box = E('textarea', {
 		'rows': 8, 'wrap': 'off',
 		'style': 'width:100%;direction:ltr;text-align:left;font-family:monospace',
-		'placeholder': 'vless://…\nvmess://…\naether://…\nl2tp://user:password@server:1701?ipsec=0\nl2tp://user:password@server:1701?ipsec=1&psk=key'
+		'placeholder': 'vless://…\nvmess://…\naether://…\nl2tp://user:password@server:1701?ipsec=0\nl2tp://user:password@server:1701?ipsec=1&psk=key\npptp://user:password@server:1723\nsstp://user:password@server:443'
 	});
 	ui.showModal(_('Add the node via the link'), [
 		E('p', {}, _('Enter share links, one per line. Subscription links are not supported!')),

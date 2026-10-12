@@ -335,9 +335,13 @@ service_started() {
 	tproxy_port="$(cfg tproxy_port 1082)"
 	bridge_port="$(cfg bridge_port 10808)"
 
-	if bridge_wanted && { bridge_is_ovpn || bridge_is_l2tp; }; then
+	if bridge_wanted && { bridge_is_ovpn || bridge_is_l2tp || bridge_is_ppp; }; then
 		_tunnel_dev="$ZGZ_OVPN_DEV"; _tunnel_name=OpenVPN
 		if bridge_is_l2tp; then _tunnel_dev=zgzl2tp; _tunnel_name=L2TP; fi
+		case "$(bridge_type)" in
+			pptp) _tunnel_dev=zgzpptp; _tunnel_name=PPTP ;;
+			sstp) _tunnel_dev=zgzsstp; _tunnel_name=SSTP ;;
+		esac
 		# OpenVPN opens no port: what it makes is its tunnel device, with an
 		# address on it once the server has answered. Waited for, so that the
 		# rules do not send the network into a way out that is not there yet.
@@ -379,7 +383,27 @@ service_started() {
 	# The rules send every LAN packet to a port the core listens on, and name
 	# lookups to another. Install them before it is listening and the whole
 	# network has nowhere to go - no web, no DNS, and no obvious reason why.
-	if ! wait_for_port "$tproxy_port" 20; then
+	#
+	# Twenty seconds is plenty on most routers, but not on all: a small one
+	# reading geoip.dat and geosite.dat can take half a minute before Xray
+	# listens, and giving up at twenty left a core that was about to work
+	# with no rules in front of it. So past twenty the wait goes on, up to two
+	# minutes, for as long as the core is still running.
+	_cw=0
+	_cwarned=0
+	until listening "$tproxy_port"; do
+		_cw=$((_cw + 1))
+		if [ "$_cw" -ge 20 ]; then
+			pgrep -f "$ZGZ_CONFIG_JSON" >/dev/null 2>&1 || break
+			[ "$_cw" -lt 120 ] || break
+			if [ "$_cwarned" = 0 ]; then
+				log_step "the core is still starting - waiting for it"
+				_cwarned=1
+			fi
+		fi
+		sleep 1
+	done
+	if ! listening "$tproxy_port"; then
 		log "$(core_title "$(active_engine)") never started listening on $tproxy_port - leaving the network untouched"
 		ks_on && log "Kill switch is on: devices have no way out by the uplink until the tunnel works"
 		log "listening now: $(netstat -ln 2>/dev/null | awk '/LISTEN|udp/ { print $4 }' | tr '\n' ' ')"

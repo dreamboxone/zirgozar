@@ -1,0 +1,264 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+# Part of Zirgozar - https://github.com/dreamboxone/zirgozar
+#
+# zgz-pppvpn - PPTP and SSTP accounts, the way zgz-l2tp carries L2TP ones: a
+# PPP link on a device of its own, with a routing table of its own, which the
+# core then sends the tunnel's traffic out of. Nothing on the router is routed
+# over it otherwise.
+#
+#   zgz-pppvpn check          is everything there for the node in bridge.json
+#   zgz-pppvpn run            connect, and stay until the link goes (procd)
+#   zgz-pppvpn test tcp|url   connect the node on stdin, measure, disconnect
+#
+# PPTP is pppd with its PPTP plugin, to TCP port 1723 and then GRE. SSTP is
+# sstpc, which speaks PPP inside HTTPS to port 443 and starts pppd itself.
+
+set -e
+. "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
+MODE="${1:-check}"
+NODE="${ZGZ_PPP_NODE:-$ZGZ_ETC/bridge.json}"
+
+fail() {
+	[ "$MODE" = test ] || say_message "$1"
+	echo "$1" >&2
+	exit 1
+}
+
+field() {
+	jsonfilter -i "$NODE" -e "@.$1" 2>/dev/null || true
+}
+
+# Which of the two, and the names that go with it. A test runs on a device and
+# a table of its own, so that measuring an account never disturbs the one the
+# tunnel is running on.
+setup() {
+	TYPE="$(field type)"
+	case "$TYPE" in
+		pptp) NAME=PPTP ;;
+		sstp) NAME=SSTP ;;
+		*) fail 'This is not a PPTP or SSTP account.' ;;
+	esac
+	if [ "$MODE" = test ]; then
+		DEV="zgz${TYPE}t"; STATE="$ZGZ_RUN/$TYPE-test"
+		[ "$TYPE" = pptp ] && TABLE=19014 || TABLE=19015
+	else
+		DEV="zgz$TYPE"; STATE="$ZGZ_RUN/$TYPE"
+		[ "$TYPE" = pptp ] && TABLE=19012 || TABLE=19013
+	fi
+}
+
+# One value inside double quotes for a pppd options file. A control character
+# could end the line and start an option of its own, so it is refused.
+quote() {
+	case "$1" in *[[:cntrl:]]*) fail "Invalid character in the $NAME account." ;; esac
+	printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+}
+
+pptp_plugin() {
+	for _pp in /usr/lib/pppd/*/pptp.so; do
+		[ -f "$_pp" ] && { echo "$_pp"; return 0; }
+	done
+	return 1
+}
+
+check() {
+	command -v pppd >/dev/null 2>&1 || fail "$NAME needs PPP. Install dependencies under Router requirements."
+	if [ "$TYPE" = pptp ]; then
+		pptp_plugin >/dev/null || fail 'PPTP needs the PPTP plugin for PPP. Install dependencies under Router requirements.'
+	else
+		command -v sstpc >/dev/null 2>&1 && [ -f /usr/lib/sstp-pppd-plugin.so ] ||
+			fail 'SSTP needs sstp-client. Install dependencies under Router requirements.'
+	fi
+	SERVER="$(field server)"; PORT="$(field port)"; USER="$(field username)"; PASS="$(field password)"
+	MTU="$(field mtu)"; MPPE="$(field mppe)"
+	case "$SERVER" in ''|*[!A-Za-z0-9_.-]*) fail "Invalid $NAME account. Check server, username and password." ;; esac
+	case "$PORT" in ''|*[!0-9]*) fail "Invalid $NAME account. Check server, username and password." ;; esac
+	case "$MTU" in ''|*[!0-9]*) MTU=1400 ;; esac
+	[ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ] && [ "$MTU" -ge 576 ] && [ "$MTU" -le 1460 ] &&
+		[ -n "$USER" ] && [ -n "$PASS" ] || fail "Invalid $NAME account. Check server, username and password."
+	quote "$USER" >/dev/null; quote "$PASS" >/dev/null
+}
+
+cleanup() {
+	trap - EXIT INT TERM
+	[ -z "${PID:-}" ] || { kill "$PID" 2>/dev/null || true; wait "$PID" 2>/dev/null || true; }
+	# The PPP pid is owned by our linkname, not by other PPP connections.
+	_ppp="$(cat "/var/run/ppp-$DEV.pid" 2>/dev/null)" || _ppp=''
+	case "$_ppp" in ''|*[!0-9]*) : ;; *)
+		if [ -r "/proc/$_ppp/cmdline" ] && tr '\000' ' ' < "/proc/$_ppp/cmdline" | grep -Fq "$STATE/ppp.options"; then
+			kill "$_ppp" 2>/dev/null || true
+		fi ;;
+	esac
+	if [ "${ROUTES:-0}" = 1 ]; then
+		ip -4 rule del pref "$TABLE" oif "$DEV" lookup "$TABLE" 2>/dev/null || true
+		ip -4 route flush table "$TABLE" 2>/dev/null || true
+		ip -6 rule del pref "$TABLE" oif "$DEV" lookup "$TABLE" 2>/dev/null || true
+		ip -6 route flush table "$TABLE" 2>/dev/null || true
+	fi
+	[ "${PAUSED:-0}" != 1 ] || "$ZGZ_LIB/zgz-rules" local resume >/dev/null 2>&1 || true
+	rm -rf "$STATE"
+	[ "${TEST_LOCK:-0}" != 1 ] || rmdir "$ZGZ_RUN/.l2tp-test-lock" 2>/dev/null || true
+}
+
+connect() {
+	check
+	# Do not overwrite a table or interface owned by another program.
+	[ ! -d "/sys/class/net/$DEV" ] || fail "The $NAME device is already in use."
+	[ -z "$(ip -4 route show table "$TABLE" 2>/dev/null)" ] || fail "The $NAME routing table is already in use."
+	ROUTES=1
+	# A dead PPP link must fail closed, rather than fall back to the WAN.
+	ip -4 route add unreachable default metric 32767 table "$TABLE"
+	ip -4 rule add pref "$TABLE" oif "$DEV" lookup "$TABLE"
+	ip -6 route add unreachable default metric 32767 table "$TABLE" 2>/dev/null || true
+	ip -6 rule add pref "$TABLE" oif "$DEV" lookup "$TABLE" 2>/dev/null || true
+	umask 077
+	mkdir -p "$STATE"
+	# Looked up outside the tunnel: this account is the way into it.
+	_ip="$(resolve_direct "$SERVER" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
+	[ -n "$_ip" ] || fail "The $NAME server has no reachable IPv4 address."
+
+	# What both have in common. The address, the routes and the name servers
+	# the server offers are not used: the core decides what goes where.
+	{
+		echo 'noauth'
+		echo 'noipdefault'
+		echo 'nodefaultroute'
+		echo 'noproxyarp'
+		echo 'refuse-eap'
+		# Header compression and IPv6 are not asked for: servers that do
+		# not offer them - SoftEther's SSTP for one - reject the request and
+		# then drop the link.
+		echo 'novj'
+		echo 'novjccomp'
+		echo 'nobsdcomp'
+		echo 'nodeflate'
+		echo 'noipv6'
+		echo 'ipcp-accept-local'
+		echo 'ipcp-accept-remote'
+		echo 'lcp-echo-interval 5'
+		echo 'lcp-echo-failure 3'
+		echo 'lcp-max-terminate 0'
+		echo "ifname $DEV"
+		echo "linkname $DEV"
+		echo "ipparam $DEV"
+		echo 'ip-up-script /bin/true'
+		echo 'ip-down-script /bin/true'
+		echo 'nodetach'
+		echo "user $(quote "$USER")"
+		echo "password $(quote "$PASS")"
+	} > "$STATE/ppp.options" || fail "Cannot write the $NAME options."
+
+	if [ "$TYPE" = pptp ]; then
+		# PPTP servers almost all insist on MPPE, and the account can say
+		# when one does not.
+		{
+			echo "plugin $(pptp_plugin)"
+			echo "pptp_server $_ip"
+			if [ "$MPPE" = false ]; then
+				echo 'nomppe'
+			else
+				echo 'require-mppe-128'
+			fi
+		} >> "$STATE/ppp.options"
+		pppd file "$STATE/ppp.options" > "$STATE/log" 2>&1 &
+	else
+		# SSTP is TLS to the address looked up above, not to the name: the
+		# name would be looked up again by sstpc, through whatever the router
+		# is using for names - which may be the tunnel this is to become.
+		# The certificate is not checked, as OpenWrt's own SSTP does not.
+		# sstpc gives pppd its own plugin and socket.
+		echo 'refuse-pap' >> "$STATE/ppp.options"
+		# No --ipparam here: given one, sstpc's link is dropped right after
+		# the password is accepted.
+		sstpc --cert-warn --log-stderr --log-level 1 \
+			--user "$USER" --password "$PASS" \
+			"$_ip:$PORT" file "$STATE/ppp.options" > "$STATE/log" 2>&1 &
+	fi
+	PID=$!
+	_n=0
+	while [ "$_n" -lt 45 ]; do
+		if ! kill -0 "$PID" 2>/dev/null; then
+			[ ! -s "$STATE/log" ] || tail -20 "$STATE/log" >&2
+			fail "The $NAME client stopped. Check Runtime Logs."
+		fi
+		if ip -4 addr show dev "$DEV" 2>/dev/null | grep -q 'inet '; then
+			# Set on the device once it is up, not negotiated: SoftEther's SSTP
+			# drops a link that asks for any MRU of its own.
+			ip link set dev "$DEV" mtu "$MTU" 2>/dev/null || true
+			ip -4 route replace default dev "$DEV" metric 10 table "$TABLE"
+			return 0
+		fi
+		sleep 1; _n=$((_n+1))
+	done
+	# Authentication diagnostics contain no account password with PPP debug off.
+	[ ! -s "$STATE/log" ] || tail -20 "$STATE/log" >&2
+	fail "$NAME did not connect. Check server, username and password."
+}
+
+measure() {
+	_url="$(cfg test_url 'http://www.gstatic.com/generate_204')"
+	# Resolve outside the tunnel, then make the measured connection on PPP.
+	_authority="${_url#*://}"; _authority="${_authority%%/*}"
+	_host="${_authority%%:*}"; _port="${_authority##*:}"
+	case "$_url" in http://*) _default=80 ;; https://*) _default=443 ;; *) fail 'Invalid test URL.' ;; esac
+	[ "$_port" != "$_authority" ] || _port="$_default"
+	_ip="$(resolve_direct "$_host" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
+	[ -n "$_ip" ] || { echo 0; return 1; }
+	if [ "$KIND" = tcp ]; then
+		_t="$(curl -4 -sS --noproxy '*' --interface "$DEV" --resolve "$_host:$_port:$_ip" \
+			--connect-timeout 8 --max-time 10 -o /dev/null -w '%{time_connect}' "$_url" 2>/dev/null)" || true
+	else
+		_t="$(curl -4 -fsS --noproxy '*' --interface "$DEV" --resolve "$_host:$_port:$_ip" \
+			--connect-timeout 8 --max-time 10 -o /dev/null -w '%{time_total}' "$_url" 2>/dev/null)" || _t=0
+	fi
+	awk -v t="${_t:-0}" 'BEGIN { print (t > 0 ? (t*1000 < 1 ? 1 : int(t*1000+0.5)) : 0) }'
+}
+
+case "$MODE" in
+	check)
+		setup
+		check ;;
+	run)
+		setup
+		trap cleanup EXIT
+		trap 'exit 1' INT TERM
+		connect
+		# procd starts the whole connection again when the client exits or
+		# the link loses its address.
+		while kill -0 "$PID" 2>/dev/null; do
+			ip -4 addr show dev "$DEV" 2>/dev/null | grep -q 'inet ' || exit 1
+			sleep 5
+		done
+		exit 1 ;;
+	test)
+		KIND="${2:-url}"
+		case "$KIND" in tcp|url) : ;; *) exit 1 ;; esac
+		# One account measured at a time, L2TP ones included: each pauses the
+		# router's own traffic going into the tunnel while it connects.
+		mkdir "$ZGZ_RUN/.l2tp-test-lock" 2>/dev/null || { echo -2; exit 1; }
+		TEST_LOCK=1
+		_in="$ZGZ_RUN/pppvpn-test.$$"
+		umask 077
+		cat > "$_in"
+		NODE="$_in"
+		setup
+		mkdir -p "$STATE"
+		mv -f "$_in" "$STATE/node.json"
+		NODE="$STATE/node.json"
+		trap cleanup EXIT
+		trap 'exit 1' INT TERM
+		# An already connected identical account can be measured without reconnecting.
+		if cmp -s "$NODE" "$ZGZ_ETC/bridge.json" && ip -4 addr show dev "zgz$TYPE" 2>/dev/null | grep -q 'inet '; then
+			DEV="zgz$TYPE"
+			measure
+			exit 0
+		fi
+		if [ "$(cfg_bool localhost_proxy 1)" = 1 ]; then
+			"$ZGZ_LIB/zgz-rules" local pause >/dev/null 2>&1; PAUSED=1
+		fi
+		connect
+		measure ;;
+	*) echo 'usage: zgz-pppvpn check|run|test tcp|url' >&2; exit 1 ;;
+esac

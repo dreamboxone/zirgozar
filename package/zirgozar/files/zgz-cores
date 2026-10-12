@@ -617,6 +617,13 @@ remove_openvpn() {
 
 LATEST_CACHE="$ZGZ_ETC/cores.latest"
 LATEST_MAX_AGE=43200        # twelve hours
+# This program's own release is asked after on its own and more often: one
+# small request an hour, so that a new release reaches the routers within the
+# hour while the cores' dozen requests stay twice a day. When it was asked is
+# kept in memory, not on flash: the list itself is rewritten only when the
+# answer is new.
+APP_MAX_AGE=3600            # an hour
+APP_CHECKED="$ZGZ_RUN/app.latest.checked"
 
 latest_of() {
 	sed -n "s/^$1	//p" "$LATEST_CACHE" 2>/dev/null | head -1
@@ -701,8 +708,12 @@ cmd_latest() {
 	# that gets a router rate-limited.
 	if [ "${1:-}" != "force" ] && [ -s "$LATEST_CACHE" ]; then
 		_age=$(( $(date +%s) - $(date -r "$LATEST_CACHE" +%s 2>/dev/null || echo 0) ))
-		[ "$_age" -ge 0 ] && [ "$_age" -lt "$LATEST_MAX_AGE" ] && return 0
+		if [ "$_age" -ge 0 ] && [ "$_age" -lt "$LATEST_MAX_AGE" ]; then
+			app_latest
+			return 0
+		fi
 	fi
+	echo $(( $(date +%s) + APP_MAX_AGE )) > "$APP_CHECKED" 2>/dev/null || true
 
 	_tmp="$LATEST_CACHE.new"
 	: > "$_tmp"
@@ -748,6 +759,34 @@ cmd_latest() {
 	else
 		rm -f "$_tmp"
 	fi
+	return 0
+}
+
+# This program's newest release alone, when the last asking is an hour old.
+# When the next asking is due is written down before asking, so the page's
+# polls do not ask again while one is on its way; a question that got no
+# answer - the router just up, GitHub not reachable - is asked again in five
+# minutes rather than in an hour.
+app_latest() {
+	_now="$(date +%s)"
+	_due="$(cat "$APP_CHECKED" 2>/dev/null)" || _due=0
+	case "$_due" in ''|*[!0-9]*) _due=0 ;; esac
+	[ "$_now" -lt "$_due" ] && return 0
+	echo $((_now + APP_MAX_AGE)) > "$APP_CHECKED" 2>/dev/null || true
+	_tag="$(curl -fsSL --connect-timeout 8 --max-time 20 \
+		"https://api.github.com/repos/$(repo_of zirgozar)/releases/latest" 2>/dev/null |
+		sed -n 's/.*"tag_name"[ \t]*:[ \t]*"\([^"]*\)".*/\1/p' | head -1)"
+	if [ -z "$_tag" ]; then
+		echo $((_now + 300)) > "$APP_CHECKED" 2>/dev/null || true
+		return 0
+	fi
+	_tag="$(tag_version "$_tag")"
+	[ "$(latest_of zirgozar)" = "$_tag" ] && return 0
+	{
+		grep -v "^zirgozar$(printf '\t')" "$LATEST_CACHE" 2>/dev/null || true
+		printf 'zirgozar\t%s\n' "$_tag"
+	} > "$LATEST_CACHE.new" && mv -f "$LATEST_CACHE.new" "$LATEST_CACHE"
+	log "a new release of this program is out: $_tag"
 	return 0
 }
 

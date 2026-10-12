@@ -44,6 +44,7 @@ var T = [
 	[ 'the chosen server needs a core this router does not have', 'سرور انتخاب‌شده هسته‌ای لازم دارد که روی این روتر نیست' ],
 	[ '{} did not connect within two minutes', '{1} در دو دقیقه وصل نشد' ],
 	[ 'the bridge never started listening on {}', 'پل هیچ‌وقت روی {1} شروع به گوش دادن نکرد' ],
+	[ 'the core is still starting - waiting for it', 'هسته هنوز در حال راه‌اندازی است - منتظر آن' ],
 	[ '{} never started listening on {} - leaving the network untouched', '{1} هیچ‌وقت روی {2} شروع به گوش دادن نکرد - شبکه دست‌نخورده ماند' ],
 	[ '{}[{}] transparent proxy, DNS[{}], firewall: {}', '{1}[{2}] پروکسی شفاف، DNS[{3}]، فایروال: {4}' ],
 	[ 'Kill switch is on: devices have no way out by the uplink until the tunnel works', 'کلید قطع اضطراری روشن است: تا تونل کار نکند دستگاه‌ها از اینترنت اصلی راهی به بیرون ندارند' ],
@@ -187,6 +188,7 @@ var T = [
 	[ 'update: installing with {}', 'به‌روزرسانی: در حال نصب با {1}' ],
 	[ 'update: {} said: {}', 'به‌روزرسانی: {1} گفت: {2}' ],
 	[ 'update: now version {}', 'به‌روزرسانی: نسخه فعلی {1}' ],
+	[ 'a new release of this program is out: {}', 'نسخه جدید این برنامه منتشر شده: {1}' ],
 	[ 'update: {} (not enough room)', 'به‌روزرسانی: {1} (جای کافی نیست)' ],
 	[ 'update: {}', 'به‌روزرسانی: {1}' ],
 	[ 'nothing missing', 'چیزی کم نیست' ],
@@ -298,9 +300,78 @@ function line(l) {
 	return sentence(l);
 }
 
+/* -------------------------------------------------------- the core's log
+
+   The cores' own lines, as the system log has them: "Mon Oct 12 17:59:17
+   2026 daemon.info xray[17714]: 2026/10/12 14:29:17.375071 from ... ". What
+   the core says is its own and mostly stays as it said it; the date becomes
+   one Solar Hijri date, the level a Persian word, and the line Xray writes
+   for every connection - most of the log - a Persian sentence. */
+
+var MONTHS = { Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6, Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12 };
+
+var WAY = { proxy: 'تونل', direct: 'مستقیم', block: 'مسدود', 'dns-out': 'DNS', api: 'آمار' };
+
+var LEVEL = { Debug: 'اشکال‌زدایی', Info: 'اطلاعات', Warning: 'هشدار', Error: 'خطا',
+              DEBUG: 'اشکال‌زدایی', INFO: 'اطلاعات', WARN: 'هشدار', ERROR: 'خطا', FATAL: 'خطای مهلک' };
+
+var CORE = [
+	[ 'core: Xray {} started', 'هسته: Xray {1} شروع به کار کرد' ],
+	[ 'infra/conf/serial: Reading config: &{Name:{} Format:json}', 'خواندن کانفیگ: {1}' ],
+	[ 'A unified platform for anti-censorship.', 'یک بستر یکپارچه برای مقابله با سانسور.' ],
+	[ 'infra/conf: The "{}" setting is deprecated and will be removed. {}', 'تنظیم «{1}» منسوخ شده و حذف خواهد شد. {2}' ],
+	[ 'inbound/{}[{}]: inbound connection from {}', 'ورودی {2}: اتصال ورودی از {3}' ],
+	[ 'inbound/{}[{}]: inbound packet connection from {}', 'ورودی {2}: اتصال بسته‌ای ورودی از {3}' ],
+	[ 'inbound/{}[{}]: inbound connection to {}', 'ورودی {2}: اتصال ورودی به {3}' ],
+	[ 'inbound/{}[{}]: inbound packet connection to {}', 'ورودی {2}: اتصال بسته‌ای ورودی به {3}' ],
+	[ 'outbound/{}[{}]: outbound connection to {}', 'خروجی {2}: اتصال خروجی به {3}' ],
+	[ 'outbound/{}[{}]: outbound packet connection to {}', 'خروجی {2}: اتصال بسته‌ای خروجی به {3}' ],
+	[ 'connection: open connection to {} using outbound/{}[{}]: {}', 'اتصال: باز کردن اتصال به {1} از خروجی {3} ممکن نشد: {4}' ],
+	[ 'sing-box started ({})', 'sing-box شروع به کار کرد ({1})' ]
+];
+var CORE_RX = CORE.map(function(t) {
+	var parts = t[0].split('{}').map(function(p) {
+		return p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	});
+	return [ new RegExp('^' + parts.join('(.*?)') + '$'), t[1] ];
+});
+
+function coreSentence(s) {
+	/* Xray's line for each connection it takes. */
+	var m = /^from (.+?) accepted (tcp|udp):(.+?) \[(.+?) -> (.+?)\]$/.exec(s);
+	if (m)
+		return 'اتصال ' + m[2].toUpperCase() + ' از ' + (m[1] == 'DNS' ? 'DNS' : m[1]) + ' به ' + m[3] +
+			' [' + m[4] + ' ← ' + (WAY[m[5]] || m[5]) + ']';
+	for (var i = 0; i < CORE_RX.length; i++) {
+		var c = CORE_RX[i][0].exec(s);
+		if (c) return CORE_RX[i][1].replace(/\{(\d+)\}/g, function(w, n) { return c[+n] != null ? c[+n] : ''; });
+	}
+	return s;
+}
+
+function coreLine(l) {
+	l = l.replace(/\x1b\[[0-9;]*m/g, '');
+	var m = /^\w{3} (\w{3}) +(\d+) (\d{2}:\d{2}:\d{2}) (\d{4}) [a-z]+\.[a-z]+ ([^\s:]+?)(?:\[\d+\])?: (.*)$/.exec(l);
+	if (!m) return coreSentence(l);
+	var date = MONTHS[m[1]] ? jalali(+m[4], MONTHS[m[1]], +m[2]) + ' ' + m[3] : m[1] + ' ' + m[2] + ' ' + m[3];
+	var who = m[5], s = m[6];
+	/* The core's own date after the system log's: Xray's in UTC, sing-box's
+	   with its zone. One date is enough. */
+	s = s.replace(/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)? /, '')
+	     .replace(/^[+-]\d{4} \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} /, '');
+	var level = '';
+	var lv = /^\[(Debug|Info|Warning|Error)\] (.*)$/.exec(s) ||
+	         /^(DEBUG|INFO|WARN|ERROR|FATAL)\s*(?:\[[^\]]*\]\s*)?(.*)$/.exec(s);
+	if (lv) { level = '[' + LEVEL[lv[1]] + '] '; s = lv[2]; }
+	return date + ' ' + who + ': ' + level + coreSentence(s);
+}
+
 return baseclass.extend({
 	text: function(t) {
 		return String(t || '').split('\n').map(line).join('\n');
+	},
+	core: function(t) {
+		return String(t || '').split('\n').map(coreLine).join('\n');
 	},
 	line: line,
 	sentence: sentence,

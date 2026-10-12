@@ -157,7 +157,7 @@ sift_one() {
 	# a real request, decides whether they work.
 	case "$_proto" in
 		balancing|shunt|interface) return 0 ;;
-		wireguard|hysteria2|hysteria|tuic|openvpn|amneziawg|warp|aether|l2tp)
+		wireguard|hysteria2|hysteria|tuic|openvpn|amneziawg|warp|aether|l2tp|pptp|sstp)
 			printf '%06d\t%s\n' 9000 "$_tag" >> "$ALIVE"
 			echo x >> "$ATTEMPTS"
 			return 0
@@ -353,15 +353,17 @@ prune_batch() {
 # Measure one batch. Appends "ms<TAB>tag" per server that answered.
 run_batch() {
 	_list="$1"
-	# L2TP accounts need a negotiated PPP tunnel before a request is meaningful.
-	# Test each in isolation; they cannot be placed in a batch of native outbounds.
-	awk -F '\t' '$3 == "l2tp"' "$_list" | while IFS="	" read -r tag label proto host port payload; do
-		_ms="$(printf '%s\n' "$payload" | "$ZGZ_LIB/zgz-l2tp" test url 2>/dev/null)" || _ms=0
+	# L2TP, PPTP and SSTP accounts need a negotiated PPP tunnel before a
+	# request is meaningful. Test each in isolation; they cannot be placed in
+	# a batch of native outbounds.
+	awk -F '\t' '$3 == "l2tp" || $3 == "pptp" || $3 == "sstp"' "$_list" | while IFS="	" read -r tag label proto host port payload; do
+		_pv=zgz-pppvpn; [ "$proto" != l2tp ] || _pv=zgz-l2tp
+		_ms="$(printf '%s\n' "$payload" | "$ZGZ_LIB/$_pv" test url 2>/dev/null)" || _ms=0
 		case "$_ms" in ''|*[!0-9]*) _ms=0 ;; esac
 		[ "$_ms" -le 0 ] || printf '%06d\t%s\n' "$_ms" "$tag" >> "$RESULTS"
 		echo x >> "$ATTEMPTS"
 	done
-	awk -F '\t' '$3 != "l2tp"' "$_list" > "$_list.native"
+	awk -F '\t' '$3 != "l2tp" && $3 != "pptp" && $3 != "sstp"' "$_list" > "$_list.native"
 	mv "$_list.native" "$_list"
 	[ -s "$_list" ] || return 0
 	build_batch_config "$_list"
@@ -555,7 +557,7 @@ cmd_use() {
 	# port to knock on, and which address it uses is warp-plus's choice.
 	case "$(printf '%s' "$_row" | cut -f3)" in
 		balancing|shunt|interface) select_row "$_row" 0; return $? ;;
-		warp|aether|l2tp) select_row "$_row" 0; return $? ;;
+		warp|aether|l2tp|pptp|sstp) select_row "$_row" 0; return $? ;;
 	esac
 	select_row "$_row" "$(tcp_ms "$(printf '%s' "$_row" | cut -f4)" "$(printf '%s' "$_row" | cut -f5)")"
 }
@@ -579,7 +581,7 @@ select_row() {
 
 	_tmp="$ZGZ_RUN/best.new"
 	case "$_proto" in
-		hysteria2|tuic|openvpn|amneziawg|warp|aether|l2tp)
+		hysteria2|tuic|openvpn|amneziawg|warp|aether|l2tp|pptp|sstp)
 			# Xray cannot speak these. zgz-bridge runs a core that can and
 			# offers it as a plain SOCKS port on loopback, so what Xray ends
 			# up holding is an ordinary socks outbound and nothing else in the
@@ -590,8 +592,8 @@ select_row() {
 			write_if_changed "$ZGZ_RUN/bridge.new" "$ZGZ_ETC/bridge.json" || true
 			chmod 600 "$ZGZ_ETC/bridge.json" 2>/dev/null || true
 			rm -f "$ZGZ_RUN/bridge.new"
-			if [ "$_proto" = "openvpn" ] || [ "$_proto" = "l2tp" ]; then
-				_dev="$ZGZ_OVPN_DEV"; [ "$_proto" != l2tp ] || _dev=zgzl2tp
+			if [ "$_proto" = "openvpn" ] || ppp_dev "$_proto" >/dev/null; then
+				_dev="$(ppp_dev "$_proto")" || _dev="$ZGZ_OVPN_DEV"
 				# OpenVPN is a tunnel device, not a port: the way out is
 				# that device, with the core's own mark so the firewall
 				# leaves it alone.

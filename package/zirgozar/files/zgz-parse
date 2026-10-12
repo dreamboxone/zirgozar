@@ -634,6 +634,35 @@ function do_l2tp(body, secure,   label, query, p, cred, user, pass, psk, mtu, mo
 	emit(label, "l2tp", payload)
 }
 
+# pptp://user:password@server[:1723]?mtu=1400&mppe=1#label
+# sstp://user:password@server[:443]?mtu=1400#label
+# Accounts carried by zgz-pppvpn. Like L2TP, a provider gives the server
+# without a port, so the protocol's own is the default.
+function do_pppvpn(body, kind, defport,   label, query, p, cred, user, pass, mtu, mppe, payload) {
+	p = index(body, "#")
+	if (p > 0) { label = clean_label(substr(body, p + 1)); body = substr(body, 1, p - 1) }
+	p = index(body, "?")
+	if (p > 0) { query = substr(body, p + 1); body = substr(body, 1, p - 1) }
+	p = index(body, "@")
+	if (p <= 0) return
+	cred = substr(body, 1, p - 1); body = substr(body, p + 1)
+	p = index(cred, ":"); if (p <= 0) return
+	user = urldec(substr(cred, 1, p - 1)); pass = urldec(substr(cred, p + 1))
+	sub(/\/+$/, "", body)
+	if (body !~ /:[0-9]+$/) body = body ":" defport
+	if (!hostport(body) || HOST !~ /^[A-Za-z0-9_.-]+$/) return
+	mtu = qs(query, "mtu"); if (mtu == "") mtu = 1400
+	if (mtu !~ /^[0-9]+$/ || (mtu + 0) < 576 || (mtu + 0) > 1460) return
+	mtu += 0
+	mppe = qs(query, "mppe")
+	if (mppe != "" && mppe != "0" && mppe != "1") return
+	if (user == "" || pass == "" || user ~ /[[:cntrl:]]/ || pass ~ /[[:cntrl:]]/) return
+	payload = "{\"type\":\"" kind "\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT ",\"username\":\"" jesc(user) "\",\"password\":\"" jesc(pass) "\",\"mtu\":" mtu
+	if (kind == "pptp") payload = payload ",\"mppe\":" (mppe == "0" ? "false" : "true")
+	payload = payload "}"
+	emit(label, kind, payload)
+}
+
 function do_hysteria2(body,   label, auth, query, p) {
 	p = index(body, "#")
 	if (p > 0) { label = clean_label(substr(body, p + 1)); body = substr(body, 1, p - 1) }
@@ -1759,7 +1788,7 @@ LANDING {
 	line = $0
 	gsub(/\r/, "", line)
 	if (line == "" || split(line, rec, "\t") < 6) next
-	if (rec[3] ~ /^(hysteria2|hysteria|tuic|openvpn|amneziawg|l2tp|warp|aether)$/) next
+	if (rec[3] ~ /^(hysteria2|hysteria|tuic|openvpn|amneziawg|l2tp|pptp|sstp|warp|aether)$/) next
 	if (!lready) {
 		split(ENVIRON["LAND"], land, "\t")
 		lp = ENVIRON["LAND"]
@@ -1886,6 +1915,8 @@ function do_line(line) {
 	else if (index(line, "aether://")    == 1) do_aether(substr(line, 10))
 	else if (index(line, "l2tp://")      == 1) do_l2tp(substr(line, 8), 0)
 	else if (index(line, "l2tp+ipsec://") == 1) do_l2tp(substr(line, 14), 1)
+	else if (index(line, "pptp://")      == 1) do_pppvpn(substr(line, 8), "pptp", 1723)
+	else if (index(line, "sstp://")      == 1) do_pppvpn(substr(line, 8), "sstp", 443)
 }
 
 # ------------------------------------------------------------------- YAML

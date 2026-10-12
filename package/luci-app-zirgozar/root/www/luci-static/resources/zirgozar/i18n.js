@@ -55,7 +55,7 @@ var FA = {
 	'Aether App Path': 'مسیر برنامه اتر',
 	'Aether carries aether:// configs, including WireGuard-over-MASQUE and Tor/Psiphon. Install it above.': 'اتر کانفیگ‌های aether://، از جمله WireGuard روی MASQUE و تور/سایفون را اجرا می‌کند. از بخش بالا نصبش کنید.',
 	'Aether protocol': 'پروتکل اتر',
-	'Aether did not connect within two minutes. Check its exit-node and the Runtime Logs page.': 'اتر در دو دقیقه وصل نشد. نود خروجی آن و صفحه گزارش‌های اجرا را بررسی کنید.',
+	'Aether did not connect within two minutes. Check its exit-node and the Runtime Logs page.': 'اتر در دو دقیقه وصل نشد. نود خروجی آن و صفحه گزارش‌ها را بررسی کنید.',
 	'No Aether config is selected.': 'هیچ کانفیگ اتر انتخاب نشده است.',
 	'An Aether config needs Aether. Install it on the App Update page.': 'برای اجرای کانفیگ اتر، برنامه اتر را از صفحه به‌روزرسانی نصب کنید.',
 	'Aether cannot run on this router.': 'اتر روی این روتر قابل اجرا نیست.',
@@ -101,14 +101,14 @@ var FA = {
 	'Aether DNS': 'DNS اتر',
 	'The downloaded Aether lacks configurable MASQUE SNI. The installed core was kept.': 'نسخه دانلودشده اتر امکان تنظیم SNI مربوط به MASQUE را ندارد. هسته نصب‌شده حفظ شد.',
 	'Usage: zgz-aether check|prepare|run': 'دستور اتر باید با گزینه بررسی، آماده‌سازی یا اجرا فراخوانی شود.',
-	'Aether did not connect within four minutes. Check its endpoint and the Runtime Logs page.': 'اتر در چهار دقیقه متصل نشد. آدرس مقصد و صفحه گزارش‌های اجرا را بررسی کنید.',
+	'Aether did not connect within four minutes. Check its endpoint and the Runtime Logs page.': 'اتر در چهار دقیقه متصل نشد. آدرس مقصد و صفحه گزارش‌ها را بررسی کنید.',
 	'WARP account API address': 'آدرس API ساخت حساب وارپ',
 	'WARP account ECH': 'ECH ساخت حساب وارپ',
 	'WARP account ECH resolver': 'DNS دریافت ECH برای ساخت حساب وارپ',
 	'Used only to create WARP keys; it does not enable ECH on the tunnel.': 'فقط برای ساخت کلیدهای وارپ استفاده می‌شود و ECH تونل را فعال نمی‌کند.',
 	'Leave empty to scan automatically. A fixed endpoint disables automatic endpoint selection.': 'برای اسکن خودکار خالی بگذارید. با وارد کردن آدرس ثابت، انتخاب خودکار مقصد غیرفعال می‌شود.',
 	'Invalid Aether account ECH setting.': 'تنظیم ECH ساخت حساب اتر معتبر نیست.',
-	'Aether could not create its WARP account. On the Configs page, edit this config, turn on Advanced Aether options and change the WARP account API address or WARP account ECH. Runtime Logs has the details.': 'ساخت حساب وارپ اتر انجام نشد. در صفحه «کانفیگ‌ها» این کانفیگ را ویرایش کنید، «تنظیمات پیشرفته اتر» را روشن کنید و «آدرس API ساخت حساب وارپ» یا «ECH ساخت حساب وارپ» را تغییر دهید. جزئیات در «لاگ‌های اجرا» است.',
+	'Aether could not create its WARP account. On the Configs page, edit this config, turn on Advanced Aether options and change the WARP account API address or WARP account ECH. Runtime Logs has the details.': 'ساخت حساب وارپ اتر انجام نشد. در صفحه «کانفیگ‌ها» این کانفیگ را ویرایش کنید، «تنظیمات پیشرفته اتر» را روشن کنید و «آدرس API ساخت حساب وارپ» یا «ECH ساخت حساب وارپ» را تغییر دهید. جزئیات در «گزارش‌ها» است.',
 	'Exit countries': 'کشورهای خروجی',
 	'Germany': 'آلمان',
 	'Sweden': 'سوید',
@@ -159,7 +159,7 @@ var FA = {
 	'No backup file was received.': 'فایل پشتیبانی دریافت نشد.',
 	'This is not a Zirgozar backup file.': 'این فایل، فایل پشتیبان زیرگذر نیست.',
 	'The settings in this backup file are damaged.': 'تنظیمات داخل این فایل پشتیبان خراب است.',
-	'For L2TP it can be left empty: the standard port 1701 is used.': 'برای L2TP می‌توان خالی گذاشت؛ پورت استاندارد 1701 استفاده می‌شود.',
+	'For L2TP, PPTP and SSTP it can be left empty: the standard port is used (1701, 1723 and 443).': 'برای L2TP، PPTP و SSTP می‌توان خالی گذاشت؛ پورت استاندارد استفاده می‌شود (1701، 1723 و 443).',
 	'Expecting: non-empty value': 'این فیلد نباید خالی باشد',
 	'Available: %s': 'آماده نصب: %s',
 	'days': 'روز',
@@ -222,14 +222,41 @@ var FA = {
 	'L2TP tests': 'تست‌های L2TP',
 	'Enter the L2TP server IPv4 address or domain name.': 'آدرس IPv4 یا نام دامنه سرور L2TP را وارد کنید.',
 	'L2TP requires a username and password.': 'برای L2TP نام کاربری و رمز عبور لازم است.',
-	'A handshake to the port the tunnel will use. For L2TP, a TCP connection through the tunnel to the test URL.': 'زمان برقراری اتصال به پورت سرور. برای L2TP، زمان اتصال TCP از داخل تونل به مقصد تست.',
+	'A handshake to the port the tunnel will use. For L2TP, PPTP and SSTP, a TCP connection through the tunnel to the test URL.': 'زمان برقراری اتصال به پورت سرور. برای L2TP، PPTP و SSTP، زمان اتصال TCP از داخل تونل به مقصد تست.',
+	'Enter the server IPv4 address or domain name.': 'آدرس IPv4 یا نام دامنه سرور را وارد کنید.',
+	'This account requires a username and password.': 'برای این اکانت نام کاربری و رمز عبور لازم است.',
+	'MPPE encryption': 'رمزگذاری MPPE',
+	'Almost every PPTP server requires it. Turn it off only if the provider says the server does not encrypt.': 'تقریباً همه سرورهای PPTP آن را لازم دارند. فقط وقتی خاموشش کنید که فروشنده بگوید سرور رمزگذاری ندارد.',
+	'PPTP tests': 'تست‌های PPTP',
+	'SSTP tests': 'تست‌های SSTP',
+	'PPTP uses TCP port 1723 and GRE. Its encryption is weak: use it only when nothing else gets through. Ping measures the server address. TCPing measures a TCP connection through the tunnel to the test URL; URL Test measures the full request.': 'PPTP از پورت TCP شماره ۱۷۲۳ و GRE استفاده می‌کند. رمزگذاری آن ضعیف است: فقط وقتی استفاده کنید که چیز دیگری رد نمی‌شود. پینگ زمان پاسخ آدرس سرور را می‌سنجد. TCPing زمان اتصال TCP از داخل تونل به مقصد تست و URL Test زمان درخواست کامل را می‌سنجد.',
+	'SSTP runs inside HTTPS, normally on port 443, so it gets through most firewalls. The server certificate is not checked. Ping measures the server address. TCPing measures a TCP connection through the tunnel to the test URL; URL Test measures the full request.': 'SSTP داخل HTTPS و معمولاً روی پورت ۴۴۳ کار می‌کند، برای همین از بیشتر فایروال‌ها رد می‌شود. گواهی سرور بررسی نمی‌شود. پینگ زمان پاسخ آدرس سرور را می‌سنجد. TCPing زمان اتصال TCP از داخل تونل به مقصد تست و URL Test زمان درخواست کامل را می‌سنجد.',
+	'This is not a PPTP or SSTP account.': 'این اکانت PPTP یا SSTP نیست.',
+	'PPTP needs PPP. Install dependencies under Router requirements.': 'PPTP به PPP نیاز دارد. وابستگی‌ها را در بخش نیازمندی‌های روتر نصب کنید.',
+	'SSTP needs PPP. Install dependencies under Router requirements.': 'SSTP به PPP نیاز دارد. وابستگی‌ها را در بخش نیازمندی‌های روتر نصب کنید.',
+	'PPTP needs the PPTP plugin for PPP. Install dependencies under Router requirements.': 'PPTP به افزونه PPTP برای PPP نیاز دارد. وابستگی‌ها را در بخش نیازمندی‌های روتر نصب کنید.',
+	'SSTP needs sstp-client. Install dependencies under Router requirements.': 'SSTP به sstp-client نیاز دارد. وابستگی‌ها را در بخش نیازمندی‌های روتر نصب کنید.',
+	'Invalid PPTP account. Check server, username and password.': 'اطلاعات اکانت PPTP درست نیست. آدرس سرور، نام کاربری و رمز را بررسی کنید.',
+	'Invalid SSTP account. Check server, username and password.': 'اطلاعات اکانت SSTP درست نیست. آدرس سرور، نام کاربری و رمز را بررسی کنید.',
+	'The PPTP server has no reachable IPv4 address.': 'سرور PPTP آدرس IPv4 در دسترسی ندارد.',
+	'The SSTP server has no reachable IPv4 address.': 'سرور SSTP آدرس IPv4 در دسترسی ندارد.',
+	'The PPTP client stopped. Check Runtime Logs.': 'برنامه PPTP متوقف شد. گزارش‌ها را بررسی کنید.',
+	'The SSTP client stopped. Check Runtime Logs.': 'برنامه SSTP متوقف شد. گزارش‌ها را بررسی کنید.',
+	'PPTP did not connect. Check server, username and password.': 'PPTP وصل نشد. آدرس سرور، نام کاربری و رمز را بررسی کنید.',
+	'SSTP did not connect. Check server, username and password.': 'SSTP وصل نشد. آدرس سرور، نام کاربری و رمز را بررسی کنید.',
+	'The PPTP device is already in use.': 'دستگاه PPTP در حال استفاده است.',
+	'The SSTP device is already in use.': 'دستگاه SSTP در حال استفاده است.',
+	'The PPTP routing table is already in use.': 'جدول مسیریابی PPTP در حال استفاده است.',
+	'The SSTP routing table is already in use.': 'جدول مسیریابی SSTP در حال استفاده است.',
+	'Invalid character in the PPTP account.': 'اکانت PPTP نویسه نامعتبر دارد.',
+	'Invalid character in the SSTP account.': 'اکانت SSTP نویسه نامعتبر دارد.',
 	'L2TP normally uses UDP port 1701. Ping measures the server address. TCPing measures a TCP connection through the tunnel to the test URL; URL Test measures the full request. Iran routing and traffic rules are applied by the routing core.': 'پورت معمول L2TP برابر ۱۷۰۱ و از نوع UDP است. پینگ زمان پاسخ آدرس سرور را می‌سنجد. TCPing زمان اتصال TCP از داخل تونل به مقصد تست و URL Test زمان درخواست کامل را می‌سنجد. تفکیک ایران و قوانین ترافیک در هسته مسیریابی اعمال می‌شوند.',
 	'L2TP needs xl2tpd and PPP. Install dependencies under Router requirements.': 'L2TP به xl2tpd و PPP نیاز دارد. وابستگی‌ها را در بخش نیازمندی‌های روتر نصب کنید.',
 	'L2TP/IPsec needs strongSwan. Install dependencies under Router requirements.': 'L2TP/IPsec به strongSwan نیاز دارد. وابستگی‌ها را در بخش نیازمندی‌های روتر نصب کنید.',
 	'Invalid L2TP account or missing ucode socket module. Install dependencies and check the account.': 'اطلاعات اکانت L2TP درست نیست یا ماژول socket نصب نشده است. وابستگی‌ها و اطلاعات اکانت را بررسی کنید.',
-	'L2TP/IPsec negotiation failed. Check PSK and Runtime Logs.': 'برقراری IPsec ناموفق بود. کلید مشترک و گزارش‌های اجرا را بررسی کنید.',
+	'L2TP/IPsec negotiation failed. Check PSK and Runtime Logs.': 'برقراری IPsec ناموفق بود. کلید مشترک و گزارش‌ها را بررسی کنید.',
 	'L2TP did not connect. Check server, account password and IPsec settings.': 'L2TP وصل نشد. آدرس سرور، رمز اکانت و تنظیمات IPsec را بررسی کنید.',
-	'L2TP did not connect. The Runtime Logs page says how far it got.': 'L2TP وصل نشد. جزئیات اتصال در برگه گزارش‌های اجرا موجود است.',
+	'L2TP did not connect. The Runtime Logs page says how far it got.': 'L2TP وصل نشد. جزئیات اتصال در برگه گزارش‌ها موجود است.',
 	'Fetched every fifteen minutes. Xray, sing-box, Hysteria, Clash and WireGuard files are accepted, as are a plain list of links and a single base64 block.':
 		'هر پانزده دقیقه یک بار خوانده می‌شود. فایل‌های Xray، sing-box، Hysteria، Clash و وایرگارد پذیرفته می‌شوند، و همین‌طور لیست ساده‌ای از لینک‌ها یا یک بلوک base64.',
 	'Name': 'نام',
@@ -307,12 +334,12 @@ var FA = {
 	'No node on the list answered at all': 'هیچ کانفیگی در لیست جواب نداد',
 
 	/* ------------------------------------------------------------- the log */
-	'Log': 'لاگ',
+	'Log': 'گزارش',
 	'The last few hundred lines this program wrote to the system log, newest at the bottom. It refreshes every five seconds. Nothing here is stored by this package — it is the router’s own log, and it is emptied when the router restarts.':
-		'چند صد خط آخری که این برنامه در لاگ سیستم نوشته، تازه‌ترین در پایین. هر پنج ثانیه تازه می‌شود. هیچ‌کدام از این‌ها را خود پکیج ذخیره نمی‌کند — لاگ خود روتر است و با ریستارت روتر پاک می‌شود.',
+		'چند صد خط آخری که این برنامه در گزارش سیستم نوشته، تازه‌ترین در پایین. هر پنج ثانیه تازه می‌شود. هیچ‌کدام از این‌ها را خود پکیج ذخیره نمی‌کند — گزارش خود روتر است و با ریستارت روتر پاک می‌شود.',
 	/* The lines themselves are said in Persian by logfa.js, sentence by
 	   sentence, with the paths and numbers in them left as they are. */
-	'Nothing has been logged yet.': 'هنوز چیزی در لاگ نوشته نشده.',
+	'Nothing has been logged yet.': 'هنوز چیزی در گزارش نوشته نشده.',
 	'Refresh': 'تازه‌سازی',
 	'Following': 'دنبال کردن',
 	'Not following': 'دنبال نکردن',
@@ -640,10 +667,10 @@ var FA = {
 		'چند اتصال داخل یک اتصال. روی کانفیگ‌های VLESS با flow، xhttp و وایرگارد استفاده نمی‌شود، چون آنجا کار نمی‌کند.',
 	'Mux concurrency': 'تعداد هم‌زمان Mux',
 	'XUDP Mux concurrency': 'تعداد هم‌زمان XUDP',
-	'Enable Node Log': 'لاگ کانفیگ فعال باشد',
+	'Enable Node Log': 'گزارش کانفیگ فعال باشد',
 	'What the core itself says, shown on the Log page beside this program’s own runtime log.':
-		'چیزهایی که خود هسته می‌گوید، که در صفحه لاگ کنار لاگ خود برنامه نشان داده می‌شود.',
-	'Log Level': 'سطح لاگ',
+		'چیزهایی که خود هسته می‌گوید، که در صفحه گزارش کنار گزارش خود برنامه نشان داده می‌شود.',
+	'Log Level': 'سطح گزارش',
 	'Traffic: written every (Min)': 'ترافیک: ذخیره هر (دقیقه)',
 	'Xray Noise Packets': 'بسته‌های نویز Xray',
 	'To send noise packets, select "Noise" in Xray Settings.':
@@ -672,7 +699,7 @@ var FA = {
 	'A downloaded file does not match the release\'s checksum - nothing was installed.':
 		'فایل دانلودشده با چک‌سام انتشار جور نیست - چیزی نصب نشد.',
 	'The package manager refused the new version. The Log page has the details.':
-		'مدیر پکیج نسخه جدید را نپذیرفت. جزییات در صفحه لاگ است.',
+		'مدیر پکیج نسخه جدید را نپذیرفت. جزییات در صفحه گزارش است.',
 	'Updating Zirgozar': 'در حال به‌روزرسانی زیرگذر',
 	'Checking for new versions': 'در حال بررسی نسخه‌های جدید',
 	'Checking which servers answer': 'در حال بررسی سرورهایی که جواب می‌دهند',
@@ -691,13 +718,13 @@ var FA = {
 		'خالی یعنی برنامه خودش Xray مناسب را پیدا می‌کند، و اگر Xray از قبل نصب باشد همان را استفاده می‌کند.',
 
 	/* ------------------------------------------------------ Runtime Logs */
-	'Runtime Logs': 'لاگ‌های اجرا',
-	'The node log is switched off in Settings → Log.': 'لاگ کانفیگ در تنظیمات پایه، برگه لاگ، خاموش است.',
+	'Runtime Logs': 'گزارش‌ها',
+	'The node log is switched off in Settings → Log.': 'گزارش کانفیگ در تنظیمات پایه، برگه گزارش، خاموش است.',
 	'The core has not said anything yet.': 'هسته هنوز چیزی نگفته.',
 	'What Zirgozar does is shown here, refreshed every 5 seconds. It is emptied when the router reboots.':
 		'اقدامات برنامه زیرگذر در این بخش نمایش داده می‌شود که هر 5 ثانیه به‌روز می‌شود. پس از ریبوت روتر پاک می‌شود.',
-	'Clear logs': 'پاک کردن لاگ‌ها',
-	'Node log': 'لاگ کانفیگ',
+	'Clear logs': 'پاک کردن گزارش‌ها',
+	'Node log': 'گزارش کانفیگ',
 	'The Xray core’s messages are shown here.':
 		'پیام‌های هسته Xray در این بخش نمایش داده می‌شود.',
 
@@ -757,7 +784,7 @@ var FA = {
 	'The node the tunnel is using': 'کانفیگی که تونل استفاده می‌کند',
 	'Socks Listen Port': 'پورت SOCKS',
 	'What the core itself says, shown on the Runtime Logs page beside this program’s own log.':
-		'پیام‌های هسته Xray ثبت شوند و در صفحه «لاگ‌های اجرا»، بخش «لاگ کانفیگ» نمایش داده شوند.',
+		'پیام‌های هسته Xray ثبت شوند و در صفحه «گزارش‌ها»، بخش «گزارش کانفیگ» نمایش داده شوند.',
 	'Waiting for the router…': 'در انتظار پاسخ روتر…',
 
 	/* ----------------------------------------------------------- units */
@@ -1036,7 +1063,7 @@ var FA = {
 		'کانفیگ انتخاب‌شده در «تنظیمات پایه» خوانده نمی‌شود. کانفیگ دیگری انتخاب کنید یا آن را روی خودکار بگذارید.',
 	'The helper for this node\'s protocol would not start.': 'هسته کمکی پروتکل این کانفیگ اجرا نشد.',
 	'The tunnel process started but never accepted connections. Check the system log for what it said.':
-		'هسته تونل اجرا شد اما هیچ اتصالی نپذیرفت. پیام آن را در «گزارش‌های اجرا» ببینید.',
+		'هسته تونل اجرا شد اما هیچ اتصالی نپذیرفت. پیام آن را در «گزارش‌ها» ببینید.',
 	'Iran routing is switched on but geoip.dat and geosite.dat are not on the router yet - press Update beside them. Until then everything goes through the tunnel.':
 		'مسیریابی ایران روشن است اما geoip.dat و geosite.dat هنوز روی روتر نیستند. در صفحه «به‌روزرسانی برنامه» دکمه به‌روزرسانی کنار آن‌ها را بزنید. تا آن موقع همه ترافیک از تونل می‌رود.',
 	'The routing data on this router is not the pair this expects: the core refused geoip:ir and geosite:ir. Connected with the Iran split off. Press Update beside the routing data on the settings page to fetch the right files.':
@@ -1181,7 +1208,7 @@ var FA = {
 	'Running (%s), listening on %s.': 'در حال اجرا (%s)، روی پورت‌های %s.',
 	'The router as a proxy server: phones and laptops away from home connect to it. A server that listens beyond the router has its port opened in the firewall while it runs.':
 		'روتر به‌عنوان سرور پروکسی: گوشی و لپ‌تاپ بیرون از خانه به آن وصل می‌شوند. پورت سرورهایی که فقط روی خود روتر نیستند، تا وقتی اجرا می‌شوند در فایروال باز می‌شود.',
-	'Log level': 'سطح لاگ',
+	'Log level': 'سطح گزارش',
 	'Users Manager': 'مدیریت کاربران',
 	'Outbound': 'خروجی',
 	'Listen Port': 'پورت شنود',
@@ -1278,7 +1305,7 @@ var FA = {
 		'warp-plus فقط برای کانفیگ‌های وارپ لازم است: وارپ کلودفلر، وارپ در وارپ، سایفون پشت وارپ، و کانفیگ‌های وایرگارد که روی «اجرا با warp-plus» گذاشته شده‌اند.',
 	'A WARP node needs warp-plus. Install it on the App Update page.': 'کانفیگ وارپ به warp-plus نیاز دارد. از صفحه «به‌روزرسانی» نصبش کنید.',
 	'WARP did not connect. The Runtime Logs page says how far it got. Without an account, press Register on the node\'s page while another node is connected; without an answer from WARP, turn Scan on or give another endpoint.':
-		'وارپ وصل نشد. صفحه «لاگ‌های اجرا» نشان می‌دهد تا کجا پیش رفت. اگر اکانت ندارد، وقتی کانفیگ دیگری وصل است در صفحه این کانفیگ «ثبت‌نام» را بزنید. اگر وارپ جواب نمی‌دهد، اسکن را روشن کنید یا اندپوینت دیگری بدهید.',
+		'وارپ وصل نشد. صفحه «گزارش‌ها» نشان می‌دهد تا کجا پیش رفت. اگر اکانت ندارد، وقتی کانفیگ دیگری وصل است در صفحه این کانفیگ «ثبت‌نام» را بزنید. اگر وارپ جواب نمی‌دهد، اسکن را روشن کنید یا اندپوینت دیگری بدهید.',
 	'warp-plus publishes no build for this router\'s processor.': 'warp-plus برای پردازنده این روتر نسخه‌ای منتشر نکرده است.',
 	'unzip is needed to install warp-plus and is not on this router. Press Install dependencies on the settings page.':
 		'برای نصب warp-plus برنامه unzip لازم است و روی این روتر نیست. در صفحه تنظیمات «نصب پیش‌نیازها» را بزنید.',

@@ -307,9 +307,14 @@ return view.extend({
 		o.textvalue = function(section_id) {
 			var v = String(this.cfgvalue(section_id) || '');
 			if (!v) return uci.get('zirgozar', section_id, 'content') ? _('a file') : '-';
-			return E('span', { 'style': 'direction:ltr;display:inline-block;max-width:170px;overflow:hidden;' +
-			                            'text-overflow:ellipsis;white-space:nowrap;vertical-align:middle',
-			                   'title': v }, v);
+			/* The copy button to the left of the address, whichever way the
+			   page reads: the pair is laid out left to right. */
+			return E('span', { 'style': 'direction:ltr;display:inline-flex;gap:6px;align-items:center' }, [
+				pui.copyBtn ? pui.copyBtn(v) : '',
+				E('span', { 'style': 'display:inline-block;max-width:170px;overflow:hidden;' +
+				                     'text-overflow:ellipsis;white-space:nowrap;vertical-align:middle',
+				            'title': v }, v)
+			]);
 		};
 		o.validate = function(section, value) {
 			if (!value) return true;

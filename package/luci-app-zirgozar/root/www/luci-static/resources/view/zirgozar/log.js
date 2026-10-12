@@ -27,14 +27,13 @@ var callLog = rpc.declare({ object: 'luci.zirgozar', method: 'log', expect: { ''
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
 
-/* The core's lines are its own, English with paths and numbers in them, and
-   stay left to right. This program's own lines are said in Persian when the
-   page is - see logfa.js - and each line then takes the direction of what it
-   says, so a Persian sentence reads right to left and a path inside it, or a
-   line that was left in English, still reads the right way round. */
-function box(own) {
-	if (own && i18n.get() === 'fa')
-		return E('pre', { 'dir': 'auto', 'class': 'mk-log',
+/* Both logs are said in Persian when the page is - see logfa.js - and each
+   line then takes the direction of what it says, so a Persian sentence reads
+   right to left and a path inside it, or a line that was left in English,
+   still reads the right way round. */
+function box() {
+	if (i18n.get() === 'fa')
+		return E('pre', { 'dir': 'auto', 'class': 'mk-log mk-log-fa',
 		                  'style': 'unicode-bidi:plaintext;text-align:start' }, '');
 	return E('pre', { 'dir': 'ltr', 'class': 'mk-log' }, '');
 }
@@ -59,12 +58,32 @@ return view.extend({
 	render: function(data) {
 		i18n.setLang(uci.get('zirgozar', 'config', 'lang'));
 
-		var runtime = box(true), core = box(false);
+		var runtime = box(), core = box();
+
+		/* In Persian when it can be, and as it came when it cannot - a
+		   browser still holding an older logfa.js must not get an empty box. */
+		function said(fn, t) {
+			if (i18n.get() !== 'fa') return t;
+			if (typeof logfa[fn] !== 'function') {
+				/* An older copy: fetched afresh, and the page drawn again with
+				   it - once, so a copy that really lacks it cannot loop. */
+				try {
+					if (!window.sessionStorage.getItem('zirgozar-logfa-fresh')) {
+						window.sessionStorage.setItem('zirgozar-logfa-fresh', '1');
+						var v = L.env.resource_version ? '?v=' + L.env.resource_version : '';
+						fetch(L.env.base_url + '/zirgozar/logfa.js' + v, { cache: 'reload' })
+							.then(function() { location.reload(); }).catch(function() {});
+					}
+				} catch (e) {}
+				return t;
+			}
+			try { return logfa[fn](t); } catch (e) { return t; }
+		}
 
 		function draw(d) {
 			d = d || {};
-			fill(runtime, i18n.get() === 'fa' ? logfa.text(d.text) : d.text, _('Nothing has been logged yet.'));
-			fill(core, d.core, uci.get('zirgozar', 'config', 'log_node') === '0'
+			fill(runtime, said('text', d.text), _('Nothing has been logged yet.'));
+			fill(core, said('core', d.core), uci.get('zirgozar', 'config', 'log_node') === '0'
 				? _('The node log is switched off in Settings → Log.')
 				: _('The core has not said anything yet.'));
 		}
@@ -78,11 +97,15 @@ return view.extend({
 				E('div', { 'class': 'mk-row', 'style': 'margin-bottom:10px;justify-content:space-between' }, [
 					E('span', { 'style': 'font-size:13px;color:var(--muted)' },
 						_('What Zirgozar does is shown here, refreshed every 5 seconds. It is emptied when the router reboots.')),
-					pui.btn(_('Clear logs'), 'danger mk-small', function() {
-						return callAction('clear_log', '').then(function() {
-							return callLog().then(draw);
-						});
-					}, 'trash')
+					E('div', { 'style': 'display:flex;gap:8px;align-items:center' }, [
+						/* What is in the box, as it reads on the page. */
+						pui.copyBtn ? pui.copyBtn(function() { return runtime.textContent; }) : '',
+						pui.btn(_('Clear logs'), 'danger mk-small', function() {
+							return callAction('clear_log', '').then(function() {
+								return callLog().then(draw);
+							});
+						}, 'trash')
+					])
 				]),
 				runtime
 			])),
@@ -90,11 +113,15 @@ return view.extend({
 				E('div', { 'class': 'mk-row', 'style': 'margin-bottom:10px;justify-content:space-between' }, [
 					E('span', { 'style': 'font-size:13px;color:var(--muted)' },
 						_('The Xray core’s messages are shown here.')),
-					pui.btn(_('Clear logs'), 'danger mk-small', function() {
-						return callAction('clear_core_log', '').then(function() {
-							return callLog().then(draw);
-						});
-					}, 'trash')
+					E('div', { 'style': 'display:flex;gap:8px;align-items:center' }, [
+						/* What is in the box, as it reads on the page. */
+						pui.copyBtn ? pui.copyBtn(function() { return core.textContent; }) : '',
+						pui.btn(_('Clear logs'), 'danger mk-small', function() {
+							return callAction('clear_core_log', '').then(function() {
+								return callLog().then(draw);
+							});
+						}, 'trash')
+					])
 				]),
 				core
 			]))

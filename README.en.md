@@ -5,7 +5,7 @@
 <h3 align="center">A router-wide tunnel for OpenWrt</h3>
 
 <p align="center">
-  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.20-r1"></a>
+  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.20-r2"></a>
   <a href="https://github.com/dreamboxone/zirgozar/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/dreamboxone/zirgozar/total?style=for-the-badge&color=0ea5e9"></a>
   <img alt="OpenWrt" src="https://img.shields.io/badge/OpenWrt-23.05%20%7C%2024.10%20%7C%2025.12-00B5E2?style=for-the-badge&logo=openwrt&logoColor=white">
   <img alt="Xray" src="https://img.shields.io/badge/core-Xray-7c3aed?style=for-the-badge">
@@ -92,14 +92,14 @@ install the main file first, then the `luci-app-…` one. After the second, pres
 
 SSH into the router and run the command below to download and install or upgrade
 version **5.7.20** for its architecture. The version must first be published on
-the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.20-r1).
+the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.20-r2).
 
 ```sh
 (
   set -eu
   . /etc/openwrt_release
-  version='5.7.20-r1'
-  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.20-r1'
+  version='5.7.20-r2'
+  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.20-r2'
   install_dir="/tmp/zirgozar-install-$version"
   mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
@@ -129,11 +129,11 @@ These examples use `arm_cortex-a7_neon-vfpv4`; replace it with your router's arc
 ```sh
 # OpenWrt 25.12 and later
 apk update
-apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.20-r1.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.20-r1.apk
+apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.20-r2.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.20-r2.apk
 
 # OpenWrt 24.10 / 23.05
 opkg update
-opkg install /tmp/zirgozar_5.7.20-r1_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.20-r1_all.ipk
+opkg install /tmp/zirgozar_5.7.20-r2_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.20-r2_all.ipk
 ```
 
 > [!IMPORTANT]
@@ -422,6 +422,8 @@ settings.
 **OpenVPN.** An OpenVPN config is carried by the official OpenVPN client (`openvpn-openssl`) and by nothing else. When it is not on the router, *Router requirements* installs it; until it is, the config does not run and the page says so. The `.ovpn` profile is given to OpenVPN as it is, so every directive the official client knows works: a static key (`<secret>`), `pkcs12`, `socks-proxy` and `http-proxy`, `ping-restart` and `connect-retry`, `tun-mtu`, `mssfix` and `fragment`, and the rest. Only what would act on the router rather than on the connection is taken out: scripts and plugins, the management socket, the routes and DNS the profile would install, and the device name. So are the directives OpenVPN 2.6 refuses a whole profile over, which profiles made for Windows or for an old server carry: `ip-win32`, `route-method`, `dhcp-renew` and the other Windows-only ones, `key-method`, `keysize`, `ncp-disable`; `tls-remote` becomes `verify-x509-name`. A server too old to negotiate a cipher is offered the one the profile's `cipher` line names and falls back on it, as the sing-box that carried OpenVPN before did; BF-CBC and the other old ciphers need `libopenssl-legacy` on the router. The names of the profile's servers are looked up directly, never through the tunnel OpenVPN is opening. What goes through the tunnel is this program's decision, not the profile's. OpenVPN makes the device `zgzovpn` and the core's way out for this node is bound to it, so the Iran split, DNS and the rules work as for any other node, whether the active core is Xray or sing-box. A user name and password, and the pass phrase of an encrypted private key, go in the settings of the config when the profile does not carry them. An OpenVPN config can be built field by field under **Add**, or read from its file with **Add file**. A TAP profile (`dev tap`) is not supported. Like hysteria2 it is chosen by hand: the automatic ranking does not measure it.
 
 **L2TP / IPsec.** Choose L2TP / IPsec under **Add** and enter the IPv4 server or domain, port (usually 1701), username and password. Enable **Use IPsec** and enter the provider PSK for an IPsec account. Import plain accounts as `l2tp://user:password@server:1701?ipsec=0#name` and IPsec accounts as `l2tp+ipsec://user:password@server:1701?psk=key#name`; URL-encode special characters in credentials and PSKs. MTU defaults to 1400. **Router requirements** installs the dependencies. The client creates `zgzl2tp` and the routing core sends the primary outbound through it, retaining the Iran split and routing rules. Ping measures the server address; TCPing measures a TCP handshake through the tunnel to the test URL, and URL Test measures the full request. Plain L2TP has no encryption. L2TP is supported as the primary tunnel and cannot be placed in a proxy chain or balancer.
+
+**PPTP and SSTP.** Choose PPTP or SSTP under **Add** and enter the server (IPv4 or domain), username and password. The port can be left empty: 1723 for PPTP, 443 for SSTP. Import them as `pptp://user:password@server:1723?mppe=1#name` and `sstp://user:password@server:443#name`; URL-encode special characters in credentials. MTU defaults to 1400. **Router requirements** installs the dependencies: the PPTP plugin and MPPE for PPTP, and `sstp-client` with OpenSSL's legacy module for SSTP. Like L2TP, the client creates a device of its own (`zgzpptp` or `zgzsstp`) and the routing core sends the primary outbound through it, keeping the Iran split and routing rules. SSTP runs inside HTTPS and gets through most firewalls; the server certificate is not checked. PPTP's encryption is weak; its MPPE encryption is on by default. Both are supported as the primary tunnel only, not in a proxy chain or balancer.
 
 **AmneziaWG.** A WireGuard `.conf` that carries any of the AmneziaWG lines - `Jc`, `Jmin`, `Jmax`, `S1` to `S4`, `H1` to `H4` (a number or a range) and the decoy packets `I1` to `I5` - is an AmneziaWG node, version 2 or 3. Xray cannot speak it, and neither can the official sing-box: it is carried by [sing-box-lx](https://github.com/Leadaxe/sing-box-lx). While this config is chosen, sing-box-lx carries the whole tunnel by itself and Xray stands aside. Without sing-box-lx installed the page says so. Chosen by hand, like hysteria2 and OpenVPN.
 

@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.7.20-r1';
+var BUILD = '5.7.20-r2';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -60,6 +60,7 @@ var ICONS = {
 	list:     '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2"/><circle cx="4.5" cy="12" r="1.2"/><circle cx="4.5" cy="18" r="1.2"/>',
 	rss:      '<path d="M5 11a8 8 0 0 1 8 8M5 5a14 14 0 0 1 14 14"/><circle cx="6" cy="18" r="1.5"/>',
 	cloud:    '<path d="M7 18h10.5a4 4 0 0 0 .6-8A6 6 0 0 0 6.6 9 4.5 4.5 0 0 0 7 18z"/>',
+	copy:     '<rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M15 9V6.5A2.5 2.5 0 0 0 12.5 4h-6A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15H9"/>',
 	'chevron-down': '<path d="M6 9l6 6 6-6"/>',
 	'chevron-up':   '<path d="M6 15l6-6 6 6"/>',
 	eye:      '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
@@ -91,8 +92,9 @@ function logoImg(file, height, cls) {
    removed. When the router says another version than the one these pages
    were built for, each file is fetched again past the cache and the page
    reloaded, once. */
-var OWN_FILES = [ 'zirgozar/ui', 'zirgozar/i18n', 'zirgozar/status', 'zirgozar/qr',
+var OWN_FILES = [ 'zirgozar/ui', 'zirgozar/i18n', 'zirgozar/status', 'zirgozar/qr', 'zirgozar/logfa', 'zirgozar/nodelink',
 	'view/zirgozar/settings', 'view/zirgozar/nodes', 'view/zirgozar/node', 'view/zirgozar/server', 'view/zirgozar/subscribe', 'view/zirgozar/other',
+	'view/zirgozar/shunt_rule',
 	'view/zirgozar/update', 'view/zirgozar/traffic', 'view/zirgozar/geoview', 'view/zirgozar/acl',
 	'view/zirgozar/log' ];
 
@@ -152,6 +154,50 @@ function btn(text, tone, fn, ico) {
 			r.then(end, end);
 		}
 	}, [ ico ? icon(ico) : '', E('span', {}, text) ]);
+}
+
+/* Text onto the clipboard. The clipboard API is only there on https, and a
+   router is mostly opened over http, so otherwise the text goes through a
+   hidden box and the browser's own copy. */
+function copyText(text) {
+	text = String(text || '');
+	var byHand = function() {
+		var box = E('textarea', { 'readonly': 'readonly',
+			'style': 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0' }, text);
+		document.body.appendChild(box);
+		box.select();
+		var ok = false;
+		try { ok = document.execCommand('copy'); } catch (e) {}
+		document.body.removeChild(box);
+		return ok ? Promise.resolve() : Promise.reject();
+	};
+	if (navigator.clipboard && window.isSecureContext)
+		return navigator.clipboard.writeText(text).catch(byHand);
+	return byHand();
+}
+
+/* A small button with the copy mark, for text the reader may want to take
+   away - a log, a link. What it copies is asked for when it is pressed, so it
+   is always what is on the page then. A tick for a moment says it worked. */
+function copyBtn(get, title) {
+	var b = E('button', { 'type': 'button', 'class': 'mk-icobtn', 'title': title || _('Copy'),
+	                      'aria-label': title || _('Copy') }, icon('copy'));
+	b.addEventListener('click', function(ev) {
+		ev.preventDefault();
+		ev.stopPropagation();
+		copyText(typeof get == 'function' ? get() : get).then(function() {
+			b.replaceChild(icon('check'), b.firstChild);
+			b.classList.add('done');
+			window.clearTimeout(b.zgzTimer);
+			b.zgzTimer = window.setTimeout(function() {
+				b.replaceChild(icon('copy'), b.firstChild);
+				b.classList.remove('done');
+			}, 1500);
+		}, function() {
+			note(b, _('Select the text and copy it by hand.'), 'warn');
+		});
+	});
+	return b;
 }
 
 /* Makhzan's card: a coloured bar along the top, an icon and a title. */
@@ -562,6 +608,8 @@ return baseclass.extend({
 	checkboxes: checkboxes,
 	icon: icon,
 	btn: btn,
+	copyBtn: copyBtn,
+	copyText: copyText,
 	card: card,
 	metric: metric,
 	bytes: bytes,

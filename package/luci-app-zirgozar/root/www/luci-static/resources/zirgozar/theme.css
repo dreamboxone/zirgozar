@@ -298,6 +298,11 @@
 .mk-metric .mk-big{font-size:20px}
 .mk-btn.mk-small{margin-top:0}
 .mk-log{margin:0;padding:12px;border-radius:14px;overflow:auto;max-height:60vh;font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-word;background:var(--soft);border:1px solid var(--line);color:var(--text);font-family:ui-monospace,Consolas,monospace!important}
+.mk-icobtn{display:inline-flex;align-items:center;justify-content:center;flex:none;width:32px;height:32px;padding:0;border-radius:9px;border:1px solid var(--line);background:var(--soft);color:var(--muted);cursor:pointer;vertical-align:middle;transition:color .15s,border-color .15s}
+.mk-icobtn:hover{color:var(--text);border-color:var(--muted)}
+.mk-icobtn.done{color:#10b981;border-color:#10b981}
+.mk-icobtn .mk-ico{width:17px;height:17px}
+.mk-log.mk-log-fa{font-family:Vazirmatn,Tahoma,sans-serif!important;font-size:13px;line-height:1.9}
 .mk a.mk-tab{text-decoration:none}
 
 /* Paths and file names: data, so left to right in either language, and in a

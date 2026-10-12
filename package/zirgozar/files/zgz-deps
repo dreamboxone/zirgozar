@@ -65,6 +65,17 @@ wanted() {
 			echo "strongswan-default strongswan-swanctl"
 		fi
 	fi
+	# PPTP: pppd's own plugin, the kernel's PPTP and GRE, and MPPE, which
+	# almost every PPTP server insists on.
+	if uci -q show zirgozar 2>/dev/null | grep -q "pptp://"; then
+		echo "ppp-mod-pptp kmod-mppe"
+	fi
+	# SSTP: sstp-client, and OpenSSL's legacy provider for the MD4 its
+	# password hash is made with - without it the link is refused with
+	# "Could not create password hash".
+	if uci -q show zirgozar 2>/dev/null | grep -q "sstp://"; then
+		echo "sstp-client kmod-mppe libopenssl-legacy"
+	fi
 	# An OpenVPN config is carried by OpenVPN itself, and by nothing else.
 	# Any build of it will do; the OpenSSL one when there is none.
 	if [ ! -x /usr/sbin/openvpn ] && ! command -v openvpn >/dev/null 2>&1 && has_ovpn_node; then
@@ -191,10 +202,23 @@ cmd_install() {
 	# take the rest of the list down with it.
 	_failed=""
 	for _p in $_missing; do
+		# sstp-client carries an example /etc/ppp/chap-secrets that ppp
+		# already owns. Refused, apk leaves it half installed and reports an
+		# error on every install after it, whatever is being installed; so it
+		# is let overwrite the file, and the router's own is put back.
+		_force=""
+		if [ "$_p" = sstp-client ]; then
+			_force="--force-overwrite"
+			cp -p /etc/ppp/chap-secrets "$ZGZ_RUN/chap-secrets.keep" 2>/dev/null || true
+		fi
 		case "$_m" in
-			apk)  bounded 180 apk add "$_p" >/dev/null 2>&1 || _failed="$_failed $_p" ;;
-			opkg) bounded 180 opkg install "$_p" >/dev/null 2>&1 || _failed="$_failed $_p" ;;
+			apk)  bounded 180 apk add $_force "$_p" >/dev/null 2>&1 || _failed="$_failed $_p" ;;
+			opkg) bounded 180 opkg install $_force "$_p" >/dev/null 2>&1 || _failed="$_failed $_p" ;;
 		esac
+		if [ -n "$_force" ] && [ -f "$ZGZ_RUN/chap-secrets.keep" ]; then
+			cp -p "$ZGZ_RUN/chap-secrets.keep" /etc/ppp/chap-secrets 2>/dev/null || true
+			rm -f "$ZGZ_RUN/chap-secrets.keep"
+		fi
 	done
 
 	forget_caps

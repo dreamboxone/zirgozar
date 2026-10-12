@@ -227,8 +227,9 @@ do_url() {
 	# would be a second core, a second port and a second thing to leave
 	# running. Say so rather than reporting a working node as broken.
 	case "$_proto" in
-		l2tp)
-			_l2tp_ms="$(printf '%s\n' "$_payload2" | "$ZGZ_LIB/zgz-l2tp" test url 2>/dev/null)" || _l2tp_ms=0
+		l2tp|pptp|sstp)
+			_pv=zgz-pppvpn; [ "$_proto" != l2tp ] || _pv=zgz-l2tp
+			_l2tp_ms="$(printf '%s\n' "$_payload2" | "$ZGZ_LIB/$_pv" test url 2>/dev/null)" || _l2tp_ms=0
 			printf '%s\n' "$_l2tp_ms" > "$_out"
 			return 0 ;;
 		aether)
@@ -364,9 +365,10 @@ cmd_run() {
 	# A TCP handshake to a port that only speaks UDP can never be answered, and
 	# a cross would say the node is dead when it is not.
 	case "$_kind:$_proto" in
-		tcp:l2tp)
+		tcp:l2tp|tcp:pptp|tcp:sstp)
 			put "$_id.tcp" -1
-			_l2tp_ms="$(printf '%s\n' "$_payload" | "$ZGZ_LIB/zgz-l2tp" test tcp 2>/dev/null)" || _l2tp_ms=0
+			_pv=zgz-pppvpn; [ "$_proto" != l2tp ] || _pv=zgz-l2tp
+			_l2tp_ms="$(printf '%s\n' "$_payload" | "$ZGZ_LIB/$_pv" test tcp 2>/dev/null)" || _l2tp_ms=0
 			put "$_id.tcp" "$_l2tp_ms"
 			return 0 ;;
 		ping:aether)
