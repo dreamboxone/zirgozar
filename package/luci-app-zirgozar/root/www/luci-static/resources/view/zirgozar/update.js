@@ -30,8 +30,38 @@ function bytes(n) {
 	return pui.bytes(n);
 }
 
+/* This program's version on its own row, short: "5.7.20-7" in Persian - the
+   release, then its revision on its right - with no word before it, and as
+   everywhere else in English. Kept left to right inside the Persian text, so
+   that the revision stays on the right. */
+function appVersion(v) {
+	if (!v || i18n.get() !== 'fa') return pui.versionText(v);
+	var m = /^(.*?)-r(\d+)$/.exec(String(v));
+	return '\u2066' + (m ? m[1] + '-' + m[2] : v + '-1') + '\u2069';
+}
+
 function chip(text, tone) {
 	return E('span', { 'class': 'mk-chip ' + (tone || '') }, text);
+}
+
+/* A version left to right whatever the page's direction: "1.14.3-lx.16" in
+   a Persian line otherwise came out as "lx.16-1.14.3". */
+function ltr(t) {
+	return '\u2066' + t + '\u2069';
+}
+
+/* The rows are read as columns: the version, then whether it is the latest,
+   then where the file is. Each of the first two is given a width of its
+   own, so the next one starts at the same place on every row whatever the
+   length of the version before it. */
+function verChip(text, tone) {
+	var c = chip(text, tone);
+	c.style.cssText = 'min-width:136px;justify-content:center;box-sizing:border-box';
+	return c;
+}
+
+function verState(node) {
+	return E('span', { 'style': 'display:inline-flex;align-items:center;min-width:118px' }, node || '');
 }
 
 /* What a button said, kept by row. The rows are drawn afresh every few
@@ -297,15 +327,17 @@ function render(d, early) {
 	if (abox) {
 		var app = cores.app || {};
 		while (abox.firstChild) abox.removeChild(abox.firstChild);
-		var value = [ app.unknown ? chip('…') : chip(pui.versionText(app.version) || '?', 'ok') ];
+		/* Shown as the cores below are: the installed version in brackets,
+		   and a newer one, when there is one, after an arrow. */
+		var value = [ app.unknown ? verChip('…') : verChip('【 ' + (appVersion(app.version) || '?') + ' 】', 'ok') ];
 		if (!busy && app.update && app.latest)
-			value.push(chip(_('Available: %s').format(pui.versionText(app.latest)), 'info'));
+			value.push(verState(chip((i18n.dir() === 'rtl' ? '← ' : '→ ') + appVersion(app.latest), 'info')));
 		else if (!busy && app.latest)
-			value.push(E('span', { 'style': 'color:var(--muted)' }, _('It is the latest version')));
+			value.push(verState(E('span', { 'style': 'color:var(--muted)' }, _('It is the latest version'))));
 		abox.appendChild(row('Zirgozar', value, [
 			checkBtn('primary', 'app', busy),
 			!busy && app.update && app.latest
-				? pui.btn(_('Update to %s').format(pui.versionText(app.latest)), 'success mk-small', function() {
+				? pui.btn(_('Update to %s').format(appVersion(app.latest)), 'success mk-small', function() {
 					return act('app', 'app_update', '',
 						_('Downloading and installing the new version. This takes a minute or two; the page reloads by itself when it is done.'));
 				}, 'download')
@@ -322,28 +354,31 @@ function render(d, early) {
 		(cores.cores || []).forEach(function(c) {
 			var value = [];
 			if (c.unknown) {
-				value.push(chip('…'));
+				value.push(verChip('…'));
+				value.push(verState());
 				value.push(E('code', { 'style': 'font-size:11.5px;color:var(--muted)' }, c.path));
 			} else if (c.installed) {
-				value.push(chip('【 ' + (c.version || _('installed')) + ' 】', 'ok'));
+				value.push(verChip('【 ' + (c.version ? ltr(c.version) : _('installed')) + ' 】', 'ok'));
 				/* What the project has published, when it is not what is
 				   installed. Two different strings, not "newer" - version
 				   numbers written by three different projects are a way to be
 				   confidently wrong about which way round they go. */
 				if (!busy && c.update && c.latest)
-					value.push(chip((i18n.dir() === 'rtl' ? '← ' : '→ ') + c.latest, 'info'));
+					value.push(verState(chip((i18n.dir() === 'rtl' ? '← ' : '→ ') + ltr(c.latest), 'info')));
 				else if (!busy && c.latest)
-					value.push(E('span', { 'style': 'color:var(--muted)' }, _('It is the latest version')));
+					value.push(verState(E('span', { 'style': 'color:var(--muted)' }, _('It is the latest version'))));
+				else
+					value.push(verState());
 				value.push(E('code', { 'style': 'font-size:11.5px;color:var(--muted)' }, c.path));
 				if (!c.ours)
 					value.push(E('span', { 'style': 'font-size:12px;color:var(--muted)' },
 						_('(installed by another package — left alone)')));
 			} else if (!c.arch_ok) {
-				value.push(chip(_('no build for this router')));
+				value.push(verChip(_('no build for this router')));
 			} else {
-				value.push(chip(_('not installed')));
+				value.push(verChip(_('not installed')));
 				if (c.latest)
-					value.push(E('span', { 'style': 'color:var(--muted)' }, _('latest is %s').format(c.latest)));
+					value.push(verState(E('span', { 'style': 'color:var(--muted)' }, _('latest is %s').format(ltr(c.latest)))));
 			}
 
 			var actions = [];
