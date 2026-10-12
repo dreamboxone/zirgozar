@@ -94,17 +94,19 @@ asset_for() {
 	return 0
 }
 
+# The tag of a project's latest release. The API answers sixty requests an
+# hour per address, and a router's own requests go out through the tunnel -
+# from the node's address, shared with everyone else on that node, whose
+# allowance is often gone before this asks. The page of the latest release
+# answers without that limit, and the tag is in where it redirects to; so it
+# is asked first, and the API only when it does not say.
 latest_tag() {
-	_lt="$(curl -fsSL --connect-timeout 15 --max-time 45 \
-		"https://api.github.com/repos/$1/releases/latest" 2>/dev/null |
-		sed -n 's/.*"tag_name"[ \t]*:[ \t]*"\([^"]*\)".*/\1/p' | head -1)"
-	# The API answers a few requests an hour per address, and a router behind a
-	# shared exit address shares that allowance with everyone else using it. The
-	# page of the latest release answers without limit, and the tag is in where
-	# it redirects to.
+	_lt="$(curl -fsSL --connect-timeout 15 --max-time 45 -o /dev/null -w '%{url_effective}' \
+		"https://github.com/$1/releases/latest" 2>/dev/null | sed -n 's|.*/releases/tag/||p' | head -1)"
 	if [ -z "$_lt" ]; then
-		_lt="$(curl -fsSL --connect-timeout 15 --max-time 45 -o /dev/null -w '%{url_effective}' \
-			"https://github.com/$1/releases/latest" 2>/dev/null | sed -n 's|.*/releases/tag/||p' | head -1)"
+		_lt="$(curl -fsSL --connect-timeout 15 --max-time 45 \
+			"https://api.github.com/repos/$1/releases/latest" 2>/dev/null |
+			sed -n 's/.*"tag_name"[ \t]*:[ \t]*"\([^"]*\)".*/\1/p' | head -1)"
 	fi
 	echo "$_lt"
 	return 0
@@ -751,9 +753,7 @@ cmd_latest() {
 		printf '%s\n' "$_xr" > "$XRAY_VERSIONS.new" && mv -f "$XRAY_VERSIONS.new" "$XRAY_VERSIONS"
 	fi
 	_xn="$(printf '%s\n' "$_xr" | while read -r _t _k; do [ "$_k" = stable ] && echo "$(ver_key "$_t") $_t"; done | sort -r | head -1 | cut -d' ' -f2)"
-	[ -n "$_xn" ] || _xn="$(curl -fsSL --connect-timeout 8 --max-time 20 \
-		"https://api.github.com/repos/$XRAY_REPO/releases/latest" 2>/dev/null |
-		sed -n 's/.*"tag_name"[ \t]*:[ \t]*"\([^"]*\)".*/\1/p' | head -1)"
+	[ -n "$_xn" ] || _xn="$(latest_tag "$XRAY_REPO")"
 	if [ -n "$_xn" ]; then
 		printf 'xray\t%s\n' "$(tag_version "$_xn")" >> "$_tmp"
 	else
@@ -763,12 +763,9 @@ cmd_latest() {
 	for _c in xray-patterniha sing-box sing-box-lx hysteria geoview warp-plus vwarp aether zirgozar; do
 		_repo="$(repo_of "$_c")"
 		[ -n "$_repo" ] || continue
-		# The tag is all that is wanted, so this is a small request and a
-		# short leash. A source that will not answer leaves the previous
-		# answer in place rather than blanking it.
-		_tag="$(curl -fsSL --connect-timeout 8 --max-time 20 \
-			"https://api.github.com/repos/$_repo/releases/latest" 2>/dev/null |
-			sed -n 's/.*"tag_name"[ \t]*:[ \t]*"\([^"]*\)".*/\1/p' | head -1)"
+		# The tag is all that is wanted. A source that will not answer
+		# leaves the previous answer in place rather than blanking it.
+		_tag="$(latest_tag "$_repo")"
 		if [ -n "$_tag" ]; then
 			printf '%s\t%s\n' "$_c" "$(tag_version "$_tag")" >> "$_tmp"
 		else
@@ -798,9 +795,7 @@ app_latest() {
 	case "$_due" in ''|*[!0-9]*) _due=0 ;; esac
 	[ "$_now" -lt "$_due" ] && return 0
 	echo $((_now + APP_MAX_AGE)) > "$APP_CHECKED" 2>/dev/null || true
-	_tag="$(curl -fsSL --connect-timeout 8 --max-time 20 \
-		"https://api.github.com/repos/$(repo_of zirgozar)/releases/latest" 2>/dev/null |
-		sed -n 's/.*"tag_name"[ \t]*:[ \t]*"\([^"]*\)".*/\1/p' | head -1)"
+	_tag="$(latest_tag "$(repo_of zirgozar)")"
 	if [ -z "$_tag" ]; then
 		echo $((_now + 300)) > "$APP_CHECKED" 2>/dev/null || true
 		return 0
@@ -965,12 +960,38 @@ install_self() {
 		return 1
 	fi
 
-	# Every download address in the release, one per line. The answer may
-	# come on one line or many, so it is split on commas first.
-	_urls="$(curl -fsSL --connect-timeout 15 --max-time 45 \
-		"https://api.github.com/repos/$SELF_REPO/releases/latest" 2>/dev/null |
-		tr ',' '\n' |
-		sed -n 's/.*"browser_download_url"[ \t]*:[ \t]*"\([^"]*\)".*/\1/p')"
+	# Every download address in the release, one per line. Made from the
+	# latest tag, whose files are named the same way every time - the API's
+	# list of them is asked for only when that does not work: it is the
+	# request a shared exit address has most often used up already (see
+	# latest_tag), and an update that said "GitHub could not be reached" while
+	# GitHub was there was the result.
+	_urls=""
+	_tag="$(latest_tag "$SELF_REPO")"
+	if [ -n "$_tag" ]; then
+		_v="${_tag#v}"
+		case "$_v" in *-r[0-9]*) : ;; *) _v="$_v-r1" ;; esac
+		_b="https://github.com/$SELF_REPO/releases/download/$_tag"
+		# Only what the release's own checksum list names, so that a release
+		# with nothing for this processor still says so below.
+		_sumtxt="$(curl -fsSL --connect-timeout 15 --max-time 60 "$_b/SHA256SUMS" 2>/dev/null)" || _sumtxt=""
+		if [ -n "$_sumtxt" ]; then
+			_urls="$_b/SHA256SUMS"
+			for _n in "zirgozar-$_v.$_arch.apk" "luci-app-zirgozar-$_v.apk" \
+			          "zirgozar_${_v}_$_arch.ipk" "luci-app-zirgozar_${_v}_all.ipk"; do
+				if printf '%s\n' "$_sumtxt" | awk -v n="$_n" '$2 == n || $2 == "*" n { f = 1 } END { exit !f }'; then
+					_urls="$_urls
+$_b/$_n"
+				fi
+			done
+		fi
+	fi
+	if [ -z "$_urls" ]; then
+		_urls="$(curl -fsSL --connect-timeout 15 --max-time 45 \
+			"https://api.github.com/repos/$SELF_REPO/releases/latest" 2>/dev/null |
+			tr ',' '\n' |
+			sed -n 's/.*"browser_download_url"[ \t]*:[ \t]*"\([^"]*\)".*/\1/p')"
+	fi
 	[ -n "$_urls" ] || { self_fail "GitHub could not be reached."; return 1; }
 
 	if [ "$_pm" = "apk" ]; then
