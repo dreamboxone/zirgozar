@@ -578,37 +578,13 @@ ovpn_latest() {
 	return 0
 }
 
-# The kmods line this router's package list should have, for the Runtime
-# Logs page to give when it has none: the installed kernel package
-# "kernel-6.12.94~<hash>-r1" names the folder, "6.12.94-1-<hash>", and the
-# router's own target line - or failing that its release and target - the
-# rest. Empty when it cannot be worked out.
-kmods_feed() {
-	_kv="$(apk list -I kernel 2>/dev/null | head -1 | cut -d' ' -f1)"
-	_kv="${_kv#kernel-}"
-	case "$_kv" in *~*-r*) : ;; *) return 0 ;; esac
-	_kver="${_kv%%~*}"; _krest="${_kv#*~}"
-	_kdir="$_kver-${_krest##*-r}-${_krest%-r*}"
-	_ktp="$(grep -hs '/targets/.*/packages/packages\.adb' /etc/apk/repositories /etc/apk/repositories.d/*.list | head -1)"
-	if [ -n "$_ktp" ]; then
-		echo "${_ktp%/packages/packages.adb}/kmods/$_kdir/packages.adb"
-		return 0
-	fi
-	_krel="$(sed -n "s/^DISTRIB_RELEASE='\(.*\)'/\1/p" /etc/openwrt_release 2>/dev/null)"
-	_ktgt="$(sed -n "s/^DISTRIB_TARGET='\(.*\)'/\1/p" /etc/openwrt_release 2>/dev/null)"
-	[ -n "$_krel" ] && [ -n "$_ktgt" ] || return 0
-	case "$_krel" in
-		SNAPSHOT) echo "https://downloads.openwrt.org/snapshots/targets/$_ktgt/kmods/$_kdir/packages.adb" ;;
-		*) echo "https://downloads.openwrt.org/releases/$_krel/targets/$_ktgt/kmods/$_kdir/packages.adb" ;;
-	esac
-	return 0
-}
-
 install_openvpn() {
 	_op="$(ovpn_pkg)"
 	_had="$(openvpn_path)"
 	case "$(ovpn_pkg_manager)" in
 		apk)
+			# OpenVPN needs a kernel module; see ensure_kmods_feed.
+			ensure_kmods_feed || true
 			apk update >/dev/null 2>&1 || true
 			if [ -n "$_had" ]; then apk add -u "$_op" >"$ZGZ_RUN/ovpn-install.log" 2>&1
 			else apk add "$_op" >"$ZGZ_RUN/ovpn-install.log" 2>&1; fi

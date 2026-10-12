@@ -1820,3 +1820,57 @@ node_records() {
 	printf '%s\n' "$_nd_recs"
 	return 0
 }
+
+# ------------------------------------------------------------ kernel modules
+#
+# Kernel modules come from one package source of their own, kmods, made for
+# this router's kernel only. Some ways of installing PassWall rewrite the
+# package list without it, and from then on no kernel module installs at all:
+# not OpenVPN's, not PPTP's MPPE, not L2TP's - only "required by: …[kmod-…]"
+# from the package manager, which tells nobody what is wrong.
+
+# The kmods line this router's package list should have: the installed kernel
+# package "kernel-6.12.94~<hash>-r1" names the folder, "6.12.94-1-<hash>", and
+# the router's own target line - or failing that its release and target - the
+# rest. Empty when it cannot be worked out.
+kmods_feed() {
+	_kv="$(apk list -I kernel 2>/dev/null | head -1 | cut -d' ' -f1)"
+	_kv="${_kv#kernel-}"
+	case "$_kv" in *~*-r*) : ;; *) return 0 ;; esac
+	_kver="${_kv%%~*}"; _krest="${_kv#*~}"
+	_kdir="$_kver-${_krest##*-r}-${_krest%-r*}"
+	_ktp="$(grep -hs '/targets/.*/packages/packages\.adb' /etc/apk/repositories /etc/apk/repositories.d/*.list | head -1)"
+	if [ -n "$_ktp" ]; then
+		echo "${_ktp%/packages/packages.adb}/kmods/$_kdir/packages.adb"
+		return 0
+	fi
+	_krel="$(sed -n "s/^DISTRIB_RELEASE='\(.*\)'/\1/p" /etc/openwrt_release 2>/dev/null)"
+	_ktgt="$(sed -n "s/^DISTRIB_TARGET='\(.*\)'/\1/p" /etc/openwrt_release 2>/dev/null)"
+	[ -n "$_krel" ] && [ -n "$_ktgt" ] || return 0
+	case "$_krel" in
+		SNAPSHOT) echo "https://downloads.openwrt.org/snapshots/targets/$_ktgt/kmods/$_kdir/packages.adb" ;;
+		*) echo "https://downloads.openwrt.org/releases/$_krel/targets/$_ktgt/kmods/$_kdir/packages.adb" ;;
+	esac
+	return 0
+}
+
+# Put the kmods line back when it is missing, before anything is installed.
+# Only that one official line is added, and only when the address answers;
+# nothing else in the list is touched. Returns 0 when the line is there
+# afterwards - already, or now - and the caller then refreshes the index.
+ensure_kmods_feed() {
+	command -v apk >/dev/null 2>&1 || return 0
+	grep -qs '/kmods/' /etc/apk/repositories /etc/apk/repositories.d/*.list && return 0
+	_kf="$(kmods_feed)"
+	[ -n "$_kf" ] || return 1
+	if ! curl -fsSI --connect-timeout 8 --max-time 20 -o /dev/null "$_kf" 2>/dev/null; then
+		warn "the kmods source is missing from the package list, and $_kf did not answer - not added"
+		return 1
+	fi
+	_kl=/etc/apk/repositories.d/distfeeds.list
+	# The last line of the file may have no line ending of its own.
+	[ ! -s "$_kl" ] || [ -z "$(tail -c 1 "$_kl")" ] || echo >> "$_kl"
+	printf '%s\n' "$_kf" >> "$_kl" || return 1
+	log "the kmods source was missing from the package list - added: $_kf"
+	return 0
+}

@@ -182,6 +182,8 @@ var T = [
 	[ 'OpenVPN {} installed ({})', 'OpenVPN {1} نصب شد ({2})' ],
 	[ 'OpenVPN removed ({})', 'OpenVPN حذف شد ({1})' ],
 	[ 'OpenVPN: {}cannot be installed - the kmods line is missing from {}', 'OpenVPN: {1}نصب نمی‌شود - خط kmods در {2} نیست' ],
+	[ 'the kmods source was missing from the package list - added: {}', 'منبع kmods در فهرست منبع‌های بسته نبود - اضافه شد: {1}' ],
+	[ 'the kmods source is missing from the package list, and {} did not answer - not added', 'منبع kmods در فهرست منبع‌های بسته نیست و {1} جواب نداد - اضافه نشد' ],
 	[ 'add this line to {}, then press Install again: {}', 'این خط را به {1} اضافه کنید و دوباره «نصب» را بزنید: {2}' ],
 	[ "OpenVPN: {}is not available for this firmware's kernel ({})", 'OpenVPN: {1}برای کرنل این فریم‌ور ({2}) وجود ندارد' ],
 	[ '{} {} installed in {}', '{1} {2} در {3} نصب شد' ],

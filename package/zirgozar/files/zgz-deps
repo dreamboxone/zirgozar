@@ -185,6 +185,9 @@ cmd_install() {
 	# reporting as "install failed".
 	case "$_m" in
 		apk)
+			# Several of these are kernel modules - TPROXY, MPPE, L2TP -
+			# and a list without its kmods source can install none of them.
+			ensure_kmods_feed || true
 			if ! bounded 180 apk update >/dev/null 2>&1; then
 				say_message "Could not download the package index. The router needs a working internet connection before dependencies can be installed."
 				return 1
