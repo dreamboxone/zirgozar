@@ -233,6 +233,8 @@ var FA = {
 	'SSTP runs inside HTTPS, normally on port 443, so it gets through most firewalls. The server certificate is not checked. Ping measures the server address. TCPing measures a TCP connection through the tunnel to the test URL; URL Test measures the full request.': 'SSTP داخل HTTPS و معمولاً روی پورت ۴۴۳ کار می‌کند، برای همین از بیشتر فایروال‌ها رد می‌شود. گواهی سرور بررسی نمی‌شود. پینگ زمان پاسخ آدرس سرور را می‌سنجد. TCPing زمان اتصال TCP از داخل تونل به مقصد تست و URL Test زمان درخواست کامل را می‌سنجد.',
 	"OpenVPN could not be installed: a kernel module it needs is not available for this router's firmware. Update the firmware to the latest official OpenWrt release.":
 		'OpenVPN نصب نشد: ماژول کرنلی که لازم دارد برای فریم‌ور این روتر وجود ندارد. فریم‌ور را به آخرین نسخه رسمی OpenWrt به‌روز کنید.',
+	"OpenVPN could not be installed: the official source of kernel modules (kmods) is missing from this router's package sources, so no kernel module can be installed. The line to add is on the Runtime Logs page.":
+		'OpenVPN نصب نشد: منبع رسمی ماژول‌های کرنل (kmods) در فهرست منبع‌های بسته این روتر نیست، پس هیچ ماژول کرنلی نصب نمی‌شود. خطی که باید اضافه شود در صفحه «گزارش‌ها» نوشته شده.',
 	'This is not a PPTP or SSTP account.': 'این اکانت PPTP یا SSTP نیست.',
 	'PPTP needs PPP. Install dependencies under Router requirements.': 'PPTP به PPP نیاز دارد. وابستگی‌ها را در بخش نیازمندی‌های روتر نصب کنید.',
 	'SSTP needs PPP. Install dependencies under Router requirements.': 'SSTP به PPP نیاز دارد. وابستگی‌ها را در بخش نیازمندی‌های روتر نصب کنید.',

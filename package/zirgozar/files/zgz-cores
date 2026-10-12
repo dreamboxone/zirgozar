@@ -578,6 +578,32 @@ ovpn_latest() {
 	return 0
 }
 
+# The kmods line this router's package list should have, for the Runtime
+# Logs page to give when it has none: the installed kernel package
+# "kernel-6.12.94~<hash>-r1" names the folder, "6.12.94-1-<hash>", and the
+# router's own target line - or failing that its release and target - the
+# rest. Empty when it cannot be worked out.
+kmods_feed() {
+	_kv="$(apk list -I kernel 2>/dev/null | head -1 | cut -d' ' -f1)"
+	_kv="${_kv#kernel-}"
+	case "$_kv" in *~*-r*) : ;; *) return 0 ;; esac
+	_kver="${_kv%%~*}"; _krest="${_kv#*~}"
+	_kdir="$_kver-${_krest##*-r}-${_krest%-r*}"
+	_ktp="$(grep -hs '/targets/.*/packages/packages\.adb' /etc/apk/repositories /etc/apk/repositories.d/*.list | head -1)"
+	if [ -n "$_ktp" ]; then
+		echo "${_ktp%/packages/packages.adb}/kmods/$_kdir/packages.adb"
+		return 0
+	fi
+	_krel="$(sed -n "s/^DISTRIB_RELEASE='\(.*\)'/\1/p" /etc/openwrt_release 2>/dev/null)"
+	_ktgt="$(sed -n "s/^DISTRIB_TARGET='\(.*\)'/\1/p" /etc/openwrt_release 2>/dev/null)"
+	[ -n "$_krel" ] && [ -n "$_ktgt" ] || return 0
+	case "$_krel" in
+		SNAPSHOT) echo "https://downloads.openwrt.org/snapshots/targets/$_ktgt/kmods/$_kdir/packages.adb" ;;
+		*) echo "https://downloads.openwrt.org/releases/$_krel/targets/$_ktgt/kmods/$_kdir/packages.adb" ;;
+	esac
+	return 0
+}
+
 install_openvpn() {
 	_op="$(ovpn_pkg)"
 	_had="$(openvpn_path)"
@@ -598,14 +624,27 @@ install_openvpn() {
 			;;
 	esac
 	if [ -z "$(openvpn_path)" ]; then
-		# OpenVPN 2.7 needs a kernel module, and a kernel module is built for
-		# one kernel only. A router whose firmware is older than the package
-		# feed, or not an official build, has no copy of it to install - and
-		# the package manager's own line for that, "required by: openvpn-…
-		# [kmod-ovpn-backports]", says nothing to anyone who reads it.
+		# OpenVPN 2.7 needs a kernel module. Kernel modules come from one
+		# package source of their own, kmods, made for this kernel only - and
+		# installing PassWall by its script is known to leave that line out of
+		# the list, after which no kernel module can be installed at all. The
+		# package manager's own words for it, "required by: openvpn-…
+		# [kmod-ovpn-backports]", tell nobody any of this, so it is said
+		# here: the line missing, with the exact line to put back; or the
+		# line there and the module still not, which is the firmware.
 		if grep -q 'kmod-' "$ZGZ_RUN/ovpn-install.log" 2>/dev/null; then
-			say_message "OpenVPN could not be installed: a kernel module it needs is not available for this router's firmware. Update the firmware to the latest official OpenWrt release."
-			warn "OpenVPN: $(grep -o 'kmod-[A-Za-z0-9_-]*' "$ZGZ_RUN/ovpn-install.log" | sort -u | tr '\n' ' ')is not available for this firmware's kernel ($(uname -r))"
+			_km="$(grep -o 'kmod-[A-Za-z0-9_-]*' "$ZGZ_RUN/ovpn-install.log" | sort -u | tr '\n' ' ')"
+			if [ "$(ovpn_pkg_manager)" = apk ] && ! grep -qs '/kmods/' /etc/apk/repositories /etc/apk/repositories.d/*.list; then
+				_kl="$(kmods_feed)"
+				say_message "OpenVPN could not be installed: the official source of kernel modules (kmods) is missing from this router's package sources, so no kernel module can be installed. The line to add is on the Runtime Logs page."
+				warn "OpenVPN: ${_km}cannot be installed - the kmods line is missing from /etc/apk/repositories.d/distfeeds.list"
+				if [ -n "$_kl" ]; then
+					warn "add this line to /etc/apk/repositories.d/distfeeds.list, then press Install again: $_kl"
+				fi
+			else
+				say_message "OpenVPN could not be installed: a kernel module it needs is not available for this router's firmware. Update the firmware to the latest official OpenWrt release."
+				warn "OpenVPN: ${_km}is not available for this firmware's kernel ($(uname -r))"
+			fi
 		else
 			say_message "OpenVPN could not be installed: $(tail -1 "$ZGZ_RUN/ovpn-install.log" 2>/dev/null | cut -c1-160)"
 		fi

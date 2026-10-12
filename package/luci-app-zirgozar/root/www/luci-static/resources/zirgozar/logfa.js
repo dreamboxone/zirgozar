@@ -181,6 +181,8 @@ var T = [
 	[ '{} downloaded but will not run here: {}', '{1} دانلود شد ولی اینجا اجرا نمی‌شود: {2}' ],
 	[ 'OpenVPN {} installed ({})', 'OpenVPN {1} نصب شد ({2})' ],
 	[ 'OpenVPN removed ({})', 'OpenVPN حذف شد ({1})' ],
+	[ 'OpenVPN: {}cannot be installed - the kmods line is missing from {}', 'OpenVPN: {1}نصب نمی‌شود - خط kmods در {2} نیست' ],
+	[ 'add this line to {}, then press Install again: {}', 'این خط را به {1} اضافه کنید و دوباره «نصب» را بزنید: {2}' ],
 	[ "OpenVPN: {}is not available for this firmware's kernel ({})", 'OpenVPN: {1}برای کرنل این فریم‌ور ({2}) وجود ندارد' ],
 	[ '{} {} installed in {}', '{1} {2} در {3} نصب شد' ],
 	[ 'update: no package for {} in the latest release', 'به‌روزرسانی: در آخرین انتشار بسته‌ای برای {1} نیست' ],
