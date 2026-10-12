@@ -312,7 +312,15 @@ install_singbox() {
 		_n=$((_n + 1))
 		curl -fsSL --connect-timeout 20 --max-time 900 "$_url" 2>/dev/null |
 			tar -xzO -f - "$_name/sing-box" > "$_bin" 2>/dev/null || true
-		[ "$(file_size "$_bin")" -gt 1048576 ] 2>/dev/null && break
+		# Over a megabyte is not enough to go on: a download cut off half
+		# way - the tunnel it went through restarting, say - leaves a file
+		# that starts like the program and stops short of it, and dies the
+		# moment it is run, saying nothing. So it is run, and fetched again
+		# when it will not.
+		chmod 0755 "$_bin" 2>/dev/null || true
+		if [ "$(file_size "$_bin")" -gt 1048576 ] 2>/dev/null && "$_bin" version >/dev/null 2>&1; then
+			break
+		fi
 		rm -f "$_bin"
 		sleep 3
 	done
@@ -500,7 +508,14 @@ install_binary() {
 		elif ! same_arch "$_src"; then
 			_why="it is built for a different processor than this router"
 		else
-			_why="it is built for this processor but would not start: $("$_src" version 2>&1 | head -1)"
+			_said="$("$_src" "$_vflag" 2>&1 | head -1)"
+			if [ -n "$_said" ]; then
+				_why="it is built for this processor but would not start: $_said"
+			else
+				# Nothing at all: it was killed the moment it ran, which is
+				# what a file cut off part way through its download does.
+				_why="it stopped the moment it was started, without a word - the download was most likely cut off part way; try again"
+			fi
 		fi
 		rm -f "$_src"
 		rm -rf "$ZGZ_RUN/xtract"

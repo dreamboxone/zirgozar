@@ -235,6 +235,12 @@ var FA = {
 		'OpenVPN نصب نشد: ماژول کرنلی که لازم دارد برای فریم‌ور این روتر وجود ندارد. فریم‌ور را به آخرین نسخه رسمی OpenWrt به‌روز کنید.',
 	"OpenVPN could not be installed: the official source of kernel modules (kmods) is missing from this router's package sources, so no kernel module can be installed. The line to add is on the Runtime Logs page.":
 		'OpenVPN نصب نشد: منبع رسمی ماژول‌های کرنل (kmods) در فهرست منبع‌های بسته این روتر نیست، پس هیچ ماژول کرنلی نصب نمی‌شود. خطی که باید اضافه شود در صفحه «گزارش‌ها» نوشته شده.',
+	'The %s that was downloaded could not be installed - %s.': '%s که دانلود شد نصب نشد - %s.',
+	'what came back is not a program at all - the address may have moved, or answered with an error page':
+		'چیزی که دانلود شد اصلاً برنامه نیست - ممکن است آدرس عوض شده باشد یا یک صفحه خطا برگشته باشد',
+	'it is built for a different processor than this router': 'برای پردازنده‌ای غیر از پردازنده این روتر ساخته شده',
+	'it stopped the moment it was started, without a word - the download was most likely cut off part way; try again':
+		'همان لحظه اجرا متوقف شد و چیزی نگفت - به احتمال زیاد دانلود نیمه‌کاره قطع شده؛ دوباره امتحان کنید',
 	'This is not a PPTP or SSTP account.': 'این اکانت PPTP یا SSTP نیست.',
 	'PPTP needs PPP. Install dependencies under Router requirements.': 'PPTP به PPP نیاز دارد. وابستگی‌ها را در بخش نیازمندی‌های روتر نصب کنید.',
 	'SSTP needs PPP. Install dependencies under Router requirements.': 'SSTP به PPP نیاز دارد. وابستگی‌ها را در بخش نیازمندی‌های روتر نصب کنید.',
@@ -1500,6 +1506,18 @@ function tr(s) {
 		if (m) v = FA['The installed Aether does not support %s.'].replace('%s', m[1]);
 		m = /^Aether has no supported build for ([A-Za-z0-9_-]+)\.$/.exec(s);
 		if (m) v = FA['Aether has no supported build for %s.'].replace('%s', m[1]);
+		/* A core that downloaded and would not install: its name and the
+		   reason are in the sentence, and the reason is said in Persian too
+		   when it is one of the known ones. */
+		m = /^The (\S+) that was downloaded could not be installed - (.+)\.$/.exec(s);
+		if (m) {
+			var why = FA[m[2]];
+			if (why === undefined) {
+				var r = /^it is built for this processor but would not start: (.*)$/.exec(m[2]);
+				why = r ? 'برای همین پردازنده ساخته شده ولی اجرا نشد: ' + r[1] : m[2];
+			}
+			v = FA['The %s that was downloaded could not be installed - %s.'].replace('%s', m[1]).replace('%s', why);
+		}
 	}
 	if (v === undefined && Object.prototype.hasOwnProperty.call(LUCI_FA, s))
 		v = LUCI_FA[s];
