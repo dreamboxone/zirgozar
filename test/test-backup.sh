@@ -22,7 +22,7 @@ echo account > "$ZGZ_ETC/warp/n1/wgcf-account.toml"
 echo identity > "$ZGZ_ETC/warp/n1/primary/wgcf-identity.json"
 echo big > "$ZGZ_ETC/geo/geosite.dat"
 echo cached > "$ZGZ_ETC/subs/default.links"
-echo 5.7.20-r8 > "$ZGZ_ETC/version"
+echo 5.7.20-r9 > "$ZGZ_ETC/version"
 ROUTER="$RIG/lib/zgz-router"
 
 sh "$ROUTER" backup >/dev/null 2>&1

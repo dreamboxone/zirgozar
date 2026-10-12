@@ -500,7 +500,7 @@ var FA = {
 	'(installed by another package — left alone)':
 		'(توسط پکیج دیگری نصب شده — دست‌نخورده مانده)',
 	'Xray carries the traffic. sing-box and hysteria are only needed for nodes that speak hysteria2 or tuic, which Xray does not — one of them is then run as a local helper for that one node, and everything else works exactly as before.':
-		'ترافیک را Xray می‌برد. sing-box و hysteria فقط برای کانفیگ‌های hysteria2 و tuic لازم‌اند که Xray پشتیبانی نمی‌کند؛ در آن صورت فقط برای همان کانفیگ کنار Xray اجرا می‌شوند.',
+		'اولویت با هسته ایکس‌ری است. هسته سینگ‌باکس و هیستریا فقط برای کانفیگ‌های هیستریا و tuic لازم‌اند و در کنار ایکس‌ری اجرا می‌شوند.',
 
 	'Traffic history': 'تاریخچه مصرف',
 	'Forget all recorded traffic': 'حذف تاریخچه مصرف',
@@ -941,7 +941,7 @@ var FA = {
 	'The Geoview page needs it, and so does sing-box whenever the Iran split or ad blocking is on - it is then installed by itself. Empty means this program’s own copy in the folder above.':
 		'صفحه «موقعیت‌یاب» به آن نیاز دارد، و sing-box هم وقتی تفکیک ایران یا مسدود کردن تبلیغات روشن است — آن وقت خودش نصب می‌شود. خالی یعنی نسخه خود این برنامه در پوشه بالا.',
 	'Geoview shows where a name or an address belongs, on the Geoview page. sing-box cannot read the routing data without it: when sing-box carries the tunnel with the Iran split or ad blocking on, Geoview is installed by itself if it is missing.':
-		'Geoview در صفحه «موقعیت‌یاب» نشان می‌دهد یک نام یا آدرس به کجا تعلق دارد. sing-box بدون آن داده‌های مسیریابی را نمی‌تواند بخواند: وقتی sing-box تونل را می‌برد و تفکیک ایران یا مسدود کردن تبلیغات روشن است، اگر Geoview نصب نباشد خودش نصب می‌شود.',
+		'موقعیت‌یاب نشان می‌دهد یک دامنه یا آدرس به کدام کشور تعلق دارد. سینگ‌باکس بدون آن تفکیک ترافیک نمی‌کند.',
 	'sing-box needs Geoview to read the routing data, and it could not be installed, so the Iran split and ad blocking are off. Install Geoview on the App Update page, or choose Xray under Active core in Basic Settings.':
 		'sing-box برای خواندن داده‌های مسیریابی به Geoview نیاز دارد و نصب آن ممکن نشد، پس تفکیک ایران و مسدود کردن تبلیغات خاموش است. Geoview را از صفحه «به‌روزرسانی» نصب کنید، یا در تنظیمات پایه زیر «هسته فعال» Xray را انتخاب کنید.',
 	'Enter something to look for first.': 'اول چیزی برای جست‌وجو وارد کنید.',
@@ -1109,7 +1109,7 @@ var FA = {
 	'HTTP/3 (QUIC)': 'HTTP/3 (QUIC)',
 	'OpenVPN did not connect. The Runtime Logs page says how far it got.': 'OpenVPN وصل نشد. صفحه‌ی «گزارش اجرا» می‌گوید تا کجا پیش رفت.',
 	'OpenVPN is the official client, from the router’s own packages: every OpenVPN config is carried by it and by nothing else. Install, update and remove go through the package manager.':
-		'OpenVPN کلاینت رسمی است و از بسته‌های خود روتر نصب می‌شود: هر کانفیگ OpenVPN فقط با آن اجرا می‌شود. نصب، به‌روزرسانی و حذفش با مدیر بسته‌ی روتر انجام می‌شود.',
+		'هسته OpenVPN رسمی است و از پکیج‌های خود روتر نصب می‌شود. کانفیگ‌های OpenVPN فقط با آن اجرا می‌شوند.',
 	'This router has neither opkg nor apk, so OpenVPN cannot be installed automatically.': 'این روتر نه opkg دارد نه apk، پس OpenVPN خودکار نصب نمی‌شود.',
 	'OpenVPN profile': 'پروفایل OpenVPN',
 	'The whole .ovpn profile. Choose the file and its contents are put in the box for you.':
@@ -1306,7 +1306,7 @@ var FA = {
 	'Only WARP nodes need it. Empty means this program’s own copy in the folder above.':
 		'فقط کانفیگ‌های وارپ لازمش دارند. خالی یعنی نسخه خود این برنامه در پوشه بالا.',
 	'warp-plus is only needed for WARP nodes: Cloudflare WARP, WARP in WARP, Psiphon behind WARP, and WireGuard nodes set to be carried by it.':
-		'warp-plus فقط برای کانفیگ‌های وارپ لازم است: وارپ کلودفلر، وارپ در وارپ، سایفون پشت وارپ، و کانفیگ‌های وایرگارد که روی «اجرا با warp-plus» گذاشته شده‌اند.',
+		'وارپ‌پلاس فقط برای کانفیگ‌های از نوع وارپ شامل: وارپ کلودفلر، وارپ در وارپ، سایفون پشت وارپ، و کانفیگ‌های وایرگارد روی وارپ لازم است.',
 	'A WARP node needs warp-plus. Install it on the App Update page.': 'کانفیگ وارپ به warp-plus نیاز دارد. از صفحه «به‌روزرسانی» نصبش کنید.',
 	'WARP did not connect. The Runtime Logs page says how far it got. Without an account, press Register on the node\'s page while another node is connected; without an answer from WARP, turn Scan on or give another endpoint.':
 		'وارپ وصل نشد. صفحه «گزارش‌ها» نشان می‌دهد تا کجا پیش رفت. اگر اکانت ندارد، وقتی کانفیگ دیگری وصل است در صفحه این کانفیگ «ثبت‌نام» را بزنید. اگر وارپ جواب نمی‌دهد، اسکن را روشن کنید یا اندپوینت دیگری بدهید.',
@@ -1337,7 +1337,7 @@ var FA = {
 		'فقط کانفیگ‌های وارپ با MASQUE یا با پوشش لازمش دارند. خالی یعنی نسخه خود این برنامه در پوشه بالا.',
 	'Xray (patterniha)': 'Xray (پترنیها)',
 	'Vwarp is warp-plus with WARP over MASQUE and noize; WARP nodes that use either need it. Xray (patterniha) is Xray that also carries VLESS and Trojan without TLS to public addresses - configs over Cloudflare’s plain-HTTP ports - which the official Xray refuses; installed beside it, it is used for those configs.':
-		'Vwarp همان warp-plus است به‌علاوه MASQUE و پوشش (noize)؛ کانفیگ‌های وارپی که از این دو استفاده می‌کنند لازمش دارند. Xray (پترنیها) نسخه‌ای از Xray است که VLESS و Trojan بدون TLS را هم به آدرس عمومی وصل می‌کند - کانفیگ‌هایی که از پورت‌های HTTP ساده کلودفلر می‌روند - و Xray رسمی آن‌ها را رد می‌کند. کنار Xray رسمی نصب می‌شود و برای همین کانفیگ‌ها به کار می‌رود.',
+		'وی‌وارپ همان وارپ‌پلاس است به‌همراه ماسک و پوشش یا نویز. کانفیگ‌های وارپی که از این دو استفاده می‌کنند لازمش دارند. هسته پترنی‌ها نسخه‌ای از ایکس‌ری است که وی‌لس و تروجان بدون TLS را رد نمی‌کند.',
 	'This WARP node uses MASQUE or noize, which need Vwarp. Install it on the App Update page.':
 		'این کانفیگ وارپ از MASQUE یا پوشش استفاده می‌کند که به Vwarp نیاز دارد. از صفحه «به‌روزرسانی» نصبش کنید.',
 	'The Xray download does not match its published checksum - nothing was installed.':
