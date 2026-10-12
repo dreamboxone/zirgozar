@@ -179,6 +179,7 @@ www/luci-static/resources/view/zirgozar/settings.js
 www/luci-static/resources/view/zirgozar/log.js
 www/luci-static/resources/view/zirgozar/server.js
 www/luci-static/resources/zirgozar/i18n.js
+www/luci-static/resources/zirgozar/logfa.js
 www/luci-static/resources/zirgozar/status.js
 www/luci-static/resources/zirgozar/qr.js
 www/luci-static/resources/zirgozar/nodelink.js

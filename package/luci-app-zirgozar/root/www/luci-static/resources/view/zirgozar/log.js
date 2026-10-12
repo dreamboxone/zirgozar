@@ -18,6 +18,7 @@
 'require uci';
 'require zirgozar.i18n as i18n';
 'require zirgozar.ui as pui';
+'require zirgozar.logfa as logfa';
 
 /* Our own strings, in the language the setting names. */
 var _ = i18n.tr;
@@ -26,10 +27,15 @@ var callLog = rpc.declare({ object: 'luci.zirgozar', method: 'log', expect: { ''
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
 
-/* Left to right whatever the interface language is: these are log lines,
-   every one of them English with paths and numbers in it. Laid out right to
-   left they would be unreadable. */
-function box() {
+/* The core's lines are its own, English with paths and numbers in them, and
+   stay left to right. This program's own lines are said in Persian when the
+   page is - see logfa.js - and each line then takes the direction of what it
+   says, so a Persian sentence reads right to left and a path inside it, or a
+   line that was left in English, still reads the right way round. */
+function box(own) {
+	if (own && i18n.get() === 'fa')
+		return E('pre', { 'dir': 'auto', 'class': 'mk-log',
+		                  'style': 'unicode-bidi:plaintext;text-align:start' }, '');
 	return E('pre', { 'dir': 'ltr', 'class': 'mk-log' }, '');
 }
 
@@ -53,11 +59,11 @@ return view.extend({
 	render: function(data) {
 		i18n.setLang(uci.get('zirgozar', 'config', 'lang'));
 
-		var runtime = box(), core = box();
+		var runtime = box(true), core = box(false);
 
 		function draw(d) {
 			d = d || {};
-			fill(runtime, d.text, _('Nothing has been logged yet.'));
+			fill(runtime, i18n.get() === 'fa' ? logfa.text(d.text) : d.text, _('Nothing has been logged yet.'));
 			fill(core, d.core, uci.get('zirgozar', 'config', 'log_node') === '0'
 				? _('The node log is switched off in Settings → Log.')
 				: _('The core has not said anything yet.'));

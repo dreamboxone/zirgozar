@@ -7,8 +7,8 @@
 # packages.inc.sh - what goes into a package, shared by the .apk and .ipk
 # builders so the two formats can never drift apart.
 
-VERSION=5.7.19
-RELEASE=9
+VERSION=5.7.20
+RELEASE=1
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -239,6 +239,9 @@ stage_luci() {
 	# three blank pages - it ships beside them, not as an extra.
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/i18n.js" \
 		"$i/www/luci-static/resources/zirgozar/i18n.js"
+	# The runtime log said again in Persian, for the Log page.
+	install -m 0644 "$l/www/luci-static/resources/zirgozar/logfa.js" \
+		"$i/www/luci-static/resources/zirgozar/logfa.js"
 	# The frame every page is drawn in, its stylesheet, and the Persian
 	# typeface it uses. Required by every view, like the strings above.
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/ui.js" \

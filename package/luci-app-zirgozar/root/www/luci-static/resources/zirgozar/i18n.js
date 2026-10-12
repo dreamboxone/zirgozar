@@ -310,9 +310,8 @@ var FA = {
 	'Log': 'لاگ',
 	'The last few hundred lines this program wrote to the system log, newest at the bottom. It refreshes every five seconds. Nothing here is stored by this package — it is the router’s own log, and it is emptied when the router restarts.':
 		'چند صد خط آخری که این برنامه در لاگ سیستم نوشته، تازه‌ترین در پایین. هر پنج ثانیه تازه می‌شود. هیچ‌کدام از این‌ها را خود پکیج ذخیره نمی‌کند — لاگ خود روتر است و با ریستارت روتر پاک می‌شود.',
-	/* The lines themselves are never translated: they are the router's own
-	   log, written in English with paths and numbers in them, and a Persian
-	   rendering of half of them would be a worse thing to read than either. */
+	/* The lines themselves are said in Persian by logfa.js, sentence by
+	   sentence, with the paths and numbers in them left as they are. */
 	'Nothing has been logged yet.': 'هنوز چیزی در لاگ نوشته نشده.',
 	'Refresh': 'تازه‌سازی',
 	'Following': 'دنبال کردن',
