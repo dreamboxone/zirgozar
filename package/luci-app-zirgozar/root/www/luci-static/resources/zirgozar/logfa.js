@@ -181,6 +181,7 @@ var T = [
 	[ '{} downloaded but will not run here: {}', '{1} دانلود شد ولی اینجا اجرا نمی‌شود: {2}' ],
 	[ 'OpenVPN {} installed ({})', 'OpenVPN {1} نصب شد ({2})' ],
 	[ 'OpenVPN removed ({})', 'OpenVPN حذف شد ({1})' ],
+	[ "OpenVPN: {}is not available for this firmware's kernel ({})", 'OpenVPN: {1}برای کرنل این فریم‌ور ({2}) وجود ندارد' ],
 	[ '{} {} installed in {}', '{1} {2} در {3} نصب شد' ],
 	[ 'update: no package for {} in the latest release', 'به‌روزرسانی: در آخرین انتشار بسته‌ای برای {1} نیست' ],
 	[ 'update: downloading {}', 'به‌روزرسانی: در حال دانلود {1}' ],

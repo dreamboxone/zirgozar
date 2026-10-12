@@ -598,7 +598,17 @@ install_openvpn() {
 			;;
 	esac
 	if [ -z "$(openvpn_path)" ]; then
-		say_message "OpenVPN could not be installed: $(tail -1 "$ZGZ_RUN/ovpn-install.log" 2>/dev/null | cut -c1-160)"
+		# OpenVPN 2.7 needs a kernel module, and a kernel module is built for
+		# one kernel only. A router whose firmware is older than the package
+		# feed, or not an official build, has no copy of it to install - and
+		# the package manager's own line for that, "required by: openvpn-…
+		# [kmod-ovpn-backports]", says nothing to anyone who reads it.
+		if grep -q 'kmod-' "$ZGZ_RUN/ovpn-install.log" 2>/dev/null; then
+			say_message "OpenVPN could not be installed: a kernel module it needs is not available for this router's firmware. Update the firmware to the latest official OpenWrt release."
+			warn "OpenVPN: $(grep -o 'kmod-[A-Za-z0-9_-]*' "$ZGZ_RUN/ovpn-install.log" | sort -u | tr '\n' ' ')is not available for this firmware's kernel ($(uname -r))"
+		else
+			say_message "OpenVPN could not be installed: $(tail -1 "$ZGZ_RUN/ovpn-install.log" 2>/dev/null | cut -c1-160)"
+		fi
 		return 1
 	fi
 	log "OpenVPN $(core_version /usr/sbin/openvpn) installed ($_op)"
