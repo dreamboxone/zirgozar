@@ -152,17 +152,28 @@ rig_set block_quic 0
 # A device that looked a blocked name up while the tunnel was off still has the
 # filtering address for it. That address is inside 10.0.0.0/8, so it has to be
 # sent to the tunnel before the reserved-address return, or it never is.
-sh "$RIG/lib/zgz-rules" dump > "$WORK/rules.nft"
-pre=$(awk '/chain prerouting/, /^	}/' "$WORK/rules.nft")
-p=$(printf '%s
-' "$pre" | grep -n 'ip daddr 10.10.34.0/24 meta l4proto tcp .*tproxy ip to 127.0.0.1:1084' | head -1 | cut -d: -f1)
-r=$(printf '%s
-' "$pre" | grep -n 'ip daddr @reserved return' | head -1 | cut -d: -f1)
-if [ -n "$p" ] && [ -n "$r" ] && [ "$p" -lt "$r" ]; then
-	ok "the filtering addresses go to their own inbound, ahead of the reserved return"
+# Under REDIRECT, the default, their TCP is marked for a REDIRECT port of its
+# own; under TPROXY it is handed to their inbound directly.
+poison_first() {
+	sh "$RIG/lib/zgz-rules" dump > "$WORK/rules.nft"
+	pre=$(awk '/chain prerouting/, /^	}/' "$WORK/rules.nft")
+	p=$(printf '%s\n' "$pre" | grep -n "ip daddr 10.10.34.0/24 meta l4proto tcp .*$2" | head -1 | cut -d: -f1)
+	r=$(printf '%s\n' "$pre" | grep -n 'ip daddr @reserved return' | head -1 | cut -d: -f1)
+	if [ -n "$p" ] && [ -n "$r" ] && [ "$p" -lt "$r" ]; then
+		ok "$1: the filtering addresses go to their own inbound, ahead of the reserved return"
+	else
+		bad "$1: the filtering addresses go to their own inbound, ahead of the reserved return"
+	fi
+}
+poison_first REDIRECT 'meta mark set 0x165 counter accept'
+if awk '/chain proxy_nat/, /^	}/' "$WORK/rules.nft" | grep -q 'meta mark 0x165 meta l4proto tcp counter redirect to :1086'; then
+	ok "REDIRECT: and are redirected to the port beside it"
 else
-	bad "the filtering addresses go to their own inbound, ahead of the reserved return"
+	bad "REDIRECT: and are redirected to the port beside it"
 fi
+rig_set tcp_proxy_way tproxy
+poison_first TPROXY 'tproxy ip to 127.0.0.1:1084'
+rig_set tcp_proxy_way ''
 rig_set client_proxy 0
 sh "$RIG/lib/zgz-rules" dump > "$WORK/rules.nft"
 if grep -q '10.10.34.0/24' "$WORK/rules.nft"; then
