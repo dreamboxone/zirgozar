@@ -48,6 +48,23 @@ poison_port() {
 	return 0
 }
 
+# Under TCP Proxy Way REDIRECT, TCP has a port of its own beside every TPROXY
+# port, as PassWall2 gives it: the filtering addresses' beside poison_port,
+# and an Access Control rule's beside the port of its node.
+tcp_redirect() {
+	[ "$(cfg tcp_proxy_way redirect)" = "redirect" ]
+}
+
+poison_redir_port() {
+	echo $(( $(cfg redir_port 1085) + 1 ))
+	return 0
+}
+
+acl_redir_port() {
+	echo $(( $1 + 100 ))
+	return 0
+}
+
 # The runtime log the Log page shows, the way PassWall2 keeps one: a file in
 # RAM, a date on every line, and a button that empties it. Everything also
 # goes to syslog as before - the file is what the page reads, the system log

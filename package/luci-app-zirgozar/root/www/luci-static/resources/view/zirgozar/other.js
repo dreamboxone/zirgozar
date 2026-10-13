@@ -158,10 +158,10 @@ return view.extend({
 		o.default = 'auto';
 
 		o = s.option(form.ListValue, 'tcp_proxy_way', _('TCP Proxy Way'),
-			_('TPROXY carries TCP and UDP on one port. REDIRECT sends TCP to a port of its own, for a kernel whose TPROXY misbehaves with TCP; UDP is always TPROXY.'));
-		o.value('tproxy', 'TPROXY');
+			_('REDIRECT, as in PassWall2: TCP goes to a port of its own and UDP by TPROXY. TPROXY carries both on one port.'));
 		o.value('redirect', 'REDIRECT');
-		o.default = 'tproxy';
+		o.value('tproxy', 'TPROXY');
+		o.default = 'redirect';
 
 		o = s.option(form.Flag, 'accept_icmp', _('Hijacking ICMP (PING)'),
 			_('A tunnel carries no ICMP, so a ping to a tunnelled address never comes back. With this on, the router answers it.'));

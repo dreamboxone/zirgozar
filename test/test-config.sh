@@ -1017,6 +1017,7 @@ OTHER="$(tr -d '\n' < "$WORK/other.json")"
 for want in \
 	'"tag": "socks-in", "listen": "0.0.0.0", "port": 1070' \
 	'"tag": "redir-in"' \
+	'"tag": "poison-redir",      "listen": "0.0.0.0",      "port": 1086' \
 	'"tproxy": "redirect"' \
 	'"routeOnly": true' \
 	'"bufferSize": 512' \
@@ -1027,6 +1028,14 @@ for want in \
 		bad "carried through: $want"
 	fi
 done
+
+# Unset, TCP goes by REDIRECT, as PassWall2 has it; TPROXY only when chosen.
+rig_set tcp_proxy_way ''
+sh "$RIG/lib/zgz-mkconfig" 2>/dev/null | tr -d '\n' | grep -q '"tag": "redir-in"' &&
+	ok "REDIRECT by default" || bad "REDIRECT by default"
+rig_set tcp_proxy_way tproxy
+sh "$RIG/lib/zgz-mkconfig" 2>/dev/null | tr -d '\n' | grep -qE '"tag": "(redir-in|poison-redir)"' &&
+	bad "no REDIRECT inbound under TPROXY" || ok "no REDIRECT inbound under TPROXY"
 
 # Unset, the sniffed name is for routing only, as PassWall2 has it.
 rig_set sniffing_override_dest ''

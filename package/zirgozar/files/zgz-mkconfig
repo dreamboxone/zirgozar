@@ -349,9 +349,23 @@ acl_one() {
       \"streamSettings\": { \"sockopt\": { \"tproxy\": \"tproxy\" } },
       \"sniffing\": $sniffing
     }"
+				_acl_in="\"acl$acl_count\""
+				if tcp_redirect; then
+					acl_inbounds="$acl_inbounds,
+    {
+      \"tag\": \"acl$acl_count-redir\",
+      \"listen\": \"0.0.0.0\",
+      \"port\": $(acl_redir_port "$port"),
+      \"protocol\": \"dokodemo-door\",
+      \"settings\": { \"network\": \"tcp\", \"followRedirect\": true },
+      \"streamSettings\": { \"sockopt\": { \"tproxy\": \"redirect\" } },
+      \"sniffing\": $sniffing
+    }"
+					_acl_in="$_acl_in,\"acl$acl_count-redir\""
+				fi
 				acl_outbounds="$acl_outbounds
 $(printf '%s\n' "$out" | sed -e 's/^[[:space:]]*//' -e "s/^{/{\"tag\":\"acl$acl_count-out\",/" | head -1),"
-				add_rule "{\"type\":\"field\",\"inboundTag\":[\"acl$acl_count\"],\"outboundTag\":\"acl$acl_count-out\"}"
+				add_rule "{\"type\":\"field\",\"inboundTag\":[$_acl_in],\"outboundTag\":\"acl$acl_count-out\"}"
 			else
 				warn "access control rule $1: node '$node' cannot be used - sending it through the tunnel's own node"
 				mode=2
@@ -439,11 +453,11 @@ if [ "$(cfg_bool socks_enabled 0)" = "1" ] && [ -r /lib/functions.sh ]; then
 	config_foreach socks_one socks
 fi
 
-# TCP Proxy Way, as PassWall2 offers it. TPROXY is the default and carries
-# both TCP and UDP on one port; REDIRECT sends TCP to a port of its own, for a
-# kernel whose TPROXY misbehaves with TCP. UDP has no other way than TPROXY.
+# TCP Proxy Way, as PassWall2 offers it. REDIRECT is the default, as there:
+# TCP to a port of its own and UDP by TPROXY, which carries both on one port
+# when it is chosen instead. UDP has no other way than TPROXY.
 redir_inbound=""
-if [ "$(cfg tcp_proxy_way tproxy)" = "redirect" ]; then
+if tcp_redirect; then
 	redir_inbound=",
     {
       \"tag\": \"redir-in\",
@@ -471,6 +485,18 @@ poison_inbound=",
       \"streamSettings\": { \"sockopt\": { \"tproxy\": \"tproxy\" } },
       \"sniffing\": { \"enabled\": true, \"destOverride\": [ \"http\", \"tls\", \"quic\" ], \"routeOnly\": false }
     }"
+if tcp_redirect; then
+	poison_inbound="$poison_inbound,
+    {
+      \"tag\": \"poison-redir\",
+      \"listen\": \"0.0.0.0\",
+      \"port\": $(poison_redir_port),
+      \"protocol\": \"dokodemo-door\",
+      \"settings\": { \"network\": \"tcp\", \"followRedirect\": true },
+      \"streamSettings\": { \"sockopt\": { \"tproxy\": \"redirect\" } },
+      \"sniffing\": { \"enabled\": true, \"destOverride\": [ \"http\", \"tls\", \"quic\" ], \"routeOnly\": false }
+    }"
+fi
 
 # ------------------------------------------------------------ shunt rules
 
@@ -527,7 +553,7 @@ fi
 
 main_in='"tproxy-in","poison-in"'
 if [ -n "$redir_inbound" ]; then
-	main_in="$main_in,\"redir-in\""
+	main_in="$main_in,\"redir-in\",\"poison-redir\""
 fi
 socks_in=""
 if [ -n "$_nsp" ]; then

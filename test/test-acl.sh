@@ -79,6 +79,7 @@ rig_set direct_ip ""
 echo "== access control"
 rig_set ipv6 block
 rig_set block_quic 1
+rig_set tcp_proxy_way tproxy
 : > "$ZGZ_RUN/acl.tsv"
 acl "cfg01 - 00:11:22:33:44:55 192.168.1.50-192.168.1.60,192.168.1.7 - 0 0 - - 1:65535 1:65535"
 acl "cfg02 br-lan - 192.168.1.0/24 - 2 0 - 1:65535 80:443,8443 1:65535"
@@ -136,6 +137,71 @@ if [ -n "$j" ] && [ -n "$r" ] && [ -n "$t" ] && [ "$r" -lt "$j" ] && [ "$j" -lt 
 else
 	bad "the jumps sit between the reserved returns and the catch-all"
 fi
+
+echo "== access control under REDIRECT, PassWall2's default"
+rig_set tcp_proxy_way ""
+dump "REDIRECT"
+if chain acl_2 | grep -qF 'meta l4proto tcp meta mark set 0x164 counter accept'; then
+	ok "global node: TCP marked for the LAN's REDIRECT port"
+else
+	bad "global node: TCP marked for the LAN's REDIRECT port"
+fi
+if chain acl_3 | grep -qF 'meta l4proto tcp meta mark set 0x173 counter accept'; then
+	ok "own node: TCP marked for a REDIRECT port of its own"
+else
+	bad "own node: TCP marked for a REDIRECT port of its own"
+fi
+if chain acl_3 | grep -q 'tcp counter tproxy'; then bad "own node: TCP never tproxied"; else ok "own node: TCP never tproxied"; fi
+if chain acl_3 | grep -qF 'meta l4proto udp counter tproxy ip to 127.0.0.1:1183'; then
+	ok "own node: UDP still by TPROXY to its port"
+else
+	bad "own node: UDP still by TPROXY to its port"
+fi
+if chain proxy_nat | grep -qF 'meta mark 0x164 meta l4proto tcp counter redirect to :1085'; then
+	ok "the LAN's TCP redirected"
+else
+	bad "the LAN's TCP redirected"
+fi
+if chain proxy_nat | grep -qF 'meta mark 0x173 meta l4proto tcp counter redirect to :1283'; then
+	ok "the own node's TCP redirected beside its port"
+else
+	bad "the own node's TCP redirected beside its port"
+fi
+if chain prerouting | grep -qF 'ip daddr 10.10.34.0/24 meta l4proto tcp meta mark set 0x165 counter accept' &&
+   chain proxy_nat | grep -qF 'meta mark 0x165 meta l4proto tcp counter redirect to :1086'; then
+	ok "the filtering addresses' TCP redirected to a port of their own"
+else
+	bad "the filtering addresses' TCP redirected to a port of their own"
+fi
+rig_set client_proxy 0
+dump "REDIRECT, Client Proxy off"
+if chain proxy_nat | grep -qF 'meta mark 0x173 meta l4proto tcp counter redirect to :1283'; then
+	ok "Access Control is redirected with Client Proxy off"
+else
+	bad "Access Control is redirected with Client Proxy off"
+fi
+rig_set client_proxy 1
+
+echo "== the router's own traffic"
+rig_set localhost_proxy 1
+sh "$RIG/lib/zgz-rules" dump-local > "$WORK/local.nft" 2>/dev/null
+if grep -qF 'meta l4proto udp meta mark set' "$WORK/local.nft" && ! grep -qF 'meta l4proto { tcp, udp } meta mark set' "$WORK/local.nft" &&
+   grep -qF 'type nat hook output priority dstnat' "$WORK/local.nft" && grep -qF 'meta l4proto tcp counter redirect to :1085' "$WORK/local.nft"; then
+	ok "REDIRECT: TCP redirected on its way out, only UDP routed back in"
+else
+	bad "REDIRECT: TCP redirected on its way out, only UDP routed back in"
+fi
+if command -v nft >/dev/null 2>&1; then
+	nft --check --file "$WORK/local.nft" >/dev/null 2>&1 && ok "nft accepts the router's own rules" || bad "nft accepts the router's own rules"
+fi
+rig_set tcp_proxy_way tproxy
+sh "$RIG/lib/zgz-rules" dump-local > "$WORK/local.nft" 2>/dev/null
+if grep -qF 'meta l4proto { tcp, udp } meta mark set' "$WORK/local.nft" && ! grep -qF 'output_nat' "$WORK/local.nft"; then
+	ok "TPROXY: both routed back in, as before"
+else
+	bad "TPROXY: both routed back in, as before"
+fi
+rig_set localhost_proxy 0
 
 echo "== the core"
 : > "$ZGZ_RUN/acl.tsv"

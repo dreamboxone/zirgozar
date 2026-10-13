@@ -861,8 +861,8 @@ var FA = {
 	'Only Web': 'فقط وب',
 	'Prefer firewall tools': 'ابزار فایروال',
 	'TCP Proxy Way': 'روش پروکسی TCP',
-	'TPROXY carries TCP and UDP on one port. REDIRECT sends TCP to a port of its own, for a kernel whose TPROXY misbehaves with TCP; UDP is always TPROXY.':
-		'TPROXY روش پیشنهادی است و TCP و UDP را با هم می‌برد. REDIRECT فقط برای روترهایی است که TPROXY آن‌ها با TCP مشکل دارد.',
+	'REDIRECT, as in PassWall2: TCP goes to a port of its own and UDP by TPROXY. TPROXY carries both on one port.':
+		'REDIRECT مثل پسوال۲: TCP به پورت جداگانه می‌رود و UDP با TPROXY. در TPROXY هر دو از یک پورت می‌روند.',
 	'Hijacking ICMP (PING)': 'پاسخ به پینگ (ICMP)',
 	'A tunnel carries no ICMP, so a ping to a tunnelled address never comes back. With this on, the router answers it.':
 		'فیلترشکن پینگ را عبور نمی‌دهد، پس پینگ گرفتن از سایت‌ها جواب نمی‌دهد. اگر روشن باشد، خود روتر به این پینگ‌ها جواب می‌دهد (عدد پینگ واقعی نیست).',

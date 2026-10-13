@@ -82,12 +82,16 @@ dns_hijack="$(cfg_bool dns_hijack 1)"
 # addresses from the router, since a tunnel carries no ICMP.
 client_proxy="$(cfg_bool client_proxy 1)"
 localhost_proxy="$(cfg_bool localhost_proxy 1)"
-tcp_way="$(cfg tcp_proxy_way tproxy)"
+tcp_way="$(cfg tcp_proxy_way redirect)"
 redir_port="$(cfg redir_port 1085)"
 accept_icmp="$(cfg_bool accept_icmp 0)"
 # Marks TCP that is to be redirected rather than handed to TPROXY. Not the
-# tunnel's mark, which the policy route would act on.
+# tunnel's mark, which the policy route would act on. Each REDIRECT port has
+# a mark of its own, since the nat chain sees only the mark: the LAN's, the
+# filtering addresses', and one per Access Control rule from ACL_MARK up.
 REDIR_MARK=0x164
+POISON_MARK=0x165
+ACL_MARK=0x170
 LOCAL_TABLE=zirgozar-local
 # Measuring a node from the router has to reach it directly, so while one is
 # being chosen the router's own traffic is left out of the tunnel.
@@ -300,8 +304,14 @@ nft_ruleset() {
 			_poison="		ip daddr $ZGZ_POISON_V4 udp dport 443 counter drop
 "
 		fi
-		_poison="$_poison		ip daddr $ZGZ_POISON_V4 meta l4proto tcp counter tproxy ip to 127.0.0.1:$_pp meta mark set $MARK accept
-		ip daddr $ZGZ_POISON_V4 meta l4proto udp counter tproxy ip to 127.0.0.1:$_pp meta mark set $MARK accept
+		if [ "$tcp_way" = "redirect" ]; then
+			_poison="$_poison		ip daddr $ZGZ_POISON_V4 meta l4proto tcp meta mark set $POISON_MARK counter accept
+"
+		else
+			_poison="$_poison		ip daddr $ZGZ_POISON_V4 meta l4proto tcp counter tproxy ip to 127.0.0.1:$_pp meta mark set $MARK accept
+"
+		fi
+		_poison="$_poison		ip daddr $ZGZ_POISON_V4 meta l4proto udp counter tproxy ip to 127.0.0.1:$_pp meta mark set $MARK accept
 "
 	fi
 
@@ -338,6 +348,7 @@ nft_ruleset() {
 	_acljumps=""
 	_aclfwd=""
 	_aclchains=""
+	_aclnat=""
 	_n=0
 	while IFS='	' read -r _id _if _macs _ips _sets _mode _port _tno _uno _tr _ur; do
 		[ -n "$_id" ] || continue
@@ -388,8 +399,24 @@ nft_ruleset() {
 "
 			[ "$_ur" != "-" ] && [ "$_ur" != "1:65535" ] && _body="$_body		meta l4proto udp udp dport != { $(nft_ports "$_ur") } accept
 "
-			_body="$_body$_quic		meta l4proto tcp counter tproxy ip to 127.0.0.1:$_tp meta mark set $MARK accept
-		meta l4proto udp counter tproxy ip to 127.0.0.1:$_tp meta mark set $MARK accept
+			if [ "$tcp_way" = "redirect" ]; then
+				# Marked here and redirected in the nat chain, to the REDIRECT
+				# port beside the rule's own: the LAN's for a rule that uses
+				# the tunnel's node, a port of its own for one with a node.
+				if [ "$_tp" = "$tproxy_port" ]; then
+					_am="$REDIR_MARK"
+				else
+					_am="$(printf '0x%x' $((ACL_MARK + _n)))"
+					_aclnat="$_aclnat		meta mark $_am meta l4proto tcp counter redirect to :$(acl_redir_port "$_tp")
+"
+				fi
+				_body="$_body$_quic		meta l4proto tcp meta mark set $_am counter accept
+"
+			else
+				_body="$_body$_quic		meta l4proto tcp counter tproxy ip to 127.0.0.1:$_tp meta mark set $MARK accept
+"
+			fi
+			_body="$_body		meta l4proto udp counter tproxy ip to 127.0.0.1:$_tp meta mark set $MARK accept
 		accept
 "
 		fi
@@ -443,12 +470,18 @@ ACL
 "
 	fi
 
-	# REDIRECT for TCP, and pings answered by the router: both nat work.
+	# REDIRECT for TCP, and pings answered by the router: both nat work. The
+	# TCP rules act only on what prerouting marked, which is everything going
+	# into the tunnel - Access Control's devices too, with Client Proxy off.
 	_nat=""
-	if [ "$client_proxy" = "1" ]; then
-		_natrules=""
-		[ "$tcp_way" = "redirect" ] && _natrules="$_natrules		meta mark $REDIR_MARK meta l4proto tcp counter redirect to :$redir_port
+	_natrules=""
+	if [ "$tcp_way" = "redirect" ]; then
+		_natrules="		meta mark $REDIR_MARK meta l4proto tcp counter redirect to :$redir_port
+$_aclnat"
+		[ "$client_proxy" = "1" ] && _natrules="$_natrules		meta mark $POISON_MARK meta l4proto tcp counter redirect to :$(poison_redir_port)
 "
+	fi
+	if [ "$client_proxy" = "1" ]; then
 		if [ "$accept_icmp" = "1" ]; then
 			_natrules="$_natrules		iifname != { $_iflist } return
 		meta mark $BYPASS return
@@ -459,13 +492,13 @@ ACL
 			_natrules="$_natrules		ip protocol icmp icmp type echo-request counter redirect
 "
 		fi
-		if [ -n "$_natrules" ]; then
-			_nat="	chain proxy_nat {
+	fi
+	if [ -n "$_natrules" ]; then
+		_nat="	chain proxy_nat {
 		type nat hook prerouting priority dstnat; policy accept;
 
 $_natrules	}
 "
-		fi
 	fi
 
 	_forward=""
@@ -564,8 +597,20 @@ $([ -n "$_lex" ] && printf '\tset exclude {\n\t\ttype ipv4_addr\n\t\tflags inter
 		ip daddr @reserved return
 $([ -n "$_ldl" ] && printf '\t\tip daddr @direct return\n')
 $([ -n "$_lex" ] && printf '\t\tip daddr @exclude return\n')
-		meta l4proto { tcp, udp } meta mark set $MARK
+$(if [ "$tcp_way" = "redirect" ]; then printf '\t\tmeta l4proto udp meta mark set %s\n' "$MARK"; else printf '\t\tmeta l4proto { tcp, udp } meta mark set %s\n' "$MARK"; fi)
 	}
+$(if [ "$tcp_way" = "redirect" ]; then
+	printf '\n\t# The same, for TCP under REDIRECT: sent to the REDIRECT port as it\n'
+	printf '\t# leaves, the way PassWall2 does, rather than routed back in.\n'
+	printf '\tchain output_nat {\n\t\ttype nat hook output priority dstnat; policy accept;\n\n'
+	printf '\t\tmeta mark %s return\n' "$BYPASS"
+	printf '\t\tmeta mark & 0xff0000 == 0x80000 return\n'
+	printf '\t\tmeta l4proto tcp th dport 53 return\n'
+	printf '\t\tip daddr @reserved return\n'
+	[ -n "$_ldl" ] && printf '\t\tip daddr @direct return\n'
+	[ -n "$_lex" ] && printf '\t\tip daddr @exclude return\n'
+	printf '\t\tmeta l4proto tcp counter redirect to :%s\n\t}\n' "$redir_port"
+fi)
 }
 NFT
 	return 0
@@ -647,7 +692,12 @@ ipt_up() {
 		if [ "$block_quic" = "1" ]; then
 			ipt -t mangle -A ZGZ_PRE -d "$ZGZ_POISON_V4" -p udp --dport 443 -j DROP
 		fi
-		ipt_must -t mangle -A ZGZ_PRE -d "$ZGZ_POISON_V4" -p tcp -j TPROXY 			--on-ip 127.0.0.1 --on-port "$(poison_port)" --tproxy-mark "$MARK" || return 1
+		if [ "$tcp_way" = "redirect" ]; then
+			ipt_must -t mangle -A ZGZ_PRE -d "$ZGZ_POISON_V4" -p tcp -j MARK --set-mark "$POISON_MARK" || return 1
+			ipt -t mangle -A ZGZ_PRE -d "$ZGZ_POISON_V4" -p tcp -j ACCEPT
+		else
+			ipt_must -t mangle -A ZGZ_PRE -d "$ZGZ_POISON_V4" -p tcp -j TPROXY 			--on-ip 127.0.0.1 --on-port "$(poison_port)" --tproxy-mark "$MARK" || return 1
+		fi
 		ipt_must -t mangle -A ZGZ_PRE -d "$ZGZ_POISON_V4" -p udp -j TPROXY 			--on-ip 127.0.0.1 --on-port "$(poison_port)" --tproxy-mark "$MARK" || return 1
 	fi
 	for _c in $RESERVED_V4; do
@@ -713,13 +763,18 @@ ipt_up() {
 		ipt_must -t mangle -A PREROUTING -i "$_d" -j ZGZ_PRE || return 1
 	done
 
-	# REDIRECT for TCP, and pings answered by the router.
-	if [ "$client_proxy" = "1" ] && { [ "$tcp_way" = "redirect" ] || [ "$accept_icmp" = "1" ]; }; then
+	# REDIRECT for TCP - whatever prerouting marked, Access Control's devices
+	# included - and pings answered by the router.
+	if [ "$tcp_way" = "redirect" ] || { [ "$client_proxy" = "1" ] && [ "$accept_icmp" = "1" ]; }; then
 		ipt -t nat -N ZGZ_NAT
 		if [ "$tcp_way" = "redirect" ]; then
 			ipt_must -t nat -A ZGZ_NAT -m mark --mark "$REDIR_MARK" -p tcp -j REDIRECT --to-ports "$redir_port" || return 1
+			ipt_must -t nat -A ZGZ_NAT -m mark --mark "$POISON_MARK" -p tcp -j REDIRECT --to-ports "$(poison_redir_port)" || return 1
+			for _an in $_ipt_aclnat; do
+				ipt_must -t nat -A ZGZ_NAT -m mark --mark "${_an%:*}" -p tcp -j REDIRECT --to-ports "${_an#*:}" || return 1
+			done
 		fi
-		if [ "$accept_icmp" = "1" ]; then
+		if [ "$client_proxy" = "1" ] && [ "$accept_icmp" = "1" ]; then
 			ipt -t nat -A ZGZ_NAT -m mark --mark "$BYPASS" -j RETURN
 			for _c in $RESERVED_V4 $(direct_ips); do
 				ipt -t nat -A ZGZ_NAT -d "$_c" -j RETURN
@@ -760,6 +815,7 @@ ipt_up() {
 # jump to it per kind of source, and a verdict at the end of every chain.
 ipt_acl() {
 	_n=0
+	_ipt_aclnat=""
 	while IFS='	' read -r _id _if _macs _ips _sets _mode _port _tno _uno _tr _ur; do
 		[ -n "$_id" ] || continue
 		_n=$((_n + 1))
@@ -802,7 +858,19 @@ ipt_acl() {
 			if [ "$block_quic" = "1" ]; then
 				ipt -t mangle -A "$_c" -p udp --dport 443 -j DROP
 			fi
-			ipt_must -t mangle -A "$_c" -p tcp -j TPROXY 				--on-ip 127.0.0.1 --on-port "$_tp" --tproxy-mark "$MARK" || return 1
+			if [ "$tcp_way" = "redirect" ]; then
+				# See the nftables side: a mark per REDIRECT port.
+				if [ "$_tp" = "$tproxy_port" ]; then
+					_am="$REDIR_MARK"
+				else
+					_am="$(printf '0x%x' $((ACL_MARK + _n)))"
+					_ipt_aclnat="$_ipt_aclnat $_am:$(acl_redir_port "$_tp")"
+				fi
+				ipt_must -t mangle -A "$_c" -p tcp -j MARK --set-mark "$_am" || return 1
+				ipt -t mangle -A "$_c" -p tcp -j ACCEPT
+			else
+				ipt_must -t mangle -A "$_c" -p tcp -j TPROXY 				--on-ip 127.0.0.1 --on-port "$_tp" --tproxy-mark "$MARK" || return 1
+			fi
 			ipt_must -t mangle -A "$_c" -p udp -j TPROXY 				--on-ip 127.0.0.1 --on-port "$_tp" --tproxy-mark "$MARK" || return 1
 			ipt -t mangle -A "$_c" -j ACCEPT
 		fi
@@ -884,7 +952,21 @@ ipt_local_up() {
 	for _c in $RESERVED_V4 $(direct_ips) $(local_exclusions); do
 		ipt -t mangle -A ZGZ_OUT -d "$_c" -j RETURN
 	done
-	ipt -t mangle -A ZGZ_OUT -p tcp -j MARK --set-mark "$MARK"
+	# Under REDIRECT, TCP goes to the REDIRECT port as it leaves, as PassWall2
+	# sends it, instead of being routed back in.
+	if [ "$tcp_way" = "redirect" ]; then
+		ipt -t nat -N ZGZ_ONAT
+		ipt -t nat -A ZGZ_ONAT -m mark --mark "$BYPASS" -j RETURN
+		ipt -t nat -A ZGZ_ONAT -m mark --mark 0x80000/0xff0000 -j RETURN
+		ipt -t nat -A ZGZ_ONAT -p tcp --dport 53 -j RETURN
+		for _c in $RESERVED_V4 $(direct_ips) $(local_exclusions); do
+			ipt -t nat -A ZGZ_ONAT -d "$_c" -j RETURN
+		done
+		ipt_must -t nat -A ZGZ_ONAT -p tcp -j REDIRECT --to-ports "$redir_port" || return 1
+		ipt_must -t nat -A OUTPUT -j ZGZ_ONAT || return 1
+	else
+		ipt -t mangle -A ZGZ_OUT -p tcp -j MARK --set-mark "$MARK"
+	fi
 	ipt -t mangle -A ZGZ_OUT -p udp -j MARK --set-mark "$MARK"
 
 	ipt -t mangle -N ZGZ_LO
@@ -901,8 +983,10 @@ ipt_local_down() {
 	command -v iptables >/dev/null 2>&1 || return 0
 	ipt_drop_jumps mangle OUTPUT     ZGZ_OUT iptables
 	ipt_drop_jumps mangle PREROUTING ZGZ_LO  iptables
+	ipt_drop_jumps nat    OUTPUT     ZGZ_ONAT iptables
 	ipt_kill_chain mangle ZGZ_OUT iptables
 	ipt_kill_chain mangle ZGZ_LO  iptables
+	ipt_kill_chain nat    ZGZ_ONAT iptables
 	return 0
 }
 
