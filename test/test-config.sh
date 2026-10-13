@@ -1029,6 +1029,15 @@ for want in \
 	fi
 done
 
+# BitTorrent is refused only when asked, as in PassWall2.
+rig_set block_torrent ''
+sh "$RIG/lib/zgz-mkconfig" 2>/dev/null | grep -q '"bittorrent"' &&
+	bad "BitTorrent is not refused by default" || ok "BitTorrent is not refused by default"
+rig_set block_torrent 1
+sh "$RIG/lib/zgz-mkconfig" 2>/dev/null | grep -q '"protocol":\["bittorrent"\],"outboundTag":"block"' &&
+	ok "and is when turned on" || bad "and is when turned on"
+rig_set block_torrent ''
+
 # Unset, TCP goes by REDIRECT, as PassWall2 has it; TPROXY only when chosen.
 rig_set tcp_proxy_way ''
 sh "$RIG/lib/zgz-mkconfig" 2>/dev/null | tr -d '\n' | grep -q '"tag": "redir-in"' &&

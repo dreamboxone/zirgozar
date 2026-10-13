@@ -420,7 +420,7 @@ return view.extend({
 
 		o = s.option(form.Flag, 'block_torrent', _('Block BitTorrent'),
 			_('BitTorrent through a free node is how a free node stops existing.'));
-		o.default = '1';
+		o.default = '0';
 		o.rmempty = false;
 
 		o = s.option(form.ListValue, 'block_quic', _('Refuse QUIC'),

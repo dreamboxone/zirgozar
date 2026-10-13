@@ -51,7 +51,7 @@ dns_port="$(cfg dns_port 1053)"
 api_port="$(cfg api_port 10853)"
 route_ir="$(cfg_bool route_ir 0)"
 block_ads="$(cfg_bool block_ads 0)"
-block_torrent="$(cfg_bool block_torrent 1)"
+block_torrent="$(cfg_bool block_torrent 0)"
 loglevel="$(cfg loglevel warning)"
 # PassWall2's switch for the core's own log. Off is a core that says nothing.
 [ "$(cfg_bool log_node 1)" = "1" ] || loglevel=none
