@@ -568,14 +568,18 @@ add_shunt() {
 	shunt_rules="$shunt_rules$1"
 }
 
-# A hand-added node's outbound, dialling through the pre-proxy node given -
-# PassWall2's per-rule Preproxy. A node with a chain of its own keeps it: one
-# layer of pre-proxy, as PassWall2 says. The pre-proxy's own outbound is made
-# with the others that dial through something, from the dialer tag.
+# A node's outbound - added by hand or a subscription's - dialling through the
+# pre-proxy node given: PassWall2's per-rule Preproxy. A node with a chain of
+# its own keeps it: one layer of pre-proxy, as PassWall2 says. The pre-proxy's
+# own outbound is made with the others that dial through something, from the
+# dialer tag.
 shunt_outbound() {
 	if [ -n "$2" ] && [ "$2" != "$1" ] && uci -q get "zirgozar.$2.link" >/dev/null 2>&1; then
 		warp_in_use "$1" && return 1
-		node_records "$1" 1 2>/dev/null | head -1 | warp_natives |
+		case "$1" in
+			sub:*) "$ZGZ_LIB/zgz-nodes" resolve "$1" 2>/dev/null | head -1 ;;
+			*) node_records "$1" 1 2>/dev/null | head -1 ;;
+		esac | warp_natives |
 			awk -F'\t' '$6 ~ /"protocol"/ { print; found = 1; exit } END { exit found ? 0 : 1 }' |
 			decorate "chain-$2" | cut -f6-
 		return 0
@@ -583,10 +587,11 @@ shunt_outbound() {
 	acl_outbound "$1"
 }
 
-# Where a choice goes, as an outbound tag in SHUNT_TAG. A hand-added node is
-# built as its own outbound here; one that cannot be - deleted since, or a
-# hysteria2 or tuic node, which needs a helper of its own - goes the tunnel's
-# way rather than nowhere.
+# Where a choice goes, as an outbound tag in SHUNT_TAG. A node - added by hand,
+# or a subscription's, found again in its list - is built as its own outbound
+# here; one that cannot be - deleted since, gone from its list, or a hysteria2
+# or tuic node, which needs a helper of its own - goes the tunnel's way rather
+# than nowhere.
 #
 #   shunt_tag <choice> <rule> [pre-proxy]
 shunt_tag() {

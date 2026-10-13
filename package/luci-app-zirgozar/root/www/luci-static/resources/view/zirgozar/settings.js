@@ -234,7 +234,7 @@ return view.extend({
 			var k = n.sub + '|' + n.label;
 			seenName[k] = (seenName[k] || 0) + 1;
 		});
-		function subChoices(opt) {
+		function subChoices(opt, keep) {
 			subNodes.forEach(function(n) {
 				var parts = [ n.protocol, n.host, n.port, n.label ];
 				if (n.fp) parts.push('#' + n.fp);
@@ -244,11 +244,13 @@ return view.extend({
 			});
 			/* A choice whose node has left the list is still the choice, and is
 			   found again by the router; it keeps a name here. */
-			var cur = uci.get('zirgozar', 'config', 'node') || '';
-			if (cur.indexOf('sub:') == 0 && opt.keylist.indexOf(cur) < 0) {
-				var k = cur.split(':').slice(2).join(':').split('|');
-				opt.value(cur, (k[3] || k[1] || cur));
-			}
+			(keep || [ uci.get('zirgozar', 'config', 'node') ]).forEach(function(cur) {
+				cur = cur || '';
+				if (cur.indexOf('sub:') == 0 && opt.keylist.indexOf(cur) < 0) {
+					var k = cur.split(':').slice(2).join(':').split('|');
+					opt.value(cur, (k[3] || k[1] || cur));
+				}
+			});
 		}
 
 		/* The tiles and the status card for the top of the page, and the
@@ -401,6 +403,9 @@ return view.extend({
 			opt.value('_direct', _('Direct Connection'));
 			opt.value('_blackhole', _('Blackhole (Block)'));
 			nodeChoices(opt);
+			/* A subscription's nodes too, as for the tunnel's own node. */
+			subChoices(opt, rules.map(function(r) { return r.node; })
+				.concat([ uci.get('zirgozar', 'config', 'default_node') ]));
 		}
 
 		o = s.taboption('shunt', form.ListValue, 'domainStrategy', _('Domain Strategy'),
@@ -536,7 +541,7 @@ return view.extend({
 			_('With Xray as the active core the rule is left out.'));
 		so.modalonly = true;
 
-		sr.description = _('FakeDNS works with its main switch on, for a rule whose names go through a node. Preproxy: the rule’s hand-added node is reached through this node first — only for a rule that goes to a hand-added node, and one layer only: a node with a chain of its own keeps it.');
+		sr.description = _('FakeDNS works with its main switch on, for a rule whose names go through a node. Preproxy: the rule’s node is reached through this node first — one layer only: a node with a chain of its own keeps it.');
 
 		o = s.taboption('shunt', form.ListValue, 'default_node', _('Default'),
 			_('Where everything no rule claims goes.'));
@@ -549,7 +554,7 @@ return view.extend({
 		o.default = '0';
 
 		o = s.taboption('shunt', form.ListValue, 'default_preproxy', _('Default Preproxy'),
-			_('When the Default row goes to a hand-added node, it is reached through this node first.'));
+			_('When the Default row goes to a node, it is reached through this node first.'));
 		o.value('', _('Close (Not use)'));
 		nodeChoices(o);
 

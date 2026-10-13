@@ -1049,12 +1049,12 @@ var FA = {
 	'Not valid, please re-enter: %s': 'نادرست است، دوباره وارد کنید: %s',
 	'Names that go through a node are answered with made-up addresses, and the node looks up the real one at the far end — for streaming services that unlock by DNS, or to save a lookup. Tick it for each rule below that should use it. The router itself can open those names only with Localhost Proxy on.':
 		'اگر روشن باشد، برای سایت‌هایی که از فیلترشکن می‌روند یک آدرس موقت ساختگی داده می‌شود و آدرس واقعی در سمت سرور پیدا می‌شود؛ سایت‌ها سریع‌تر باز می‌شوند و بعضی سرویس‌های ویدیویی هم باز می‌شوند. در جدول پایین برای هر قانونی که می‌خواهید تیک FakeDNS را بزنید.',
-	'FakeDNS works with its main switch on, for a rule whose names go through a node. Preproxy: the rule’s hand-added node is reached through this node first — only for a rule that goes to a hand-added node, and one layer only: a node with a chain of its own keeps it.':
-		'FakeDNS: فقط وقتی کار می‌کند که «کلید اصلی FakeDNS» روشن باشد و قانون به یک کانفیگ برود. پیش‌پروکسی: اگر قانون به یک کانفیگ دستی می‌رود، اتصال اول از این کانفیگ رد می‌شود (دو لایه).',
+	'FakeDNS works with its main switch on, for a rule whose names go through a node. Preproxy: the rule’s node is reached through this node first — one layer only: a node with a chain of its own keeps it.':
+		'FakeDNS: فقط وقتی کار می‌کند که «کلید اصلی FakeDNS» روشن باشد و قانون به یک کانفیگ برود. پیش‌پروکسی: اتصال کانفیگ قانون اول از این کانفیگ رد می‌شود (دو لایه).',
 	'Everything the tunnel carries gets made-up addresses — the DNS tab’s FakeDNS. Like that one, it takes effect only with lookups sent straight into the tunnel.':
 		'برای همه سایت‌هایی که از فیلترشکن می‌روند آدرس ساختگی داده می‌شود. فقط وقتی کار می‌کند که در برگه DNS، «روش پیدا کردن دامنه‌ها» روی «مستقیم داخل تونل» باشد.',
-	'When the Default row goes to a hand-added node, it is reached through this node first.':
-		'اگر ردیف پیش‌فرض به یک کانفیگ دستی می‌رود، اتصال اول از این کانفیگ رد می‌شود.',
+	'When the Default row goes to a node, it is reached through this node first.':
+		'اگر ردیف پیش‌فرض به یک کانفیگ می‌رود، اتصال اول از این کانفیگ رد می‌شود.',
 	'Delete the subscribed node': 'حذف کانفیگ‌ها',
 	'Delete subscription': 'حذف اشتراک',
 	'Not enough free space on the router: %s needed, %s free. Nothing was installed.': 'فضای خالی روتر کافی نیست: %s لازم است و %s خالی است. نصب انجام نشد.',
