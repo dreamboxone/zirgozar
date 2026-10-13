@@ -1028,6 +1028,12 @@ for want in \
 	fi
 done
 
+# Unset, the sniffed name is for routing only, as PassWall2 has it.
+rig_set sniffing_override_dest ''
+sh "$RIG/lib/zgz-mkconfig" 2>/dev/null | tr -d '
+' | grep -q '"tag": "tproxy-in".*"routeOnly": true' &&
+	ok "the destination is not overridden by default" || bad "the destination is not overridden by default"
+
 if [ -x "$RIG/core/xray" ]; then
 	if "$RIG/core/xray" run -test -config "$WORK/xtab.json" >"$WORK/xtab.test" 2>&1; then
 		ok "the core accepts all of it"

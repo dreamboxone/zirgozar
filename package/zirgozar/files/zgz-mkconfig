@@ -125,7 +125,7 @@ sniff_dest='"http", "tls", "quic"'
 if [ "$fakedns" = "1" ] || [ "$shunt_fake" = "1" ]; then
 	sniff_dest='"http", "tls", "quic", "fakedns"'
 fi
-if [ "$(cfg_bool sniffing_override_dest 1)" = "1" ] || [ "$fakedns" = "1" ] || [ "$shunt_fake" = "1" ]; then
+if [ "$(cfg_bool sniffing_override_dest 0)" = "1" ] || [ "$fakedns" = "1" ] || [ "$shunt_fake" = "1" ]; then
 	sniff_excl="$(cfg excluded_domains '' | tr '\r' '\n' |
 		awk 'NF && $1 !~ /^#/ { gsub(/"/, "", $1); printf "%s\"%s\"", (n++ ? ", " : ""), $1 }')"
 	sniffing="{ \"enabled\": true, \"destOverride\": [ $sniff_dest ], \"routeOnly\": false${sniff_excl:+, \"domainsExcluded\": [ $sniff_excl ]} }"

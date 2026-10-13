@@ -244,7 +244,7 @@ return view.extend({
 
 		o = s.option(form.Flag, 'sniffing_override_dest', _('Override the connection destination address'),
 			_('Override the connection destination address with the sniffed domain. Otherwise the sniffed domain is used for routing only.'));
-		o.default = '1';
+		o.default = '0';
 		o.rmempty = false;
 
 		o = s.option(form.TextValue, 'excluded_domains', _('Excluded Domains'),
