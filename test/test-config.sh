@@ -36,6 +36,13 @@ ss://YWVzLTEyOC1nY206cGFzc3dvcmRAMS4yLjMuNDoxMjM0#SS-LEGACY
 hysteria2://hunter2@hy.example.com:443?sni=hy.example.com&insecure=1#HY2
 tuic://11111111-2222-3333-4444-555555555555:hunter2@tu.example.com:443?sni=tu.example.com&congestion_control=bbr#TUIC
 socks5://dXNlcjpwYXNz@sk.example.com:1080#SOCKS
+anytls://hunter2@at.example.com:443?sni=at.example.com&fp=chrome#ANYTLS
+snell://hunter2@sn.example.com:8443?version=5&obfs=http&obfs-host=bing.com#SNELL
+snell://hunter2@sn3.example.com:8443?version=3#SNELL-V3
+naive+quic://user:pass@nv.example.com:443#NAIVE
+openconnect://user:pass@oc.example.com/staff?flavor=gp#OC
+tailscale://tskey-auth-1@controlplane.tailscale.com?exit_node=100.64.0.1#TS
+tailscale://tskey-auth-1@controlplane.tailscale.com#TS-NOEXIT
 # a comment, and below it two things that must be refused rather than guessed at
 vless://not-a-link
 ss://bm9wZQ==
@@ -92,6 +99,17 @@ check "$(grep -c 'pqbad.example.com' "$WORK/cand.tsv")" "1" "and the node is kep
 # outbound rather than merely relaxing a check.
 AI=$(grep -c 'allowInsecure' "$WORK/cand.tsv" || true)
 check "$AI" "0" "allowInsecure is never written"
+
+# The sing-box-only kinds: described for zgz-bridge, and refused when sing-box
+# could not run them.
+pl() { awk -F'\t' -v l="$1" '$2 == l { print $3 " " $6 }' "$WORK/cand.tsv"; }
+case "$(pl ANYTLS)" in 'anytls {"type":"anytls","server":"at.example.com","port":443,"password":"hunter2","sni":"at.example.com","fp":"chrome"'*) ok "an anytls link is read" ;; *) bad "an anytls link is read: $(pl ANYTLS)" ;; esac
+case "$(pl SNELL)" in *'"version":4,"obfs":"http","obfs_host":"bing.com"'*) ok "a snell v5 link is read as v4" ;; *) bad "a snell v5 link is read as v4: $(pl SNELL)" ;; esac
+check "$(pl SNELL-V3)" "" "a snell version sing-box does not speak is refused"
+case "$(pl NAIVE)" in 'naive {"type":"naive","server":"nv.example.com","port":443,"username":"user","password":"pass","sni":"","quic":true}') ok "a naive+quic link is read" ;; *) bad "a naive+quic link is read: $(pl NAIVE)" ;; esac
+case "$(pl OC)" in *'"port":443,"path":"/staff"'*'"flavor":"gp"'*) ok "an openconnect link without a port is on 443" ;; *) bad "an openconnect link without a port is on 443: $(pl OC)" ;; esac
+case "$(pl TS)" in *'"exit_node":"100.64.0.1"'*'"state":"ts'*) ok "a tailscale link is read" ;; *) bad "a tailscale link is read: $(pl TS)" ;; esac
+check "$(pl TS-NOEXIT)" "" "a tailscale link without an exit node is refused"
 
 # base64 in awk has to agree with base64 everywhere else.
 if command -v base64 >/dev/null 2>&1; then
@@ -219,7 +237,7 @@ if [ -x "$RIG/core/xray" ]; then
 	jtot=0
 	while IFS='	' read -r tag label proto host port payload; do
 		[ -n "$tag" ] || continue
-		case "$proto" in hysteria2|tuic) continue ;; esac
+		case "$proto" in hysteria2|tuic|anytls|snell|naive|openconnect|tailscale) continue ;; esac
 		jtot=$((jtot + 1))
 		printf '{"log":{"loglevel":"none"},"outbounds":[%s]}' \
 			"$(printf '%s' "$payload" | sed 's/^{/{"tag":"proxy",/')" > "$WORK/j.json"
@@ -238,7 +256,7 @@ if [ -x "$RIG/core/xray" ]; then
 	tot=0
 	while IFS='	' read -r tag label proto host port payload; do
 		[ -n "$tag" ] || continue
-		case "$proto" in hysteria2|tuic) continue ;; esac
+		case "$proto" in hysteria2|tuic|anytls|snell|naive|openconnect|tailscale) continue ;; esac
 		tot=$((tot + 1))
 		printf '{"log":{"loglevel":"none"},"outbounds":[%s]}' \
 			"$(printf '%s' "$payload" | sed 's/^{/{"tag":"proxy",/')" > "$WORK/one.json"

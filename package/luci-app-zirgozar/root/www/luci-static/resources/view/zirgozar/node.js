@@ -56,6 +56,14 @@ SCHEMES.l2tp = 'l2tp';
 SCHEMES['l2tp+ipsec'] = 'l2tp';
 SCHEMES.pptp = 'pptp';
 SCHEMES.sstp = 'sstp';
+SCHEMES.anytls = 'anytls';
+SCHEMES.snell = 'snell';
+SCHEMES['naive+https'] = 'naive';
+SCHEMES['naive+quic'] = 'naive';
+SCHEMES.openconnect = 'openconnect';
+SCHEMES.tailscale = 'tailscale';
+var OC_FLAVORS = [ [ 'anyconnect', 'Cisco AnyConnect / ocserv' ], [ 'gp', 'GlobalProtect' ], [ 'fortinet', 'Fortinet' ],
+	[ 'f5', 'F5' ], [ 'pulse', 'Pulse Secure' ], [ 'nc', 'Juniper Network Connect' ] ];
 /* The PPP accounts, each with the port its servers listen on: providers hand
    them out with only a server name. */
 var PPP_PORT = { l2tp: '1701', pptp: '1723', sstp: '443' };
@@ -199,6 +207,30 @@ function parseLink(link) {
 		return f;
 	}
 
+	if (proto == 'openconnect' || proto == 'tailscale') {
+		var oat = body.lastIndexOf('@'), ocred = oat >= 0 ? body.slice(0, oat) : '', ohost = oat >= 0 ? body.slice(oat + 1) : body;
+		var oq = function(k) { var v = q[k]; delete q[k]; return v == null ? '' : v; };
+		var sl = ohost.indexOf('/');
+		f.oc_path = sl >= 0 ? ohost.slice(sl).replace(/\/+$/, '') : '';
+		ohost = sl >= 0 ? ohost.slice(0, sl) : ohost;
+		var ohp = splitHostPort(ohost) || (ohost ? { host: ohost.replace(/^\[|\]$/g, ''), port: '443' } : null);
+		if (proto == 'openconnect') {
+			if (!ohp) return null;
+			var oci = ocred.indexOf(':');
+			f.user = dec(oci >= 0 ? ocred.slice(0, oci) : ocred); f.password = oci >= 0 ? dec(ocred.slice(oci + 1)) : '';
+			f.address = ohp.host; f.port = ohp.port;
+			f.oc_flavor = oq('flavor') || 'anyconnect'; f.oc_group = oq('group'); f.oc_fpr = oq('fingerprint');
+			f.insecure = oq('insecure') == '1' ? '1' : '0';
+		} else {
+			f.ts_key = dec(ocred);
+			f.ts_control = (!ohp || ohp.host == 'controlplane.tailscale.com') ? '' :
+				(ohp.port == '443' ? ohp.host : joinHostPort(ohp.host, ohp.port));
+			f.ts_exit = oq('exit_node'); f.ts_hostname = oq('hostname');
+		}
+		f.rest = q;
+		return f;
+	}
+
 	var at = body.lastIndexOf('@'), cred = '', hp;
 	/* L2TP, PPTP and SSTP have one port each, and providers give the
 	   server without it. */
@@ -277,6 +309,20 @@ function parseLink(link) {
 		f.uuid = ti >= 0 ? t.slice(0, ti) : t; f.password = ti >= 0 ? t.slice(ti + 1) : '';
 		f.sni = take('sni'); f.alpn = take('alpn'); f.cc = take('congestion_control');
 		f.insecure = take('allow_insecure') == '1' ? '1' : '0';
+	} else if (proto == 'anytls') {
+		f.password = dec(cred); f.sni = take('sni') || take('peer'); f.fp = take('fp'); f.alpn = take('alpn');
+		f.insecure = (take('insecure') == '1' || take('allowInsecure') == '1') ? '1' : '0';
+	} else if (proto == 'snell') {
+		f.snell_psk = dec(cred);
+		var sv = take('version') || '4';
+		f.snell_version = sv == '5' ? '4' : sv;
+		f.snell_obfs = take('obfs') == 'http' ? 'http' : '';
+		f.snell_obfs_host = take('obfs-host'); f.snell_mode = take('mode');
+	} else if (proto == 'naive') {
+		var ni = cred.indexOf(':');
+		f.user = dec(ni >= 0 ? cred.slice(0, ni) : cred); f.password = ni >= 0 ? dec(cred.slice(ni + 1)) : '';
+		f.naive_quic = /^naive\+quic:/i.test(s) ? '1' : '0';
+		f.sni = take('sni');
 	} else if (proto == 'wireguard') {
 		/* wireguard://PRIVATE-KEY@endpoint?address=…&publickey=… - see
 		   do_wireguard in zgz-parse. */
@@ -308,7 +354,8 @@ function blankNode() {
 		proto: 'vless', rest: {}, address: '', port: '',
 		encryption: 'none', security: 'none', type: 'tcp', header_type: 'none',
 		alter_id: '0', vmess_security: 'auto', ss_method: 'aes-128-gcm', uot: '0', insecure: '0',
-		warp_mode: 'warp', warp_country: 'AT', warp_scan: '1', warp_noize: 'off', warp_mt: 'h2'
+		warp_mode: 'warp', warp_country: 'AT', warp_scan: '1', warp_noize: 'off', warp_mt: 'h2',
+		snell_version: '4', oc_flavor: 'anyconnect', naive_quic: '0'
 	};
 }
 
@@ -356,6 +403,11 @@ function buildLink(f, name) {
 		var wqs = buildQuery(q);
 		return 'warp://' + (f.warp_key ? enc(f.warp_key) + '@' : '') + (f.warp_endpoint || 'auto') +
 			(wqs ? '?' + wqs : '') + frag;
+	}
+
+	if (p == 'tailscale') {
+		q.exit_node = f.ts_exit; q.hostname = f.ts_hostname;
+		return 'tailscale://' + enc(f.ts_key) + '@' + (f.ts_control || 'controlplane.tailscale.com') + '?' + buildQuery(q) + frag;
 	}
 
 	var hp = joinHostPort(f.address, f.port);
@@ -406,6 +458,30 @@ function buildLink(f, name) {
 		q.allow_insecure = f.insecure == '1' ? '1' : '';
 		var qs4 = buildQuery(q);
 		return 'tuic://' + enc(f.uuid) + ':' + enc(f.password) + '@' + hp + (qs4 ? '?' + qs4 : '') + frag;
+	}
+	if (p == 'anytls') {
+		q.sni = f.sni; q.fp = f.fp; q.alpn = f.alpn; q.insecure = f.insecure == '1' ? '1' : '';
+		var qa = buildQuery(q);
+		return 'anytls://' + enc(f.password) + '@' + hp + (qa ? '?' + qa : '') + frag;
+	}
+	if (p == 'snell') {
+		q.version = f.snell_version || '4';
+		q.obfs = q.version == '4' ? f.snell_obfs : '';
+		q['obfs-host'] = q.obfs ? f.snell_obfs_host : '';
+		q.mode = q.version == '6' ? f.snell_mode : '';
+		return 'snell://' + enc(f.snell_psk) + '@' + hp + '?' + buildQuery(q) + frag;
+	}
+	if (p == 'naive') {
+		q.sni = f.sni;
+		var qn = buildQuery(q), na = f.user ? enc(f.user) + ':' + enc(f.password) + '@' : '';
+		return (f.naive_quic == '1' ? 'naive+quic://' : 'naive+https://') + na + hp + (qn ? '?' + qn : '') + frag;
+	}
+	if (p == 'openconnect') {
+		q.flavor = f.oc_flavor || 'anyconnect'; q.group = f.oc_group; q.fingerprint = f.oc_fpr;
+		q.insecure = f.insecure == '1' ? '1' : '';
+		var oa = f.user ? enc(f.user) + ':' + enc(f.password) + '@' : '';
+		var opath = f.oc_path ? '/' + String(f.oc_path).replace(/^\/+/, '') : '';
+		return 'openconnect://' + oa + joinHostPort(f.address, f.port || '443') + opath + '?' + buildQuery(q) + frag;
 	}
 	if (p == 'wireguard') {
 		q.address = f.wg_address; q.publickey = f.wg_pubkey; q.presharedkey = f.wg_psk;
@@ -649,7 +725,9 @@ return view.extend({
 
 			o = field(form.ListValue, 'proto', _('Protocol'));
 			[ [ 'vless', 'VLESS' ], [ 'vmess', 'VMess' ], [ 'trojan', 'Trojan' ], [ 'shadowsocks', 'Shadowsocks' ],
-			  [ 'socks', 'Socks' ], [ 'http', 'HTTP' ], [ 'hysteria2', 'Hysteria2' ], [ 'tuic', 'TUIC' ], [ 'warp', 'WARP' ],
+			  [ 'socks', 'Socks' ], [ 'http', 'HTTP' ], [ 'hysteria2', 'Hysteria2' ], [ 'tuic', 'TUIC' ],
+			  [ 'anytls', 'AnyTLS' ], [ 'snell', 'Snell' ], [ 'naive', 'NaiveProxy' ], [ 'openconnect', 'OpenConnect' ],
+			  [ 'tailscale', 'Tailscale' ], [ 'warp', 'WARP' ],
 			  [ 'wireguard', 'WireGuard' ], [ 'openvpn', 'OpenVPN' ], [ 'l2tp', 'L2TP / IPsec' ], [ 'pptp', 'PPTP' ], [ 'sstp', 'SSTP' ], [ '_balancing', 'Balancing' ],
 			  [ '_shunt', 'Shunt' ], [ '_iface', 'Custom Interface' ], [ 'aether', 'Aether' ] ]
 				.forEach(function(v) { o.value(v[0], v[1]); });
@@ -657,7 +735,7 @@ return view.extend({
 			var candidates = (data && data[1] && data[1].nodes) || [];
 			var origins = (data && data[3]) || {};
 			var nodes = candidates.filter(function(n) {
-				return !/^(hysteria2|hysteria|tuic|openvpn|amneziawg|l2tp|pptp|sstp|balancing|shunt|interface|aether)$/.test(n.protocol);
+				return !/^(hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|openvpn|amneziawg|l2tp|pptp|sstp|balancing|shunt|interface|aether)$/.test(n.protocol);
 			}).map(function(n) {
 				var origin = origins[n.tag];
 				return origin ? { tag: origin, label: n.label || n.tag } : null;
@@ -856,7 +934,7 @@ return view.extend({
 
 			/* A server of its own for all but WARP and OpenVPN, whose profile
 			   names its own. */
-			var SERVERS = XR.concat([ 'hysteria2', 'tuic', 'wireguard', 'l2tp', 'pptp', 'sstp' ]);
+			var SERVERS = XR.concat([ 'hysteria2', 'tuic', 'anytls', 'snell', 'naive', 'openconnect', 'wireguard', 'l2tp', 'pptp', 'sstp' ]);
 			o = field(form.Value, 'address', _('Address (Support Domain Name)'));
 			o.rmempty = false;
 			o.validate = function(section_id, value) {
@@ -1030,14 +1108,56 @@ return view.extend({
 			o.validate = function(section_id, value) {
 				return !PPP_PORT[this.section.formvalue(section_id, '_proto')] || !!value ? true : _('This account requires a username and password.');
 			};
-			[ 'socks', 'http', 'l2tp', 'pptp', 'sstp' ].forEach(function(p) { o.depends('_proto', p); });
+			[ 'socks', 'http', 'l2tp', 'pptp', 'sstp', 'naive', 'openconnect' ].forEach(function(p) { o.depends('_proto', p); });
 
 			o = field(form.Value, 'password', _('Password'));
 			o.password = true;
 			o.validate = function(section_id, value) {
 				return !PPP_PORT[this.section.formvalue(section_id, '_proto')] || !!value ? true : _('This account requires a username and password.');
 			};
-			[ 'trojan', 'shadowsocks', 'socks', 'http', 'hysteria2', 'tuic', 'l2tp', 'pptp', 'sstp' ].forEach(function(p) { o.depends('_proto', p); });
+			[ 'trojan', 'shadowsocks', 'socks', 'http', 'hysteria2', 'tuic', 'anytls', 'naive', 'openconnect', 'l2tp', 'pptp', 'sstp' ].forEach(function(p) { o.depends('_proto', p); });
+
+			o = field(form.Value, 'snell_psk', 'PSK');
+			o.password = true; o.rmempty = false;
+			o.depends('_proto', 'snell');
+			o = field(form.ListValue, 'snell_version', _('Version'));
+			o.value('4', 'v4 / v5'); o.value('6', 'v6');
+			o.depends('_proto', 'snell');
+			o = field(form.ListValue, 'snell_obfs', _('Obfuscation'));
+			o.value('', _('None')); o.value('http', 'http');
+			o.depends({ '_proto': 'snell', '_snell_version': '4' });
+			o = field(form.Value, 'snell_obfs_host', _('Obfuscation host'));
+			o.placeholder = 'bing.com';
+			o.depends({ '_proto': 'snell', '_snell_version': '4', '_snell_obfs': 'http' });
+			o = field(form.ListValue, 'snell_mode', _('Mode'));
+			o.value('', 'default'); o.value('unshaped', 'unshaped'); o.value('unsafe-raw', 'unsafe-raw');
+			o.depends({ '_proto': 'snell', '_snell_version': '6' });
+
+			o = field(form.Flag, 'naive_quic', 'QUIC', _('Over QUIC instead of HTTP/2. Needs sing-box-lx.'));
+			o.depends('_proto', 'naive');
+
+			o = field(form.ListValue, 'oc_flavor', _('Server type'));
+			OC_FLAVORS.forEach(function(v) { o.value(v[0], v[1]); });
+			o.depends('_proto', 'openconnect');
+			o = field(form.Value, 'oc_group', _('Group'), _('Optional.'));
+			o.depends('_proto', 'openconnect');
+			o = field(form.Value, 'oc_path', _('Path'), _('Optional, such as /staff.'));
+			o.depends('_proto', 'openconnect');
+			o = field(form.Value, 'oc_fpr', _('Certificate fingerprint'), _('Optional. For a self-signed server certificate.'));
+			o.depends('_proto', 'openconnect');
+
+			o = field(form.Value, 'ts_key', _('Auth key'));
+			o.password = true; o.rmempty = false;
+			o.depends('_proto', 'tailscale');
+			o = field(form.Value, 'ts_exit', _('Exit node'), _('Name or Tailscale IP of the exit node.'));
+			o.rmempty = false;
+			o.depends('_proto', 'tailscale');
+			o = field(form.Value, 'ts_hostname', _('Device name'));
+			o.placeholder = 'zirgozar';
+			o.depends('_proto', 'tailscale');
+			o = field(form.Value, 'ts_control', _('Control server'), _('Empty for Tailscale; a Headscale address otherwise.'));
+			o.placeholder = 'controlplane.tailscale.com';
+			o.depends('_proto', 'tailscale');
 
 			o = field(form.Flag, 'uot', _('UDP over TCP'),
 				_('UDP is carried inside the TCP connection, for a SOCKS server that takes it that way. Only sing-box does this, so a node with it on is carried by sing-box when there is one.'));
@@ -1080,7 +1200,8 @@ return view.extend({
 					x.depends({ '_proto': p, '_security': 'tls' });
 					x.depends({ '_proto': p, '_security': 'reality' });
 				});
-				if (withHyTuic) { x.depends('_proto', 'hysteria2'); x.depends('_proto', 'tuic'); }
+				if (withHyTuic) { x.depends('_proto', 'hysteria2'); x.depends('_proto', 'tuic'); x.depends('_proto', 'naive'); }
+				x.depends('_proto', 'anytls');
 			}
 
 			o = field(form.Value, 'sni', _('SNI Domain'));
@@ -1090,6 +1211,7 @@ return view.extend({
 			[ 'h3', 'h2', 'http/1.1', 'h2,http/1.1', 'h3,h2,http/1.1' ].forEach(function(v) { o.value(v); });
 			TLSP.forEach(function(p) { o.depends({ '_proto': p, '_security': 'tls' }); });
 			o.depends('_proto', 'tuic');
+			o.depends('_proto', 'anytls');
 
 			o = field(form.Value, 'fp', _('Finger Print'));
 			o.value('', _('Default'));
@@ -1116,8 +1238,7 @@ return view.extend({
 			TLSP.forEach(function(p) { o.depends({ '_proto': p, '_security': 'reality' }); });
 
 			o = field(form.Flag, 'insecure', _('allowInsecure'));
-			o.depends('_proto', 'hysteria2');
-			o.depends('_proto', 'tuic');
+			[ 'hysteria2', 'tuic', 'anytls', 'openconnect' ].forEach(function(p) { o.depends('_proto', p); });
 
 			o = field(form.ListValue, 'hy2_obfs', _('Obfuscation'));
 			o.value('', _('None'));

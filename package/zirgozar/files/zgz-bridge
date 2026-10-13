@@ -10,7 +10,8 @@
 #   zgz-bridge command   print the command line to run it
 #   zgz-bridge config    write the bridge's configuration, print its path
 #
-# hysteria2 and tuic are not Xray protocols. Rather than run a second routing
+# hysteria2, tuic, anytls, snell, naive, OpenConnect and Tailscale are not
+# Xray protocols. Rather than run a second routing
 # engine for them - with its own idea of DNS, its own transparent proxy
 # arrangement and its own firewall rules to keep in step - one of them is run
 # here for a single server and asked only to offer it as a SOCKS port on
@@ -53,16 +54,22 @@ jbool() {
 }
 
 # The sing-box that runs the helper. AmneziaWG's obfuscation exists only in
-# sing-box-lx, so for that node nothing else will do; every other kind runs
-# on whichever sing-box there is.
+# sing-box-lx, so for that node nothing else will do, and naive is in no other
+# build either; OpenConnect and Tailscale are in the builds made with them.
+# Every other kind runs on whichever sing-box there is.
 bridge_singbox() {
-	if [ "$(jget type)" = "amneziawg" ]; then
-		_bs="$(singbox_lx_path)"
-		[ -x "$_bs" ] && "$_bs" version 2>/dev/null | grep -q with_awg || return 1
-		echo "$_bs"
-		return 0
-	fi
-	find_singbox
+	_bt="$(jget type)"
+	case "$_bt" in
+		amneziawg) _btag=with_awg; _bc="$(singbox_lx_path)" ;;
+		naive) _btag=with_naive_outbound; _bc="$(singbox_lx_path)" ;;
+		openconnect) _btag=with_openconnect; _bc="$(singbox_path) $(singbox_lx_path)" ;;
+		tailscale) _btag=with_tailscale; _bc="$(singbox_path) $(singbox_lx_path)" ;;
+		*) find_singbox; return ;;
+	esac
+	for _bs in $_bc; do
+		[ -x "$_bs" ] && "$_bs" version 2>/dev/null | grep -q "$_btag" && { echo "$_bs"; return 0; }
+	done
+	return 1
 }
 
 cmd_needed() {
@@ -77,9 +84,14 @@ singbox_config() {
 	# An OpenVPN profile has too many parts - certificates, keys, a wrapped
 	# control channel - for a line of shell to build; zgz-sbconfig does it, and
 	# decrypts the key on the way.
-	if [ "$_type" = "openvpn" ] || [ "$_type" = "amneziawg" ]; then
+	case "$_type" in openvpn|amneziawg|anytls|snell|naive|openconnect|tailscale) _uc=1 ;; *) _uc="" ;; esac
+	if [ -n "$_uc" ]; then
 		command -v ucode >/dev/null 2>&1 || return 1
-		ucode "$ZGZ_LIB/zgz-sbconfig" mode=bridge bridge="$NODE" bridgeport="$PORT" \
+		if [ "$_type" = "tailscale" ]; then
+			mkdir -p "$ZGZ_ETC/tailscale"
+			chmod 700 "$ZGZ_ETC/tailscale" 2>/dev/null || true
+		fi
+		ucode "$ZGZ_LIB/zgz-sbconfig" mode=bridge bridge="$NODE" bridgeport="$PORT" etc="$ZGZ_ETC" \
 			lib="$ZGZ_LIB" rsdir="$ZGZ_RUN/rs" mark="$ZGZ_OUT_MARK" > "$ZGZ_BRIDGE_JSON.new" 2>"$ZGZ_RUN/bridge.err" || {
 			rm -f "$ZGZ_BRIDGE_JSON.new"
 			say_message "$(sed -n 's/^error: //p' "$ZGZ_RUN/bridge.err" | head -1)"
@@ -365,6 +377,11 @@ cmd_config() {
 	if [ "$(jget type)" = "amneziawg" ]; then
 		say_message "AmneziaWG needs sing-box-lx, the build that has it. Install it on the App Update page."
 		warn "no sing-box-lx installed to carry amneziawg"
+		return 1
+	fi
+	if [ "$(jget type)" = "naive" ]; then
+		say_message "A naive config needs sing-box-lx, the build that has it. Install it on the App Update page."
+		warn "no sing-box-lx installed to carry naive"
 		return 1
 	fi
 	say_message "The chosen node speaks $(jget type), which Xray cannot. Install sing-box on the settings page, or pick another node."

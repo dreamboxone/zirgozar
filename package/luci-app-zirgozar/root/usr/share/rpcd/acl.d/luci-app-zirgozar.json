@@ -7,7 +7,7 @@
 				"luci-rpc": [ "getHostHints" ]
 			},
 			"file": {
-				"/tmp/zirgozar-backup.tar.gz": [ "read" ]
+				"/tmp/zirgozar-backup.tar": [ "read" ]
 			},
 			"uci": [ "zirgozar", "zirgozar_server" ]
 		},
@@ -16,7 +16,7 @@
 				"luci.zirgozar": [ "action" ]
 			},
 			"file": {
-				"/tmp/zirgozar-restore.tar.gz": [ "write" ]
+				"/tmp/zirgozar-restore": [ "write" ]
 			},
 			"uci": [ "zirgozar", "zirgozar_server" ]
 		}

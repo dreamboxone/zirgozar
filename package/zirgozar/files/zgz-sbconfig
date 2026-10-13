@@ -30,8 +30,10 @@
 //   api=PORT       the clash API port the statistics are read from
 //   mark=N         the mark every connection the core opens carries
 //   level=LEVEL    the log level, in Xray's words
-//   bridge=FILE    the hysteria2, tuic or AmneziaWG server the chosen node is,
-//                  if it is one
+//   bridge=FILE    the server the chosen node is, when it is one Xray cannot
+//                  speak: hysteria2, tuic, AmneziaWG, anytls, snell, naive,
+//                  OpenConnect or Tailscale
+//   etc=DIR        where Tailscale keeps a node's identity
 //   bridgeport=N   the local port Xray would have been given for it
 //   mode=test      a measuring configuration from zgz-test or zgz-probe, not
 //                  the tunnel: no node is called proxy, every node it names
@@ -104,22 +106,131 @@ function awg_endpoint(b, tag, mark) {
 	return e;
 }
 
+// The node a bridge file describes, in sing-box's words; null for a kind it
+// does not know. OpenConnect, Tailscale and AmneziaWG are endpoints there,
+// the rest outbounds.
+const ENDPOINT_TYPES = { wireguard: true, openconnect: true, tailscale: true };
+
+function bridge_node(b, tag, mark) {
+	if (b.type == 'amneziawg')
+		return awg_endpoint(b, tag, mark);
+	let sni = b.sni ? b.sni : b.server;
+	let r = { type: b.type, tag, routing_mark: mark };
+	switch (b.type) {
+	case 'hysteria2':
+	case 'tuic':
+	case 'anytls':
+	case 'snell':
+	case 'naive':
+		r.server = b.server;
+		r.server_port = int(b.port);
+		break;
+	}
+	switch (b.type) {
+	case 'hysteria2':
+		r.password = b.password;
+		if (b.obfs)
+			r.obfs = { type: b.obfs, password: b.obfs_password };
+		r.tls = { enabled: true, server_name: sni, insecure: !!b.insecure };
+		break;
+	case 'tuic':
+		r.uuid = b.uuid;
+		r.password = b.password;
+		r.congestion_control = b.congestion_control ? b.congestion_control : 'bbr';
+		r.tls = { enabled: true, server_name: sni, insecure: !!b.insecure, alpn: [ 'h3' ] };
+		break;
+	case 'anytls':
+		r.password = b.password;
+		r.tls = { enabled: true, server_name: sni, insecure: !!b.insecure };
+		if (b.fp)
+			r.tls.utls = { enabled: true, fingerprint: b.fp };
+		if (b.alpn)
+			r.tls.alpn = split(b.alpn, ',');
+		break;
+	case 'snell':
+		r.version = int(b.version ?? 4);
+		r.psk = b.psk;
+		if (b.userkey)
+			r.userkey = b.userkey;
+		if (b.reuse)
+			r.reuse = true;
+		if (r.version == 6) {
+			if (b.mode)
+				r.mode = b.mode;
+		} else if (b.obfs == 'http') {
+			r.obfs_mode = 'http';
+			if (b.obfs_host)
+				r.obfs_host = b.obfs_host;
+		}
+		break;
+	case 'naive':
+		if (b.username)
+			r.username = b.username;
+		if (b.password)
+			r.password = b.password;
+		if (b.quic)
+			r.quic = true;
+		// Only the name is taken: naive is Chrome's own TLS, as it is.
+		r.tls = { enabled: true, server_name: sni };
+		break;
+	case 'openconnect': {
+		let host = index(b.server, ':') >= 0 ? `[${b.server}]` : b.server;
+		r.server = `https://${host}${int(b.port) == 443 ? '' : ':' + b.port}${b.path ?? ''}`;
+		r.flavor = b.flavor ? b.flavor : 'anyconnect';
+		if (b.username)
+			r.username = b.username;
+		if (b.password)
+			r.password = b.password;
+		if (b.group)
+			r.auth_group = b.group;
+		// No browser to sign in with on a router.
+		r.external_auth_disabled = true;
+		let t = {};
+		if (b.insecure)
+			t.insecure = true;
+		if (b.fingerprint)
+			t.peer_fingerprint = [ b.fingerprint ];
+		if (length(t))
+			r.tls = t;
+		break;
+	}
+	case 'tailscale':
+		if (!match(b.state ?? '', /^ts[0-9]+$/))
+			return null;
+		r.state_directory = `${args.etc ?? '/etc/zirgozar'}/tailscale/${b.state}`;
+		r.auth_key = b.auth_key;
+		if (b.server != 'controlplane.tailscale.com')
+			r.control_url = `https://${index(b.server, ':') >= 0 ? '[' + b.server + ']' : b.server}${int(b.port) == 443 ? '' : ':' + b.port}`;
+		r.hostname = b.hostname ? b.hostname : 'zirgozar';
+		r.exit_node = b.exit_node;
+		break;
+	default:
+		return null;
+	}
+	return r;
+}
+
 // zgz-sbconfig mode=bridge: the whole configuration of the helper that offers
-// one AmneziaWG server as a SOCKS port on loopback - what zgz-bridge runs when
+// one such server as a SOCKS port on loopback - what zgz-bridge runs when
 // Xray is the engine. OpenVPN is not here: the official client carries it.
 if (args.mode == 'bridge') {
 	let raw = readfile(args.bridge ?? '');
 	let b = raw ? json(raw) : null;
-	if (type(b) != 'object' || b.type != 'amneziawg') {
-		stderr.write('error: There is no AmneziaWG config to run.\n');
+	let node = (type(b) == 'object') ? bridge_node(b, 'out', int(args.mark ?? 255)) : null;
+	if (!node) {
+		stderr.write('error: There is no config here that sing-box can run.\n');
 		exit(2);
 	}
-	print(sprintf('%J', {
+	let c = {
 		log: { level: 'warn', timestamp: true },
 		inbounds: [{ type: 'mixed', tag: 'in', listen: '127.0.0.1', listen_port: int(args.bridgeport ?? 10808) }],
-		endpoints: [ awg_endpoint(b, 'out', int(args.mark ?? 255)) ],
 		route: { final: 'out' }
-	}), '\n');
+	};
+	if (ENDPOINT_TYPES[node.type])
+		c.endpoints = [ node ];
+	else
+		c.outbounds = [ node ];
+	print(sprintf('%J', c), '\n');
 	exit(0);
 }
 
@@ -307,9 +418,10 @@ function transport_of(ss, tag) {
 	return false;
 }
 
-// A hysteria2 or tuic node is, for Xray, a plain socks outbound pointing at a
-// helper program. sing-box needs no helper: the node itself is read from the
-// file that describes it and dialled directly.
+// A hysteria2, tuic, anytls, snell, naive, OpenConnect or Tailscale node is,
+// for Xray, a plain socks outbound pointing at a helper program. sing-box
+// needs no helper: the node itself is read from the file that describes it and
+// dialled directly.
 function native_bridge(o) {
 	if (o.tag != 'proxy' || o.protocol != 'socks' || !args.bridge)
 		return null;
@@ -320,36 +432,15 @@ function native_bridge(o) {
 	let b = raw ? json(raw) : null;
 	if (type(b) != 'object')
 		return null;
-	if (b.type == 'amneziawg')
-		return awg_endpoint(b, 'proxy', MARK);
-	let tls = { enabled: true, server_name: b.sni ? b.sni : b.server };
-	if (b.insecure)
-		tls.insecure = true;
-	let r = { tag: 'proxy', server: b.server, server_port: int(b.port), routing_mark: MARK };
-	if (b.type == 'hysteria2') {
-		r.type = 'hysteria2';
-		r.password = b.password;
-		if (b.obfs)
-			r.obfs = { type: b.obfs, password: b.obfs_password };
-	} else if (b.type == 'tuic') {
-		r.type = 'tuic';
-		r.uuid = b.uuid;
-		r.password = b.password;
-		r.congestion_control = b.congestion_control ? b.congestion_control : 'bbr';
-		tls.alpn = [ 'h3' ];
-	} else {
-		return null;
-	}
-	r.tls = tls;
-	return r;
+	return bridge_node(b, 'proxy', MARK);
 }
 
 function conv_outbound(o) {
 	let tag = o.tag;
 	let nb = native_bridge(o);
 	if (nb) {
-		// An AmneziaWG node is an endpoint in sing-box, not an outbound.
-		push(nb.type == 'wireguard' ? endpoints : outbounds, nb);
+		// AmneziaWG, OpenConnect and Tailscale are endpoints in sing-box.
+		push(ENDPOINT_TYPES[nb.type] ? endpoints : outbounds, nb);
 		out_tags[tag] = true;
 		return;
 	}

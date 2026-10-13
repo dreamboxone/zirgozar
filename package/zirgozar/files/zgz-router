@@ -330,31 +330,78 @@ cmd_quicmove() {
 }
 
 # PassWall2's Backup and Restore: the settings of both sides - every config,
-# subscription, rule and setting is in the two files under /etc/config - and
-# the WARP accounts, which cannot be made again with the same keys. What can
-# be fetched again is left out: the routing data, the cores, Aether's data,
+# subscription, rule and setting, the shunt rules among them, is in the two
+# files under /etc/config - the WARP and Aether accounts, which cannot be made
+# again with the same keys, and the routing data, so that a router restored
+# from it routes as before without waiting for a download. Only what is
+# fetched again on its own is left out: the cores, Psiphon's server lists,
 # what the subscriptions last brought and the traffic history.
 #
 # The archive is handed to and taken from the browser by LuCI's own file
-# transfer, at these two addresses and nowhere else.
-BACKUP_OUT="${ZGZ_BACKUP_OUT:-/tmp/zirgozar-backup.tar.gz}"
-RESTORE_IN="${ZGZ_RESTORE_IN:-/tmp/zirgozar-restore.tar.gz}"
+# transfer, at these two addresses and nowhere else. Both are in memory, so
+# what an archive needs there is counted before it is made or unpacked.
+#
+# A plain tar and not a packed one: the routing data is most of it, and
+# busybox's gzip takes most of half a minute over it on a router - longer
+# than the page waits for an answer. A backup made by an earlier version is
+# packed, and is read as one.
+BACKUP_OUT="${ZGZ_BACKUP_OUT:-/tmp/zirgozar-backup.tar}"
+RESTORE_IN="${ZGZ_RESTORE_IN:-/tmp/zirgozar-restore}"
 UCI_DIR="${ZGZ_UCI_DIR:-/etc/config}"
 BACKUP_MARK=zirgozar-backup
 
+# The routing data: the plain files in the folder, by safe names only.
+backup_geo_files() {
+	_gd="$(cfg geo_dir "$ZGZ_ETC/geo")"
+	[ -d "$_gd" ] || return 0
+	for _f in "$_gd"/*; do
+		[ -f "$_f" ] && [ ! -L "$_f" ] || continue
+		case "${_f##*/}" in *[!A-Za-z0-9_.-]*|.*) continue ;; esac
+		echo "$_f"
+	done
+	return 0
+}
+
 cmd_backup() {
-	_d="$(mktemp -d /tmp/zgz-backup.XXXXXX)" || return 1
+	_geo="$(backup_geo_files)"
+	# Twice the data, once copied and once in the archive, and room to spare.
+	_kb=0
+	[ -z "$_geo" ] || _kb="$(du -ck $_geo 2>/dev/null | awk 'END { print $1 + 0 }')"
+	_tmp="$(dirname "$BACKUP_OUT")"
+	_need=$(( _kb * 2048 + ZGZ_SPACE_MARGIN ))
+	_free="$(free_bytes "$_tmp")"
+	if [ "$_free" -lt "$_need" ]; then
+		echo "Not enough free memory for the backup file: needs $(human_size "$_need"), $(human_size "$_free") free."
+		return 1
+	fi
+	_d="$(mktemp -d "$_tmp/zgz-backup.XXXXXX")" || return 1
 	mkdir -p "$_d/etc/config" "$_d/etc/zirgozar"
 	printf '%s\nversion %s\ndate %s\n' "$BACKUP_MARK" "$(zgz_version)" "$(date '+%Y-%m-%d %H:%M')" > "$_d/$BACKUP_MARK"
 	for _f in zirgozar zirgozar_server; do
 		if [ -f "$UCI_DIR/$_f" ]; then cp -p "$UCI_DIR/$_f" "$_d/etc/config/$_f"; fi
 	done
 	if [ -d "$ZGZ_ETC/warp" ]; then cp -pR "$ZGZ_ETC/warp" "$_d/etc/zirgozar/warp"; fi
+	# Aether's keys, and not what Psiphon keeps beside them.
+	for _k in "$ZGZ_ETC"/aether/*/identity*.toml; do
+		[ -f "$_k" ] && [ ! -L "$_k" ] || continue
+		_id="${_k%/*}"; _id="${_id##*/}"
+		case "$_id" in ''|*[!A-Za-z0-9_]*) continue ;; esac
+		case "${_k##*/}" in *[!A-Za-z0-9_.-]*) continue ;; esac
+		mkdir -p "$_d/etc/zirgozar/aether/$_id"
+		cp -p "$_k" "$_d/etc/zirgozar/aether/$_id/"
+	done
+	_parts="$BACKUP_MARK etc"
+	if [ -n "$_geo" ]; then
+		mkdir -p "$_d/geo"
+		for _f in $_geo; do cp -p "$_f" "$_d/geo/"; done
+		_parts="$_parts geo"
+	fi
 	rm -f "$BACKUP_OUT"
 	_rc=0
-	( cd "$_d" && tar -czf "$BACKUP_OUT" "$BACKUP_MARK" etc ) 2>/dev/null || _rc=1
+	( cd "$_d" && tar -cf "$BACKUP_OUT" $_parts ) 2>/dev/null || _rc=1
 	rm -rf "$_d"
 	if [ "$_rc" != 0 ] || [ ! -s "$BACKUP_OUT" ]; then
+		rm -f "$BACKUP_OUT"
 		echo "The backup file could not be made."
 		return 1
 	fi
@@ -372,7 +419,9 @@ cmd_restore() {
 		echo "No backup file was received."
 		return 1
 	fi
-	_list="$(tar -tvzf "$_in" 2>/dev/null)" || _list=""
+	_z=""
+	if gzip -t "$_in" 2>/dev/null; then _z=z; fi
+	_list="$(tar -tv${_z}f "$_in" 2>/dev/null)" || _list=""
 	if [ -z "$_list" ]; then
 		rm -f "$_in"
 		echo "This is not a Zirgozar backup file."
@@ -382,24 +431,38 @@ cmd_restore() {
 	_bad="$(printf '%s\n' "$_list" | awk '
 		{ t = substr($1, 1, 1); n = $NF; sub(/^\.\//, "", n); sub(/\/$/, "", n) }
 		t != "-" && t != "d" { print; next }
+		n ~ /\.\./ { print; next }
 		n == "" || n == "'"$BACKUP_MARK"'" || n == "etc" || n == "etc/config" || n == "etc/zirgozar" || n == "etc/zirgozar/warp" { next }
 		n == "etc/config/zirgozar" || n == "etc/config/zirgozar_server" { next }
-		n ~ /^etc\/zirgozar\/warp(\/[A-Za-z0-9_.-]+)+$/ && n !~ /\.\./ { next }
+		n ~ /^etc\/zirgozar\/warp(\/[A-Za-z0-9_.-]+)+$/ { next }
+		n == "etc/zirgozar/aether" || n ~ /^etc\/zirgozar\/aether\/[A-Za-z0-9_]+$/ { next }
+		n ~ /^etc\/zirgozar\/aether\/[A-Za-z0-9_]+\/identity[A-Za-z0-9_.-]*\.toml$/ { next }
+		n == "geo" || n ~ /^geo\/[A-Za-z0-9_-][A-Za-z0-9_.-]*$/ { next }
 		{ print }')"
 	if [ -n "$_bad" ]; then
 		rm -f "$_in"
 		echo "This is not a Zirgozar backup file."
 		return 1
 	fi
-	_d="$(mktemp -d /tmp/zgz-restore.XXXXXX)" || return 1
-	if ! tar -xzf "$_in" -C "$_d" 2>/dev/null || [ "$(head -n 1 "$_d/$BACKUP_MARK" 2>/dev/null)" != "$BACKUP_MARK" ] ||
+	# Unpacked in memory beside the file itself.
+	_size="$(printf '%s\n' "$_list" | awk '$3 ~ /^[0-9]+$/ { s += $3 } END { print s + 0 }')"
+	_need=$(( _size + ZGZ_SPACE_MARGIN ))
+	_free="$(free_bytes "$(dirname "$_in")")"
+	if [ "$_free" -lt "$_need" ]; then
+		rm -f "$_in"
+		echo "Not enough free memory to open the backup file: needs $(human_size "$_need"), $(human_size "$_free") free."
+		return 1
+	fi
+	_d="$(mktemp -d "$(dirname "$_in")/zgz-restore.XXXXXX")" || return 1
+	if ! tar -x${_z}f "$_in" -C "$_d" 2>/dev/null || [ "$(head -n 1 "$_d/$BACKUP_MARK" 2>/dev/null)" != "$BACKUP_MARK" ] ||
 	   [ ! -s "$_d/etc/config/zirgozar" ]; then
 		rm -rf "$_d" "$_in"
 		echo "This is not a Zirgozar backup file."
 		return 1
 	fi
+	rm -f "$_in"
 	if ! uci -q -c "$_d/etc/config" show zirgozar >/dev/null 2>&1; then
-		rm -rf "$_d" "$_in"
+		rm -rf "$_d"
 		echo "The settings in this backup file are damaged."
 		return 1
 	fi
@@ -415,7 +478,34 @@ cmd_restore() {
 		rm -rf "$ZGZ_ETC/warp"
 		cp -pR "$_d/etc/zirgozar/warp" "$ZGZ_ETC/warp"
 	fi
-	rm -rf "$_d" "$_in"
+	if [ -d "$_d/etc/zirgozar/aether" ]; then
+		for _a in "$_d"/etc/zirgozar/aether/*; do
+			[ -d "$_a" ] || continue
+			mkdir -p "$ZGZ_ETC/aether/${_a##*/}"
+			cp -p "$_a"/* "$ZGZ_ETC/aether/${_a##*/}/" 2>/dev/null || true
+		done
+	fi
+	# The routing data goes where the restored settings keep it, one file
+	# at a time and only where it fits: a full overlay is worse than a
+	# download.
+	if [ -d "$_d/geo" ]; then
+		_gd="$(cfg geo_dir "$ZGZ_ETC/geo")"
+		mkdir -p "$_gd" 2>/dev/null || true
+		for _f in "$_d"/geo/*; do
+			[ -f "$_f" ] || continue
+			_t="$_gd/${_f##*/}"
+			_new="$(wc -c < "$_f")"
+			_old=0
+			[ ! -f "$_t" ] || _old="$(wc -c < "$_t")"
+			if [ "$(( $(free_bytes "$_gd") + _old ))" -lt "$(( _new + ZGZ_SPACE_MARGIN ))" ]; then
+				warn "backup: no room for ${_f##*/} in $_gd, left as it was"
+				continue
+			fi
+			rm -f "$_t"
+			cp -p "$_f" "$_t" || rm -f "$_t"
+		done
+	fi
+	rm -rf "$_d"
 	if uci -q delete zirgozar.config.factory_reset; then uci -q commit zirgozar || true; fi
 	# The node in use and what was measured belong to the old settings.
 	rm -f "$ZGZ_ETC/best.json" "$ZGZ_ETC/best.meta" "$ZGZ_ETC/bridge.json" "$ZGZ_ETC/nodes.cache"

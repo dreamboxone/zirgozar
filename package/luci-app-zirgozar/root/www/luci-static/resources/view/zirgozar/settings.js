@@ -29,17 +29,18 @@ var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
 
 /* PassWall2's Backup and Restore. The archive goes to and from the browser
    through LuCI's own file transfer, at the two paths the ACL allows. */
-var BACKUP_PATH = '/tmp/zirgozar-backup.tar.gz';
-var RESTORE_PATH = '/tmp/zirgozar-restore.tar.gz';
+var BACKUP_PATH = '/tmp/zirgozar-backup.tar';
+var RESTORE_PATH = '/tmp/zirgozar-restore';
 
 function backupDownload() {
 	var d = new Date(), pad = function(n) { return ('0' + n).slice(-2); };
-	var name = 'zirgozar-backup-' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + '.tar.gz';
+	var name = 'zirgozar-backup-' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+	           '-' + pad(d.getHours()) + pad(d.getMinutes()) + '.tar';
 	var form = E('form', { 'method': 'post', 'action': L.env.cgi_base + '/cgi-download', 'style': 'display:none' }, [
 		E('input', { 'type': 'hidden', 'name': 'sessionid', 'value': rpc.getSessionID() }),
 		E('input', { 'type': 'hidden', 'name': 'path', 'value': BACKUP_PATH }),
 		E('input', { 'type': 'hidden', 'name': 'filename', 'value': name }),
-		E('input', { 'type': 'hidden', 'name': 'mimetype', 'value': 'application/gzip' })
+		E('input', { 'type': 'hidden', 'name': 'mimetype', 'value': 'application/x-tar' })
 	]);
 	document.body.appendChild(form);
 	form.submit();
@@ -59,7 +60,7 @@ function backupUpload(file) {
 /* Asks for the file, and for a yes, before anything is sent. Resolves with
    the router's answer, or null when nothing was chosen. */
 function backupRestore() {
-	var picker = E('input', { 'type': 'file', 'accept': '.tar.gz,.tgz,.gz,application/gzip', 'style': 'display:none' });
+	var picker = E('input', { 'type': 'file', 'accept': '.tar,.tar.gz,.tgz,.gz,application/x-tar,application/gzip', 'style': 'display:none' });
 	return new Promise(function(resolve, reject) {
 		picker.addEventListener('change', function() {
 			var f = picker.files && picker.files[0];
@@ -699,7 +700,7 @@ return view.extend({
 					E('div', { 'style': 'display:flex;gap:10px;flex-wrap:wrap;align-items:center' }, [ down, up ]),
 					E('div', { 'class': 'cbi-value-description' },
 						_('Backup or Restore Client and Server Configurations.') + ' ' +
-						_('The file holds every config, subscription, rule and setting, and the WARP accounts. The routing data, the cores and the traffic history are not in it; they are downloaded again.')),
+						_('The file holds every config, subscription, rule and setting, the shunt rules, the WARP and Aether accounts and the routing data. The cores and the traffic history are not in it.')),
 					E('div', { 'class': 'cbi-value-description', 'style': 'color:#dc2626;font-weight:600' },
 						_('Note: Restoring configurations across different versions may cause compatibility issues.'))
 				])

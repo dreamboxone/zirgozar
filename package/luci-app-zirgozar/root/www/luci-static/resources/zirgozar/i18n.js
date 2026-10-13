@@ -150,7 +150,7 @@ var FA = {
 	'Create Backup File': 'ساخت فایل پشتیبان',
 	'Restore Backup File': 'بازگردانی فایل پشتیبان',
 	'Backup or Restore Client and Server Configurations.': 'پشتیبان‌گیری یا بازگردانی تنظیمات کلاینت و سرور.',
-	'The file holds every config, subscription, rule and setting, and the WARP accounts. The routing data, the cores and the traffic history are not in it; they are downloaded again.': 'این فایل همه کانفیگ‌ها، اشتراک‌ها، قوانین و تنظیمات و حساب‌های WARP را در خود دارد. داده‌های مسیریابی، هسته‌ها و تاریخچه ترافیک در آن نیستند و دوباره دانلود می‌شوند.',
+	'The file holds every config, subscription, rule and setting, the shunt rules, the WARP and Aether accounts and the routing data. The cores and the traffic history are not in it.': 'این فایل همه کانفیگ‌ها، اشتراک‌ها، قوانین و تنظیمات، قوانین شانت، حساب‌های WARP و Aether و داده‌های مسیریابی را در خود دارد. هسته‌ها و تاریخچه ترافیک در آن نیستند.',
 	'Note: Restoring configurations across different versions may cause compatibility issues.': 'توجه: بازگردانی تنظیمات یک نسخه دیگر ممکن است مشکل سازگاری ایجاد کند.',
 	'Every config, subscription and setting will be replaced by the ones in the backup file. Continue?': 'همه کانفیگ‌ها، اشتراک‌ها و تنظیمات با محتوای فایل پشتیبان جایگزین می‌شوند. ادامه می‌دهید؟',
 	'Restored. The program is restarting with these settings; the page reloads in a moment.': 'بازگردانی انجام شد. برنامه با این تنظیمات دوباره راه‌اندازی می‌شود و صفحه تا چند لحظه دیگر دوباره بارگذاری می‌شود.',
@@ -159,6 +159,8 @@ var FA = {
 	'No backup file was received.': 'فایل پشتیبانی دریافت نشد.',
 	'This is not a Zirgozar backup file.': 'این فایل، فایل پشتیبان زیرگذر نیست.',
 	'The settings in this backup file are damaged.': 'تنظیمات داخل این فایل پشتیبان خراب است.',
+	'Not enough free memory for the backup file: needs %s, %s free.': 'حافظه آزاد برای ساخت فایل پشتیبان کافی نیست: %s لازم است و %s آزاد است.',
+	'Not enough free memory to open the backup file: needs %s, %s free.': 'حافظه آزاد برای باز کردن فایل پشتیبان کافی نیست: %s لازم است و %s آزاد است.',
 	'For L2TP, PPTP and SSTP it can be left empty: the standard port is used (1701, 1723 and 443).': 'برای L2TP، PPTP و SSTP می‌توان خالی گذاشت؛ پورت استاندارد استفاده می‌شود (1701، 1723 و 443).',
 	'Expecting: non-empty value': 'این فیلد نباید خالی باشد',
 	'Available: %s': 'آماده نصب: %s',
@@ -526,11 +528,27 @@ var FA = {
 	'Sing-Box-LX App Path': 'مسیر برنامه Sing-Box-LX',
 	'The sing-box build that speaks xhttp. Empty means this program’s own copy in the folder above.': 'نسخه‌ای از sing-box که xhttp را می‌فهمد. خالی یعنی نسخه خود این برنامه در پوشه بالا.',
 	'Active core': 'هسته فعال',
-	'Auto measures the nodes and uses the fastest. A node chosen here - added by hand or from a subscription - is used as it is, and nothing is measured. A subscription’s node is found again each time its list is read, as PassWall2 does.': 'خودکار کانفیگ‌ها را می‌سنجد و سریع‌ترین را برمی‌دارد. کانفیگی که اینجا انتخاب شود - دستی یا از اشتراک - همان‌طور استفاده می‌شود و سنجیده نمی‌شود. کانفیگ اشتراک هر بار که فهرستش دوباره خوانده می‌شود، مثل پسوال۲ دوباره پیدا می‌شود.',
+	'Auto measures the nodes and uses the fastest. A node chosen here - added by hand or from a subscription - is used as it is, and nothing is measured. A subscription’s node is found again each time its list is read, as PassWall2 does.': 'خودکار: سریع‌ترین کانفیگ.',
 	'Nodes to use was set to manually added configs only, so the subscriptions could not be used. It is now set to all configs.': 'گزینه «کانفیگ‌هایی که استفاده شوند» روی «فقط کانفیگ‌های دستی» بود و اشتراک‌ها استفاده نمی‌شدند. حالا روی «همه کانفیگ‌ها» گذاشته شد.',
 	'Traffic statistics': 'آمار ترافیک',
 	'Shows the tunnel traffic.': 'ترافیک فیلترشکن را نشان می‌دهد.',
 	'AmneziaWG needs sing-box-lx, the build that has it. Install it on the App Update page.': 'AmneziaWG به sing-box-lx نیاز دارد، همان نسخه‌ای که آن را دارد. از صفحه «به‌روزرسانی» نصبش کنید.',
+	'A naive config needs sing-box-lx, the build that has it. Install it on the App Update page.': 'کانفیگ naive به sing-box-lx نیاز دارد. آن را از صفحه به‌روزرسانی برنامه نصب کنید.',
+	'Over QUIC instead of HTTP/2. Needs sing-box-lx.': 'به‌جای HTTP/2 روی QUIC. به sing-box-lx نیاز دارد.',
+	'Server type': 'نوع سرور',
+	'Group': 'گروه',
+	'Optional.': 'اختیاری.',
+	'Path': 'مسیر',
+	'Optional, such as /staff.': 'اختیاری، مثلاً /staff.',
+	'Certificate fingerprint': 'اثر انگشت گواهی',
+	'Optional. For a self-signed server certificate.': 'اختیاری. برای گواهی خودامضای سرور.',
+	'Auth key': 'کلید احراز هویت',
+	'Name or Tailscale IP of the exit node.': 'نام یا IP تیل‌اسکیل نود خروجی.',
+	'Device name': 'نام دستگاه',
+	'Control server': 'سرور کنترل',
+	'Empty for Tailscale; a Headscale address otherwise.': 'خالی برای Tailscale؛ در غیر این صورت آدرس Headscale.',
+	'Obfuscation host': 'میزبان مبهم‌سازی',
+	'Version': 'نسخه',
 	'OpenVPN user name': 'نام کاربری OpenVPN',
 	'Only for an OpenVPN profile that asks for a user name and password.': 'فقط برای پروفایل OpenVPN که نام کاربری و رمز می‌خواهد.',
 	'OpenVPN password': 'رمز OpenVPN',
@@ -1506,6 +1524,8 @@ function tr(s) {
 		if (m) v = FA['The installed Aether does not support %s.'].replace('%s', m[1]);
 		m = /^Aether has no supported build for ([A-Za-z0-9_-]+)\.$/.exec(s);
 		if (m) v = FA['Aether has no supported build for %s.'].replace('%s', m[1]);
+		m = /^(Not enough free memory (?:for|to open) the backup file): needs (.+), (.+) free\.$/.exec(s);
+		if (m) v = FA[m[1] + ': needs %s, %s free.'].replace('%s', m[2]).replace('%s', m[3]);
 		/* A core that downloaded and would not install: its name and the
 		   reason are in the sentence, and the reason is said in Persian too
 		   when it is one of the known ones. */

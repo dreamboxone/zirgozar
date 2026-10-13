@@ -393,7 +393,7 @@ method_nodeconfig() {
 	[ -n "$rec" ] || { fail "not xray"; return; }
 	proto="$(printf '%s' "$rec" | cut -f3)"
 	case "$proto" in
-		hysteria2|hysteria|tuic|openvpn|amneziawg|warp|l2tp|pptp|sstp) fail "not xray"; return ;;
+		hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|openvpn|amneziawg|warp|l2tp|pptp|sstp) fail "not xray"; return ;;
 	esac
 	out="$(printf '%s\n' "$rec" | DOMSTRAT="" decorate | cut -f6- | sed 's/^{/{"tag":"proxy",/')"
 	chains="$(chain_outbounds "$out" | while read -r _co; do [ -n "$_co" ] && printf ',%s' "$_co"; done)"
@@ -736,8 +736,9 @@ method_action() {
 			esac
 			;;
 		backup_create)
-			# Made at once - two small files - and then fetched by the
-			# browser through LuCI's own download.
+			# Made at once - the settings, the accounts and the routing
+			# data, copied into one unpacked file - and then fetched by
+			# the browser through LuCI's own download.
 			_why="$("$ROUTER" backup 2>/dev/null)" || { fail "${_why:-The backup file could not be made.}"; return; }
 			;;
 		backup_restore)

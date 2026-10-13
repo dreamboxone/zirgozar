@@ -178,7 +178,7 @@ function linkType(link) {
 	var m = l.match(/^([a-z][a-z0-9+.-]*):\/\//i);
 	if (m) {
 		var t = m[1].toLowerCase();
-		return { ss: 'shadowsocks', hy2: 'hysteria2', socks5: 'socks', wg: 'wireguard' }[t] || t;
+		return { ss: 'shadowsocks', hy2: 'hysteria2', socks5: 'socks', wg: 'wireguard', 'naive+https': 'naive', 'naive+quic': 'naive' }[t] || t;
 	}
 	if (/^\s*\[(interface|peer)\]/i.test(l))
 		return /^\s*(jc|jmin|jmax|s[1-4]|h[1-4]|i[1-5])\s*=/im.test(l) ? 'amneziawg' : 'wireguard';

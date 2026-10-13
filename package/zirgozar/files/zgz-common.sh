@@ -461,7 +461,7 @@ sbconfig() {
 	ucode "$ZGZ_LIB/zgz-sbconfig" \
 		geoview="$(geoview_path)" geodir="$(geo_dir 2>/dev/null)" \
 		rsdir="$ZGZ_RUN/rs" api="$(cfg api_port 10853)" \
-		bridge="$ZGZ_ETC/bridge.json" bridgeport="$(cfg bridge_port 10808)" \
+		bridge="$ZGZ_ETC/bridge.json" bridgeport="$(cfg bridge_port 10808)" etc="$ZGZ_ETC" \
 		mark="$ZGZ_OUT_MARK" level="$_sb_level" "$@"
 }
 
@@ -532,14 +532,14 @@ core_accepts() {
 # files it is depends on the setting: the official one, or sing-box-lx.
 #
 # With Xray in the settings, it is the sing-box for a node Xray cannot speak:
-# sing-box-lx for AmneziaWG, whose obfuscation only it has, and otherwise the
+# sing-box-lx for AmneziaWG and naive, which only it has, and otherwise the
 # official one, or sing-box-lx when that is the only one there is.
 engine_singbox_path() {
 	case "$(cfg core_engine xray)" in
 		singbox-lx) singbox_lx_path ;;
 		singbox|sing-box) singbox_path ;;
 		*)
-			if grep -q '"type"[ 	]*:[ 	]*"amneziawg"' "$ZGZ_ETC/bridge.json" 2>/dev/null; then
+			if grep -qE '"type"[ 	]*:[ 	]*"(amneziawg|naive)"' "$ZGZ_ETC/bridge.json" 2>/dev/null; then
 				singbox_lx_path
 			elif [ -x "$(singbox_path)" ] || [ ! -x "$(singbox_lx_path)" ]; then
 				singbox_path
@@ -1563,7 +1563,7 @@ chain_outbound() {
 	[ -n "$_co" ] || return 1
 	case "$(printf '%s' "$_co" | cut -f3)" in
 		# A pre-proxy Xray cannot speak cannot be dialled through by Xray.
-		hysteria2|hysteria|tuic|openvpn|amneziawg|l2tp|pptp|sstp|aether) return 1 ;;
+		hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|openvpn|amneziawg|l2tp|pptp|sstp|aether) return 1 ;;
 	esac
 	printf '%s\n' "$_co" | cut -f6- | DOMSTRAT="${DOMSTRAT:-}" decorate |
 		sed -e "s/^{/{\"tag\":\"chain-$1\",/"
@@ -1710,7 +1710,7 @@ node_records() {
 				esac
 				[ -n "$_nd_r" ] || continue
 				case "$(printf '%s' "$_nd_r" | cut -f3)" in
-					hysteria2|tuic|openvpn|amneziawg|l2tp|pptp|sstp|aether|balancing|shunt|interface) continue ;;
+					hysteria2|tuic|anytls|snell|naive|openconnect|tailscale|openvpn|amneziawg|l2tp|pptp|sstp|aether|balancing|shunt|interface) continue ;;
 				esac
 				_nd_first="$_nd_r"
 				break
@@ -1753,7 +1753,7 @@ node_records() {
 				_nd_r="$(printf '%s\n' "$_nd_r" | warp_natives | head -1)"
 				[ -n "$_nd_r" ] || return 1
 				case "$(printf '%s' "$_nd_r" | cut -f3)" in
-					hysteria2|hysteria|tuic|openvpn|amneziawg|l2tp|pptp|sstp|aether|balancing|shunt|interface) return 1 ;;
+					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|openvpn|amneziawg|l2tp|pptp|sstp|aether|balancing|shunt|interface) return 1 ;;
 				esac
 				_nd_host="$(printf '%s' "$_nd_r" | cut -f4)"
 				_nd_port="$(printf '%s' "$_nd_r" | cut -f5)"
@@ -1795,13 +1795,13 @@ node_records() {
 				_nd_land="$(section_links "$_nd_to" | LC_ALL=C awk -v LIMIT=1 -f "$ZGZ_LIB/zgz-parse" 2>/dev/null | head -1 | warp_natives)"
 				_nd_first="$(printf '%s\n' "$_nd_recs" | head -1)"
 				case "$(printf '%s' "$_nd_first" | cut -f3)" in
-					hysteria2|hysteria|tuic|openvpn|amneziawg|l2tp|pptp|sstp|aether) _nd_land="" ;;
+					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|openvpn|amneziawg|l2tp|pptp|sstp|aether) _nd_land="" ;;
 					# The first hop is reached as chain-<this node>, which for
 					# WARP is its WireGuard outbound - when it has one.
 					warp) [ -n "$(printf '%s\n' "$_nd_first" | warp_natives)" ] || _nd_land="" ;;
 				esac
 				case "$(printf '%s' "$_nd_land" | cut -f3)" in
-					hysteria2|hysteria|tuic|openvpn|amneziawg|l2tp|pptp|sstp|aether|'') _nd_land="" ;;
+					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|openvpn|amneziawg|l2tp|pptp|sstp|aether|'') _nd_land="" ;;
 				esac
 				if [ -n "$_nd_land" ]; then
 					printf '%s\t%s → %s\t%s\t%s\t%s\t%s\n' \

@@ -705,6 +705,135 @@ function do_tuic(body,   label, cred, uuid, pass, query, p, q) {
 		",\"insecure\":" (qs(query, "allow_insecure") == "1" ? "true" : "false") "}")
 }
 
+# --------------------------------- anytls, snell, naive, openconnect, tailscale
+#
+# Five more sing-box-only kinds, carried the way hysteria2 is: the payload
+# describes the node and sing-box offers it as a SOCKS port. naive needs
+# sing-box-lx, the build that has it; OpenConnect and Tailscale are sing-box
+# endpoints rather than outbounds.
+#
+#   anytls://PASSWORD@host:port?sni=&insecure=1&fp=&alpn=#name
+#   snell://PSK@host:port?version=4|6&obfs=http&obfs-host=&mode=&reuse=1&userkey=#name
+#   naive+https://[user:pass@]host:port#name      naive+quic://... over QUIC
+#   openconnect://[user:pass@]host:port[/path]?flavor=&group=&fingerprint=&insecure=1#name
+#   tailscale://AUTHKEY@control-host[:port]?exit_node=&hostname=#name
+
+function mk_anytls(pass, sni, ins, fp, alpn) {
+	return "{\"type\":\"anytls\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT \
+		",\"password\":\"" jesc(pass) "\",\"sni\":\"" jesc(sni) "\",\"fp\":\"" jesc(fp) "\"" \
+		",\"alpn\":\"" jesc(alpn) "\",\"insecure\":" (ins ? "true" : "false") "}"
+}
+
+# Version 5 is version 4 on the wire; 1 to 3 sing-box does not speak.
+function mk_snell(psk, ver, obfs, ohost, mode, reuse, ukey) {
+	if (ver == "") ver = 4
+	if (ver !~ /^[456]$/ || psk == "") return ""
+	if (ver == 5) ver = 4
+	if (obfs != "http") obfs = ""
+	return "{\"type\":\"snell\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT \
+		",\"psk\":\"" jesc(psk) "\",\"version\":" ver ",\"obfs\":\"" obfs "\",\"obfs_host\":\"" jesc(ohost) "\"" \
+		",\"mode\":\"" jesc(mode) "\",\"userkey\":\"" jesc(ukey) "\",\"reuse\":" (reuse ? "true" : "false") "}"
+}
+
+function mk_naive(user, pass, sni, quic) {
+	return "{\"type\":\"naive\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT \
+		",\"username\":\"" jesc(user) "\",\"password\":\"" jesc(pass) "\",\"sni\":\"" jesc(sni) "\"" \
+		",\"quic\":" (quic ? "true" : "false") "}"
+}
+
+function mk_openconnect(user, pass, path, flavor, group, fpr, ins) {
+	if (flavor == "") flavor = "anyconnect"
+	if (flavor !~ /^(anyconnect|gp|fortinet|f5|pulse|nc)$/) return ""
+	return "{\"type\":\"openconnect\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT \
+		",\"path\":\"" jesc(path) "\",\"username\":\"" jesc(user) "\",\"password\":\"" jesc(pass) "\"" \
+		",\"flavor\":\"" flavor "\",\"group\":\"" jesc(group) "\",\"fingerprint\":\"" jesc(fpr) "\"" \
+		",\"insecure\":" (ins ? "true" : "false") "}"
+}
+
+# Tailscale keeps the node's identity on flash, one folder per account and
+# control server, so that a restart is not a new device on the tailnet.
+function ts_state(s,   h, i) {
+	h = 5381
+	for (i = 1; i <= length(s); i++) h = (h * 33 + ORD[substr(s, i, 1)]) % 2147483647
+	return "ts" h
+}
+
+function mk_tailscale(key, exitn, hname) {
+	if (key == "" || exitn == "") return ""
+	return "{\"type\":\"tailscale\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT \
+		",\"auth_key\":\"" jesc(key) "\",\"exit_node\":\"" jesc(exitn) "\",\"hostname\":\"" jesc(hname) "\"" \
+		",\"state\":\"" ts_state(key "|" HOST ":" PORT) "\"}"
+}
+
+# The parts every one of these links has: #label, ?query, user[:pass]@.
+function link_split(body,   p) {
+	LLABEL = ""; LQUERY = ""; LUSER = ""; LPASS = ""; LCRED = 0
+	p = index(body, "#")
+	if (p > 0) { LLABEL = clean_label(substr(body, p + 1)); body = substr(body, 1, p - 1) }
+	p = index(body, "?")
+	if (p > 0) { LQUERY = substr(body, p + 1); body = substr(body, 1, p - 1) }
+	p = index(body, "@")
+	if (p > 0) {
+		LCRED = 1
+		LUSER = substr(body, 1, p - 1); body = substr(body, p + 1)
+		p = index(LUSER, ":")
+		if (p > 0) { LPASS = urldec(substr(LUSER, p + 1)); LUSER = substr(LUSER, 1, p - 1) }
+		LUSER = urldec(LUSER)
+	}
+	return body
+}
+
+function lbool(k,   v) {
+	v = tolower(qs(LQUERY, k))
+	return v == "1" || v == "true"
+}
+
+function do_anytls(body,   alpn) {
+	body = link_split(body)
+	if (!LCRED || LUSER == "" || !hostport(body)) return
+	alpn = qs(LQUERY, "alpn")
+	emit(LLABEL, "anytls", mk_anytls(LPASS != "" ? LUSER ":" LPASS : LUSER, qs(LQUERY, "sni") != "" ? qs(LQUERY, "sni") : qs(LQUERY, "peer"), \
+		lbool("insecure") || lbool("allowInsecure"), qs(LQUERY, "fp"), alpn))
+}
+
+function do_snell(body,   psk, pl) {
+	body = link_split(body)
+	if (!LCRED || !hostport(body)) return
+	psk = LPASS != "" ? LUSER ":" LPASS : LUSER
+	if (psk == "") psk = qs(LQUERY, "psk")
+	pl = mk_snell(psk, qs(LQUERY, "version"), qs(LQUERY, "obfs"), qs(LQUERY, "obfs-host"), \
+		qs(LQUERY, "mode"), lbool("reuse"), qs(LQUERY, "userkey"))
+	if (pl != "") emit(LLABEL, "snell", pl)
+}
+
+function do_naive(body, quic) {
+	body = link_split(body)
+	if (!hostport(body)) return
+	emit(LLABEL, "naive", mk_naive(LUSER, LPASS, qs(LQUERY, "sni"), quic))
+}
+
+function do_openconnect(body,   p, path, pl) {
+	body = link_split(body)
+	path = ""
+	p = index(body, "/")
+	if (p > 0) { path = substr(body, p); body = substr(body, 1, p - 1); sub(/\/+$/, "", path) }
+	if (body !~ /:[0-9]+$/) body = body ":443"
+	if (!hostport(body) || HOST !~ /^[A-Za-z0-9_.:-]+$/ || path ~ /[^A-Za-z0-9_.~\/-]/) return
+	pl = mk_openconnect(LUSER, LPASS, path, tolower(qs(LQUERY, "flavor")), qs(LQUERY, "group"), \
+		qs(LQUERY, "fingerprint"), lbool("insecure"))
+	if (pl != "") emit(LLABEL, "openconnect", pl)
+}
+
+function do_tailscale(body,   pl) {
+	body = link_split(body)
+	sub(/\/+$/, "", body)
+	if (body == "") body = "controlplane.tailscale.com"
+	if (body !~ /:[0-9]+$/) body = body ":443"
+	if (!LCRED || !hostport(body) || HOST !~ /^[A-Za-z0-9_.:-]+$/) return
+	pl = mk_tailscale(LPASS != "" ? LUSER ":" LPASS : LUSER, qs(LQUERY, "exit_node"), qs(LQUERY, "hostname"))
+	if (pl != "") emit(LLABEL, "tailscale", pl)
+}
+
 # ------------------------------------------------------------------ warp://
 #
 # Cloudflare WARP, carried by warp-plus or Vwarp: a client that registers its
@@ -1516,7 +1645,7 @@ function sb_stream(it,   tls, rel, tr, net, sec, sni, fp, alpn, pbk, sid, path, 
 	return stream(net, sec, host, path, sni, fp, alpn, pbk, sid, "", svc, "", jstr(tr, "mode"))
 }
 
-function from_singbox(it,   t, lab, peer, aw, ak, ai, nk) {
+function from_singbox(it,   t, lab, peer, aw, ak, ai, nk, sbp) {
 	t = tolower(jstr(it, "type"))
 	if (t == "") return
 	if (t ~ /^(direct|block|dns|selector|urltest|tun|mixed)$/) return
@@ -1588,6 +1717,24 @@ function from_singbox(it,   t, lab, peer, aw, ak, ai, nk) {
 		return
 	}
 
+	if (t == "anytls") {
+		emit(lab, "anytls", mk_anytls(jstr(it, "password"), jstr(jraw(it, "tls"), "server_name"), \
+			jbool(jraw(it, "tls"), "insecure"), jstr(jraw(jraw(it, "tls"), "utls"), "fingerprint"), \
+			jjoin(jraw(jraw(it, "tls"), "alpn"))))
+		return
+	}
+	if (t == "snell") {
+		sbp = mk_snell(jstr(it, "psk"), jnum(it, "version") > 0 ? jnum(it, "version") : "", jstr(it, "obfs_mode"), \
+			jstr(it, "obfs_host"), jstr(it, "mode"), jbool(it, "reuse"), jstr(it, "userkey"))
+		if (sbp != "") emit(lab, "snell", sbp)
+		return
+	}
+	if (t == "naive") {
+		emit(lab, "naive", mk_naive(jstr(it, "username"), jstr(it, "password"), \
+			jstr(jraw(it, "tls"), "server_name"), jbool(it, "quic")))
+		return
+	}
+
 	XEXTRA = ""
 	if (t == "vless")            emit(lab, "vless", mk_vless(jstr(it, "uuid"), "none", jstr(it, "flow"), sb_stream(it)))
 	else if (t == "vmess")       emit(lab, "vmess", mk_vmess(jstr(it, "uuid"), jnum(it, "alter_id"), jstr(it, "security"), sb_stream(it)))
@@ -1627,7 +1774,7 @@ function cl_stream(it, t,   net, sec, sni, fp, alpn, pbk, sid, path, host, svc, 
 	return stream(net, sec, host, path, sni, fp, alpn, pbk, sid, "", svc, "", "")
 }
 
-function from_clash(it,   t, lab) {
+function from_clash(it,   t, lab, clp) {
 	t = tolower(jstr(it, "type"))
 	lab = clean_label(jstr(it, "name"))
 	HOST = jstr(it, "server")
@@ -1660,6 +1807,14 @@ function from_clash(it,   t, lab) {
 			",\"obfs\":\"" jesc(jstr(it, "obfs")) "\"" \
 			",\"obfs_password\":\"" jesc(jstr(it, "obfs-password")) "\"" \
 			",\"insecure\":" (jbool(it, "skip-cert-verify") ? "true" : "false") "}")
+	}
+	else if (t == "anytls")
+		emit(lab, "anytls", mk_anytls(jstr(it, "password"), jstr(it, "sni"), jbool(it, "skip-cert-verify"), \
+			jstr(it, "client-fingerprint"), jjoin(jraw(it, "alpn"))))
+	else if (t == "snell") {
+		clp = mk_snell(jstr(it, "psk"), jnum(it, "version") > 0 ? jnum(it, "version") : "", jstr(jraw(it, "obfs-opts"), "mode"), \
+			jstr(jraw(it, "obfs-opts"), "host"), "", 0, "")
+		if (clp != "") emit(lab, "snell", clp)
 	}
 }
 
@@ -1788,7 +1943,7 @@ LANDING {
 	line = $0
 	gsub(/\r/, "", line)
 	if (line == "" || split(line, rec, "\t") < 6) next
-	if (rec[3] ~ /^(hysteria2|hysteria|tuic|openvpn|amneziawg|l2tp|pptp|sstp|warp|aether)$/) next
+	if (rec[3] ~ /^(hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|openvpn|amneziawg|l2tp|pptp|sstp|warp|aether)$/) next
 	if (!lready) {
 		split(ENVIRON["LAND"], land, "\t")
 		lp = ENVIRON["LAND"]
@@ -1909,6 +2064,12 @@ function do_line(line) {
 	else if (index(line, "hysteria2://") == 1) do_hysteria2(substr(line, 13))
 	else if (index(line, "hy2://")       == 1) do_hysteria2(substr(line, 7))
 	else if (index(line, "tuic://")      == 1) do_tuic(substr(line, 8))
+	else if (index(line, "anytls://")    == 1) do_anytls(substr(line, 10))
+	else if (index(line, "snell://")     == 1) do_snell(substr(line, 9))
+	else if (index(line, "naive+https://") == 1) do_naive(substr(line, 15), 0)
+	else if (index(line, "naive+quic://") == 1) do_naive(substr(line, 14), 1)
+	else if (index(line, "openconnect://") == 1) do_openconnect(substr(line, 15))
+	else if (index(line, "tailscale://") == 1) do_tailscale(substr(line, 13))
 	else if (index(line, "wireguard://") == 1) do_wireguard(substr(line, 13))
 	else if (index(line, "wg://")        == 1) do_wireguard(substr(line, 6))
 	else if (index(line, "warp://")      == 1) do_warp(substr(line, 8))
