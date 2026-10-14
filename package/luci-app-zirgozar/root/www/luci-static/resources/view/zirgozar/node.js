@@ -1411,14 +1411,26 @@ return view.extend({
 			};
 		}
 
-		/* Once an added node is saved it is an ordinary one: the address
-		   names it, so that Save & Apply's reload, or the browser's, opens
-		   this node again rather than another empty one. */
+		/* An added node is saved only when it is not one already there, under
+		   any name; then the address becomes the list's, so that Save &
+		   Apply's reload goes back to Configs rather than to another empty
+		   node. */
 		if (isNew) {
 			var save = m.save;
 			m.save = function() {
-				return save.apply(this, arguments).then(function(r) {
-					window.history.replaceState(null, '', L.url('admin', 'services', 'zirgozar', 'node') + '?sid=' + encodeURIComponent(sid));
+				var self = this, args = arguments;
+				return m.parse().then(function() {
+					var l = String(uci.get('zirgozar', sid, 'link') || '').trim();
+					return l ? callAction('node_dup', sid + ';' + l) : {};
+				}).then(function(d) {
+					if (d && d.dup_id) {
+						var msg = _('This config is already in the list: %s').format(d.dup_name || d.dup_id);
+						ui.addNotification(null, E('p', {}, msg), 'danger');
+						return Promise.reject(new Error(msg));
+					}
+					return save.apply(self, args);
+				}).then(function(r) {
+					window.history.replaceState(null, '', back);
 					return r;
 				});
 			};

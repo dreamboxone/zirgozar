@@ -320,6 +320,12 @@ return view.extend({
 			if (!value) return true;
 			if (!/^https?:\/\//.test(value))
 				return _('Must start with http:// or https://');
+			/* The same list twice is every node in it twice. */
+			var key = function(u) { return String(u || '').trim().replace(/\/+$/, '').toLowerCase(); };
+			var other = uci.sections('zirgozar', 'subscription').filter(function(x) {
+				return x['.name'] != section && x.url && key(x.url) == key(value);
+			})[0];
+			if (other) return _('This subscription is already in the list: %s').format(other.name || other['.name']);
 			return true;
 		};
 

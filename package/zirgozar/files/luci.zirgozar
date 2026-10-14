@@ -689,11 +689,26 @@ method_action() {
 			;;
 		add_links)
 			# PassWall2's "Add the node via the link": one node per link.
-			_n="$(printf '%s\n' "$arg" | "$NODES" addlinks 2>/dev/null)" || _n=0
+			_n="$(printf '%s\n' "$arg" | "$NODES" addlinks 2>/dev/null)" || _n="0 0"
 			detach "$NODES" build
 			json_init
 			json_add_boolean "ok" 1
-			json_add_int "added" "${_n:-0}"
+			json_add_int "added" "$(echo "$_n" | cut -d' ' -f1)"
+			json_add_int "skipped" "$(echo "$_n 0" | cut -d' ' -f2)"
+			json_dump
+			return
+			;;
+		node_dup)
+			# The node added by hand that a link or file already is, for the
+			# node page before a new one is saved. "<id>;<link>": the id is
+			# the node being saved, which is not compared with itself.
+			_skip="${arg%%;*}"
+			case "$_skip" in *[!A-Za-z0-9_]*) _skip="" ;; esac
+			_d="$(printf '%s\n' "${arg#*;}" | SKIP="$_skip" "$NODES" dupof 2>/dev/null)" || _d=""
+			json_init
+			json_add_boolean "ok" 1
+			json_add_string "dup_id" "$(printf '%s' "$_d" | cut -f1)"
+			json_add_string "dup_name" "$(printf '%s' "$_d" | cut -f2)"
 			json_dump
 			return
 			;;

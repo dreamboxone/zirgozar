@@ -958,15 +958,42 @@ forget_refs() {
 	return 0
 }
 
+# What a node is, leaving its name aside: the servers its link or file reads
+# as - protocol, address, port and everything else - one a line, sorted.
+node_key() {
+	printf '%s\n' "$1" | LC_ALL=C awk -f "$PARSE" 2>/dev/null | cut -f3- | sort -u
+}
+
+# The node added by hand that the link or file on stdin already is, if any,
+# as "id<TAB>name". SKIP is a node not to compare it with: itself.
+cmd_dupof() {
+	_dk="$(node_key "$(cat)")"
+	[ -n "$_dk" ] || return 1
+	for _ds in $(uci -q -X show zirgozar | sed -n 's/^zirgozar\.\([A-Za-z0-9_]*\)=node$/\1/p'); do
+		[ "$_ds" = "${SKIP:-}" ] && continue
+		_dl="$(uci -q get "zirgozar.$_ds.link")" || continue
+		[ "$(node_key "$_dl")" = "$_dk" ] || continue
+		printf '%s\t%s\n' "$_ds" "$(uci -q get "zirgozar.$_ds.name")"
+		return 0
+	done
+	return 1
+}
+
 # Share links on stdin, one per line: each becomes a node of its own, named
-# the way its link names it. Prints how many were added.
+# the way its link names it - unless it is already a node, under any name.
+# Prints how many were added and how many were already there.
 cmd_addlinks() {
 	_n=0
+	_dup=0
 	while IFS= read -r _l; do
 		_l="$(printf '%s' "$_l" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 		case "$_l" in *://*) : ;; *) continue ;; esac
 		_rec="$(printf '%s\n' "$_l" | LC_ALL=C awk -v LIMIT=1 -f "$PARSE" 2>/dev/null | head -1)"
 		[ -n "$_rec" ] || continue
+		if printf '%s\n' "$_l" | cmd_dupof >/dev/null; then
+			_dup=$((_dup + 1))
+			continue
+		fi
 		_name="$(printf '%s' "$_rec" | cut -f2 | sed -e 's/\\"/"/g' -e 's/\\\\/\\/g')"
 		_sid="$(new_name n)"
 		uci -q set "zirgozar.$_sid=node" || continue
@@ -976,7 +1003,7 @@ cmd_addlinks() {
 		_n=$((_n + 1))
 	done
 	[ "$_n" -gt 0 ] && uci -q commit zirgozar
-	echo "$_n"
+	echo "$_n $_dup"
 	return 0
 }
 
@@ -1250,6 +1277,7 @@ case "${1:-update}" in
 	status) cmd_status ;;
 	inuse)  cmd_inuse ;;
 	addlinks) cmd_addlinks ;;
+	dupof)    cmd_dupof ;;
 	fixnames) cmd_fixnames ;;
 	delete) shift; cmd_delete "$@"; cmd_build >/dev/null 2>&1 || true ;;
 	clear)  cmd_clear; cmd_build >/dev/null 2>&1 || true ;;

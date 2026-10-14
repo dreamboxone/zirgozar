@@ -1004,6 +1004,10 @@ var FA = {
 	'Traffic goes through a node of this subscription first and leaves from the one chosen here.':
 		'ترافیک اول از یک کانفیگ این اشتراک عبور می‌کند و از کانفیگی که اینجا انتخاب می‌شود خارج می‌شود.',
 	'Add the node via the link': 'افزودن با لینک',
+	'This config is already in the list: %s': 'این کانفیگ از قبل در فهرست هست: %s',
+	'They are already in the list.': 'این‌ها از قبل در فهرست هستند.',
+	'This subscription is already in the list: %s': 'این اشتراک از قبل در فهرست هست: %s',
+	'%d added; %d were already in the list.': '%d کانفیگ اضافه شد؛ %d تا از قبل در فهرست بودند.',
 	'Enter share links, one per line. Subscription links are not supported!': 'لینک‌های کانفیگ را وارد کنید، هر خط یک لینک. لینک اشتراک پذیرفته نمی‌شود!',
 	'Please enter the correct link.': 'لطفا لینک درست وارد کنید.',
 	'None of those could be read as a node.': 'هیچ‌کدام از این‌ها به‌عنوان کانفیگ خوانده نشد.',

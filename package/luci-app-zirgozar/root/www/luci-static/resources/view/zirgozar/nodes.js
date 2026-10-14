@@ -260,8 +260,17 @@ function addViaLinks() {
 						return;
 					}
 					return callAction('add_links', box.value).then(function(r) {
+						if (r && !r.added && r.skipped) {
+							pui.note(b, _('They are already in the list.'), 'warn');
+							return;
+						}
 						if (!r || !r.added) {
 							pui.note(b, _('None of those could be read as a node.'), 'error');
+							return;
+						}
+						if (r.skipped) {
+							pui.note(b, _('%d added; %d were already in the list.').format(r.added, r.skipped), 'ok');
+							window.setTimeout(function() { ui.hideModal(); location.reload(); }, 2000);
 							return;
 						}
 						ui.hideModal();
