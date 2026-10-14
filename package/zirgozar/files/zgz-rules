@@ -53,7 +53,7 @@ RESERVED_V4="0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.1
 
 tproxy_port="$(cfg tproxy_port 1082)"
 dns_port="$(cfg dns_port 1053)"
-ipv6_mode="$(cfg ipv6 block)"
+ipv6_mode="$(cfg ipv6 off)"
 block_quic="$(cfg block_quic auto)"
 case "$block_quic" in
 	1|on|true|yes) block_quic=1 ;;

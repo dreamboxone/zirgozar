@@ -320,6 +320,11 @@ return view.extend({
 		o.placeholder = '1070';
 		o.default = '1070';
 
+		o = s.taboption('main', form.Value, 'node_http_port', _('Node HTTP Listen Port'),
+			_('An HTTP proxy beside it, the same way out. Empty for none.'));
+		o.datatype = 'port';
+		o.placeholder = '1071';
+
 		o = s.taboption('main', form.Flag, 'node_socks_bind_local', _('Node Socks Bind Local'),
 			_('When selected, it can only be accessed localhost.'));
 		o.default = '1';
@@ -354,6 +359,13 @@ return view.extend({
 		so.rmempty = false;
 		/* After the tunnel's own ports, so a new row never lands on one. */
 		so.default = String(1090 + uci.sections('zirgozar', 'socks').length);
+
+		so = ss.option(form.Value, 'http_port', _('HTTP Listen Port'));
+		so.datatype = 'port';
+		so.placeholder = _('None');
+		so.validate = function(section_id, value) {
+			return (!value || value != this.section.formvalue(section_id, 'port')) ? true : _('Not the SOCKS port.');
+		};
 
 		/* Back to how the package installed it, on the next save. Asked about
 		   when ticked, since there is no undo; the page reloads once it has
@@ -410,10 +422,11 @@ return view.extend({
 
 		o = s.taboption('shunt', form.ListValue, 'domainStrategy', _('Domain Strategy'),
 			_('AsIs: only the name is used for routing. IPIfNonMatch: when no rule matches the name, it is resolved to addresses and all the rules are tried again. IPOnDemand: whenever an address rule is met, the name is resolved at once. Auto chooses IPIfNonMatch when a rule or the Iran split has addresses in it, and AsIs otherwise.'));
-		o.value('', _('Auto'));
-		o.value('AsIs');
-		o.value('IPIfNonMatch');
 		o.value('IPOnDemand');
+		o.value('IPIfNonMatch');
+		o.value('AsIs');
+		o.value('auto', _('Auto'));
+		o.default = 'IPOnDemand';
 
 		o = s.taboption('shunt', form.ListValue, 'domainMatcher', _('Domain matcher'));
 		o.value('', 'hybrid');
@@ -584,7 +597,7 @@ return view.extend({
 		o.value('UseIP');
 		o.value('UseIPv4');
 		o.value('UseIPv6');
-		o.default = 'UseIPv4';
+		o.default = 'UseIP';
 
 		o = s.taboption('dns', form.ListValue, 'remote_dns_protocol', _('Remote DNS Protocol'),
 			_('TCP is the default because a great many free nodes carry no UDP at all, and a lookup sent as UDP through one of them is simply lost.'));
@@ -652,6 +665,15 @@ return view.extend({
 		o.value('UseIPv4');
 		o.value('UseIPv6');
 		o.default = 'UseIPv4';
+
+		o = s.taboption('dns', form.Value, 'node_dns', _('Node address DNS'),
+			_('The resolver every node’s server name is looked up with, straight out - an IP address, since nothing can be looked up before the tunnel is up. Empty uses Direct DNS. Such as 1.1.1.1, tcp://8.8.8.8 or https://8.8.8.8/dns-query.'));
+		o.placeholder = _('Direct DNS');
+		o.validate = function(section_id, value) {
+			if (!value || /^((udp|tcp):\/\/)?(\d{1,3}(\.\d{1,3}){3}|\[[0-9A-Fa-f:]+\])(:\d+)?$/.test(value) ||
+			    /^https:\/\/(\d{1,3}(\.\d{1,3}){3}|\[[0-9A-Fa-f:]+\])(:\d+)?(\/\S*)?$/.test(value)) return true;
+			return _('An IP address, such as 1.1.1.1, tcp://8.8.8.8 or https://8.8.8.8/dns-query.');
+		};
 
 		o = s.taboption('dns', form.TextValue, 'dns_hosts', _('Domain Override'),
 			_('One per line: a name, a space, and the address it should resolve to.'));

@@ -159,6 +159,12 @@ return view.extend({
 			return _('Not valid, please re-enter: %s').format(value);
 		};
 
+		o = s.option(form.Value, 'sourcePort', _('Source port'), _('The port the connection comes from. Such as 1000-2000,3000.'));
+		o.validate = function(section_id, value) {
+			if (!value || /^[0-9]+([-:][0-9]+)?(,[0-9]+([-:][0-9]+)?)*$/.test(String(value).replace(/\s/g, ''))) return true;
+			return _('Not valid, please re-enter: %s').format(value);
+		};
+
 		o = s.option(form.TextValue, 'domain_list', _('Domain'), items([
 			_("Plaintext: If this string matches any part of the targeting domain, this rule takes effet. Example: rule 'sina.com' matches targeting domain 'sina.com', 'sina.com.cn' and 'www.sina.com', but not 'sina.cn'."),
 			_("Regular expression: Begining with 'regexp:', the rest is a regular expression. When the regexp matches targeting domain, this rule takes effect. Example: rule 'regexp:\\.goo.*\\.com$' matches 'www.google.com' and 'fonts.googleapis.com', but not 'google.com'."),

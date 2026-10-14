@@ -630,6 +630,8 @@ for (let i in X.inbounds) {
 			push(sniff_in, tag);
 	} else if (i.protocol == 'socks') {
 		b = { type: 'socks', tag, listen: i.listen, listen_port: i.port };
+	} else if (i.protocol == 'http') {
+		b = { type: 'http', tag, listen: i.listen, listen_port: i.port };
 	} else {
 		warn(`inbound ${tag}: ${i.protocol} is not translated`);
 		continue;
@@ -805,6 +807,19 @@ for (let ri, r in xr) {
 		if (length(ranges))
 			base.port_range = ranges;
 	}
+	if (r.sourcePort) {
+		let ports = [], ranges = [];
+		for (let p in split(`${r.sourcePort}`, ',')) {
+			if (match(p, /[-:]/))
+				push(ranges, replace(p, '-', ':'));
+			else if (p != '')
+				push(ports, int(p));
+		}
+		if (length(ports))
+			base.source_port = ports;
+		if (length(ranges))
+			base.source_port_range = ranges;
+	}
 
 	let to = target(r.outboundTag);
 	let groups = [];
@@ -891,6 +906,7 @@ function dns_server(sv) {
 let dns = { servers: [], rules: [] };
 let dns_final = null;
 let have_direct_dns = false;
+let have_node_dns = false;
 
 let hosts = X.dns?.hosts ?? {};
 if (length(keys(hosts))) {
@@ -910,6 +926,8 @@ for (let sv in X.dns?.servers ?? []) {
 	if (sv.domains) {
 		if (sv.tag == 'dns-direct')
 			have_direct_dns = true;
+		if (sv.tag == 'dns-nodes')
+			have_node_dns = true;
 		for (let g in name_groups(split_names(sv.domains))) {
 			push(dns.rules, { ...g, action: 'route', server: sv.tag });
 		}
@@ -943,9 +961,10 @@ if (length(keys(rule_sets)) || length(keys(user_sets)))
 		...map(keys(rule_sets), (t) => ({ tag: t, type: 'local', format: 'binary', path: rule_sets[t] })),
 		...map(keys(user_sets), (t) => user_sets[t])
 	];
-// The resolver a node's own name is looked up with: the direct one, or in a
-// measurement the one resolver it has, which is the direct resolver too.
-let node_dns = have_direct_dns ? 'dns-direct' : (args.mode == 'test' ? dns_final : null);
+// The resolver a node's own name is looked up with: the one the DNS tab names
+// for nodes, else the direct one, or in a measurement the one resolver it has,
+// which is the direct resolver too.
+let node_dns = have_node_dns ? 'dns-nodes' : (have_direct_dns ? 'dns-direct' : (args.mode == 'test' ? dns_final : null));
 for (let o in [ ...outbounds ]) {
 	if (o._strategy && node_dns)
 		o.domain_resolver = { server: node_dns, strategy: o._strategy };

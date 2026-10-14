@@ -408,6 +408,15 @@ if [ -n "$_nsp" ]; then
 	socks_inbounds=",
     { \"tag\": \"socks-in\", \"listen\": \"$_nsl\", \"port\": $_nsp, \"protocol\": \"socks\", \"settings\": { \"udp\": true } }"
 fi
+# And an HTTP proxy beside it, the same way out, on the same addresses.
+_nhp="$(cfg node_http_port '')"
+case "$_nhp" in ''|0|*[!0-9]*) _nhp="" ;; esac
+if [ -n "$_nhp" ]; then
+	_nhl="0.0.0.0"
+	[ "$(cfg_bool node_socks_bind_local 1)" = "1" ] && _nhl="127.0.0.1"
+	socks_inbounds="$socks_inbounds,
+    { \"tag\": \"http-in\", \"listen\": \"$_nhl\", \"port\": $_nhp, \"protocol\": \"http\", \"settings\": {} }"
+fi
 if [ -n "$ovpn_via" ]; then
 	socks_inbounds="$socks_inbounds,
     { \"tag\": \"ovpn-via\", \"listen\": \"127.0.0.1\", \"port\": $(cfg bridge_port 10808), \"protocol\": \"socks\", \"settings\": { \"udp\": true } }"
@@ -421,29 +430,38 @@ fi
 # own - or, with no node named, the way the tunnel goes. A node that cannot be
 # used goes the tunnel's way rather than leaving the port dead.
 socks_one() {
-	local enabled node port out
+	local enabled node port hport out
 	config_get_bool enabled "$1" enabled 1
 	[ "$enabled" = "1" ] || return 0
 	config_get port "$1" port ""
 	case "$port" in ''|0|*[!0-9]*) return 0 ;; esac
 	config_get node "$1" node ""
+	config_get hport "$1" http_port ""
+	case "$hport" in ''|0|*[!0-9]*) hport="" ;; esac
 	socks_count=$((socks_count + 1))
 	_own=0
+	_sin="\"socks$socks_count\""
 	socks_inbounds="$socks_inbounds,
     { \"tag\": \"socks$socks_count\", \"listen\": \"0.0.0.0\", \"port\": $port, \"protocol\": \"socks\", \"settings\": { \"udp\": true } }"
+	# An HTTP proxy beside it, going the same way.
+	if [ -n "$hport" ] && [ "$hport" != "$port" ]; then
+		socks_inbounds="$socks_inbounds,
+    { \"tag\": \"socks$socks_count-http\", \"listen\": \"0.0.0.0\", \"port\": $hport, \"protocol\": \"http\", \"settings\": {} }"
+		_sin="$_sin,\"socks$socks_count-http\""
+	fi
 	if [ -n "$node" ]; then
 		out="$(acl_outbound "$node")" || out=""
 		if [ -n "$out" ]; then
 			socks_outbounds="$socks_outbounds
 $(printf '%s\n' "$out" | sed -e 's/^[[:space:]]*//' -e "s/^{/{\"tag\":\"socks$socks_count-out\",/" | head -1),"
-			add_rule "{\"type\":\"field\",\"inboundTag\":[\"socks$socks_count\"],\"outboundTag\":\"socks$socks_count-out\"}"
+			add_rule "{\"type\":\"field\",\"inboundTag\":[$_sin],\"outboundTag\":\"socks$socks_count-out\"}"
 			_own=1
 		else
 			warn "SOCKS port $port: node '$node' cannot be used - it goes the tunnel's way instead"
 		fi
 	fi
 	if [ "$_own" = "0" ]; then
-		socks_plain="$socks_plain,\"socks$socks_count\""
+		socks_plain="$socks_plain,$_sin"
 	fi
 	return 0
 }
@@ -559,6 +577,9 @@ socks_in=""
 if [ -n "$_nsp" ]; then
 	socks_in='"socks-in"'
 fi
+if [ -n "$_nhp" ]; then
+	socks_in="${socks_in:+$socks_in,}\"http-in\""
+fi
 if [ -n "$socks_plain" ]; then
 	socks_in="${socks_in:+$socks_in,}${socks_plain#,}"
 fi
@@ -648,7 +669,7 @@ shunt_words() {
 }
 
 shunt_one() {
-	local node group network protocol inbound source port domain_list ip_list fake pre invert _rm _x
+	local node group network protocol inbound source port sport domain_list ip_list fake pre invert _rm _x
 	config_get node "$1" node ""
 	config_get group "$1" group ""
 	[ "$(printf '%s' "$group" | tr 'A-Z' 'a-z')" = "$shunt_group" ] || return 0
@@ -687,6 +708,7 @@ shunt_one() {
 	config_get inbound "$1" inbound ""
 	config_get source "$1" source ""
 	config_get port "$1" port ""
+	config_get sport "$1" sourcePort ""
 	config_get domain_list "$1" domain_list ""
 	config_get ip_list "$1" ip_list ""
 
@@ -711,6 +733,12 @@ shunt_one() {
 	case "$port" in
 		''|*[!0-9,:-]*) : ;;
 		*) _base="$_base,\"port\":\"$(printf '%s' "$port" | tr ':' '-')\"" ;;
+	esac
+	# The port the connection comes from, written the same way.
+	sport="$(printf '%s' "$sport" | tr -d ' \t')"
+	case "$sport" in
+		''|*[!0-9,:-]*) : ;;
+		*) _base="$_base,\"sourcePort\":\"$(printf '%s' "$sport" | tr ':' '-')\"" ;;
 	esac
 
 	_d="$(shunt_list "$domain_list" geosite:)"
@@ -789,8 +817,8 @@ rules="$rules_head${shunt_rules:+,$shunt_rules}${rules:+,$rules}"
 # once the name has been looked up, so with the Iran split or any address in
 # a shunt rule it is IPIfNonMatch, and otherwise AsIs, which saves a lookup
 # on every connection.
-case "$(cfg domainStrategy '')" in
-	AsIs|IPIfNonMatch|IPOnDemand) domain_strategy="$(cfg domainStrategy '')" ;;
+case "$(cfg domainStrategy IPOnDemand)" in
+	AsIs|IPIfNonMatch|IPOnDemand) domain_strategy="$(cfg domainStrategy IPOnDemand)" ;;
 	*)
 		if [ "$shunt_ip" = "1" ]; then
 			domain_strategy=IPIfNonMatch
@@ -924,7 +952,7 @@ $shunt_outbounds" | awk 'NF { printf "%s%s,\n", "    ", $0 }')"
 # PassWall2's DNS tab, option for option.
 set -- $(direct_dns)
 dd_proto="$1"; dd_addr="$2"; dd_port="$3"
-direct_qs="$(cfg direct_dns_query_strategy UseIPv4)"
+direct_qs="$(cfg direct_dns_query_strategy UseIP)"
 remote_proto="$(cfg remote_dns_protocol tcp)"
 remote_dns="$(cfg remote_dns 8.8.8.8)"
 remote_doh="$(cfg remote_dns_doh 'https://8.8.8.8/dns-query')"
@@ -1004,7 +1032,7 @@ rm -f "$ZGZ_RUN/dns_hosts.tsv"
 # What the Direct DNS answers for: the names that go straight out, and the
 # names of every node this configuration dials - its own, its pre-proxy's,
 # and those of the Access Control rules.
-direct_names="$(printf '%s\n%s\n%s\n%s\n%s\n' "$proxy_out" "$chain_outs" "$acl_outbounds" "$socks_outbounds" "$shunt_outbounds" |
+node_names="$(printf '%s\n%s\n%s\n%s\n%s\n' "$proxy_out" "$chain_outs" "$acl_outbounds" "$socks_outbounds" "$shunt_outbounds" |
 	grep -oE '"(address|endpoint)":"[^"]*"' | sed 's/^"[a-z]*":"//; s/"$//' |
 	sed 's/:[0-9]*$//' | grep '[a-zA-Z]' | grep -v -e '^\[' -e ':' | sort -u |
 	awk 'NF { printf "%s\"full:%s\"", (n++ ? "," : ""), $0 }')"
@@ -1019,8 +1047,22 @@ if bridge_is_ovpn; then
 	_ovn="$(grep -oE '"server":"[^"]*"' "$ZGZ_ETC/bridge.json" 2>/dev/null | sed 's/^"server":"//; s/"$//' |
 		grep '[a-zA-Z]' | grep -v ':' | sort -u |
 		awk 'NF { printf "%s\"full:%s\"", (n++ ? "," : ""), $0 }')"
-	[ -n "$_ovn" ] && direct_names="${direct_names:+$direct_names,}$_ovn"
+	[ -n "$_ovn" ] && node_names="${node_names:+$node_names,}$_ovn"
 fi
+# The nodes' own names go to the direct resolver - or to the one the DNS tab
+# names for them, every node's, a subscription's included, straight out.
+direct_names=""
+node_dns="$(cfg node_dns '')"
+# Only an address: a name would have to be looked up first, and before the
+# tunnel is up there is nothing to look it up with.
+_ndh="$(printf '%s' "$node_dns" | sed -e 's#^[a-z]*://##' -e 's#/.*##' -e 's#^\[\(.*\)\].*#\1#' -e 's#:[0-9]*$##')"
+case "$_ndh" in
+	*[g-zG-Z]*)
+		warn "Node address DNS '$node_dns' is not an IP address - the Direct DNS is used instead"
+		node_dns=""
+		;;
+esac
+[ -n "$node_dns" ] || direct_names="$node_names"
 [ -n "$direct_domains" ] && direct_names="${direct_names:+$direct_names,}$direct_domains"
 [ -n "$shunt_direct_names" ] && direct_names="${direct_names:+$direct_names,}$shunt_direct_names"
 [ "$route_ir" = "1" ] && direct_names="${direct_names:+$direct_names,}\"geosite:ir\""
@@ -1060,6 +1102,20 @@ node_dns_one() {
 	return 0
 }
 node_dns_n=0
+if [ -n "$node_dns" ] && [ -n "$node_names" ]; then
+	case "$node_dns" in
+		udp://*)
+			_nr="${node_dns#udp://}"
+			_np=53
+			case "$_nr" in *:*) _np="${_nr##*:}"; _nr="${_nr%:*}" ;; esac
+			_ns="\"address\":\"$(json_escape "$_nr")\",\"port\":$_np"
+			;;
+		*://*) _ns="\"address\":\"$(json_escape "$node_dns")\"" ;;
+		*) _ns="\"address\":\"$(json_escape "$node_dns")\",\"port\":53" ;;
+	esac
+	dns_servers="${dns_servers:+$dns_servers,}{\"tag\":\"dns-nodes\",$_ns,\"domains\":[$node_names],\"skipFallback\":true,\"finalQuery\":true,\"queryStrategy\":\"$direct_qs\"}"
+	rules="{\"type\":\"field\",\"inboundTag\":[\"dns-nodes\"],\"outboundTag\":\"direct\"}${rules:+,$rules}"
+fi
 for _nsid in $(uci -q -X show zirgozar 2>/dev/null | sed -n 's/^zirgozar\.\([A-Za-z0-9_]*\)=node$/\1/p'); do
 	node_dns_one "$_nsid"
 done

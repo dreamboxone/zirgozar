@@ -157,6 +157,7 @@ var T = [
 	[ 'no warp-plus or Vwarp installed to carry the WARP node', 'warp-plus یا Vwarp برای بردن کانفیگ وارپ نصب نیست' ],
 	[ 'no sing-box-lx installed to carry amneziawg', 'sing-box-lx برای بردن amneziawg نصب نیست' ],
 	[ 'no sing-box-lx installed to carry naive', 'sing-box-lx برای بردن naive نصب نیست' ],
+	[ 'Settings moved to the new defaults', 'تنظیمات به پیش‌فرض‌های تازه منتقل شد' ],
 	[ 'no core installed that can carry {}', 'هسته‌ای که {1} را ببرد نصب نیست' ],
 
 	/* ------------------------------------------------------------- WARP */

@@ -84,6 +84,7 @@ start_service() {
 	"$ZGZ_LIB/zgz-router" dnsmove >/dev/null 2>&1 || true
 	"$ZGZ_LIB/zgz-router" quicmove >/dev/null 2>&1 || true
 	"$ZGZ_LIB/zgz-router" tcpmove >/dev/null 2>&1 || true
+	"$ZGZ_LIB/zgz-router" defmove >/dev/null 2>&1 || true
 	"$ZGZ_LIB/zgz-router" rebind >/dev/null 2>&1 || true
 	# Nodes and subscriptions with names of their own, not places in the
 	# file - see zgz-nodes. Before anything reads a setting naming one.

@@ -170,9 +170,9 @@ return view.extend({
 
 		o = s.option(form.ListValue, 'ipv6', _('IPv6'),
 			_('Almost no node on a free list carries IPv6, and a client that prefers it leaves without the tunnel while looking perfectly fine. Refusing it makes the client fall back to IPv4, which is tunnelled.'));
-		o.value('block', _('Refuse it while connected (recommended)'));
 		o.value('off', _('Leave it alone'));
-		o.default = 'block';
+		o.value('block', _('Refuse it while connected'));
+		o.default = 'off';
 
 		o = s.option(form.ListValue, 'lan_zone', _('Interfaces to tunnel'),
 			_('Read from this router. Left unset — which is how it ships — every LAN interface is tunnelled, which is what almost everyone wants. Choose one to pick traffic up from that interface only.'));

@@ -329,6 +329,28 @@ cmd_quicmove() {
 	return 0
 }
 
+# Once, on an upgrade: every setting still holding the default it shipped with
+# before moves to today's - the sniffed name for routing only, BitTorrent not
+# refused, IPv6 left alone, the direct resolver asked for both kinds of
+# address, IPOnDemand for routing. A value chosen afterwards is left alone.
+cmd_defmove() {
+	[ "$(cfg defaults_moved 0)" = "1" ] && return 0
+	command -v uci >/dev/null 2>&1 || return 0
+	_dm() {
+		_dv="$(uci -q get "zirgozar.config.$1")" || _dv=""
+		case " $2 " in *" ${_dv:-_} "*) uci -q set "zirgozar.config.$1=$3" ;; esac
+	}
+	_dm sniffing_override_dest "1" 0
+	_dm block_torrent "1" 0
+	_dm ipv6 "block" off
+	_dm direct_dns_query_strategy "UseIPv4" UseIP
+	_dm domainStrategy "_" IPOnDemand
+	uci -q set zirgozar.config.defaults_moved='1'
+	uci -q commit zirgozar
+	log "Settings moved to the new defaults"
+	return 0
+}
+
 # Once: TCP Proxy Way from TPROXY, the old default, to REDIRECT, PassWall2's -
 # under TPROXY Supercell's games lost their connection while loading, and
 # under REDIRECT they did not. Chosen again by hand afterwards is left alone.
@@ -540,7 +562,8 @@ case "${1:-}" in
 	dnsmove)  cmd_dnsmove ;;
 	quicmove) cmd_quicmove ;;
 	tcpmove)  cmd_tcpmove ;;
+	defmove)  cmd_defmove ;;
 	clock)    cmd_clock ;;
 	schedule) cmd_schedule "${2:-}" "${3:-}" ;;
-	*) echo "usage: $0 reset|backup|restore|rebind|dnsmove|quicmove|tcpmove|clock|schedule sync|stop|start|restart|geo|sub <section>" >&2; exit 1 ;;
+	*) echo "usage: $0 reset|backup|restore|rebind|dnsmove|quicmove|tcpmove|defmove|clock|schedule sync|stop|start|restart|geo|sub <section>" >&2; exit 1 ;;
 esac

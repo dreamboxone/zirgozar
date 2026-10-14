@@ -985,7 +985,7 @@ if printf '%s' "$PROXY_LINE" | grep -q '"type":"fragment"'; then
 else
 	ok "fragment is left off the node carried inside the pre-proxy"
 fi
-if grep '"tag":"chain-cfgpre"' "$WORK/xtab.json" | grep -q '"domainStrategy":"UseIPv4"'; then
+if grep '"tag":"chain-cfgpre"' "$WORK/xtab.json" | grep -q '"domainStrategy":"UseIP"'; then
 	ok "the pre-proxy's own name is resolved through the direct resolver"
 else
 	bad "the pre-proxy's own name is resolved through the direct resolver"
