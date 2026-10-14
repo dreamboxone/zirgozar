@@ -18,6 +18,7 @@
 'require uci';
 'require zirgozar.i18n as i18n';
 'require zirgozar.ui as pui';
+'require tools.widgets as widgets';
 
 var _ = i18n.tr;
 
@@ -285,6 +286,7 @@ return view.extend({
 		s.tab('keywords', _('Keyword filter method inside the config'));
 		s.tab('sched', _('Auto Update'));
 		s.tab('chain', _('Chain Proxy'));
+		s.tab('core', _('Core and connection'));
 
 		o = s.taboption('main', form.Value, 'name', _('Name'));
 		o.rmempty = false;
@@ -358,6 +360,39 @@ return view.extend({
 		o.value('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0', 'Edge for Linux');
 		o.value('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0', 'Edge for Windows');
 		o.value('v2rayN/9.99', 'v2rayN');
+
+		o = s.taboption('main', form.Flag, 'hwid', _('Send HWID'),
+			_('Some providers count devices: this sends what the router is and a hash of its model and address when the list is read.'));
+		o.default = '0';
+		o.modalonly = true;
+
+		/* Which core carries this subscription's nodes, by protocol. */
+		[ [ 'vless', 'VLESS' ], [ 'vmess', 'VMess' ], [ 'trojan', 'Trojan' ], [ 'ss', 'Shadowsocks' ] ].forEach(function(p) {
+			var c = s.taboption('core', form.ListValue, p[0] + '_type', _('%s core').format(p[1]));
+			c.value('', _('Auto'));
+			c.value('xray', 'Xray');
+			c.value('singbox', 'sing-box');
+			c.modalonly = true;
+		});
+		o = s.taboption('core', form.ListValue, 'hysteria2_type', _('%s core').format('Hysteria2'));
+		o.value('', _('Auto'));
+		o.value('singbox', 'sing-box');
+		o.value('hysteria', 'hysteria');
+		o.modalonly = true;
+
+		o = s.taboption('core', widgets.DeviceSelect, 'outbound_iface', _('Outbound Interface'),
+			_('The interface this subscription’s nodes go out by. Empty is the router’s usual way.'));
+		o.noaliases = true;
+		o.optional = true;
+		o.modalonly = true;
+
+		o = s.taboption('core', form.Value, 'hysteria_up_mbps', _('Hysteria upload (Mbps)'),
+			_('For this subscription’s Hysteria2 nodes that set none. Empty lets them find out.'));
+		o.datatype = 'uinteger';
+		o.modalonly = true;
+		o = s.taboption('core', form.Value, 'hysteria_down_mbps', _('Hysteria download (Mbps)'));
+		o.datatype = 'uinteger';
+		o.modalonly = true;
 
 		o = s.taboption('keywords', form.ListValue, 'filter_keyword_mode', _('Keyword filter method inside the config'));
 		o.modalonly = true;

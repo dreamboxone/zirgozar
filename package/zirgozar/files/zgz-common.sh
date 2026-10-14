@@ -348,6 +348,21 @@ wanted_engine() {
 	   [ -x "$(engine_singbox_path)" ]; then
 		_we=singbox
 	fi
+	# A subscription can name the core for its nodes, by protocol: Xray only
+	# for what Xray speaks, sing-box when there is one, the official
+	# hysteria client for its hysteria2 nodes beside Xray.
+	_ws="$(sed -n 's/^sub=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)"
+	case "$_ws" in *[!A-Za-z0-9_]*) _ws="" ;; esac
+	if [ -n "$_ws" ]; then
+		_wp="$(sed -n 's/^protocol=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)"
+		_wk="$_wp"
+		[ "$_wp" = "shadowsocks" ] && _wk=ss
+		case "$(uci -q get "zirgozar.$_ws.${_wk}_type" 2>/dev/null)" in
+			singbox) [ -x "$(engine_singbox_path)" ] && _we=singbox ;;
+			xray) case "$_wp" in vless|vmess|trojan|shadowsocks|socks|http) _we=xray ;; esac ;;
+			hysteria) [ "$_wp" = "hysteria2" ] && _we=xray ;;
+		esac
+	fi
 	# WARP over MASQUE is Xray's alone: sing-box has no such outbound.
 	if [ "$_we" = "singbox" ] && grep -q '"protocol":"masque"' "$ZGZ_BEST" 2>/dev/null; then
 		_we=xray

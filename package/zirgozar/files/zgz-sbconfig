@@ -116,6 +116,9 @@ function bridge_node(b, tag, mark) {
 		return awg_endpoint(b, tag, mark);
 	let sni = b.sni ? b.sni : b.server;
 	let r = { type: b.type, tag, routing_mark: mark };
+	// A subscription's own way out.
+	if (b.iface)
+		r.bind_interface = b.iface;
 	switch (b.type) {
 	case 'hysteria2':
 	case 'tuic':
@@ -129,6 +132,10 @@ function bridge_node(b, tag, mark) {
 	switch (b.type) {
 	case 'hysteria2':
 		r.password = b.password;
+		if (int(b.up_mbps) > 0)
+			r.up_mbps = int(b.up_mbps);
+		if (int(b.down_mbps) > 0)
+			r.down_mbps = int(b.down_mbps);
 		if (b.obfs)
 			r.obfs = { type: b.obfs, password: b.obfs_password };
 		r.tls = { enabled: true, server_name: sni, insecure: !!b.insecure };
@@ -480,6 +487,8 @@ function conv_outbound(o) {
 			e.detour = sock.dialerProxy;
 		else
 			e.routing_mark = sock.mark ?? MARK;
+		if (sock.interface && !sock.dialerProxy)
+			e.bind_interface = sock.interface;
 		push(endpoints, e);
 		out_tags[tag] = true;
 		return;

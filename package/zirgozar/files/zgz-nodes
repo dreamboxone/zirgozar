@@ -116,6 +116,23 @@ sub_curl() {
 	if [ -n "$SUB_UA" ] && [ "$SUB_UA" != "curl" ]; then
 		set -- "$@" -A "$SUB_UA"
 	fi
+	# Send HWID: what this router is, for a provider that counts devices -
+	# the system, its version, the model, and a hash of the model and the
+	# first port's address, never the address itself.
+	if [ "$SUB_HWID" = "1" ]; then
+		set -- "$@" -H "x-device-os: OpenWrt"
+		_hw_v="$(sed -n "s/^DISTRIB_RELEASE='\(.*\)'$/\1/p" /etc/openwrt_release 2>/dev/null)"
+		[ -n "$_hw_v" ] && set -- "$@" -H "x-ver-os: $_hw_v"
+		_hw_m="$(cat /tmp/sysinfo/model 2>/dev/null)"
+		if [ -n "$_hw_m" ]; then
+			set -- "$@" -H "x-device-model: $_hw_m"
+			_hw_a="$(cat /sys/class/net/eth0/address 2>/dev/null)"
+			if [ -n "$_hw_a" ] && command -v sha256sum >/dev/null 2>&1; then
+				_hw_h="$(printf '%s' "$_hw_a-$_hw_m" | sha256sum | cut -d' ' -f1)"
+				[ -n "$_hw_h" ] && set -- "$@" -H "x-hwid: $_hw_h"
+			fi
+		fi
+	fi
 	curl -fsSL --connect-timeout "$_sc_c" --max-time "$_sc_m" --retry "$_sc_r" \
 		-H 'Accept: */*' -D "$SUB_HDR" -o "$_sc_o" "$@" "$_sc_u" 2>/dev/null
 }
@@ -176,13 +193,14 @@ sub_failed() {
 
 fetch_one() {
 	_sec="$1"
-	local url name enabled content ua mode
+	local url name enabled content ua mode hwid
 	config_get url "$_sec" url ""
 	config_get name "$_sec" name "$_sec"
 	config_get content "$_sec" content ""
 	config_get_bool enabled "$_sec" enabled 1
 	config_get ua "$_sec" user_agent "$SUB_UA_DEFAULT"
 	config_get mode "$_sec" access_mode ""
+	config_get_bool hwid "$_sec" hwid 0
 
 	# One subscription asked for by name is read whether or not it is
 	# switched on: somebody pressed its button.
@@ -200,6 +218,7 @@ fetch_one() {
 	_tmp="$SUBS_DIR/$_sec.body"
 	SUB_HDR="$SUBS_DIR/$_sec.hdr"
 	SUB_UA="$ua"
+	SUB_HWID="$hwid"
 	: > "$SUB_HDR"
 
 	# A source the reader handed over as a file rather than as an address.
@@ -622,6 +641,19 @@ sub_records() {
 	fi
 	[ -s "$ZGZ_RUN/sub.tsv" ] || return 0
 	SUB_HAD=1
+
+	# The subscription's own way out and Hysteria's bandwidth, on its nodes.
+	local iface hyup hydown
+	config_get iface "$_sec" outbound_iface ""
+	config_get hyup "$_sec" hysteria_up_mbps ""
+	config_get hydown "$_sec" hysteria_down_mbps ""
+	case "$iface" in *[!A-Za-z0-9_.@-]*) iface="" ;; esac
+	case "$hyup" in *[!0-9]*) hyup="" ;; esac
+	case "$hydown" in *[!0-9]*) hydown="" ;; esac
+	if [ -n "$iface$hyup$hydown" ]; then
+		IFACE="$iface" HYUP="$hyup" HYDOWN="$hydown" FRAG="" NOISE="" MUX="" DIALER="" SKIPHP="" DOMSTRAT="" SOMARK="" 			LC_ALL=C awk -v DECORATE=1 -f "$PARSE" < "$ZGZ_RUN/sub.tsv" > "$ZGZ_RUN/sub.tsv.o" 2>/dev/null &&
+			mv -f "$ZGZ_RUN/sub.tsv.o" "$ZGZ_RUN/sub.tsv"
+	fi
 
 	config_get chain "$_sec" chain_proxy ""
 	case "$chain" in

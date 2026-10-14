@@ -613,9 +613,16 @@ select_row() {
 	write_if_changed "$_tmp" "$ZGZ_BEST" || true
 	rm -f "$_tmp"
 
-	printf 'tag=%s\nlabel=%s\nprotocol=%s\nhost=%s\nport=%s\nlatency_ms=%s\ntested=%s\ntotal=%s\nalive=%s\n' \
+	# The subscription the node came from, when one of them says which core
+	# carries which protocol - looked up once here, read by wanted_engine.
+	_msub=""
+	if uci -q show zirgozar 2>/dev/null | grep -qE "_type='(xray|singbox|hysteria)'"; then
+		_mo="$("$ZGZ_LIB/zgz-nodes" origin "$_tag" 2>/dev/null)" || _mo=""
+		case "$_mo" in sub:*) _msub="${_mo#sub:}"; _msub="${_msub%%:*}" ;; esac
+	fi
+	printf 'tag=%s\nlabel=%s\nprotocol=%s\nhost=%s\nport=%s\nlatency_ms=%s\ntested=%s\ntotal=%s\nalive=%s\nsub=%s\n' \
 		"$_tag" "$_label" "$_proto" "$_host" "$_port" "$_ms" "$(date -u +%s)" \
-		"$(count "$ZGZ_CANDIDATES")" "$(count "$ALIVE")" > "$ZGZ_RUN/meta.new"
+		"$(count "$ZGZ_CANDIDATES")" "$(count "$ALIVE")" "$_msub" > "$ZGZ_RUN/meta.new"
 	write_if_changed "$ZGZ_RUN/meta.new" "$ZGZ_BEST_META" || true
 	rm -f "$ZGZ_RUN/meta.new"
 	return 0

@@ -1361,9 +1361,24 @@ function jappend(a, item) {
 # Mux is left off where it cannot work: a VLESS flow (Vision does its own
 # thing with UDP and refuses Mux), xhttp (which has its own), WireGuard, and
 # the bridge - a loopback SOCKS port in front of a core that is not Xray.
-function decorate(p, hp,   proto, ss, sock, net, fm, tcp, udp, first, d, wgs) {
+function decorate(p, hp,   proto, ss, sock, net, fm, tcp, udp, first, d, wgs, bt) {
 	if (substr(jtrim(p), 1, 1) != "{") return p
 	proto = tolower(jstr(p, "protocol"))
+	# A node a helper carries - hysteria2, tuic and the rest - is a description
+	# rather than an outbound: a subscription's interface and Hysteria's
+	# bandwidth go on it as fields of their own, for the helper to use.
+	bt = jstr(p, "type")
+	if (proto == "" && bt != "") {
+		if (ENVIRON["IFACE"] != "" && jraw(p, "iface") == "")
+			p = jset(p, "iface", "\"" ENVIRON["IFACE"] "\"")
+		if (bt == "hysteria2") {
+			if (ENVIRON["HYUP"] + 0 > 0 && jraw(p, "up_mbps") == "")
+				p = jset(p, "up_mbps", ENVIRON["HYUP"] + 0)
+			if (ENVIRON["HYDOWN"] + 0 > 0 && jraw(p, "down_mbps") == "")
+				p = jset(p, "down_mbps", ENVIRON["HYDOWN"] + 0)
+		}
+		return p
+	}
 	# One already stored without the setting - see mk_wg - gets it here.
 	if (proto == "wireguard") {
 		wgs = jraw(p, "settings")
@@ -1384,6 +1399,9 @@ function decorate(p, hp,   proto, ss, sock, net, fm, tcp, udp, first, d, wgs) {
 	if (d != "" && jraw(sock, "dialerProxy") == "" && !(ENVIRON["SKIPHP"] != "" && hp == ENVIRON["SKIPHP"]))
 		sock = jset(sock, "dialerProxy", "\"" d "\"")
 	first = (jraw(sock, "dialerProxy") == "")
+	# A subscription's own way out: the interface its nodes leave by.
+	if (first && ENVIRON["IFACE"] != "" && jraw(sock, "interface") == "")
+		sock = jset(sock, "interface", "\"" ENVIRON["IFACE"] "\"")
 	# How the server's own name is resolved: through the core's DNS, which
 	# asks the direct resolver, rather than through the router's - which
 	# while connected is this tunnel asking itself. Only on the first hop: a

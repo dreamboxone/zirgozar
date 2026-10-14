@@ -72,6 +72,16 @@ bridge_singbox() {
 	return 1
 }
 
+# The subscription of the node in use asks for the official hysteria client.
+wants_hysteria() {
+	[ "$(jget type)" = "hysteria2" ] || return 1
+	_wh="$(sed -n 's/^sub=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)"
+	case "$_wh" in ''|*[!A-Za-z0-9_]*) return 1 ;; esac
+	[ "$(uci -q get "zirgozar.$_wh.hysteria2_type" 2>/dev/null)" = "hysteria" ] || return 1
+	find_hysteria >/dev/null || return 1
+	return 0
+}
+
 cmd_needed() {
 	[ -s "$NODE" ] || return 1
 	return 0
@@ -116,14 +126,21 @@ singbox_config() {
 			if [ -n "$_obfs" ]; then
 				_ob=",\"obfs\":{\"type\":\"$(json_escape "$_obfs")\",\"password\":\"$(json_escape "$_obfspw")\"}"
 			fi
-			_out="{\"type\":\"hysteria2\",\"tag\":\"out\",\"server\":\"$(json_escape "$_server")\",\"server_port\":$_port,\"password\":\"$(json_escape "$_pass")\"$_ob,\"tls\":{\"enabled\":true,\"server_name\":\"$(json_escape "$_sni")\",\"insecure\":$_insecure}}"
+			# A subscription's bandwidth and way out, when it gives them.
+			_bw=""
+			[ -n "$(jnum up_mbps)" ] && _bw="$_bw,\"up_mbps\":$(jnum up_mbps)"
+			[ -n "$(jnum down_mbps)" ] && _bw="$_bw,\"down_mbps\":$(jnum down_mbps)"
+			[ -n "$(jget iface)" ] && _bw="$_bw,\"bind_interface\":\"$(json_escape "$(jget iface)")\""
+			_out="{\"type\":\"hysteria2\",\"tag\":\"out\",\"server\":\"$(json_escape "$_server")\",\"server_port\":$_port,\"password\":\"$(json_escape "$_pass")\"$_ob$_bw,\"tls\":{\"enabled\":true,\"server_name\":\"$(json_escape "$_sni")\",\"insecure\":$_insecure}}"
 			;;
 		tuic)
 			_uuid="$(jget uuid)"
 			_pass="$(jget password)"
 			_cc="$(jget congestion_control)"
 			[ -n "$_cc" ] || _cc=bbr
-			_out="{\"type\":\"tuic\",\"tag\":\"out\",\"server\":\"$(json_escape "$_server")\",\"server_port\":$_port,\"uuid\":\"$(json_escape "$_uuid")\",\"password\":\"$(json_escape "$_pass")\",\"congestion_control\":\"$(json_escape "$_cc")\",\"tls\":{\"enabled\":true,\"server_name\":\"$(json_escape "$_sni")\",\"insecure\":$_insecure,\"alpn\":[\"h3\"]}}"
+			_bw=""
+			[ -n "$(jget iface)" ] && _bw=",\"bind_interface\":\"$(json_escape "$(jget iface)")\""
+			_out="{\"type\":\"tuic\",\"tag\":\"out\"$_bw,\"server\":\"$(json_escape "$_server")\",\"server_port\":$_port,\"uuid\":\"$(json_escape "$_uuid")\",\"password\":\"$(json_escape "$_pass")\",\"congestion_control\":\"$(json_escape "$_cc")\",\"tls\":{\"enabled\":true,\"server_name\":\"$(json_escape "$_sni")\",\"insecure\":$_insecure,\"alpn\":[\"h3\"]}}"
 			;;
 		*)
 			return 1
@@ -197,6 +214,11 @@ hysteria_config() {
 		if [ -n "$_obfs" ]; then
 			printf 'obfs:\n  type: %s\n  %s:\n    password: %s\n' \
 				"$_obfs" "$_obfs" "$(jget obfs_password)"
+		fi
+		if [ -n "$(jnum up_mbps)" ] || [ -n "$(jnum down_mbps)" ]; then
+			printf 'bandwidth:\n'
+			[ -z "$(jnum up_mbps)" ] || printf '  up: %s mbps\n' "$(jnum up_mbps)"
+			[ -z "$(jnum down_mbps)" ] || printf '  down: %s mbps\n' "$(jnum down_mbps)"
 		fi
 		printf 'socks5:\n  listen: 127.0.0.1:%s\n' "$PORT"
 		printf 'fastOpen: true\n'
@@ -361,7 +383,7 @@ cmd_config() {
 		return 0
 	fi
 
-	if _sb="$(bridge_singbox)"; then
+	if ! wants_hysteria && _sb="$(bridge_singbox)"; then
 		if singbox_config; then
 			echo "$ZGZ_BRIDGE_JSON"
 			return 0
@@ -424,7 +446,7 @@ cmd_command() {
 		fi
 		return 0
 	fi
-	if _sb="$(bridge_singbox)" && singbox_config; then
+	if ! wants_hysteria && _sb="$(bridge_singbox)" && singbox_config; then
 		echo "$_sb run -c $ZGZ_BRIDGE_JSON"
 		return 0
 	fi
