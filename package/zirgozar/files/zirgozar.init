@@ -556,6 +556,16 @@ reload_service() {
 		if [ "$_eng" = "singbox" ]; then _tcmd="check -c"; else _tcmd="run -test -config"; fi
 		# shellcheck disable=SC2086
 		if [ -n "$_prog" ] && ! XRAY_LOCATION_ASSET="$_geo" bounded 60 "$_prog" $_tcmd "$_next" >"$ZGZ_RUN/core-test.out" 2>&1; then
+			# Another Xray on the router may take what this one will not -
+			# OpenWrt's 26.9.30 for ARMv7 crashes on any WireGuard outbound,
+			# which this program's own copy runs. Started again, the service
+			# asks each in turn, as it does at boot.
+			if [ "$_eng" = "xray" ] && _other="$(find_xray "$_next")" && [ "$_other" != "$_prog" ]; then
+				rm -f "$_next"
+				log "the running core ($_prog) refused the new settings - starting again with $_other, which accepts them"
+				restart
+				return
+			fi
 			rm -f "$_next"
 			log "the new settings were refused by the core - the tunnel is left as it was: $(grep -v '^[[:space:]]*$' "$ZGZ_RUN/core-test.out" 2>/dev/null | tail -1)"
 			say_message "The core refused the new settings, so the tunnel was left running as it was. Check the Runtime Logs page."
