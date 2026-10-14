@@ -579,6 +579,26 @@ function conv_outbound(o) {
 for (let o in X.outbounds)
 	conv_outbound(o);
 
+// A balancer - a SOCKS port's Auto Switch - is sing-box's urltest over the
+// same nodes: it probes them with the same address and keeps to one that
+// answers. Its selector names nodes by the start of their tags.
+for (let b in X.routing?.balancers ?? []) {
+	let members = [];
+	for (let o in outbounds)
+		for (let p in b.selector ?? [])
+			if (index(o.tag, p) == 0 && !(o.tag in members))
+				push(members, o.tag);
+	if (!length(members))
+		continue;
+	let u = { type: 'urltest', tag: b.tag, outbounds: members };
+	if (X.observatory?.probeUrl)
+		u.url = X.observatory.probeUrl;
+	if (X.observatory?.probeInterval)
+		u.interval = X.observatory.probeInterval;
+	push(outbounds, u);
+	out_tags[b.tag] = true;
+}
+
 // A measurement of a node sing-box cannot carry is not to be taken through
 // some other node: the core that can carry it measures the lot instead.
 if (args.mode == 'test') {
@@ -821,7 +841,7 @@ for (let ri, r in xr) {
 			base.source_port_range = ranges;
 	}
 
-	let to = target(r.outboundTag);
+	let to = target(r.balancerTag ?? r.outboundTag);
 	let groups = [];
 	if (r.domain)
 		groups = name_groups(split_names(r.domain));

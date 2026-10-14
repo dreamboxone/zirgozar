@@ -367,6 +367,57 @@ return view.extend({
 			return (!value || value != this.section.formvalue(section_id, 'port')) ? true : _('Not the SOCKS port.');
 		};
 
+		/* Auto Switch: backups for this port, tried when its node fails. */
+		so = ss.option(form.Flag, 'enable_autoswitch', _('Auto Switch'));
+		so.default = '0';
+		so.modalonly = true;
+
+		so = ss.option(form.MultiValue, 'autoswitch_backup_node', _('Backup nodes'),
+			_('Used in turn when the node above fails; the one that answers fastest is chosen.'));
+		so.widget = 'checkbox';
+		so.depends('enable_autoswitch', '1');
+		so.modalonly = true;
+		/* A new row has no list yet, and the widget reads .length. */
+		so.cfgvalue = function(section_id) {
+			var v = uci.get('zirgozar', section_id, 'autoswitch_backup_node');
+			return v == null || v === '' ? [] : (Array.isArray(v) ? v : [ v ]);
+		};
+		nodeChoices(so);
+		subChoices(so, []);
+		pui.checkboxes(so);
+
+		so = ss.option(form.Value, 'autoswitch_probe_url', _('Probe URL'));
+		so.placeholder = 'https://www.google.com/generate_204';
+		so.depends('enable_autoswitch', '1');
+		so.modalonly = true;
+		so.validate = function(section_id, value) {
+			return (!value || /^https?:\/\/\S+$/.test(value)) ? true : _('Must start with http:// or https://');
+		};
+
+		so = ss.option(form.Value, 'autoswitch_testing_time', _('How often to test (min)'));
+		so.datatype = 'range(1,60)';
+		so.placeholder = '1';
+		so.depends('enable_autoswitch', '1');
+		so.modalonly = true;
+
+		so = ss.option(form.Value, 'autoswitch_connect_timeout', _('Timeout (s)'));
+		so.datatype = 'range(1,30)';
+		so.placeholder = '3';
+		so.depends('enable_autoswitch', '1');
+		so.modalonly = true;
+
+		so = ss.option(form.Value, 'autoswitch_retry_num', _('Failures before switching'));
+		so.datatype = 'range(1,10)';
+		so.placeholder = '1';
+		so.depends('enable_autoswitch', '1');
+		so.modalonly = true;
+
+		so = ss.option(form.Flag, 'autoswitch_restore_switch', _('Back to the main node'),
+			_('Return to the node above as soon as it works again.'));
+		so.default = '1';
+		so.depends('enable_autoswitch', '1');
+		so.modalonly = true;
+
 		/* Back to how the package installed it, on the next save. Asked about
 		   when ticked, since there is no undo; the page reloads once it has
 		   happened, because everything it shows has just changed. */

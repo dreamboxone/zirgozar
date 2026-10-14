@@ -203,6 +203,11 @@ ipt_port_groups() {
 routing_up() {
 	ip rule add fwmark "$MARK" lookup "$ROUTE_TABLE" priority "$RULE_PRIO" 2>/dev/null || true
 	ip route add local 0.0.0.0/0 dev lo table "$ROUTE_TABLE" 2>/dev/null || true
+	# IPv6 through the tunnel: the same, for the addresses TPROXY hands it.
+	if [ "$ipv6_mode" = "proxy" ]; then
+		ip -6 rule add fwmark "$MARK" lookup "$ROUTE_TABLE" priority "$RULE_PRIO" 2>/dev/null || true
+		ip -6 route add local ::/0 dev lo table "$ROUTE_TABLE" 2>/dev/null || true
+	fi
 
 	if ! ip rule list 2>/dev/null | grep -qi "$MARK"; then
 		echo "could not add the policy routing rule (is ip-full installed?)" >&2
@@ -220,6 +225,10 @@ routing_down() {
 		ip rule del fwmark "$MARK" lookup "$ROUTE_TABLE" 2>/dev/null || break
 	done
 	ip route flush table "$ROUTE_TABLE" 2>/dev/null || true
+	while ip -6 rule list 2>/dev/null | grep -qi "fwmark $MARK"; do
+		ip -6 rule del fwmark "$MARK" lookup "$ROUTE_TABLE" 2>/dev/null || break
+	done
+	ip -6 route flush table "$ROUTE_TABLE" 2>/dev/null || true
 	return 0
 }
 
@@ -315,8 +324,10 @@ nft_ruleset() {
 "
 	fi
 
+	# IPv6 refused - or, going through the tunnel, refused whatever was not
+	# handed to it, so that nothing leaves beside it.
 	_v6=""
-	if [ "$ipv6_mode" != "off" ]; then
+	if [ "$ipv6_mode" = "block" ] || { [ "$ipv6_mode" = "proxy" ] && [ "$client_proxy" = "1" ]; }; then
 		_v6="		ip6 daddr @reserved6 return
 		meta nfproto ipv6 counter reject"
 	fi
@@ -391,6 +402,9 @@ nft_ruleset() {
 		else
 			_tp="$tproxy_port"
 			[ "$_mode" = "1" ] && [ "$_port" != "0" ] && _tp="$_port"
+			# A rule is about IPv4; IPv6 goes on to the IPv6 section below.
+			_body="		meta nfproto ipv6 return
+"
 			[ "$_tno" != "-" ] && _body="$_body		tcp dport { $(nft_ports "$_tno") } accept
 "
 			[ "$_uno" != "-" ] && _body="$_body		udp dport { $(nft_ports "$_uno") } accept
@@ -470,6 +484,17 @@ ACL
 "
 	fi
 
+	# IPv6, after Access Control and before the defaults, which are IPv4's:
+	# through the tunnel by TPROXY when it is to go there - TCP too, REDIRECT
+	# or not - and otherwise left exactly as it is.
+	_v6pre="		meta nfproto ipv6 return
+"
+	if [ "$ipv6_mode" = "proxy" ] && [ "$client_proxy" = "1" ]; then
+		_v6pre="		meta nfproto ipv6 meta l4proto tcp counter tproxy ip6 to [::1]:$tproxy_port meta mark set $MARK accept
+		meta nfproto ipv6 meta l4proto udp counter tproxy ip6 to [::1]:$tproxy_port meta mark set $MARK accept
+$_v6pre"
+	fi
+
 	# REDIRECT for TCP, and pings answered by the router: both nat work. The
 	# TCP rules act only on what prerouting marked, which is everything going
 	# into the tunnel - Access Control's devices too, with Client Proxy off.
@@ -490,6 +515,14 @@ $_aclnat"
 			[ -n "$_direct" ] && _natrules="$_natrules		ip daddr @direct return
 "
 			_natrules="$_natrules		ip protocol icmp icmp type echo-request counter redirect
+"
+		fi
+		# And IPv6's, when IPv6 goes through the tunnel too.
+		if [ "$ipv6_mode" = "proxy" ] && [ "$(cfg_bool accept_icmpv6 0)" = "1" ]; then
+			_natrules="$_natrules		iifname != { $_iflist } return
+		meta mark $BYPASS return
+		ip6 daddr @reserved6 return
+		meta l4proto ipv6-icmp icmpv6 type echo-request counter redirect
 "
 		fi
 	fi
@@ -555,7 +588,7 @@ $_divert
 		meta l4proto { tcp, udp } th dport 53 return
 $_poison		ip daddr @reserved return
 		ip6 daddr @reserved6 return
-$_direct$_acljumps$_defaults	}
+$_direct$_acljumps$_v6pre$_defaults	}
 
 $_forward$_dnschain$_nat}
 NFT
@@ -592,6 +625,7 @@ $([ -n "$_lex" ] && printf '\tset exclude {\n\t\ttype ipv4_addr\n\t\tflags inter
 		# direct connections would never form; left alone they go out as they
 		# would without this program.
 		meta mark & 0xff0000 == 0x80000 return
+		meta nfproto ipv6 return
 		ct direction reply return
 		meta l4proto { tcp, udp } th dport 53 return
 		ip daddr @reserved return
@@ -605,6 +639,7 @@ $(if [ "$tcp_way" = "redirect" ]; then
 	printf '\tchain output_nat {\n\t\ttype nat hook output priority dstnat; policy accept;\n\n'
 	printf '\t\tmeta mark %s return\n' "$BYPASS"
 	printf '\t\tmeta mark & 0xff0000 == 0x80000 return\n'
+	printf '\t\tmeta nfproto ipv6 return\n'
 	printf '\t\tmeta l4proto tcp th dport 53 return\n'
 	printf '\t\tip daddr @reserved return\n'
 	[ -n "$_ldl" ] && printf '\t\tip daddr @direct return\n'
@@ -797,6 +832,11 @@ ipt_up() {
 		done
 	fi
 
+	# IPv6 through the tunnel is the nftables backend's; with iptables it is
+	# refused instead, which at least sends nothing out beside the tunnel.
+	if [ "$ipv6_mode" = "proxy" ]; then
+		warn "IPv6 through the tunnel needs the nftables firewall - with iptables it is refused instead"
+	fi
 	if [ "$ipv6_mode" != "off" ] && command -v ip6tables >/dev/null 2>&1; then
 		ipt6 -t filter -N ZGZ_FWD6 2>/dev/null || true
 		ipt6 -t filter -A ZGZ_FWD6 -m mark --mark "$BYPASS" -j RETURN 2>/dev/null || true

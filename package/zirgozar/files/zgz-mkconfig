@@ -299,6 +299,17 @@ warp_in_use() {
 	return 1
 }
 
+# A WireGuard peer the tunnel is already using - the same private key - is not
+# dialled a second time beside it: the server would see one key from two
+# places and drop each in turn, the tunnel's own session with them. Such a
+# node is the tunnel's way out itself, "proxy".
+tunnel_twin() {
+	_tk="$(printf '%s' "$1" | sed -n 's/.*"secretKey":"\([^"]*\)".*/\1/p' | head -1)"
+	[ -n "$_tk" ] || return 1
+	grep -qF "\"secretKey\":\"$_tk\"" "$ZGZ_BEST" 2>/dev/null && return 0
+	return 1
+}
+
 # The node's own outbound, with its own chain if it has one, and the Xray tab
 # applied - but not the tunnel's pre-proxy: a rule naming one node means that
 # node as it is set up, not as the tunnel's own choice would be.
@@ -336,7 +347,10 @@ acl_one() {
 		1)
 			config_get node "$1" node ""
 			out="$(acl_outbound "$node")" || out=""
-			if [ -n "$out" ]; then
+			if [ -n "$out" ] && tunnel_twin "$out"; then
+				# The tunnel's own WireGuard: the tunnel's way, as is.
+				mode=2
+			elif [ -n "$out" ]; then
 				acl_count=$((acl_count + 1))
 				port=$((acl_base + acl_count))
 				acl_inbounds="$acl_inbounds,
@@ -430,7 +444,7 @@ fi
 # own - or, with no node named, the way the tunnel goes. A node that cannot be
 # used goes the tunnel's way rather than leaving the port dead.
 socks_one() {
-	local enabled node port hport out
+	local enabled node port hport out _main _asw _bk _viatun _bnodes _b _bo _sel _bal _surl _sto _sre _sti _srs
 	config_get_bool enabled "$1" enabled 1
 	[ "$enabled" = "1" ] || return 0
 	config_get port "$1" port ""
@@ -449,27 +463,89 @@ socks_one() {
     { \"tag\": \"socks$socks_count-http\", \"listen\": \"0.0.0.0\", \"port\": $hport, \"protocol\": \"http\", \"settings\": {} }"
 		_sin="$_sin,\"socks$socks_count-http\""
 	fi
+	# The way out: the node chosen, or with none the tunnel's own.
+	_main=""
 	if [ -n "$node" ]; then
 		out="$(acl_outbound "$node")" || out=""
-		if [ -n "$out" ]; then
+		if [ -n "$out" ] && tunnel_twin "$out"; then
+			# The tunnel's own WireGuard: the tunnel's way, as is.
+			_main=proxy
+		elif [ -n "$out" ]; then
 			socks_outbounds="$socks_outbounds
-$(printf '%s\n' "$out" | sed -e 's/^[[:space:]]*//' -e "s/^{/{\"tag\":\"socks$socks_count-out\",/" | head -1),"
-			add_rule "{\"type\":\"field\",\"inboundTag\":[$_sin],\"outboundTag\":\"socks$socks_count-out\"}"
-			_own=1
+$(printf '%s\n' "$out" | sed -e 's/^[[:space:]]*//' -e "s/^{/{\"tag\":\"socks$socks_count-sw-0\",/" | head -1),"
+			_main="socks$socks_count-sw-0"
 		else
 			warn "SOCKS port $port: node '$node' cannot be used - it goes the tunnel's way instead"
 		fi
+	fi
+	# Auto Switch: the backup nodes beside it, under a balancer the core
+	# probes; zgz-router socksw keeps it on the main node while that works
+	# and moves it to the best backup that does when it fails.
+	config_get_bool _asw "$1" enable_autoswitch 0
+	_bk=0
+	_viatun=0
+	[ "$_main" = "proxy" ] && _viatun=1
+	if [ "$_asw" = "1" ]; then
+		config_get _bnodes "$1" autoswitch_backup_node ""
+		for _b in $_bnodes; do
+			[ "$_b" = "$node" ] && continue
+			_bo="$(acl_outbound "$_b")" || _bo=""
+			if [ -z "$_bo" ]; then
+				warn "SOCKS port $port: backup node '$_b' cannot be used - left out"
+				continue
+			fi
+			if tunnel_twin "$_bo"; then
+				# The tunnel's own WireGuard: the tunnel's way is the member.
+				[ "$_viatun" = "1" ] || _bk=$((_bk + 1))
+				_viatun=1
+				continue
+			fi
+			_bk=$((_bk + 1))
+			socks_outbounds="$socks_outbounds
+$(printf '%s\n' "$_bo" | sed -e 's/^[[:space:]]*//' -e "s/^{/{\"tag\":\"socks$socks_count-sw-$_bk\",/" | head -1),"
+		done
+	fi
+	[ -n "$_main" ] || { _main=proxy; _viatun=1; }
+	if [ "$_bk" -gt 0 ]; then
+		_sel="\"socks$socks_count-sw-\""
+		[ "$_viatun" = "1" ] && _sel="$_sel,\"proxy\""
+		_bal="socks$socks_count-bal"
+		socks_balancers="${socks_balancers:+$socks_balancers,}{\"tag\":\"$_bal\",\"selector\":[$_sel],\"fallbackTag\":\"$_main\",\"strategy\":{\"type\":\"leastPing\"}}"
+		socks_subjects="${socks_subjects:+$socks_subjects,}$_sel"
+		add_rule "{\"type\":\"field\",\"inboundTag\":[$_sin],\"balancerTag\":\"$_bal\"}"
+		config_get _surl "$1" autoswitch_probe_url "https://www.google.com/generate_204"
+		config_get _sto "$1" autoswitch_connect_timeout 3
+		config_get _sre "$1" autoswitch_retry_num 1
+		config_get _sti "$1" autoswitch_testing_time 1
+		config_get_bool _srs "$1" autoswitch_restore_switch 1
+		case "$_sto" in ''|*[!0-9]*) _sto=3 ;; esac
+		case "$_sre" in ''|*[!0-9]*) _sre=1 ;; esac
+		case "$_sti" in ''|0|*[!0-9]*) _sti=1 ;; esac
+		case "$_surl" in http://*|https://*) : ;; *) _surl="https://www.google.com/generate_204" ;; esac
+		[ -n "$socks_probe_url" ] || { socks_probe_url="$_surl"; socks_probe_min="$_sti"; }
+		printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$_bal" "$port" "$_main" "$_sre" "$_sto" "$_sti" "$_srs" "$_surl" >> "$SOCKSW_TSV.new"
+		_own=1
+	elif [ "$_main" != "proxy" ]; then
+		add_rule "{\"type\":\"field\",\"inboundTag\":[$_sin],\"outboundTag\":\"$_main\"}"
+		_own=1
 	fi
 	if [ "$_own" = "0" ]; then
 		socks_plain="$socks_plain,$_sin"
 	fi
 	return 0
 }
+SOCKSW_TSV="$ZGZ_RUN/socksw.tsv"
+socks_balancers=""
+socks_subjects=""
+socks_probe_url=""
+socks_probe_min=1
+: > "$SOCKSW_TSV.new" 2>/dev/null || true
 if [ "$(cfg_bool socks_enabled 0)" = "1" ] && [ -r /lib/functions.sh ]; then
 	. /lib/functions.sh
 	config_load zirgozar
 	config_foreach socks_one socks
 fi
+mv -f "$SOCKSW_TSV.new" "$SOCKSW_TSV" 2>/dev/null || true
 
 # TCP Proxy Way, as PassWall2 offers it. REDIRECT is the default, as there:
 # TCP to a port of its own and UDP by TPROXY, which carries both on one port
@@ -631,6 +707,11 @@ shunt_tag() {
 				return 0
 			fi
 			_so="$(shunt_outbound "$1" "${3:-}")" || _so=""
+			if [ -n "$_so" ] && tunnel_twin "$_so"; then
+				# The tunnel's own WireGuard: the tunnel's way, as is.
+				SHUNT_TAG=proxy
+				return 0
+			fi
 			if [ -z "$_so" ]; then
 				warn "shunt rule $2: node '$1' cannot be used - it goes through the tunnel's node instead"
 				SHUNT_TAG=proxy
@@ -935,7 +1016,18 @@ if [ -n "$balancing_rule" ]; then
 	# Loopback traffic has already passed the global rules once. Dispatch it
 	# to its balancer before the catch-all can send it back to loopback.
 	rules="$balancing_rule,$rules"
-	balancers_block=",\"balancers\":[$balancing_entries]"
+fi
+# The SOCKS ports' Auto Switch balancers beside the balancing node's, and
+# their nodes probed by the same observatory - there is only one.
+_all_bal="$balancing_entries"
+[ -n "$socks_balancers" ] && _all_bal="${_all_bal:+$_all_bal,}$socks_balancers"
+[ -n "$_all_bal" ] && balancers_block=",\"balancers\":[$_all_bal]"
+if [ -n "$socks_subjects" ]; then
+	if [ -n "$observatory" ]; then
+		observatory="$(printf '%s' "$observatory" | sed "s/\"subjectSelector\":\[/\"subjectSelector\":[$socks_subjects,/")"
+	else
+		observatory="\"observatory\":{\"subjectSelector\":[$socks_subjects],\"probeUrl\":\"$(json_escape "$socks_probe_url")\",\"probeInterval\":\"${socks_probe_min}m\",\"enableConcurrency\":true},"
+	fi
 fi
 
 # Every node something here dials through, as outbounds of their own.
@@ -958,6 +1050,12 @@ remote_dns="$(cfg remote_dns 8.8.8.8)"
 remote_doh="$(cfg remote_dns_doh 'https://8.8.8.8/dns-query')"
 remote_ecs="$(cfg remote_dns_client_ip '')"
 remote_qs="$(cfg remote_dns_query_strategy UseIPv4)"
+# IPv6 through the tunnel needs IPv6 addresses to go there with.
+tproxy_listen="0.0.0.0"
+if [ "$(cfg ipv6 off)" = "proxy" ]; then
+	tproxy_listen="::"
+	[ "$remote_qs" = "UseIPv4" ] && remote_qs=UseIP
+fi
 
 dns_hosts=""
 add_host() {
@@ -1168,7 +1266,7 @@ cat <<EOF
   "log": { "loglevel": "${loglevel}" },
   ${observatory}${burst_observatory}
   "stats": {},
-  "api": { "tag": "api", "services": [ "StatsService" ] },
+  "api": { "tag": "api", "services": [ "StatsService", "RoutingService" ] },
   "policy": {
     "system": {
       "statsOutboundUplink": true,
@@ -1179,7 +1277,7 @@ cat <<EOF
   "inbounds": [
     {
       "tag": "tproxy-in",
-      "listen": "0.0.0.0",
+      "listen": "${tproxy_listen}",
       "port": ${tproxy_port},
       "protocol": "dokodemo-door",
       "settings": { "network": "tcp,udp", "followRedirect": true },

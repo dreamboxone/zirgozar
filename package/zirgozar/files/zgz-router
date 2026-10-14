@@ -127,6 +127,11 @@ cmd_schedule_sync() {
 			case "$_hi" in 1|2|3|5|10|15|30) : ;; *) _hi=3 ;; esac
 			echo "*/$_hi * * * * $ZGZ_LIB/zgz-router schedule health >/dev/null 2>&1" >> "$CRONTAB.zgz"
 		fi
+		# Auto Switch of the SOCKS ports, when a row has it on.
+		if [ "$(cfg_bool socks_enabled 0)" = "1" ] &&
+		   uci -q show zirgozar 2>/dev/null | grep -q "\.enable_autoswitch='1'"; then
+			echo "* * * * * $ZGZ_LIB/zgz-router schedule socksw >/dev/null 2>&1" >> "$CRONTAB.zgz"
+		fi
 		for _w in stop start restart; do
 			_week="$(cfg "${_w}_week_mode" '')"
 			[ -n "$_week" ] || continue
@@ -211,6 +216,9 @@ cmd_schedule() {
 		health)
 			"$ZGZ_LIB/zgz-refresh" health
 			;;
+		socksw)
+			cmd_socksw
+			;;
 		sync)
 			cmd_schedule_sync
 			;;
@@ -261,7 +269,7 @@ cmd_schedule() {
 			log "Scheduled update of subscription $2"
 			"$ZGZ_LIB/zgz-nodes" update "$2" >/dev/null 2>&1 || true
 			;;
-		*) echo "usage: $0 schedule sync|stop|start|restart|geo|sub <section>" >&2; return 1 ;;
+		*) echo "usage: $0 schedule sync|stop|start|restart|geo|socksw|sub <section>" >&2; return 1 ;;
 	esac
 	return 0
 }
@@ -326,6 +334,62 @@ cmd_quicmove() {
 	esac
 	uci -q set zirgozar.config.quic_moved='1'
 	uci -q commit zirgozar
+	return 0
+}
+
+# Auto Switch for the SOCKS ports, every minute while one has it on. Each such
+# port is a balancer over its main node and its backups (see socks_one in
+# zgz-mkconfig). Through the core's API, never a restart: the port is pinned
+# to the main node while a request through it gets an answer; after as many
+# failures in a row as the row allows, the pin is lifted and the core's own
+# probes pick the best backup that answers; with Restore on, it goes back to
+# the main node as soon as that answers again. sing-box chooses by itself.
+SOCKSW_TSV="$ZGZ_RUN/socksw.tsv"
+
+socksw_test() {
+	_sn=0
+	while [ "$_sn" -lt "$4" ]; do
+		_sn=$((_sn + 1))
+		_sc="$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout "$3" --max-time $(($3 * 3)) \
+			-x "socks5h://127.0.0.1:$1" "$2" 2>/dev/null)" || _sc=000
+		case "$_sc" in 2*|3*) return 0 ;; esac
+	done
+	return 1
+}
+
+cmd_socksw() {
+	[ -s "$SOCKSW_TSV" ] || return 0
+	[ "$(sed -n 's/^name=//p' "$ZGZ_RUN/core.info" 2>/dev/null | tail -1)" = "xray" ] || return 0
+	_sp="$(sed -n 's/^path=//p' "$ZGZ_RUN/core.info" 2>/dev/null | tail -1)"
+	[ -x "$_sp" ] || return 0
+	_sa="127.0.0.1:$(cfg api_port 10853)"
+	# One at a time: a slow test must not meet the next minute's.
+	mkdir "$ZGZ_RUN/socksw.lock" 2>/dev/null || return 0
+	trap 'rmdir "$ZGZ_RUN/socksw.lock" 2>/dev/null' EXIT
+	_now="$(date +%s)"
+	while IFS='	' read -r _bal _port _main _retry _to _every _restore _url; do
+		[ -n "$_bal" ] || continue
+		_last="$(cat "$ZGZ_RUN/socksw.$_bal.last" 2>/dev/null)" || _last=0
+		case "$_last" in ''|*[!0-9]*) _last=0 ;; esac
+		[ $((_now - _last)) -ge $((_every * 60 - 10)) ] || continue
+		echo "$_now" > "$ZGZ_RUN/socksw.$_bal.last"
+		_state="$(cat "$ZGZ_RUN/socksw.$_bal.state" 2>/dev/null)" || _state=main
+		if [ "$_state" != "backup" ]; then
+			"$_sp" api bo --server="$_sa" -b "$_bal" "$_main" >/dev/null 2>&1 || continue
+			socksw_test "$_port" "$_url" "$_to" "$_retry" && continue
+			"$_sp" api bo --server="$_sa" -b "$_bal" -r >/dev/null 2>&1 || true
+			echo backup > "$ZGZ_RUN/socksw.$_bal.state"
+			log "SOCKS port $_port: the main node failed - switched to the best working backup"
+		elif [ "$_restore" = "1" ]; then
+			"$_sp" api bo --server="$_sa" -b "$_bal" "$_main" >/dev/null 2>&1 || continue
+			if socksw_test "$_port" "$_url" "$_to" "$_retry"; then
+				echo main > "$ZGZ_RUN/socksw.$_bal.state"
+				log "SOCKS port $_port: the main node works again - switched back to it"
+			else
+				"$_sp" api bo --server="$_sa" -b "$_bal" -r >/dev/null 2>&1 || true
+			fi
+		fi
+	done < "$SOCKSW_TSV"
 	return 0
 }
 

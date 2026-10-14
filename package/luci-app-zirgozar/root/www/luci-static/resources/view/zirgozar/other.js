@@ -169,10 +169,16 @@ return view.extend({
 		o.rmempty = false;
 
 		o = s.option(form.ListValue, 'ipv6', _('IPv6'),
-			_('Almost no node on a free list carries IPv6, and a client that prefers it leaves without the tunnel while looking perfectly fine. Refusing it makes the client fall back to IPv4, which is tunnelled.'));
-		o.value('off', _('Leave it alone'));
-		o.value('block', _('Refuse it while connected'));
+			_('Directly: IPv6 goes out without the tunnel. Refused: devices use IPv4, which goes through the tunnel. Through the tunnel: IPv6 goes through the node too; the node has to carry IPv6, and the firewall has to be nftables.'));
+		o.value('off', _('Directly, outside the tunnel'));
+		o.value('block', _('Refused, devices use IPv4'));
+		o.value('proxy', _('Through the tunnel'));
 		o.default = 'off';
+
+		o = s.option(form.Flag, 'accept_icmpv6', _('Hijacking ICMPv6 (IPv6 PING)'),
+			_('With IPv6 through the tunnel, the router answers pings to IPv6 addresses.'));
+		o.default = '0';
+		o.depends('ipv6', 'proxy');
 
 		o = s.option(form.ListValue, 'lan_zone', _('Interfaces to tunnel'),
 			_('Read from this router. Left unset — which is how it ships — every LAN interface is tunnelled, which is what almost everyone wants. Choose one to pick traffic up from that interface only.'));

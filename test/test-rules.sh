@@ -63,6 +63,33 @@ check_ruleset "ipv6 left alone, no quic block, no dns hijack"
 rig_set ipv6 off;    rig_set block_quic 0; rig_set dns_hijack 1
 check_ruleset "no forward chain at all, dns hijacked"
 
+rig_set ipv6 proxy;  rig_set block_quic 1; rig_set dns_hijack 1
+check_ruleset "ipv6 through the tunnel, quic blocked, dns hijacked"
+rig_set accept_icmpv6 1
+check_ruleset "ipv6 through the tunnel, pings answered"
+rig_set accept_icmpv6 0
+
+# IPv6 left alone is left alone: nothing below the IPv6 line - REDIRECT's
+# mark for TCP above all - may reach it. Through the tunnel it is handed to
+# the core by TPROXY first.
+v6order() {
+	sh "$RIG/lib/zgz-rules" dump > "$WORK/rules.nft"
+	pre=$(awk '/chain prerouting/, /^	}/' "$WORK/rules.nft" | grep -v 'iifname "lo"')
+	r=$(printf '%s\n' "$pre" | grep -n 'meta nfproto ipv6 return' | head -1 | cut -d: -f1)
+	m=$(printf '%s\n' "$pre" | grep -n 'meta l4proto tcp meta mark set\|meta l4proto tcp counter tproxy ip to' | grep -v 10.10.34 | head -1 | cut -d: -f1)
+	if [ -n "$r" ] && [ -n "$m" ] && [ "$r" -lt "$m" ]; then ok "$1"; else bad "$1"; fi
+}
+rig_set ipv6 off
+v6order "IPv6 left alone never meets the IPv4 rules"
+rig_set ipv6 proxy
+v6order "IPv6 through the tunnel never meets the IPv4 rules either"
+if grep -q 'meta nfproto ipv6 meta l4proto tcp counter tproxy ip6 to \[::1\]:1082' "$WORK/rules.nft"; then
+	ok "IPv6 through the tunnel goes to the core by TPROXY"
+else
+	bad "IPv6 through the tunnel goes to the core by TPROXY"
+fi
+rig_set ipv6 block
+
 # A single interface has to work as well as several: `!= { "a" }` and
 # `!= { "a", "b" }` are different enough syntactically to get wrong.
 rig_set lan_zone "br-lan"

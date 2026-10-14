@@ -1618,7 +1618,7 @@ first_hop_is_chained() {
 # How a node's own server name is resolved: through the core's DNS - which
 # sends it to the direct resolver - rather than through the router's.
 node_domain_strategy() {
-	if [ "$(cfg ipv6 off)" = "off" ]; then echo UseIP; else echo UseIPv4; fi
+	if [ "$(cfg ipv6 off)" = "block" ]; then echo UseIPv4; else echo UseIP; fi
 	return 0
 }
 
