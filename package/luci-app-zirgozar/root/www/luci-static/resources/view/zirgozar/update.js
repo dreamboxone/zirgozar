@@ -107,16 +107,63 @@ function restarting(e) {
 	return /Object not found|-32000|XHR request (timed out|aborted)|NetworkError|Failed to fetch/i.test(String(e && e.message || e));
 }
 
+/* An install, an update or a removal under way. The buttons that start one
+   are off the moment one is pressed, all of them - two at once would fight
+   over the same files - and stay off until the router says it is done. The
+   router's own word for it is its job; until that is first seen, the press
+   itself stands for it. */
+var actAsked = 0, actKey = '';
+
+function working(d) {
+	return !!(d && d.job && d.job != CHECK_JOB) || (actAsked && Date.now() - actAsked < 8000);
+}
+
+/* The row a running job belongs to. */
+function jobKey(j) {
+	var m = /^Installing (.+)$/.exec(j || '');
+	if (m) return 'core:' + m[1];
+	if (j == 'Updating Zirgozar') return 'app';
+	return '';
+}
+
+function holdButtons(key) {
+	document.querySelectorAll('button.zgz-act').forEach(function(b) {
+		b.disabled = true;
+		b.zgzBusy = true;
+		if (b.dataset.key == key) b.classList.add('mk-running');
+	});
+}
+
+/* A button that starts something; drawn off while anything is running. */
+function actBtn(text, tone, key, fn, ico, d) {
+	var b = pui.btn(text, tone, fn, ico);
+	b.classList.add('zgz-act');
+	b.dataset.key = key;
+	if (working(d)) {
+		b.disabled = true;
+		b.zgzBusy = true;
+		if (key == (jobKey(d && d.job) || actKey)) b.classList.add('mk-running');
+	}
+	return b;
+}
+
 function act(key, name, arg, note) {
+	actAsked = Date.now();
+	actKey = key;
+	holdButtons(key);
 	return callAction(name, arg || '').then(function(r) {
-		if (r && r.error) say(key, _(r.error), 'error');
+		if (r && r.error) { actAsked = 0; say(key, _(r.error), 'error'); }
 		else if (note) say(key, note, 'info');
+		/* A removal is done by the time the answer comes. */
+		if (name == 'core_remove') actAsked = 0;
 	}).catch(function(e) {
 		if (restarting(e))
 			say(key, name == 'app_update' ? note : _('The router’s services are restarting. Try again in a few seconds.'), 'info');
-		else
+		else {
+			actAsked = 0;
 			say(key, String(e && e.message || e), 'error');
-	});
+		}
+	}).then(function() { return refreshNow(); });
 }
 
 /* Checking for new versions says so in one place only: the Check update
@@ -330,7 +377,9 @@ function render(d, early) {
 	/* While a check runs, what was known before it is not shown as an
 	   answer, and the page asks again sooner than its usual ten seconds. */
 	var busy = checking(d);
-	if (!early && (busy || (d.deps || {}).pending || (d.job && d.progress >= 0)) && !quickRefresh)
+	/* The job is the router's word now; the press no longer stands for it. */
+	if (!early && d.job && d.job != CHECK_JOB) actAsked = 0;
+	if (!early && (busy || (d.deps || {}).pending || working(d)) && !quickRefresh)
 		quickRefresh = window.setTimeout(function() { quickRefresh = 0; refreshNow(); }, 2000);
 	if (!busy) checkAsked = 0;
 
@@ -349,10 +398,10 @@ function render(d, early) {
 		abox.appendChild(row('Zirgozar', value, [
 			checkBtn('primary', 'app', busy),
 			!busy && app.update && app.latest
-				? pui.btn(_('Update to %s').format(appVersion(app.latest)), 'success mk-small', function() {
+				? actBtn(_('Update to %s').format(appVersion(app.latest)), 'success mk-small', 'app', function() {
 					return act('app', 'app_update', '',
 						_('Downloading and installing the new version. This takes a minute or two; the page reloads by itself when it is done.'));
-				}, 'download')
+				}, 'download', d)
 				: ''
 		], 'app'));
 		abox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:8px 0 0' },
@@ -396,11 +445,11 @@ function render(d, early) {
 			var actions = [];
 			if (c.arch_ok) {
 				actions.push(checkBtn('soft-blue', 'core:' + c.name, busy));
-				if (!c.unknown) actions.push(pui.btn(c.installed
+				if (!c.unknown) actions.push(actBtn(c.installed
 					? (c.update && c.latest ? _('Update to %s').format(c.latest) : _('Force update'))
-					: _('Install'), 'primary mk-small', function() {
+					: _('Install'), 'primary mk-small', 'core:' + c.name, function() {
 					return act('core:' + c.name, 'core_install', c.name, _('Downloading %s.').format(c.name));
-				}, 'download'));
+				}, 'download', d));
 			}
 			/* Any recent Xray, pre-releases included - those are what most
 			   people run, and GitHub's "latest" leaves them out. */
@@ -410,15 +459,15 @@ function render(d, early) {
 					return E('option', { 'value': v.tag }, v.pre ? _('%s (pre-release)').format(t) : t);
 				}));
 				actions.push(sel);
-				actions.push(pui.btn(_('Install this version'), 'soft-blue mk-small', function() {
+				actions.push(actBtn(_('Install this version'), 'soft-blue mk-small', 'core:xray', function() {
 					return act('core:xray', 'core_install', 'xray@' + sel.value,
 						_('Downloading Xray %s.').format(sel.value.replace(/^v/, '')));
-				}, 'download'));
+				}, 'download', d));
 			}
 			if (c.installed && c.ours && c.name != 'xray')
-				actions.push(pui.btn(_('Remove'), 'danger mk-small', function() {
+				actions.push(actBtn(_('Remove'), 'danger mk-small', 'core:' + c.name, function() {
 					return act('core:' + c.name, 'core_remove', c.name, _('%s removed.').format(c.name));
-				}, 'trash'));
+				}, 'trash', d));
 
 			cbox.appendChild(row({ xray: 'Xray', geoview: 'Geoview', 'sing-box-lx': 'sing-box-lx', 'warp-plus': 'warp-plus', vwarp: 'Vwarp', aether: 'Aether', mihomo: 'Mihomo', sslocal: 'shadowsocks-rust', haproxy: 'HAProxy', 'xray-patterniha': _('Xray (patterniha)'), openvpn: 'OpenVPN' }[c.name] || c.name, value, actions, 'core:' + c.name));
 		});

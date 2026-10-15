@@ -39,6 +39,7 @@ if "$ZGZ_LIB/zgz-aether" check; then ok 'Aether validates without starting a tun
 "$ZGZ_LIB/zgz-aether" run
 node "$RIG_SRC/test/test-aether.js" argv "$ZGZ_RUN/aether-argv" || bad 'wrong Gool, transport or socket mark arguments'
 ok 'helper command completed'
+if grep -qx -- '--upstream' "$ZGZ_RUN/aether-argv"; then bad 'a plain Aether config is sent back through the core'; else ok 'a plain Aether config goes straight out, marked'; fi
 "$ZGZ_LIB/zgz-mkconfig" nogeo > "$WORK/direct.json"
 if node "$RIG_SRC/test/test-aether.js" direct "$WORK/direct.json"; then ok 'direct Aether keeps marked egress and bootstrap DNS outside its tunnel'; else bad 'direct Aether has a bootstrap loop'; fi
 rig_set a1.aether_exit_node n1

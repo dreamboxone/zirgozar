@@ -91,9 +91,16 @@ finalize() {
 		[ -f "$WORK/$name.prerm" ] && sed '/^[[:space:]]*#!/d' "$WORK/$name.prerm"
 	} > "$cdir/prerm"
 
+	{
+		echo "#!/bin/sh"
+		echo "[ -n \"\${IPKG_INSTROOT}\" ] && exit 0"
+		[ -f "$WORK/$name.preinst" ] && sed '/^[[:space:]]*#!/d' "$WORK/$name.preinst"
+		[ -f "$WORK/$name.preinst" ] || echo "exit 0"
+	} > "$cdir/preinst"
+
 	[ -f "$WORK/$name.conffiles" ] && cp "$WORK/$name.conffiles" "$cdir/conffiles"
 
-	chmod 0755 "$cdir/postinst" "$cdir/prerm"
+	chmod 0755 "$cdir/postinst" "$cdir/prerm" "$cdir/preinst"
 	chown -R 0:0 "$cdir"
 
 	asm="$WORK/asm-$name"

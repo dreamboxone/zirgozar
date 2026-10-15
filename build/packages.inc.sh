@@ -8,7 +8,7 @@
 # builders so the two formats can never drift apart.
 
 VERSION=5.7.23
-RELEASE=5
+RELEASE=6
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -141,6 +141,10 @@ fi
 # went on sitting on the front page after the release that stopped
 # saying it. Nothing here is worth carrying across an install.
 rm -f /var/run/zirgozar/message
+# The reader's own Xray, set aside before the new files came in, goes back.
+if [ -f /usr/libexec/zirgozar/xray.keep ]; then
+	mv -f /usr/libexec/zirgozar/xray.keep /usr/libexec/zirgozar/xray
+fi
 # The rebind exceptions that ship on the Traffic Rules page. A configuration
 # kept from an older version has no such list; it gets one once, and a list
 # the reader has since trimmed is never filled back in.
@@ -196,6 +200,23 @@ bounded 15 /etc/init.d/zirgozar-killswitch enable >/dev/null 2>&1 || true
 # The package manager's remove step took it down for the upgrade; the setting
 # says whether it comes back.
 bounded 15 /usr/libexec/zgz-rules ks apply >/dev/null 2>&1 || true
+exit 0
+EOF
+
+	cat > "$work/zirgozar.preinst" <<'EOF'
+# An Xray the reader chose on App Update - a version picked from the list, or
+# any install they asked for - is theirs, and a new release of this program
+# does not replace it with the one it ships. It is moved aside here, out of
+# the package manager's way, and put back once the new files are in.
+D=/usr/libexec/zirgozar
+if [ -x "$D/xray" ]; then
+	have="$("$D/xray" version 2>/dev/null | awk 'NR == 1 { print $2 }')"
+	shipped="$(cat /etc/zirgozar/xray-version 2>/dev/null)"
+	if [ -f /etc/zirgozar/xray-chosen ] || { [ -n "$have" ] && [ -n "$shipped" ] && [ "$have" != "${shipped#v}" ]; }; then
+		mv -f "$D/xray" "$D/xray.keep"
+		[ -f /etc/zirgozar/xray-chosen ] || echo "$have" > /etc/zirgozar/xray-chosen
+	fi
+fi
 exit 0
 EOF
 

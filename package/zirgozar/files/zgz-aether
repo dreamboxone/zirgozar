@@ -165,10 +165,17 @@ VIA="$(aether_via)" || VIA=""
 if [ -n "$VIA" ]; then
 	chain_outbound "$VIA" >/dev/null 2>&1 || fail 'The selected Aether exit-node is missing or unsupported.'
 fi
-# Tor and the external Psiphon process do not mark every socket themselves.
-# Even Direct therefore leaves through the core's marked direct outbound.
-set -- "$@" --upstream "socks5://127.0.0.1:$UPORT"
 TOR="$(get tor)"; PSIPHON="$(get psiphon)"
+# Straight out, the way Aether is meant to run: its own sockets carry the
+# core's mark and the firewall lets them past. Sent through the core instead,
+# a QUIC tunnel is relayed packet by packet through a SOCKS port, at a
+# fraction of the speed. Only what cannot leave on its own goes through it:
+# an exit node; Tor and Psiphon, which do not mark every socket; and an API
+# address given as a name, which a marked Aether cannot look up.
+case "$API_ADDRESS" in ''|[0-9]*.*.*.*|\[*) UPNAME='' ;; *) UPNAME=1 ;; esac
+if [ -n "$VIA" ] || [ -n "$UPNAME" ] || { [ -n "$TOR" ] && [ "$TOR" != off ]; } || { [ -n "$PSIPHON" ] && [ "$PSIPHON" != off ]; }; then
+	set -- "$@" --upstream "socks5://127.0.0.1:$UPORT"
+fi
 case "$TOR" in ''|off) : ;; chain) set -- "$@" --tor --tor-bind "127.0.0.1:$PORT" --bind "127.0.0.1:$AUXPORT" ;; reverse) set -- "$@" --tor-reverse --tor-bind "127.0.0.1:$AUXPORT" ;; only) set -- "$@" --tor-only ;; *) fail 'Invalid Aether Tor mode.' ;; esac
 case "$PSIPHON" in ''|off) : ;; chain) set -- "$@" --psiphon --psiphon-bind "127.0.0.1:$PORT" --bind "127.0.0.1:$AUXPORT" ;; reverse) set -- "$@" --psiphon-reverse --psiphon-bind "127.0.0.1:$AUXPORT" ;; only) set -- "$@" --psiphon-only ;; *) fail 'Invalid Aether Psiphon mode.' ;; esac
 case "$TOR:$PSIPHON" in :*|off:*|*:|*:off) : ;; *) fail 'Choose Tor or Psiphon for one Aether config.' ;; esac

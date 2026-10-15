@@ -119,7 +119,13 @@ finalize() {
 		[ -f "$WORK/$name.prerm" ] && sed '/^[[:space:]]*#!/d' "$WORK/$name.prerm"
 	} > "$adir/pre-deinstall"
 
-	chmod 755 "$adir"/post-install "$adir"/post-upgrade "$adir"/pre-deinstall
+	{
+		echo "#!/bin/sh"
+		[ -f "$WORK/$name.preinst" ] && sed '/^[[:space:]]*#!/d' "$WORK/$name.preinst"
+		[ -f "$WORK/$name.preinst" ] || echo "exit 0"
+	} > "$adir/pre-upgrade"
+
+	chmod 755 "$adir"/post-install "$adir"/post-upgrade "$adir"/pre-deinstall "$adir"/pre-upgrade
 
 	out="$DIST/$name-$PKGVER.apk"
 	rm -f "$out"
@@ -135,6 +141,7 @@ finalize() {
 		--info "maintainer:$MAINTAINER" \
 		--info "depends:$deps" \
 		--script "post-install:$adir/post-install" \
+		--script "pre-upgrade:$adir/pre-upgrade" \
 		--script "post-upgrade:$adir/post-upgrade" \
 		--script "pre-deinstall:$adir/pre-deinstall" \
 		--files "$idir" \

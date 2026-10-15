@@ -25,7 +25,7 @@ echo ips > "$ZGZ_ETC/geo/geoip.dat"
 echo key > "$ZGZ_ETC/aether/a1/identity.toml"
 echo servers > "$ZGZ_ETC/aether/a1/identity.toml-psiphon/list"
 echo cached > "$ZGZ_ETC/subs/default.links"
-echo 5.7.23-r5 > "$ZGZ_ETC/version"
+echo 5.7.23-r6 > "$ZGZ_ETC/version"
 ROUTER="$RIG/lib/zgz-router"
 
 sh "$ROUTER" backup >/dev/null 2>&1

@@ -6,7 +6,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zirgozar
 PKG_VERSION:=5.7.23
-PKG_RELEASE:=5
+PKG_RELEASE:=6
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
 PKG_LICENSE:=AGPL-3.0-or-later
@@ -71,6 +71,25 @@ define Package/zirgozar/install
 
 endef
 
+define Package/zirgozar/preinst
+#!/bin/sh
+[ -n "$${IPKG_INSTROOT}" ] && exit 0
+# An Xray the reader chose on App Update - a version picked from the list, or
+# any install they asked for - is theirs, and a new release of this program
+# does not replace it with the one it ships. It is moved aside here, out of
+# the package manager's way, and put back once the new files are in.
+D=/usr/libexec/zirgozar
+if [ -x "$$D/xray" ]; then
+	have="$$("$$D/xray" version 2>/dev/null | awk 'NR == 1 { print $$2 }')"
+	shipped="$$(cat /etc/zirgozar/xray-version 2>/dev/null)"
+	if [ -f /etc/zirgozar/xray-chosen ] || { [ -n "$$have" ] && [ -n "$$shipped" ] && [ "$$have" != "$${shipped#v}" ]; }; then
+		mv -f "$$D/xray" "$$D/xray.keep"
+		[ -f /etc/zirgozar/xray-chosen ] || echo "$$have" > /etc/zirgozar/xray-chosen
+	fi
+fi
+exit 0
+endef
+
 define Package/zirgozar/postinst
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] && exit 0
@@ -80,6 +99,10 @@ mkdir -p /etc/zirgozar /etc/zirgozar/geo /var/run/zirgozar
 # went on sitting on the front page after the release that stopped
 # saying it. Nothing here is worth carrying across an install.
 rm -f /var/run/zirgozar/message
+# The reader's own Xray, set aside before the new files came in, goes back.
+if [ -f /usr/libexec/zirgozar/xray.keep ]; then
+	mv -f /usr/libexec/zirgozar/xray.keep /usr/libexec/zirgozar/xray
+fi
 # The version file is not a setting, but it lives in /etc, and a package
 # manager keeps a changed file there and puts the new one beside it.
 for v in /etc/zirgozar/version.apk-new /etc/zirgozar/version-opkg; do

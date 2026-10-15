@@ -187,6 +187,8 @@ install_xray() {
 	fi
 	rm -f "$_zip"
 	install_binary "$ZGZ_RUN/xtract/xray" "$DIR/xray" xray || return $?
+	# Chosen here, so a new release of this program leaves it in place.
+	[ "$DIR" = /usr/libexec/zirgozar ] && core_version "$DIR/xray" > "$ZGZ_ETC/xray-chosen" 2>/dev/null
 	# A version picked from the list is the one wanted, not merely one more
 	# on the router: left to itself the service runs the newest Xray it can
 	# find, and an older one picked here would sit unused beside it. So it
