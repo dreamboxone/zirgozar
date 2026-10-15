@@ -50,6 +50,8 @@ ssh://root:hunter2@sh.example.com#SSH
 ss://YWVzLTEyOC1nY206aHVudGVyMg==@sp.example.com:443?plugin=obfs-local%3Bobfs%3Dhttp%3Bobfs-host%3Dbing.com#SS-OBFS
 ss://YWVzLTEyOC1nY206aHVudGVyMg==@st.example.com:443?plugin=shadow-tls%3Bhost%3Dbing.com%3Bpassword%3Dp2%3Bversion%3D3#SS-STLS
 ss://YWVzLTEyOC1nY206aHVudGVyMg==@sx.example.com:443?plugin=kcptun#SS-KCPTUN
+ssr://c3NyLmV4YW1wbGUuY29tOjgzODg6YXV0aF9hZXMxMjhfbWQ1OmFlcy0yNTYtY2ZiOnRsczEuMl90aWNrZXRfYXV0aDpjR0U2YzNNLz9vYmZzcGFyYW09WW1sdVp5NWpiMjAmcHJvdG9wYXJhbT1NVEk2WVdKaiZyZW1hcmtzPVUxTlNJRzV2WkdV
+hysteria2+realm://tok123@rv.example.com/myrealm?auth=pw&obfs=gecko&obfs-password=op&stun=stun.a.com:3478#HY2-REALM
 # a comment, and below it two things that must be refused rather than guessed at
 vless://not-a-link
 ss://bm9wZQ==
@@ -124,6 +126,12 @@ case "$(pl SSH)" in 'ssh {"type":"ssh","server":"sh.example.com","port":22,"user
 case "$(pl SS-OBFS)" in *'"plugin":"obfs-local","plugin_opts":"obfs=http;obfs-host=bing.com"'*) ok "a shadowsocks link with obfs is read" ;; *) bad "a shadowsocks link with obfs is read: $(pl SS-OBFS)" ;; esac
 case "$(pl SS-STLS)" in *'"plugin":"shadow-tls","plugin_opts":"host=bing.com;password=p2;version=3"'*) ok "a shadowsocks link with ShadowTLS is read" ;; *) bad "a shadowsocks link with ShadowTLS is read: $(pl SS-STLS)" ;; esac
 check "$(pl SS-KCPTUN)" "" "a shadowsocks plugin that is not shipped is refused"
+case "$(pl 'SSR node')" in 'ssr {"type":"ssr","server":"ssr.example.com","port":8388,"protocol":"auth_aes128_md5","method":"aes-256-cfb","obfs":"tls1.2_ticket_auth","password":"pa:ss","obfs_param":"bing.com","protocol_param":"12:abc"}') ok "an ssr link is read" ;; *) bad "an ssr link is read: $(pl 'SSR node')" ;; esac
+case "$(pl HY2-REALM)" in *'"realm":"realm://tok123@rv.example.com:443/myrealm","password":"pw"'*'"obfs":"gecko"'*'"stun":"stun.a.com:3478"'*) ok "a hysteria2 realm link is read" ;; *) bad "a hysteria2 realm link is read: $(pl HY2-REALM)" ;; esac
+SSRUST="$(printf '%s\n' '#!zgz-x.ssrust=1' 'ss://YWVzLTEyOC1nY206aHVudGVyMg==@sr.example.com:443#R' | LC_ALL=C awk -f "$RIG/lib/zgz-parse" | cut -f3,6)"
+check "$SSRUST" 'ssrust	{"type":"ssrust","server":"sr.example.com","port":443,"method":"aes-128-gcm","password":"hunter2"}' "a shadowsocks node set to shadowsocks-rust is its client's"
+SSRUSTSUB="$(printf 'n0	x	shadowsocks	q.example	443	{"protocol":"shadowsocks","settings":{"servers":[{"address":"q.example","port":443,"method":"aes-128-gcm","password":"p","uot":true}]},"streamSettings":{"network":"tcp"}}\n' | SSRUST=1 LC_ALL=C awk -v DECORATE=1 -f "$RIG/lib/zgz-parse" | cut -f3,6)"
+check "$SSRUSTSUB" 'ssrust	{"type":"ssrust","server":"q.example","port":443,"method":"aes-128-gcm","password":"p"}' "and so is a subscription's, when the subscription says so"
 
 # base64 in awk has to agree with base64 everywhere else.
 if command -v base64 >/dev/null 2>&1; then
@@ -251,7 +259,7 @@ if [ -x "$RIG/core/xray" ]; then
 	jtot=0
 	while IFS='	' read -r tag label proto host port payload; do
 		[ -n "$tag" ] || continue
-		case "$proto" in hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin) continue ;; esac
+		case "$proto" in hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust) continue ;; esac
 		jtot=$((jtot + 1))
 		printf '{"log":{"loglevel":"none"},"outbounds":[%s]}' \
 			"$(printf '%s' "$payload" | sed 's/^{/{"tag":"proxy",/')" > "$WORK/j.json"
@@ -270,7 +278,7 @@ if [ -x "$RIG/core/xray" ]; then
 	tot=0
 	while IFS='	' read -r tag label proto host port payload; do
 		[ -n "$tag" ] || continue
-		case "$proto" in hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin) continue ;; esac
+		case "$proto" in hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust) continue ;; esac
 		tot=$((tot + 1))
 		printf '{"log":{"loglevel":"none"},"outbounds":[%s]}' \
 			"$(printf '%s' "$payload" | sed 's/^{/{"tag":"proxy",/')" > "$WORK/one.json"

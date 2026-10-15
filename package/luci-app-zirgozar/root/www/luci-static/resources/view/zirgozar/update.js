@@ -254,7 +254,7 @@ function renderDeps(deps) {
    answers. Waiting for the answer left three empty cards on the screen. */
 var KEPT = 'zirgozar.update.last';
 var CORE_NAMES = [ 'xray', 'xray-patterniha', 'sing-box', 'sing-box-lx', 'hysteria',
-                   'geoview', 'warp-plus', 'vwarp', 'aether', 'openvpn' ];
+                   'geoview', 'warp-plus', 'vwarp', 'aether', 'mihomo', 'sslocal', 'openvpn' ];
 
 var answered = false;
 
@@ -273,7 +273,7 @@ function kept() {
 	var dir = uci.get('zirgozar', 'config', 'core_dir') || '/usr/libexec/zirgozar';
 	var set = { xray: 'core_xray', 'sing-box': 'core_singbox', 'sing-box-lx': 'core_singbox_lx',
 	            hysteria: 'core_hysteria', geoview: 'core_geoview', 'warp-plus': 'core_warpplus',
-	            vwarp: 'core_vwarp', aether: 'core_aether' };
+	            vwarp: 'core_vwarp', aether: 'core_aether', mihomo: 'core_mihomo', sslocal: 'core_sslocal' };
 	var own = { aether: 'aether/aether' };
 	return {
 		cores: { app: { unknown: true }, unknown: true, dir: dir,
@@ -418,7 +418,7 @@ function render(d, early) {
 					return act('core:' + c.name, 'core_remove', c.name, _('%s removed.').format(c.name));
 				}, 'trash'));
 
-			cbox.appendChild(row({ xray: 'Xray', geoview: 'Geoview', 'sing-box-lx': 'sing-box-lx', 'warp-plus': 'warp-plus', vwarp: 'Vwarp', aether: 'Aether', 'xray-patterniha': _('Xray (patterniha)'), openvpn: 'OpenVPN' }[c.name] || c.name, value, actions, 'core:' + c.name));
+			cbox.appendChild(row({ xray: 'Xray', geoview: 'Geoview', 'sing-box-lx': 'sing-box-lx', 'warp-plus': 'warp-plus', vwarp: 'Vwarp', aether: 'Aether', mihomo: 'Mihomo', sslocal: 'shadowsocks-rust', 'xray-patterniha': _('Xray (patterniha)'), openvpn: 'OpenVPN' }[c.name] || c.name, value, actions, 'core:' + c.name));
 		});
 		cbox.appendChild(row(_('Free space'),
 			[ E('span', {}, cores.unknown ? '…' : bytes(cores.free)), E('code', { 'style': 'font-size:11.5px;color:var(--muted)' }, cores.dir || '') ]));
@@ -494,6 +494,11 @@ return view.extend({
 		o = s.option(form.Value, 'core_aether', _('Aether App Path'),
 			_('Aether carries aether:// configs, including WireGuard-over-MASQUE and Tor/Psiphon. Install it above.'));
 		o.placeholder = '/usr/libexec/zirgozar/aether/aether';
+
+		o = s.option(form.Value, 'core_mihomo', _('Mihomo App Path'), _('Only SSR nodes need it.'));
+		o.placeholder = '/usr/libexec/zirgozar/mihomo';
+		o = s.option(form.Value, 'core_sslocal', _('shadowsocks-rust App Path'), _('Only Shadowsocks nodes set to use it need it.'));
+		o.placeholder = '/usr/libexec/zirgozar/sslocal';
 
 		o = s.option(form.DummyValue, '_path_tip');
 		o.render = function() {

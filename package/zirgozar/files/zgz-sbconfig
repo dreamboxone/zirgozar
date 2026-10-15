@@ -114,6 +114,10 @@ const ENDPOINT_TYPES = { wireguard: true, openconnect: true, tailscale: true };
 function bridge_node(b, tag, mark) {
 	if (b.type == 'amneziawg')
 		return awg_endpoint(b, tag, mark);
+	// A Realm and Gecko are the official hysteria client's alone; it runs
+	// beside the engine and is reached as a SOCKS port.
+	if (b.type == 'hysteria2' && (b.realm || b.obfs == 'gecko'))
+		return null;
 	let sni = b.sni ? b.sni : b.server;
 	let r = { type: b.type, tag, routing_mark: mark };
 	// A subscription's own way out.

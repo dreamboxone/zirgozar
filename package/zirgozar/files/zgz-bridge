@@ -75,6 +75,8 @@ bridge_singbox() {
 # The subscription of the node in use asks for the official hysteria client.
 wants_hysteria() {
 	[ "$(jget type)" = "hysteria2" ] || return 1
+	# A Realm and Gecko are the official client's alone.
+	hysteria_only && return 0
 	_wh="$(sed -n 's/^sub=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)"
 	case "$_wh" in ''|*[!A-Za-z0-9_]*) return 1 ;; esac
 	[ "$(uci -q get "zirgozar.$_wh.hysteria2_type" 2>/dev/null)" = "hysteria" ] || return 1
@@ -198,24 +200,45 @@ warp_config() {
 
 # --------------------------------------------------------------- hysteria
 
+hysteria_only() {
+	[ -n "$(jget realm)" ] || [ "$(jget obfs)" = "gecko" ]
+}
+
+# A YAML string in single quotes, where a quote is written twice.
+yq() {
+	printf "'%s'" "$(printf '%s' "$1" | sed "s/'/''/g")"
+	return 0
+}
+
 hysteria_config() {
 	[ "$(jget type)" = "hysteria2" ] || return 1
 	_server="$(jget server)"
 	_port="$(jnum port)"
 	_sni="$(jget sni)"
-	[ -n "$_sni" ] || _sni="$_server"
+	_realm="$(jget realm)"
+	[ -n "$_sni" ] || [ -n "$_realm" ] || _sni="$_server"
 
 	# hysteria's own client reads YAML, not JSON.
 	{
 		# Port hopping: hysteria takes the range in place of the port.
 		_hp="$(jget ports)"
-		if [ -n "$_hp" ]; then
+		if [ -n "$_realm" ]; then
+			_hp=""
+			printf 'server: %s\n' "$(yq "$_realm")"
+		elif [ -n "$_hp" ]; then
 			printf 'server: %s:%s\n' "$_server" "$_hp"
 		else
 			printf 'server: %s:%s\n' "$_server" "$_port"
 		fi
 		printf 'auth: %s\n' "$(jget password)"
-		printf 'tls:\n  sni: %s\n  insecure: %s\n' "$_sni" "$(jbool insecure)"
+		printf 'tls:\n'
+		[ -z "$_sni" ] || printf '  sni: %s\n' "$_sni"
+		printf '  insecure: %s\n' "$(jbool insecure)"
+		_stun="$(jget stun)"
+		if [ -n "$_realm" ] && [ -n "$_stun" ]; then
+			printf 'realm:\n  stunServers:\n'
+			printf '%s\n' "$_stun" | tr ',' '\n' | while read -r _st; do [ -z "$_st" ] || printf '    - %s\n' "$(yq "$_st")"; done
+		fi
 		_obfs="$(jget obfs)"
 		if [ -n "$_obfs" ]; then
 			printf 'obfs:\n  type: %s\n  %s:\n    password: %s\n' \
@@ -232,6 +255,45 @@ hysteria_config() {
 		[ -z "$_hp" ] || [ -z "$_hi" ] || printf 'transport:\n  udp:\n    hopInterval: %s\n' "$_hi"
 	} > "$ZGZ_BRIDGE_JSON.yaml"
 	return 0
+}
+
+# -------------------------------------------------------------------- SSR
+
+# Mihomo, for one SSR server: a mixed port on loopback and everything to it.
+ssr_config() {
+	[ "$(jget type)" = "ssr" ] || return 1
+	mkdir -p "$ZGZ_RUN/mihomo"
+	{
+		printf 'mixed-port: %s\nbind-address: 127.0.0.1\nallow-lan: false\n' "$PORT"
+		printf 'mode: rule\nlog-level: warning\nipv6: true\nrouting-mark: %s\n' "$ZGZ_OUT_MARK"
+		printf 'geodata-auto-update: false\n'
+		printf 'proxies:\n  - name: out\n    type: ssr\n'
+		printf '    server: %s\n    port: %s\n' "$(yq "$(jget server)")" "$(jnum port)"
+		printf '    cipher: %s\n    password: %s\n' "$(yq "$(jget method)")" "$(yq "$(jget password)")"
+		printf '    obfs: %s\n    protocol: %s\n' "$(yq "$(jget obfs)")" "$(yq "$(jget protocol)")"
+		[ -z "$(jget obfs_param)" ] || printf '    obfs-param: %s\n' "$(yq "$(jget obfs_param)")"
+		[ -z "$(jget protocol_param)" ] || printf '    protocol-param: %s\n' "$(yq "$(jget protocol_param)")"
+		printf '    udp: true\nrules:\n  - MATCH,out\n'
+	} > "$ZGZ_BRIDGE_JSON.mihomo.yaml"
+	chmod 600 "$ZGZ_BRIDGE_JSON.mihomo.yaml" 2>/dev/null || true
+	return 0
+}
+
+# shadowsocks-rust's client, for one server: SOCKS on loopback, TCP and UDP.
+ssrust_config() {
+	[ "$(jget type)" = "ssrust" ] || return 1
+	printf '{"server":"%s","server_port":%s,"method":"%s","password":"%s","local_address":"127.0.0.1","local_port":%s,"mode":"tcp_and_udp","outbound_fwmark":%s}\n' \
+		"$(jget server)" "$(jnum port)" "$(jget method)" \
+		"$(sed -n 's/.*"password":"\(\([^"\\]\|\\.\)*\)".*/\1/p' "$NODE" | head -1)" \
+		"$PORT" "$ZGZ_OUT_MARK" > "$ZGZ_BRIDGE_JSON.ssrust.json"
+	chmod 600 "$ZGZ_BRIDGE_JSON.ssrust.json" 2>/dev/null || true
+	return 0
+}
+
+own_program_missing() {
+	say_message "$1"
+	warn "$2"
+	return 1
 }
 
 # ---------------------------------------------------------------- OpenVPN
@@ -391,6 +453,25 @@ cmd_config() {
 		return 0
 	fi
 
+	case "$(jget type)" in
+		ssr)
+			[ -x "$(mihomo_path)" ] || { own_program_missing "An SSR config needs Mihomo. Install it on the App Update page." "no mihomo installed to carry the SSR node"; return 1; }
+			ssr_config || return 1
+			echo "$ZGZ_BRIDGE_JSON.mihomo.yaml"
+			return 0
+			;;
+		ssrust)
+			[ -x "$(sslocal_path)" ] || { own_program_missing "This Shadowsocks config is set to use shadowsocks-rust. Install it on the App Update page." "no shadowsocks-rust installed to carry the node"; return 1; }
+			ssrust_config || return 1
+			echo "$ZGZ_BRIDGE_JSON.ssrust.json"
+			return 0
+			;;
+	esac
+	if hysteria_only && ! find_hysteria >/dev/null; then
+		own_program_missing "A Hysteria2 config with a Realm or Gecko obfuscation needs the hysteria program. Install it on the App Update page." "no hysteria installed for a Realm or Gecko node"
+		return 1
+	fi
+
 	if ! wants_hysteria && _sb="$(bridge_singbox)"; then
 		if singbox_config; then
 			echo "$ZGZ_BRIDGE_JSON"
@@ -452,6 +533,18 @@ cmd_command() {
 		else
 			echo "${_wpp#* } -c $ZGZ_BRIDGE_JSON"
 		fi
+		return 0
+	fi
+	if [ "$(jget type)" = "ssr" ]; then
+		_mh="$(mihomo_path)"
+		[ -x "$_mh" ] && ssr_config || return 1
+		echo "$_mh -d $ZGZ_RUN/mihomo -f $ZGZ_BRIDGE_JSON.mihomo.yaml"
+		return 0
+	fi
+	if [ "$(jget type)" = "ssrust" ]; then
+		_sl="$(sslocal_path)"
+		[ -x "$_sl" ] && ssrust_config || return 1
+		echo "$_sl -c $ZGZ_BRIDGE_JSON.ssrust.json"
 		return 0
 	fi
 	if ! wants_hysteria && _sb="$(bridge_singbox)" && singbox_config; then

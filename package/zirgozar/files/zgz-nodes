@@ -650,8 +650,11 @@ sub_records() {
 	case "$iface" in *[!A-Za-z0-9_.@-]*) iface="" ;; esac
 	case "$hyup" in *[!0-9]*) hyup="" ;; esac
 	case "$hydown" in *[!0-9]*) hydown="" ;; esac
-	if [ -n "$iface$hyup$hydown" ]; then
-		IFACE="$iface" HYUP="$hyup" HYDOWN="$hydown" FRAG="" NOISE="" MUX="" DIALER="" SKIPHP="" DOMSTRAT="" SOMARK="" 			LC_ALL=C awk -v DECORATE=1 -f "$PARSE" < "$ZGZ_RUN/sub.tsv" > "$ZGZ_RUN/sub.tsv.o" 2>/dev/null &&
+	# Its Shadowsocks nodes to shadowsocks-rust's own client, when set so.
+	local ssrust=""
+	[ "$(uci -q get "zirgozar.$_sec.ss_type" 2>/dev/null)" = "ssrust" ] && ssrust=1
+	if [ -n "$iface$hyup$hydown$ssrust" ]; then
+		SSRUST="$ssrust" IFACE="$iface" HYUP="$hyup" HYDOWN="$hydown" FRAG="" NOISE="" MUX="" DIALER="" SKIPHP="" DOMSTRAT="" SOMARK="" 			LC_ALL=C awk -v DECORATE=1 -f "$PARSE" < "$ZGZ_RUN/sub.tsv" > "$ZGZ_RUN/sub.tsv.o" 2>/dev/null &&
 			mv -f "$ZGZ_RUN/sub.tsv.o" "$ZGZ_RUN/sub.tsv"
 	fi
 
@@ -672,7 +675,7 @@ sub_records() {
 				_land="$(section_links "$to" 2>/dev/null | LC_ALL=C awk -v LIMIT=1 -f "$PARSE" 2>/dev/null | head -1 | warp_natives)"
 			fi
 			case "$(printf '%s' "$_land" | cut -f3)" in
-				hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|openvpn|amneziawg|l2tp|pptp|sstp|aether|'') _land="" ;;
+				hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|openvpn|amneziawg|l2tp|pptp|sstp|aether|'') _land="" ;;
 			esac
 			if [ -n "$_land" ]; then
 				LAND="$_land" LAND_ID="x${_sec}_" LAND_SIDE="$CHAINS.new" \

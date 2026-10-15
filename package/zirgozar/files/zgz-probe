@@ -157,7 +157,7 @@ sift_one() {
 	# a real request, decides whether they work.
 	case "$_proto" in
 		balancing|shunt|interface) return 0 ;;
-		wireguard|hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|openvpn|amneziawg|warp|aether|l2tp|pptp|sstp)
+		wireguard|hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|openvpn|amneziawg|warp|aether|l2tp|pptp|sstp)
 			printf '%06d\t%s\n' 9000 "$_tag" >> "$ALIVE"
 			echo x >> "$ATTEMPTS"
 			return 0
@@ -581,7 +581,7 @@ select_row() {
 
 	_tmp="$ZGZ_RUN/best.new"
 	case "$_proto" in
-		hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|openvpn|amneziawg|warp|aether|l2tp|pptp|sstp)
+		hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|openvpn|amneziawg|warp|aether|l2tp|pptp|sstp)
 			# Xray cannot speak these. zgz-bridge runs a core that can and
 			# offers it as a plain SOCKS port on loopback, so what Xray ends
 			# up holding is an ordinary socks outbound and nothing else in the

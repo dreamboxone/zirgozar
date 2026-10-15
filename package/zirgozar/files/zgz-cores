@@ -56,6 +56,10 @@ VWARP_REPO=voidr3aper-anon/Vwarp
 # accepts the configuration is the one run.
 PATTERNIHA_REPO=patterniha/Xray-core
 AETHER_REPO=CluvexStudio/Aether
+# Mihomo carries the SSR nodes, which neither Xray nor sing-box speaks.
+MIHOMO_REPO=MetaCubeX/mihomo
+# shadowsocks-rust's own client, for the Shadowsocks nodes set to use it.
+SSRUST_REPO=shadowsocks/shadowsocks-rust
 
 asset_for() {
 	_a="$(arch_assets)"
@@ -80,6 +84,24 @@ asset_for() {
 		# mips ones, and nothing else.
 		sing-box-lx) echo "$_a" | awk '{ s = $2; if (s == "mips" || s == "mipsle") s = s "-softfloat"; print (s == "amd64" || s == "arm64" || s == "armv7" || s == "mips-softfloat" || s == "mipsle-softfloat") ? s : "-" }' ;;
 		hysteria) echo "$_a" | awk '{print $3}' ;;
+		# The soft-float MIPS builds, as for sing-box; the "compatible" x86
+		# build runs on any 64-bit x86.
+		mihomo) echo "$_a" | awk '{ s = $2
+			if (s == "mips" || s == "mipsle") s = s "-softfloat"
+			else if (s == "amd64") s = "amd64-compatible"
+			print (s == "-") ? "-" : s }' ;;
+		# The static musl builds; MIPS has only glibc ones, which an OpenWrt
+		# router cannot start.
+		sslocal) case "$(echo "$_a" | awk '{print $2}')" in
+				arm64) echo aarch64-unknown-linux-musl ;;
+				armv7) echo armv7-unknown-linux-musleabihf ;;
+				armv6) echo arm-unknown-linux-musleabihf ;;
+				armv5) echo arm-unknown-linux-musleabi ;;
+				amd64) echo x86_64-unknown-linux-musl ;;
+				386) echo i686-unknown-linux-musl ;;
+				riscv64) echo riscv64gc-unknown-linux-musl ;;
+				*) echo - ;;
+			esac ;;
 		# Geoview names its builds the way sing-box does, but for "i386".
 		geoview)  echo "$_a" | awk '{ print ($2 == "386") ? "i386" : $2 }' ;;
 		# warp-plus: arm7 rather than armv7, soft-float MIPS spelled without a
@@ -375,6 +397,85 @@ install_geoview() {
 	return $?
 }
 
+# ------------------------------------------------------------------ mihomo
+
+# A gzip of the program, its name carrying the version.
+install_mihomo() {
+	_asset="$(asset_for mihomo)"
+	[ "$_asset" != "-" ] && [ -n "$_asset" ] || {
+		say_message "Mihomo publishes no build for this router's processor."
+		return 1
+	}
+	_tag="$(latest_tag "$MIHOMO_REPO")"
+	[ -n "$_tag" ] || { say_message "The newest Mihomo release could not be found. Try again in a minute."; return 1; }
+	_url="https://github.com/$MIHOMO_REPO/releases/download/$_tag/mihomo-linux-$_asset-$_tag.gz"
+	_target="$(mihomo_path)"
+	_gz="$(dirname "$_target")/mihomo.gz"
+	_size="$(remote_size "$_url")"
+	need_room $((_size * 4)) "$(dirname "$_target")" || return 1
+	mkdir -p "$(dirname "$_target")"
+	download_checked "$_url" "$_gz" "$_size" || return 1
+	_bin="$_target.part"
+	if ! gunzip -c "$_gz" > "$_bin" 2>/dev/null || [ ! -s "$_bin" ]; then
+		rm -f "$_gz" "$_bin"
+		say_message "The Mihomo download could not be unpacked."
+		return 1
+	fi
+	rm -f "$_gz"
+	install_binary "$_bin" "$_target" mihomo
+	return $?
+}
+
+# -------------------------------------------------------- shadowsocks-rust
+
+# A .tar.xz with sslocal in it and its SHA-256 beside it. busybox's tar has
+# no xz, so the router's own xz is installed the first time.
+install_sslocal() {
+	_asset="$(asset_for sslocal)"
+	[ "$_asset" != "-" ] && [ -n "$_asset" ] || {
+		say_message "shadowsocks-rust publishes no build for this router's processor."
+		return 1
+	}
+	if ! command -v xz >/dev/null 2>&1; then
+		case "$(ovpn_pkg_manager)" in
+			apk)  apk update >/dev/null 2>&1 || true; apk add xz >/dev/null 2>&1 || true ;;
+			opkg) opkg update >/dev/null 2>&1 || true; opkg install xz >/dev/null 2>&1 || true ;;
+		esac
+		command -v xz >/dev/null 2>&1 || {
+			say_message "xz is needed to unpack shadowsocks-rust and could not be installed from the router's packages."
+			return 1
+		}
+	fi
+	_tag="$(latest_tag "$SSRUST_REPO")"
+	[ -n "$_tag" ] || { say_message "The newest shadowsocks-rust release could not be found. Try again in a minute."; return 1; }
+	_url="https://github.com/$SSRUST_REPO/releases/download/$_tag/shadowsocks-$_tag.$_asset.tar.xz"
+	_target="$(sslocal_path)"
+	_txz="$(dirname "$_target")/sslocal.tar.xz"
+	_size="$(remote_size "$_url")"
+	need_room $((_size * 6)) "$(dirname "$_target")" || return 1
+	mkdir -p "$(dirname "$_target")"
+	download_checked "$_url" "$_txz" "$_size" || return 1
+	_want="$(curl -fsSL --connect-timeout 15 --max-time 60 "$_url.sha256" 2>/dev/null |
+		awk 'NR == 1 && $1 ~ /^[0-9a-fA-F]+$/ { print tolower($1) }')"
+	_got="$(sha256sum "$_txz" 2>/dev/null | awk '{ print $1 }')"
+	if [ -n "$_want" ] && [ "$_want" != "$_got" ]; then
+		rm -f "$_txz"
+		say_message "The shadowsocks-rust download does not match its published checksum - nothing was installed."
+		return 1
+	fi
+	rm -rf "$ZGZ_RUN/xtract"
+	mkdir -p "$ZGZ_RUN/xtract"
+	_bin="$_target.part"
+	if ! xz -dc "$_txz" 2>/dev/null | tar -xOf - sslocal > "$_bin" 2>/dev/null || [ ! -s "$_bin" ]; then
+		rm -f "$_txz" "$_bin"
+		say_message "The shadowsocks-rust download did not contain sslocal."
+		return 1
+	fi
+	rm -f "$_txz"
+	install_binary "$_bin" "$_target" sslocal
+	return $?
+}
+
 # --------------------------------------------------------------- warp-plus
 
 # A zip with the program in it, and beside it a .dgst file holding the zip's
@@ -497,6 +598,8 @@ install_binary() {
 	# Geoview answers -version; the cores answer version.
 	_vflag=version
 	[ "$_name" = "geoview" ] && _vflag=-version
+	[ "$_name" = "mihomo" ] && _vflag=-v
+	[ "$_name" = "sslocal" ] && _vflag=--version
 	if ! "$_src" "$_vflag" >/dev/null 2>&1; then
 		# Three different things used to be reported as one, and the one was a
 		# guess: "probably built for a different processor". It is the least
@@ -682,6 +785,8 @@ repo_of() {
 		warp-plus) echo "$WARPPLUS_REPO" ;;
 		vwarp)    echo "$VWARP_REPO" ;;
 		aether)   echo "$AETHER_REPO" ;;
+		mihomo)   echo "$MIHOMO_REPO" ;;
+		sslocal)  echo "$SSRUST_REPO" ;;
 		xray-patterniha) echo "$PATTERNIHA_REPO" ;;
 		zirgozar) echo "dreamboxone/zirgozar" ;;
 	esac
@@ -775,7 +880,7 @@ cmd_latest() {
 		_old="$(latest_of xray)"
 		[ -n "$_old" ] && printf 'xray\t%s\n' "$_old" >> "$_tmp"
 	fi
-	for _c in xray-patterniha sing-box sing-box-lx hysteria geoview warp-plus vwarp aether zirgozar; do
+	for _c in xray-patterniha sing-box sing-box-lx hysteria geoview warp-plus vwarp aether mihomo sslocal zirgozar; do
 		_repo="$(repo_of "$_c")"
 		[ -n "$_repo" ] || continue
 		# The tag is all that is wanted. A source that will not answer
@@ -842,7 +947,7 @@ one() {
 			"$(json_escape "$_have")" \
 			"$(json_escape "$_latest")" "$_new" \
 			"$(file_size "$_path")" \
-			"$(case "$_path" in "$DIR"/*|/usr/sbin/openvpn|"$(singbox_path)"|"$(singbox_lx_path)"|"$(hysteria_path)"|"$(geoview_path)"|"$(warpplus_path)"|"$(vwarp_path)") echo true ;; *) echo false ;; esac)" \
+			"$(case "$_path" in "$DIR"/*|/usr/sbin/openvpn|"$(singbox_path)"|"$(singbox_lx_path)"|"$(hysteria_path)"|"$(geoview_path)"|"$(warpplus_path)"|"$(vwarp_path)"|"$(mihomo_path)"|"$(sslocal_path)") echo true ;; *) echo false ;; esac)" \
 			"$([ "$(asset_for "$_name")" != "-" ] && echo true || echo false)"
 	else
 		printf '{"name":"%s","installed":false,"path":"","version":"","latest":"%s","update":false,"bytes":0,"ours":false,"arch_ok":%s}' \
@@ -881,6 +986,10 @@ cmd_list() {
 	one vwarp "$_v"; printf ","
 	_aether="$(aether_path)"; [ -x "$_aether" ] || _aether=""
 	one aether "$_aether"; printf ","
+	_mh="$(mihomo_path)"; [ -x "$_mh" ] || _mh=""
+	one mihomo "$_mh"; printf ","
+	_sl="$(sslocal_path)"; [ -x "$_sl" ] || _sl=""
+	one sslocal "$_sl"; printf ","
 	one openvpn "$(openvpn_path)"
 	printf ']'
 	# This program itself, for the App Update page: what is installed and
@@ -1092,7 +1201,7 @@ $_b/$_n"
 
 cmd_remove() {
 	case "$1" in
-		sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|xray-patterniha|aether)
+		sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|xray-patterniha|aether|mihomo|sslocal)
 			# Only ever our own copy - the one at its App Path. Something
 			# else on this router installed anything else, and it is not
 			# ours to delete.
@@ -1104,6 +1213,8 @@ cmd_remove() {
 				vwarp) _rm="$(vwarp_path)" ;;
 				xray-patterniha) _rm="$DIR/xray-patterniha" ;;
 				aether) _rm="$(aether_path)" ;;
+				mihomo) _rm="$(mihomo_path)" ;;
+				sslocal) _rm="$(sslocal_path)" ;;
 				*)        _rm="$(geoview_path)" ;;
 			esac
 			if [ -e "$_rm" ]; then
@@ -1144,6 +1255,8 @@ case "${1:-list}" in
 			warp-plus|vwarp) install_warpplus "$2" || _rc=$? ;;
 			xray-patterniha) install_xray_patterniha || _rc=$? ;;
 			aether) install_aether || _rc=$? ;;
+			mihomo) install_mihomo || _rc=$? ;;
+			sslocal) install_sslocal || _rc=$? ;;
 			openvpn)
 				install_openvpn || _rc=$?
 				if [ "$_rc" != 0 ] && grep -qi 'no space left' "$ZGZ_RUN/ovpn-install.log" 2>/dev/null; then

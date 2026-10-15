@@ -606,6 +606,7 @@ function do_ss(body,   label, p, cred, method, pass, dec, plug, pl) {
 		return
 	}
 
+	if (NX["ssrust"] == "1") { emit(label, "ssrust", mk_ssrust(method, pass)); return }
 	emit(label, "shadowsocks", mk_ss(method, pass))
 }
 
@@ -723,6 +724,69 @@ function do_hysteria2(body,   label, auth, query, p) {
 		",\"obfs_password\":\"" jesc(qs(query, "obfs-password")) "\"" \
 		",\"insecure\":" (qs(query, "insecure") == "1" ? "true" : "false") \
 		hy_extra(query) "}")
+}
+
+# hysteria2+realm://<token>@<rendezvous host>[:port]/<realm>?auth=&obfs=&...
+# A server reached through a Realm, which only hysteria's own client knows:
+# HTTPS to the rendezvous, or plain HTTP with hysteria2+realm+http://.
+function do_hy2realm(body, http,   label, query, p, path, tok, name, o, n, a, i, st) {
+	p = index(body, "#")
+	if (p > 0) { label = clean_label(substr(body, p + 1)); body = substr(body, 1, p - 1) }
+	p = index(body, "?")
+	if (p > 0) { query = substr(body, p + 1); body = substr(body, 1, p - 1) }
+	p = index(body, "@")
+	if (p <= 0) return
+	tok = substr(body, 1, p - 1); body = substr(body, p + 1)
+	p = index(body, "/")
+	if (p <= 0) return
+	name = substr(body, p + 1); body = substr(body, 1, p - 1)
+	if (name == "" || tok == "") return
+	if (body !~ /:[0-9]+$/ || body ~ /^\[[^]]*\]$/) body = body ":" (http ? 80 : 443)
+	if (!hostport(body)) return
+	n = split(query, a, "&")
+	st = ""
+	for (i = 1; i <= n; i++)
+		if (substr(a[i], 1, 5) == "stun=") st = st (st != "" ? "," : "") urldec(substr(a[i], 6))
+	o = "{\"type\":\"hysteria2\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT \
+		",\"realm\":\"" jesc((http ? "realm+http://" : "realm://") tok "@" body "/" name) "\"" \
+		",\"password\":\"" jesc(qs(query, "auth")) "\"" \
+		",\"sni\":\"" jesc(qs(query, "sni")) "\"" \
+		",\"obfs\":\"" jesc(qs(query, "obfs")) "\"" \
+		",\"obfs_password\":\"" jesc(qs(query, "obfs-password")) "\"" \
+		",\"insecure\":" (qs(query, "insecure") == "1" ? "true" : "false")
+	if (st != "") o = o ",\"stun\":\"" jesc(st) "\""
+	if (qs(query, "lport") ~ /^[0-9]+$/) o = o ",\"lport\":" (qs(query, "lport") + 0)
+	emit(label, "hysteria2", o hy_extra(query) "}")
+}
+
+# ssr://base64(host:port:protocol:method:obfs:base64(password)/?obfsparam=&protoparam=&remarks=)
+# For Mihomo, which still speaks it.
+function do_ssr(body,   d, p, q, a, n, i, host, pass, label, o) {
+	d = b64(body)
+	p = index(d, "/?")
+	q = ""
+	if (p > 0) { q = substr(d, p + 2); d = substr(d, 1, p - 1) }
+	else sub(/\/$/, "", d)
+	n = split(d, a, ":")
+	if (n < 6) return
+	host = a[1]
+	for (i = 2; i <= n - 5; i++) host = host ":" a[i]
+	gsub(/^\[|\]$/, "", host)
+	if (a[n - 4] !~ /^[0-9]+$/) return
+	HOST = host; PORT = a[n - 4] + 0
+	pass = b64(a[n])
+	label = clean_label(b64(qs(q, "remarks")))
+	o = "{\"type\":\"ssr\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT \
+		",\"protocol\":\"" jesc(a[n - 3]) "\",\"method\":\"" jesc(a[n - 2]) "\",\"obfs\":\"" jesc(a[n - 1]) "\"" \
+		",\"password\":\"" jesc(pass) "\"" \
+		",\"obfs_param\":\"" jesc(b64(qs(q, "obfsparam"))) "\",\"protocol_param\":\"" jesc(b64(qs(q, "protoparam"))) "\"}"
+	emit(label, "ssr", o)
+}
+
+# A Shadowsocks server for shadowsocks-rust's own client rather than the core.
+function mk_ssrust(method, pass) {
+	return "{\"type\":\"ssrust\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT \
+		",\"method\":\"" jesc(method) "\",\"password\":\"" jesc(pass) "\"}"
 }
 
 # Port hopping and bandwidth, as the clients write them: mport (or ports) a
@@ -2067,6 +2131,18 @@ DECORATE {
 	if (split(line, rec, "\t") >= 6) {
 		p = line
 		for (i = 1; i <= 5; i++) sub(/^[^\t]*\t/, "", p)
+		# A subscription's Shadowsocks nodes, to shadowsocks-rust's client:
+		# plain TCP ones only, which is what it speaks.
+		if (ENVIRON["SSRUST"] == "1" && rec[3] == "shadowsocks" && p ~ /"streamSettings":\{"network":"tcp"\}/ &&
+		    match(p, /"method":"[^"]*"/)) {
+			_m = substr(p, RSTART + 10, RLENGTH - 11)
+			if (match(p, /"password":"([^"\\]|\\.)*"/)) {
+				_pw = substr(p, RSTART + 12, RLENGTH - 13)
+				rec[3] = "ssrust"
+				p = "{\"type\":\"ssrust\",\"server\":\"" jesc(rec[4]) "\",\"port\":" (rec[5] + 0) \
+					",\"method\":\"" _m "\",\"password\":\"" _pw "\"}"
+			}
+		}
 		printf "%s\t%s\t%s\t%s\t%s\t%s\n", rec[1], rec[2], rec[3], rec[4], rec[5], \
 			decorate(p, rec[4] "|" rec[5])
 	} else {
@@ -2087,7 +2163,7 @@ LANDING {
 	line = $0
 	gsub(/\r/, "", line)
 	if (line == "" || split(line, rec, "\t") < 6) next
-	if (rec[3] ~ /^(hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|openvpn|amneziawg|l2tp|pptp|sstp|warp|aether)$/) next
+	if (rec[3] ~ /^(hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|openvpn|amneziawg|l2tp|pptp|sstp|warp|aether)$/) next
 	if (!lready) {
 		split(ENVIRON["LAND"], land, "\t")
 		lp = ENVIRON["LAND"]
@@ -2206,6 +2282,9 @@ function do_line(line) {
 	# a web page in a pasted list is still not taken for a server.
 	else if (index(line, "http://")      == 1) do_proxy(substr(line, 8), "http")
 	else if (index(line, "hysteria2://") == 1) do_hysteria2(substr(line, 13))
+	else if (index(line, "hysteria2+realm://") == 1) do_hy2realm(substr(line, 19), 0)
+	else if (index(line, "hysteria2+realm+http://") == 1) do_hy2realm(substr(line, 24), 1)
+	else if (index(line, "ssr://")       == 1) do_ssr(substr(line, 7))
 	else if (index(line, "hy2://")       == 1) do_hysteria2(substr(line, 7))
 	else if (index(line, "tuic://")      == 1) do_tuic(substr(line, 8))
 	else if (index(line, "hysteria://")  == 1) do_hysteria1(substr(line, 12))

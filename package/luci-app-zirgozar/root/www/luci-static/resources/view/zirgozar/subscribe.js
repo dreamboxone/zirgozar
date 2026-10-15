@@ -372,6 +372,7 @@ return view.extend({
 			c.value('', _('Auto'));
 			c.value('xray', 'Xray');
 			c.value('singbox', 'sing-box');
+			if (p[0] == 'ss') c.value('ssrust', 'shadowsocks-rust');
 			c.modalonly = true;
 		});
 		o = s.taboption('core', form.ListValue, 'hysteria2_type', _('%s core').format('Hysteria2'));

@@ -344,7 +344,7 @@ core_engine() {
 # every directive of a profile works - see ovpn_conf in zgz-parse.
 wanted_engine() {
 	_we="$(core_engine)"
-	if [ "$_we" = "xray" ] && [ -s "$ZGZ_ETC/bridge.json" ] && ! bridge_is_warp && ! bridge_is_ovpn && ! bridge_is_aether && ! bridge_is_l2tp && ! bridge_is_ppp &&
+	if [ "$_we" = "xray" ] && [ -s "$ZGZ_ETC/bridge.json" ] && ! bridge_is_warp && ! bridge_is_ovpn && ! bridge_is_aether && ! bridge_is_l2tp && ! bridge_is_ppp && ! bridge_is_own &&
 	   [ -x "$(engine_singbox_path)" ]; then
 		_we=singbox
 	fi
@@ -393,6 +393,17 @@ bridge_is_warp() {
 # OpenVPN is OpenVPN's own, under either engine: no core carries it.
 bridge_is_ovpn() {
 	[ "$(bridge_type)" = "openvpn" ] && return 0
+	return 1
+}
+
+# A node only a program of its own carries, under either engine: SSR
+# (Mihomo), Shadowsocks through shadowsocks-rust, and a Hysteria2 server behind
+# a Realm or Gecko obfuscation (the official hysteria client).
+bridge_is_own() {
+	case "$(bridge_type)" in
+		ssr|ssrust) return 0 ;;
+		hysteria2) grep -q '"realm":"[^"]\|"obfs":"gecko"' "$ZGZ_ETC/bridge.json" 2>/dev/null && return 0 ;;
+	esac
 	return 1
 }
 
@@ -456,6 +467,7 @@ bridge_wanted() {
 	bridge_is_aether && return 0
 	bridge_is_l2tp && return 0
 	bridge_is_ppp && return 0
+	bridge_is_own && return 0
 	[ "${1:-$(active_engine)}" = "xray" ] && return 0
 	return 1
 }
@@ -714,6 +726,20 @@ geoview_path() {
 	return 0
 }
 
+# Mihomo, for the SSR nodes nothing else here speaks.
+mihomo_path() {
+	_mp="$(cfg core_mihomo '')"
+	echo "${_mp:-$(core_dir)/mihomo}"
+	return 0
+}
+
+# shadowsocks-rust's client, for the Shadowsocks nodes set to use it.
+sslocal_path() {
+	_sp="$(cfg core_sslocal '')"
+	echo "${_sp:-$(core_dir)/sslocal}"
+	return 0
+}
+
 find_geoview() {
 	_fg="$(geoview_path)"
 	[ -x "$_fg" ] && { echo "$_fg"; return 0; }
@@ -823,6 +849,10 @@ core_version() {
 		*openvpn*)  "$1" --version 2>/dev/null | awk 'NR == 1 && $1 == "OpenVPN" { print $2 }' ;;
 		*sing-box*) "$1" version 2>/dev/null | sed -n 's/^sing-box version //p' | head -1 ;;
 		*geoview*)  "$1" -version 2>/dev/null | awk 'NR == 1 && $1 == "Geoview" { print $2 }' ;;
+		# "Mihomo Meta v1.19.32 linux arm ..."
+		*mihomo*)   "$1" -v 2>/dev/null | awk 'NR == 1 { print $3 }' ;;
+		# "shadowsocks 1.25.0"
+		*sslocal*)  "$1" --version 2>/dev/null | awk 'NR == 1 { print $2 }' ;;
 		# warp-plus says it on stderr, as the tag it was built from:
 		# "refs/tags/v1.2.6".
 		*warp-plus*|*vwarp*) "$1" version 2>&1 | head -1 | sed 's|^refs/tags/||' ;;
@@ -1595,7 +1625,7 @@ chain_outbound() {
 	[ -n "$_co" ] || return 1
 	case "$(printf '%s' "$_co" | cut -f3)" in
 		# A pre-proxy Xray cannot speak cannot be dialled through by Xray.
-		hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|openvpn|amneziawg|l2tp|pptp|sstp|aether) return 1 ;;
+		hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|openvpn|amneziawg|l2tp|pptp|sstp|aether) return 1 ;;
 	esac
 	printf '%s\n' "$_co" | cut -f6- | DOMSTRAT="${DOMSTRAT:-}" decorate |
 		sed -e "s/^{/{\"tag\":\"chain-$1\",/"
@@ -1641,14 +1671,14 @@ node_domain_strategy() {
 # as the lines zgz-parse reads them from: "#!zgz-x.<key>=<value>". A
 # certificate keeps its lines with a bar between them, a JSON object loses its
 # line breaks. Nothing at all for a node that has none.
-NODE_EXTRA_KEYS="ech tls_pin cert_name tls_pem cipher_suites user_agent finalmask tcp_fast_open tcp_mptcp domain_strategy happy_eyeballs warpplus ws_heartbeat grpc_idle grpc_health grpc_window grpc_permit kcp_mtu kcp_tti kcp_uplink kcp_downlink kcp_read kcp_write kcp_congestion sb_mux sb_mux_streams sb_mux_padding sb_brutal_up sb_brutal_down wg_system"
+NODE_EXTRA_KEYS="ech tls_pin cert_name tls_pem cipher_suites user_agent finalmask tcp_fast_open tcp_mptcp domain_strategy happy_eyeballs warpplus ws_heartbeat grpc_idle grpc_health grpc_window grpc_permit kcp_mtu kcp_tti kcp_uplink kcp_downlink kcp_read kcp_write kcp_congestion sb_mux sb_mux_streams sb_mux_padding sb_brutal_up sb_brutal_down wg_system ssrust"
 
 node_extras() {
 	for _nk in $NODE_EXTRA_KEYS; do
 		_nv="$(uci -q get "zirgozar.$1.$_nk" 2>/dev/null)" || _nv=""
 		[ -n "$_nv" ] || continue
 		case "$_nk" in
-			tcp_fast_open|tcp_mptcp|happy_eyeballs|warpplus|grpc_permit|kcp_congestion|sb_mux_padding|wg_system) [ "$_nv" = "1" ] || continue ;;
+			tcp_fast_open|tcp_mptcp|happy_eyeballs|warpplus|grpc_permit|kcp_congestion|sb_mux_padding|wg_system|ssrust) [ "$_nv" = "1" ] || continue ;;
 		esac
 		_nv="$(printf '%s' "$_nv" | tr '\r' '\n' | awk -v k="$_nk" '
 			NF { sub(/^[ \t]+/, ""); sub(/[ \t]+$/, ""); out = out (n++ ? (k == "tls_pem" ? "|" : " ") : "") $0 }
@@ -1742,7 +1772,7 @@ node_records() {
 				esac
 				[ -n "$_nd_r" ] || continue
 				case "$(printf '%s' "$_nd_r" | cut -f3)" in
-					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|openvpn|amneziawg|l2tp|pptp|sstp|aether|balancing|shunt|interface) continue ;;
+					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|openvpn|amneziawg|l2tp|pptp|sstp|aether|balancing|shunt|interface) continue ;;
 				esac
 				_nd_first="$_nd_r"
 				break
@@ -1785,7 +1815,7 @@ node_records() {
 				_nd_r="$(printf '%s\n' "$_nd_r" | warp_natives | head -1)"
 				[ -n "$_nd_r" ] || return 1
 				case "$(printf '%s' "$_nd_r" | cut -f3)" in
-					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|openvpn|amneziawg|l2tp|pptp|sstp|aether|balancing|shunt|interface) return 1 ;;
+					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|openvpn|amneziawg|l2tp|pptp|sstp|aether|balancing|shunt|interface) return 1 ;;
 				esac
 				_nd_host="$(printf '%s' "$_nd_r" | cut -f4)"
 				_nd_port="$(printf '%s' "$_nd_r" | cut -f5)"
@@ -1827,13 +1857,13 @@ node_records() {
 				_nd_land="$(section_links "$_nd_to" | LC_ALL=C awk -v LIMIT=1 -f "$ZGZ_LIB/zgz-parse" 2>/dev/null | head -1 | warp_natives)"
 				_nd_first="$(printf '%s\n' "$_nd_recs" | head -1)"
 				case "$(printf '%s' "$_nd_first" | cut -f3)" in
-					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|openvpn|amneziawg|l2tp|pptp|sstp|aether) _nd_land="" ;;
+					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|openvpn|amneziawg|l2tp|pptp|sstp|aether) _nd_land="" ;;
 					# The first hop is reached as chain-<this node>, which for
 					# WARP is its WireGuard outbound - when it has one.
 					warp) [ -n "$(printf '%s\n' "$_nd_first" | warp_natives)" ] || _nd_land="" ;;
 				esac
 				case "$(printf '%s' "$_nd_land" | cut -f3)" in
-					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|openvpn|amneziawg|l2tp|pptp|sstp|aether|'') _nd_land="" ;;
+					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|openvpn|amneziawg|l2tp|pptp|sstp|aether|'') _nd_land="" ;;
 				esac
 				if [ -n "$_nd_land" ]; then
 					printf '%s\t%s → %s\t%s\t%s\t%s\t%s\n' \
