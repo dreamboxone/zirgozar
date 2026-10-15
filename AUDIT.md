@@ -4,7 +4,7 @@ What was found wrong before this version was released, how each thing was
 confirmed, and what was done about it.
 
 Everything below was measured on a real router — an OpenWrt 25.12.5 build on
-`ipq40xx`, `arm_cortex-a7_neon-vfpv4`, with PassWall2 installed alongside — in
+`ipq40xx`, `arm_cortex-a7_neon-vfpv4`, with another proxy program installed alongside — in
 front of a real Xray 26.3.27, a real nftables, real servers and a real browser
 on the network. Nothing here was arrived at by reading the code and reasoning
 about it. Where I suspected something and turned out to be wrong, that is
@@ -44,7 +44,7 @@ failed to parse domain rule: geosite:ir > failed to load geosite: IR
   > code not found in geosite.dat: IR
 ```
 
-The `geosite.dat` it had found was PassWall2's, which carries different
+The `geosite.dat` it had found was another program's, which carries different
 categories. The right file was thirty centimetres away in `/etc/zirgozar/geo` and
 nothing had told the core about it.
 
@@ -108,13 +108,13 @@ ruleset loads.
 
 Stopping PassWall2 leaves its `inet passwall2` table behind, empty. The check
 for a second transparent proxy asked whether that table existed, so on a router
-where PassWall2 had been switched off — exactly what the page was asking for —
+where the other program had been switched off — exactly what the page was asking for —
 the front page still said:
 
 > PassWall is also redirecting traffic on this router. Two transparent proxies
 > will fight over the same packets.
 
-Confirmed both ways on the router: the table is present with PassWall2 stopped,
+Confirmed both ways on the router: the table is present with the other program stopped,
 and the rules inside it are only there when it is running. The check now asks
 whether anything in that table is still taking traffic — a `tproxy`, a
 `redirect` or a `dnat` — rather than whether the table exists.
@@ -239,7 +239,7 @@ Said plainly, because the value of the suite is in knowing where it ends.
 **The transparent proxy path, end to end, in CI.** The rules are generated for
 every combination of settings and loaded into a real `nft`, the positions that
 matter are asserted, and the whole path was driven by hand on the router for
-this release — PassWall2 stopped, tunnel up, a browser on the network fetching
+this release — the other program stopped, tunnel up, a browser on the network fetching
 real pages, counters read back. None of that runs on a build machine, because
 it needs a second machine on a LAN behind the router.
 
@@ -255,7 +255,7 @@ carries a real page through it is untested.
 working connection it does not. The rewriting is unit-tested; the mirrors
 themselves being up is somebody else's uptime.
 
-**dnsmasq on a router with several instances.** PassWall2 runs three more, and
+**dnsmasq on a router with several instances.** Another program may run more, and
 the drop-in is written into the directory the generated configuration names. It
 was correct on the router tested. A router with a different arrangement of
 instances has not been tried.

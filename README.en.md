@@ -5,7 +5,7 @@
 <h3 align="center">A router-wide tunnel for OpenWrt</h3>
 
 <p align="center">
-  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.23-r4"></a>
+  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.23-r5"></a>
   <a href="https://github.com/dreamboxone/zirgozar/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/dreamboxone/zirgozar/total?style=for-the-badge&color=0ea5e9"></a>
   <img alt="OpenWrt" src="https://img.shields.io/badge/OpenWrt-23.05%20%7C%2024.10%20%7C%2025.12-00B5E2?style=for-the-badge&logo=openwrt&logoColor=white">
   <img alt="Xray" src="https://img.shields.io/badge/core-Xray-7c3aed?style=for-the-badge">
@@ -25,12 +25,12 @@
 - ⚡ **Picks the fastest working config** by itself, and moves to the next one when a config stops working
 - 🔗 **Subscriptions** on schedules of their own; the default free list is refreshed every quarter of an hour
 - 🇮🇷 **Direct pass for Iranian traffic** — Iranian sites skip the tunnel and cost the config nothing
-- 🧭 **Shunt rules** as in PassWall2: any site or service through a config of your choice, direct, or blocked
+- 🧭 **Shunt rules**: any site or service through a config of your choice, direct, or blocked
 - ☁️ **Cloudflare WARP** through warp-plus: a free account made by itself, a scan for a WARP address that works, WARP in WARP and Psiphon behind WARP
 - 📊 **Traffic used** today, this week and this month
 - 🔄 **One-button update**, from the program's own page
 - 💾 **Saving without dropping connections** — a change the tunnel does not use does not restart it
-- 🧩 Runs on [Xray](https://github.com/XTLS/Xray-core); does not need PassWall2, and its pages have PassWall2's layout and names
+- 🧩 Runs on [Xray](https://github.com/XTLS/Xray-core)
 
 ---
 
@@ -43,7 +43,7 @@
 | **CPU** | any architecture Xray publishes a build for | two cores or more |
 
 **Flash.** The package itself is about **13 MB**, because it carries the Xray
-core. If the router already has `xray-core` — because PassWall2 pulled it in —
+core. If the router already has `xray-core` — because another program pulled it in —
 Zirgozar uses that one and downloads nothing. The Iranian routing data is
 optional and counted separately: 25 MB for the full pair, about 2 MB for the
 `-lite` pair.
@@ -92,14 +92,14 @@ install the main file first, then the `luci-app-…` one. After the second, pres
 
 SSH into the router and run the command below to download and install or upgrade
 version **5.7.23** for its architecture. The version must first be published on
-the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.23-r4).
+the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.23-r5).
 
 ```sh
 (
   set -eu
   . /etc/openwrt_release
-  version='5.7.23-r4'
-  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.23-r4'
+  version='5.7.23-r5'
+  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.23-r5'
   install_dir="/tmp/zirgozar-install-$version"
   mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
@@ -129,11 +129,11 @@ These examples use `arm_cortex-a7_neon-vfpv4`; replace it with your router's arc
 ```sh
 # OpenWrt 25.12 and later
 apk update
-apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.23-r4.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.23-r4.apk
+apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.23-r5.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.23-r5.apk
 
 # OpenWrt 24.10 / 23.05
 opkg update
-opkg install /tmp/zirgozar_5.7.23-r4_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.23-r4_all.ipk
+opkg install /tmp/zirgozar_5.7.23-r5_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.23-r5_all.ipk
 ```
 
 > [!IMPORTANT]
@@ -146,8 +146,8 @@ If that step went wrong, or you installed the file by hand, open the **App
 Update** page and look at **Router requirements**. It puts
 three questions to the running system — can it redirect traffic, can it do
 policy routing, can it fetch over HTTPS — and installs whatever is missing at
-the press of a button. It never touches `xray-core`, so a router that has
-PassWall2 is left alone.
+The press of a button. It never touches `xray-core`, so other programs on
+The router are left alone.
 
 > [!TIP]
 > Nothing runs by itself after installation. The tunnel stays off until you turn
@@ -177,7 +177,7 @@ status card.
 
 ## 🧭 4. The pages, and every option on them
 
-The tabs across the top are PassWall2's, in PassWall2's order: **Basic
+The tabs across the top: **Basic
 Settings, Configs, Node Subscribe, Other Settings, App Update, Rule Manage,
 Geoview, Access Control, Runtime Logs**.
 
@@ -198,7 +198,7 @@ Two things hold on every page:
 
 ### ⚙️ 4.1 Basic Settings
 
-At the top, PassWall2's row of tiles:
+At the top, the row of tiles:
 
 | Tile | What it shows |
 |---|---|
@@ -214,7 +214,7 @@ progress bar appears while configs are being measured; **Choose again** throws a
 current choice and measures afresh. A message the router needs you to act on
 appears here, with a cross to put it away. Each time the tunnel starts again the old message goes; if the trouble is still there, that start says so again.
 
-The form below has four tabs, in PassWall2's order.
+The form below has four tabs.
 
 #### Main
 
@@ -222,10 +222,10 @@ The form below has four tabs, in PassWall2's order.
 |---|---|---|---|
 | **Main switch** | `enabled` | off | The tunnel on or off. Save and apply for it to take effect; it holds across a reboot |
 | **Active core** | `core_engine` | Auto | *Auto* (value `xray`): Xray, and sing-box on its own for a config Xray cannot run (AmneziaWG, hysteria2, tuic); an OpenVPN config is always carried by OpenVPN itself; or `sing-box` or `sing-box-lx` for every config. sing-box is given the same configuration, translated: same inbounds, rules, DNS and Iran split; hysteria2 and tuic nodes are dialled directly, with no helper program. Not carried over: mux, noise, FakeDNS, mKCP and the poisoned-address inbound; traffic statistics are counted by polling and run a little low. The official sing-box has no xhttp; [sing-box-lx](https://github.com/Leadaxe/sing-box-lx) does, and is installed from the Cores list on this page with one press (its path is **Sing-Box-LX App Path**). If the chosen sing-box is missing or cannot run the tunnel, Xray takes over and the page says so |
-| **Node** | `node` | Auto (fastest) | Auto measures the configs and uses the fastest. A config chosen here - one added by hand or one from a subscription - is used as it is, and nothing is measured. A subscription's config is kept by what it is, and each time the list is read it is found again as PassWall2 finds it: the same config; then protocol, address and port; address and port; address; name. When none is left, the subscription's first config, and the log says so |
-| **Preproxy** | `preproxy_enabled` | off | Every config the tunnel may choose dials out through a config of yours first — PassWall2's pre-proxy. For configs that cannot be reached from here directly, or to hide which ones are being used. With it on, the first-pass handshake is skipped, because no config is reached directly |
+| **Node** | `node` | Auto (fastest) | Auto measures the configs and uses the fastest. A config chosen here - one added by hand or one from a subscription - is used as it is, and nothing is measured. A subscription's config is kept by what it is, and each time the list is read it is found again: the same config; then protocol, address and port; address and port; address; name. When none is left, the subscription's first config, and the log says so |
+| **Preproxy** | `preproxy_enabled` | off | Every config the tunnel may choose dials out through a config of yours first — the pre-proxy. For configs that cannot be reached from here directly, or to hide which ones are being used. With it on, the first-pass handshake is skipped, because no config is reached directly |
 | **Preproxy Node** | `preproxy_node` | — | The config dialled first. Only configs added by hand on Configs |
-| **Localhost Proxy** | `localhost_proxy` | on | The router's own traffic goes through the tunnel too — its downloads, its clock, its package manager, and so the routing data and the cores from GitHub. While a config is being measured or a subscription read it goes direct, so the router can always repair its own tunnel. On by default, as in PassWall2 |
+| **Localhost Proxy** | `localhost_proxy` | on | The router's own traffic goes through the tunnel too — its downloads, its clock, its package manager, and so the routing data and the cores from GitHub. While a config is being measured or a subscription read it goes direct, so the router can always repair its own tunnel. On by default |
 | **Client Proxy** | `client_proxy` | on | Devices on the LAN go through the tunnel. Turned off, they do not, but the devices named on Access Control still do |
 | **Kill switch** | `kill_switch` | off | Off: whenever the tunnel is not carrying the network — stopped, failed, restarting, or not up yet after a reboot — traffic goes out directly, untunnelled ("a cut tunnel is better than a cut internet"). On: a permanent rule of its own, apart from the tunnel (the `zirgozar_ks` table in nftables, the `ZGZ_KS` chain in iptables), closes the devices' way out by the uplink and is not removed when the tunnel stops or fails; a boot script of its own puts it in place before the network is up, so the gap between a restart and a boot is covered too. Devices reach the local network and nothing else, except: the "direct" addresses of the Traffic Rules page, the "not through the tunnel" devices of Access Control, the forwarding ports that go straight out, replies to connections that came in from outside, and — with the Iran split on — Iranian destinations (the list is cut out of `geoip.dat` with Geoview; without it Iranian destinations stay closed too). Pings, which the tunnel does not carry, are blocked as well. The result: without the tunnel there is no foreign internet, but nothing ever goes out directly without your knowing. To get the direct network back, turn this off and save. The router's own DNS behaves as before: when the tunnel stops it goes back to the operator's |
 | **Node Socks Listen Port** | `node_socks_port` | 1070 | A SOCKS server on the router that goes out the way the tunnel does. Empty for none |
@@ -243,7 +243,7 @@ The form below has four tabs, in PassWall2's order.
 
 #### Shunt Rule
 
-PassWall2's routing by rules. The rules themselves — which traffic each is
+Routing by rules. The rules themselves — which traffic each is
 about — and where each one goes are both here, in one table.
 
 | Option | In the file | Default | What it does |
@@ -268,7 +268,7 @@ rules are applied in that order. Its columns:
 | **FakeDNS** | `fakedns` | This rule's names get made-up addresses, when the main switch above is on. Not for a rule going direct or blocked |
 | **Preproxy** | `preproxy` | When the rule goes to one of your configs, it is reached through this one first. One layer only: a config with a chain of its own keeps it |
 
-In each rule's edit window, PassWall2's fields:
+In each rule's edit window, the fields:
 
 | Field | In the file | What it does |
 |---|---|---|
@@ -289,7 +289,7 @@ own on Access Control keeps that config.
 
 #### DNS
 
-PassWall2's DNS tab: a **Direct DNS** for everything that goes straight out, and
+The DNS tab: a **Direct DNS** for everything that goes straight out, and
 a **Remote DNS** for everything that goes through the tunnel.
 
 | Option | In the file | Default | What it does |
@@ -323,7 +323,7 @@ often they reach flash is set on Other Settings.
 
 ### 📋 4.2 Configs
 
-PassWall2's Node List: which configs are used and how they are measured, the
+The Node List: which configs are used and how they are measured, the
 configs you add by hand, and every config the router has.
 
 | Option | In the file | Default | What it does |
@@ -333,7 +333,7 @@ configs you add by hand, and every config the router has.
 | **Show server address and port** | `show_node_info` | off | Shows each config's address and port under its name in the list at the bottom |
 | **URL Test Address** | `test_url` | `http://www.gstatic.com/generate_204` | What a real request through a config asks for — when configs are measured and when the URL Test column is pressed |
 
-**Node selection** — this program's own, with no PassWall2 equivalent: how the
+**Node selection** — this program's own: how the
 fastest config is found when the Node in Basic Settings is Auto (section 5).
 
 | Option | In the file | Default | What it does |
@@ -345,7 +345,7 @@ fastest config is found when the Node in Basic Settings is Auto (section 5).
 | **Checked at once** | `sift_parallel` | 30 | How many handshakes run at once in the first pass. **Lower it on a router with little RAM** |
 
 **Nodes added manually** — a `config node` section per row. Above the table,
-PassWall2's buttons:
+The buttons:
 
 | Button | What it does |
 |---|---|
@@ -369,7 +369,7 @@ rather than left pointing at nothing.
 | **Ping / TCPing / URL Test** | — | Three different questions: an ICMP round trip to the address (says nothing about the server behind it); a handshake to the port the tunnel will use; a whole request carried through the config — the only one that proves it works. The request is carried by the active core, as the automatic ranking's are: with sing-box or sing-box-lx chosen under **Active core**, by that sing-box, so a config is measured the way the tunnel will run it; by Xray where the tunnel would fall back to Xray too - no sing-box, or a config sing-box cannot speak. Each says *Test* until pressed. `✕` is no answer, `—` a test that cannot be run on that config |
 | **On** | `enabled` | This config on or off |
 | **Share link** (edit window) | `link` | A share link — vless, vmess, trojan, ss, socks, hysteria2, tuic, wireguard — several one per line, or a whole WireGuard `.conf`. **Browse…** puts a file's contents in the box; nothing is uploaded |
-| **Chain Proxy** (edit window) | `chain_proxy` | PassWall2's chain: *Preproxy Node* — this config is reached through another; *Landing Node* — traffic goes through this config and leaves from another |
+| **Chain Proxy** (edit window) | `chain_proxy` | the chain: *Preproxy Node* — this config is reached through another; *Landing Node* — traffic goes through this config and leaves from another |
 | **Preproxy Node** | `preproxy_node` | The config dialled first |
 | **Landing Node** | `to_node` | The config traffic finally leaves from |
 
@@ -377,7 +377,7 @@ Beside **Edit** and **Delete** on each row: **To Top** moves it to the top,
 **Use** makes it the Node in Basic Settings and reconnects if the tunnel is on,
 **Copy** makes a copy under it.
 
-**The edit page.** **Edit** on a config opens a page of its own, PassWall2's
+**The edit page.** **Edit** on a config opens a page of its own,
 Node Config. A vless, vmess, trojan, shadowsocks, socks, http, hysteria2 or
 tuic link is shown there field by field: protocol, address, port, ID or
 password, flow, security (TLS or REALITY, with SNI, alpn, fingerprint, public
@@ -387,7 +387,7 @@ and connects without it) and transport (RAW, WebSocket, gRPC, HTTP/2,
 HTTPUpgrade, XHTTP with its Extra, mKCP with its Seed). Saving builds the link
 again from the fields; parameters the page has no field for are kept as they
 were. A WireGuard or OpenVPN file, or several links in one config, is edited as
-the text it is. Above the fields are PassWall2's four buttons: **From Share URL** puts a new
+The text it is. Above the fields are the four buttons: **From Share URL** puts a new
 link or file in place of this config (Save & Apply keeps it), **Build Share
 URL** shows the link the fields make now, ready to copy, **Generate QRCode**
 shows that link as a QR code (drawn in the browser, no internet needed), and
@@ -462,11 +462,11 @@ connects through that config.
 
 ### 🔗 4.3 Node Subscribe
 
-PassWall2's Node Subscribe. First, for all subscriptions:
+The Node Subscribe. First, for all subscriptions:
 
 | Option | In the file | Default | What it does |
 |---|---|---|---|
-| **Keyword filter method inside the config** | `filter_keyword_mode` | Discard List | Configs are kept or dropped by words in their names; a word matches anywhere in the name, exactly as written. *Close*, *Discard List*, *Keep List*, *Discard List, But Keep List First*, *Keep List, But Discard List First* — PassWall2's five modes |
+| **Keyword filter method inside the config** | `filter_keyword_mode` | Discard List | Configs are kept or dropped by words in their names; a word matches anywhere in the name, exactly as written. *Close*, *Discard List*, *Keep List*, *Discard List, But Keep List First*, *Keep List, But Discard List First* — the five modes |
 | **Discard List** | `filter_discard_list` | — | The words that drop a config |
 | **Keep List** | `filter_keep_list` | — | The words that keep a config |
 | **Nodes kept at most** | `max_nodes` | 300 | From all the subscriptions together. A long list takes longer to measure and more memory to hold |
@@ -509,7 +509,7 @@ changed — so a reboot does not lose a list that is read once a week.
 
 ### 🧰 4.4 Other Settings
 
-PassWall2's Other Settings, section by section.
+The Other Settings, section by section.
 
 **Delay Settings**
 
@@ -584,7 +584,7 @@ be made.
 | Card | What it shows |
 |---|---|
 | **App Update** | This program's version and whether a newer one is published. **Update to …** downloads the new version from GitHub, checks it against that release's checksums and installs it with the router's own package manager (apk or opkg); the settings are kept, the tunnel comes back if it was on, and the page reloads by itself |
-| **Cores** | Xray, Xray (patterniha), sing-box, hysteria, Geoview, warp-plus and Vwarp: what is installed, what each project has published, **Check update**, **Install / Update to …**, **Remove**. An update is only offered for something actually newer; for Xray, only a stable release, never a pre-release. Beside Xray is a list of its recent releases, pre-releases included, with **Install this version**. Of the Xray cores on the router the **newest** is used, unless Xray App Path names one. A release installed with **Install this version** is written into Xray App Path itself, and a running tunnel is restarted onto it; the Xray row always shows the one that runs. Empty Xray App Path to go back to the newest. sing-box and hysteria are only for configs that speak hysteria2 or tuic, which Xray does not; Geoview for the Geoview page, and for sing-box whenever the Iran split or ad blocking is on - sing-box cannot read the geo files without it, and it is installed by itself when missing; warp-plus only for WARP configs, and its download is checked against the checksum its release publishes; Vwarp only for WARP over MASQUE or with noize. **Xray (patterniha)** is [patterniha/Xray-core](https://github.com/patterniha/Xray-core): since 26.7 the official Xray refuses VLESS and Trojan without TLS to a public address - the configs that go over Cloudflare's plain-HTTP ports such as 80 and 8080, with no SNI for a filter to read - and this build takes them. It is installed beside the official one; every configuration is offered to every Xray on the router, and the first that accepts it runs it |
+| **Cores** | Xray, Xray (patterniha), sing-box, Geoview, warp-plus and Vwarp: what is installed, what each project has published, **Check update**, **Install / Update to …**, **Remove**. An update is only offered for something actually newer; for Xray, only a stable release, never a pre-release. Beside Xray is a list of its recent releases, pre-releases included, with **Install this version**. Of the Xray cores on the router the **newest** is used, unless Xray App Path names one. A release installed with **Install this version** is written into Xray App Path itself, and a running tunnel is restarted onto it; the Xray row always shows the one that runs. Empty Xray App Path to go back to the newest. sing-box and hysteria are only for configs that speak hysteria2 or tuic, which Xray does not; Geoview for the Geoview page, and for sing-box whenever the Iran split or ad blocking is on - sing-box cannot read the geo files without it, and it is installed by itself when missing; warp-plus only for WARP configs, and its download is checked against the checksum its release publishes; Vwarp only for WARP over MASQUE or with noize. **Xray (patterniha)** is [patterniha/Xray-core](https://github.com/patterniha/Xray-core): since 26.7 the official Xray refuses VLESS and Trojan without TLS to a public address - the configs that go over Cloudflare's plain-HTTP ports such as 80 and 8080, with no SNI for a filter to read - and this build takes them. It is installed beside the official one; every configuration is offered to every Xray on the router, and the first that accepts it runs it |
 | **Router requirements** | One line: everything is ready, or how many things are missing. **Details** opens the questions put to the running system — transparent proxy, policy routing, HTTPS, the firewall in use, missing packages — with **Install them**. They open by themselves when something is missing |
 
 **App Path**
@@ -594,7 +594,6 @@ be made.
 | **Folder for downloaded cores** | `core_dir` | `/usr/libexec/zirgozar` | Point it at USB storage on a router short of flash. A core another package installed is used where it is and never moved |
 | **Xray App Path** | `core_xray` | — | Empty means whichever Xray on this router accepts the configuration, preferring one already installed |
 | **Sing-Box App Path** | `core_singbox` | — | The file sing-box is installed, updated and run from. Empty is this program's own copy in the folder above |
-| **Hysteria App Path** | `core_hysteria` | — | The same for hysteria |
 | **Geoview App Path** | `core_geoview` | — | The same for Geoview |
 | **warp-plus App Path** | `core_warpplus` | — | The same for warp-plus |
 | **Vwarp App Path** | `core_vwarp` | — | The same for Vwarp |
@@ -604,7 +603,7 @@ and press Install beside it; it has to be installed again after every reboot.
 
 ### 🗺️ 4.6 Rule Manage
 
-PassWall2's Rule Manage: the routing data and the shunt rules — then this
+The Rule Manage: the routing data and the shunt rules — then this
 program's own Iran split, blocks, rebind list and direct names.
 
 **Rule status**
@@ -622,15 +621,15 @@ program's own Iran split, blocks, rebind list and direct names.
 **Rule version** shows each file's size and when it was last updated.
 **Manually update** fetches the ticked files now; **Remove both** deletes them;
 **Rollback** puts back the copy an update replaced — kept in memory, like
-PassWall2, until the next reboot or update. A download that will not fit is
+until the next reboot or update. A download that will not fit is
 refused rather than half written, and a file the core cannot read is never
 installed.
 
-**Sing-Box/Xray Shunt Rule**, as in PassWall2: the rules, a tab for each group
+**Sing-Box/Xray Shunt Rule**: the rules, a tab for each group
 with its count, in the order they are tried — the higher, the sooner. Type a
 name — in any language — and press **Add**, and the new rule opens on a
 page of its own (a name of letters, digits and `_` is its ID too; any other is
-given an ID of its own) with PassWall2's fields: Remarks, Shunt Rule Group, Protocol
+given an ID of its own) with the fields: Remarks, Shunt Rule Group, Protocol
 (http, tls, quic, bittorrent), Inbound Tag (transparent proxy, SOCKS),
 Network, Source, Port, Domain, IP and **invert**. **To Top**, dragging by the
 handle, **Edit** and **Delete** are beside each rule; the order is kept with
@@ -657,7 +656,7 @@ exactly the other traffic. A `rule-set:local:` or `rule-set:remote:` line
 
 ### 🔍 4.7 Geoview
 
-PassWall2's Geo View, with its tool Geoview (install it with the button on the
+The Geo View, with its tool Geoview (install it with the button on the
 page, or on App Update).
 
 | Field | What it does |
@@ -667,7 +666,7 @@ page, or on App Update).
 
 ### 🛡️ 4.8 Access Control
 
-PassWall2's Access control: devices with their own way out.
+The Access control: devices with their own way out.
 
 | Option | In the file | Default | What it does |
 |---|---|---|---|
@@ -687,7 +686,7 @@ A `config acl_rule` section per row:
 
 ### 📜 4.9 Runtime Logs
 
-PassWall2's Runtime Logs: this program's own log — each start and stop step by
+The Runtime Logs: this program's own log — each start and stop step by
 step, which config was chosen and why, what failed — with **Clear logs**, and
 under it the **Node log**, what the core itself said. Both refresh every few
 seconds. The lines are never translated: it is the router's own log.
@@ -696,7 +695,7 @@ seconds. The lines are never translated: it is the router's own log.
 
 ### 🖥️ 4.10 Server-Side
 
-PassWall2's Server-Side: the router becomes a proxy server, and a phone or
+The Server-Side: the router becomes a proxy server, and a phone or
 laptop away from home connects to it - to reach the home network, to use the
 router's tunnel from anywhere, or as a relay. It has a service and a settings
 file of its own (`/etc/init.d/zirgozar-server`, `/etc/config/zirgozar_server`),
@@ -759,7 +758,7 @@ wrong is quiet.
 | `subs_scheduled` | 1 | Set once subscriptions got schedules of their own |
 
 Configs you add by hand and subscriptions are given a name of their own
-(`n…`, `s…`) rather than being known by their place in the file, as PassWall2
+(`n…`, `s…`) rather than being known by their place in the file
 names its nodes: add, move or delete one and every setting naming another still
 names the right one.
 

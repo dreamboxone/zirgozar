@@ -3,12 +3,12 @@
  * Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
  * Part of Zirgozar - https://github.com/dreamboxone/zirgozar
  *
- * Other Settings, PassWall2's page of that name, section for section: Delay
+ * Other Settings, the page of that name, section for section: Delay
  * Settings, Forwarding Settings, Xray Settings and the Xray noise packets.
  * After them, the two things of this program's own that are neither a basic
  * setting nor an update: the router's clock and the traffic history.
  *
- * PassWall2's Sing-Box settings are not here. They fragment TLS over TCP, and
+ * The Sing-Box settings are not here. They fragment TLS over TCP, and
  * sing-box is only ever used here as the helper for hysteria2 and tuic nodes,
  * which are QUIC: there would be nothing for them to act on.
  */
@@ -158,7 +158,7 @@ return view.extend({
 		o.default = 'auto';
 
 		o = s.option(form.ListValue, 'tcp_proxy_way', _('TCP Proxy Way'),
-			_('REDIRECT, as in PassWall2: TCP goes to a port of its own and UDP by TPROXY. TPROXY carries both on one port.'));
+			_('REDIRECT: TCP goes to a port of its own and UDP by TPROXY. TPROXY carries both on one port.'));
 		o.value('redirect', 'REDIRECT');
 		o.value('tproxy', 'TPROXY');
 		o.default = 'redirect';
@@ -289,6 +289,57 @@ return view.extend({
 		o = s.option(form.Value, 'delay', _('Delay (ms)'));
 		o.datatype = 'or(uinteger,portrange)';
 		o.rmempty = false;
+
+		/* ----------------------------------------------- load balancing */
+		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Load Balancing'),
+			_('HAProxy, from App Update, spreads connections over the servers below and leaves out one that stops answering. Point a config at 127.0.0.1 and the port to use them.'));
+		s.anonymous = true;
+
+		o = s.option(form.Flag, 'balancing_enable', _('Enable Load Balancing'));
+		o.rmempty = false;
+
+		o = s.option(form.Value, 'health_check_inter', _('Health Check Inter (s)'));
+		o.datatype = 'range(5,3600)';
+		o.placeholder = '60';
+		o.depends('balancing_enable', '1');
+
+		o = s.option(form.Value, 'console_port', _('Console Port'), _('A page showing each server as up or down. Empty for none.'));
+		o.datatype = 'port';
+		o.depends('balancing_enable', '1');
+		o = s.option(form.Value, 'console_user', _('Console Username'));
+		o.depends('balancing_enable', '1');
+		o = s.option(form.Value, 'console_password', _('Console Password'));
+		o.password = true;
+		o.depends('balancing_enable', '1');
+
+		s = m.section(form.GridSection, 'haproxy_config', _('Load balancing servers'));
+		s.addremove = true;
+		s.anonymous = true;
+		s.sortable = true;
+		s.nodescriptions = true;
+
+		o = s.option(form.Flag, 'enabled', _('Enable'));
+		o.default = '1';
+		o.rmempty = false;
+		o.editable = true;
+
+		o = s.option(form.Value, 'lbss', _('Server address'), _('host:port'));
+		o.rmempty = false;
+		o.validate = function(section_id, value) {
+			return /^(\[[0-9a-fA-F:]+\]|[^:\s]+):\d+$/.test(value || '') ? true : _('Expecting: %s').format('host:port');
+		};
+
+		o = s.option(form.Value, 'lbort', _('Listen Port'));
+		o.datatype = 'port';
+		o.rmempty = false;
+		o.default = '1181';
+
+		o = s.option(form.Value, 'lbweight', _('Weight'));
+		o.datatype = 'range(1,256)';
+		o.default = '5';
+
+		o = s.option(form.Flag, 'backup', _('Backup'));
+		o.editable = true;
 
 		/* ------------------------------------------------------ traffic */
 		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Traffic history'));

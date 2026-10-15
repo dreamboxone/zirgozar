@@ -3,10 +3,10 @@
  * Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
  * Part of Zirgozar - https://github.com/dreamboxone/zirgozar
  *
- * One shunt rule, on a page of its own: PassWall2's shunt_rules page, field
+ * One shunt rule, on a page of its own: the shunt_rules page, field
  * for field, opened from the Sing-Box/Xray Shunt Rule list on Rule Manage.
  * Where the rule sends what it matches is chosen beside the rule in the
- * Shunt Rule tab of Basic Settings, as in PassWall2.
+ * Shunt Rule tab of Basic Settings.
  */
 
 'use strict';
@@ -22,7 +22,7 @@ function hostname(v) {
 	return /^[A-Za-z0-9_]([A-Za-z0-9_-]{0,62}\.)*[A-Za-z0-9_-]{1,63}\.?$/.test(v);
 }
 
-/* PassWall2 takes the tabs, no-break and full-width spaces out of a list
+/* The tabs, no-break and full-width spaces are taken out of a list
    before it is read; so does this. */
 function cleanText(v) {
 	return String(v || '').replace(/\t| |　/g, ' ').replace(/\r\n/g, '\n')

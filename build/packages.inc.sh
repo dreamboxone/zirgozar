@@ -8,7 +8,7 @@
 # builders so the two formats can never drift apart.
 
 VERSION=5.7.23
-RELEASE=4
+RELEASE=5
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -27,7 +27,7 @@ MAINTAINER="routekernel <https://t.me/routekernel1>"
 # instead of being handed straight to the socket that already owns it.
 #
 # Deliberately absent: xray-core. A router that has one already - because
-# PassWall2 pulled it in - needs nothing, and this finds it. Depending on it
+# another program pulled it in - needs nothing, and this finds it. Depending on it
 # would drag a second copy onto routers that do not need one, and refusing to
 # install alongside it would be worse still.
 ZGZ_DEPS="jshn libubox curl ca-bundle nftables kmod-nft-tproxy kmod-nft-socket ip-full unzip ucode ucode-mod-fs"
@@ -46,7 +46,7 @@ LUCI_DESC="Web interface for Zirgozar: connect, servers and subscriptions, traff
 CRON_LIST='*/15 * * * * /usr/libexec/zgz-refresh >/dev/null 2>&1'
 CRON_STATS='*/5 * * * * /usr/libexec/zgz-stats sample >/dev/null 2>&1'
 
-ZGZ_SCRIPTS="zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-stats zgz-test zgz-geo zgz-cores zgz-deps zgz-bridge zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-l2tp zgz-l2tpconfig zgz-pppvpn"
+ZGZ_SCRIPTS="zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-stats zgz-test zgz-geo zgz-cores zgz-deps zgz-bridge zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-l2tp zgz-l2tpconfig zgz-pppvpn zgz-lb"
 
 # stage_zgz <staging-root> <source-root> <xray-binary>
 stage_zgz() {
@@ -55,7 +55,7 @@ stage_zgz() {
 	i="$work/zirgozar"
 
 	# Our own copy of the core lives under /usr/libexec/zirgozar. /usr/bin/xray
-	# belongs to OpenWrt's xray-core package, which PassWall2 and others pull
+	# belongs to OpenWrt's xray-core package, which other programs pull
 	# in, and claiming that path makes this package refuse to install on any
 	# router that already has one.
 	install -d "$i/usr/libexec/zirgozar" "$i/etc/config" "$i/etc/init.d" \
@@ -153,15 +153,15 @@ if [ -z "\$(uci -q get zirgozar.config.rebind_seeded)" ]; then
 fi
 /usr/libexec/zgz-router rebind >/dev/null 2>&1 || true
 # The DNS tab replaced the one Iranian resolver of earlier versions with
-# PassWall2's Direct DNS. A resolver chosen before is carried across as the
+# The Direct DNS. A resolver chosen before is carried across as the
 # Direct DNS, so nothing the reader set is lost on the way.
 if [ -n "\$(uci -q get zirgozar.config.ir_dns)" ] && [ -z "\$(uci -q get zirgozar.config.direct_dns)" ]; then
 	uci -q set zirgozar.config.direct_dns_protocol='udp'
 	uci -q set zirgozar.config.direct_dns="\$(uci -q get zirgozar.config.ir_dns)"
 fi
 uci -q delete zirgozar.config.ir_dns
-# The main switch now decides what happens after a reboot, as it does in
-# PassWall2, so the separate setting for it is gone.
+# The main switch now decides what happens after a reboot, so the separate
+# setting for it is gone.
 uci -q delete zirgozar.config.autostart
 uci -q commit zirgozar
 # one set of crontab entries, however often this package is reinstalled

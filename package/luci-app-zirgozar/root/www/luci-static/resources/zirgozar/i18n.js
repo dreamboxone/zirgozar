@@ -506,8 +506,8 @@ var FA = {
 		'آخرین نسخه در حال بررسی است و تا لحظاتی دیگر نمایش داده می‌شود.',
 	'(installed by another package — left alone)':
 		'(توسط پکیج دیگری نصب شده — دست‌نخورده مانده)',
-	'Xray carries the traffic. sing-box and hysteria are only needed for nodes that speak hysteria2 or tuic, which Xray does not — one of them is then run as a local helper for that one node, and everything else works exactly as before.':
-		'اولویت با هسته ایکس‌ری است. هسته سینگ‌باکس و هیستریا فقط برای کانفیگ‌های هیستریا و tuic لازم‌اند و در کنار ایکس‌ری اجرا می‌شوند.',
+	'Xray carries the traffic. sing-box is only needed for nodes that speak what Xray does not — it is then run as a local helper for that one node, and everything else works exactly as before.':
+		'اولویت با هسته ایکس‌ری است. سینگ‌باکس فقط برای کانفیگ‌هایی لازم است که ایکس‌ری پشتیبانی نمی‌کند و در کنار آن اجرا می‌شود.',
 
 	'Traffic history': 'تاریخچه مصرف',
 	'Forget all recorded traffic': 'حذف تاریخچه مصرف',
@@ -527,7 +527,7 @@ var FA = {
 	'Sing-Box-LX App Path': 'مسیر برنامه Sing-Box-LX',
 	'The sing-box build that speaks xhttp. Empty means this program’s own copy in the folder above.': 'نسخه‌ای از sing-box که xhttp را می‌فهمد. خالی یعنی نسخه خود این برنامه در پوشه بالا.',
 	'Active core': 'هسته فعال',
-	'Auto measures the nodes and uses the fastest. A node chosen here - added by hand or from a subscription - is used as it is, and nothing is measured. A subscription’s node is found again each time its list is read, as PassWall2 does.': 'خودکار: سریع‌ترین کانفیگ.',
+	'Auto measures the nodes and uses the fastest. A node chosen here - added by hand or from a subscription - is used as it is, and nothing is measured. A subscription’s node is found again each time its list is read.': 'خودکار: سریع‌ترین کانفیگ.',
 	'Nodes to use was set to manually added configs only, so the subscriptions could not be used. It is now set to all configs.': 'گزینه «کانفیگ‌هایی که استفاده شوند» روی «فقط کانفیگ‌های دستی» بود و اشتراک‌ها استفاده نمی‌شدند. حالا روی «همه کانفیگ‌ها» گذاشته شد.',
 	'Traffic statistics': 'آمار ترافیک',
 	'Shows the tunnel traffic.': 'ترافیک فیلترشکن را نشان می‌دهد.',
@@ -670,7 +670,7 @@ var FA = {
 	'DNS Redirect': 'تغییر مسیر DNS',
 
 	'Preproxy': 'پیش‌پروکسی',
-	'Every node the tunnel may choose dials out through this node first — PassWall2’s pre-proxy. For a node that cannot be reached from here directly, or to hide which nodes are being used. With it on, the first-pass handshake is skipped, because no node is reached directly.':
+	'Every node the tunnel may choose dials out through this node first — the pre-proxy. For a node that cannot be reached from here directly, or to hide which nodes are being used. With it on, the first-pass handshake is skipped, because no node is reached directly.':
 		'هر کانفیگی که تونل انتخاب کند، اول از داخل این نود رد می‌شود. برای نودی که از اینجا مستقیم در دسترس نیست، یا برای پنهان کردن اینکه از کدام نودها استفاده می‌شود. وقتی روشن است، هندشیک مرحله اول انجام نمی‌شود، چون به هیچ نودی مستقیم وصل نمی‌شویم.',
 	'Preproxy Node': 'کانفیگ پیش‌پروکسی',
 	'Nodes added by hand on the Configs page.': 'کانفیگ‌هایی که در صفحه کانفیگ‌ها دستی اضافه شده‌اند.',
@@ -784,7 +784,7 @@ var FA = {
 		'خودکار: همه کانفیگ‌ها آزمایش می‌شوند و سریع‌ترین انتخاب می‌شود. اگر یک کانفیگ دستی انتخاب کنید، همیشه از همان استفاده می‌شود و آزمایشی انجام نمی‌شود.',
 	'Auto (fastest)': 'خودکار (سریع‌ترین)',
 	'Localhost Proxy': 'پروکسی خود روتر',
-	'When selected, the router’s own traffic goes through the tunnel as well — its downloads, its clock, its package manager, and so the routing data and the cores from GitHub. While a node is being measured or a subscription read it goes direct, so the router can always repair its own tunnel. On by default, as in PassWall2.':
+	'When selected, the router’s own traffic goes through the tunnel as well — its downloads, its clock, its package manager, and so the routing data and the cores from GitHub. While a node is being measured or a subscription read it goes direct, so the router can always repair its own tunnel. On by default.':
 		'اگر روشن باشد، اینترنت خود روتر هم از فیلترشکن می‌رود؛ مثل دانلود هسته‌ها، فایل‌های مسیریابی و پکیج‌ها از گیت‌هاب. هنگام آزمایش کانفیگ‌ها و خواندن اشتراک، روتر موقتا مستقیم وصل می‌شود تا اگر تونل قطع شد بتواند خودش را درست کند.',
 	'Kill switch': 'کلید قطع اضطراری (Kill switch)',
 	'Off, the network works directly whenever the tunnel is not carrying it — stopped, failed, restarting, or not up yet after a reboot. On, a rule of its own, kept apart from the tunnel and never removed with it, closes the way out for the devices on your network in all of those cases: they reach the local network and nothing else, and are never sent out untunnelled without your knowing. Iranian addresses stay reachable if the Iran split is on, and so do the addresses and devices you set to go direct. Pings, which the tunnel does not carry, are blocked too. To get the direct network back, turn this off and save.':
@@ -860,8 +860,8 @@ var FA = {
 	'Only Web': 'فقط وب',
 	'Prefer firewall tools': 'ابزار فایروال',
 	'TCP Proxy Way': 'روش پروکسی TCP',
-	'REDIRECT, as in PassWall2: TCP goes to a port of its own and UDP by TPROXY. TPROXY carries both on one port.':
-		'REDIRECT مثل پسوال۲: TCP به پورت جداگانه می‌رود و UDP با TPROXY. در TPROXY هر دو از یک پورت می‌روند.',
+	'REDIRECT: TCP goes to a port of its own and UDP by TPROXY. TPROXY carries both on one port.':
+		'REDIRECT: TCP به پورت جداگانه می‌رود و UDP با TPROXY. در TPROXY هر دو از یک پورت می‌روند.',
 	'Hijacking ICMP (PING)': 'پاسخ به پینگ (ICMP)',
 	'A tunnel carries no ICMP, so a ping to a tunnelled address never comes back. With this on, the router answers it.':
 		'فیلترشکن پینگ را عبور نمی‌دهد، پس پینگ گرفتن از سایت‌ها جواب نمی‌دهد. اگر روشن باشد، خود روتر به این پینگ‌ها جواب می‌دهد (عدد پینگ واقعی نیست).',
@@ -1039,8 +1039,32 @@ var FA = {
 	'TCP Brutal download (Mbps)': 'دانلود TCP Brutal (مگابیت)',
 	'System interface': 'رابط سیستمی',
 	'Protocol parameter': 'پارامتر پروتکل',
+	'Only if the provider asks for one, such as session=abc; token=xyz': 'فقط اگر فروشنده خواسته باشد، مثلاً session=abc; token=xyz',
+	'Port mapping': 'باز کردن پورت مودم',
+	'Opens a port on the modem by UPnP or NAT-PMP, for a better chance of a direct connection.': 'با UPnP یا NAT-PMP یک پورت روی مودم باز می‌کند تا اتصال مستقیم راحت‌تر برقرار شود.',
+	'The certificate, as a file on the router. Hysteria, TUIC, AnyTLS and NaiveProxy always need one.': 'گواهی، به‌صورت فایلی روی روتر. Hysteria، TUIC، AnyTLS و NaiveProxy همیشه به آن نیاز دارند.',
+	'Shadowsocks (shadowsocks-rust)': 'Shadowsocks (با shadowsocks-rust)',
+	'Tunnel (port forward)': 'تونل (انتقال پورت)',
+	'v6 (a password of 12 characters or more)': 'v6 (رمز ۱۲ حرف یا بیشتر)',
+	'Target address': 'آدرس مقصد',
+	'Target port': 'پورت مقصد',
+	'The router’s address in the tunnel; the client gets the next one.': 'آدرس روتر داخل تونل؛ کلاینت آدرس بعدی را می‌گیرد.',
+	'Router key': 'کلید روتر',
+	'Load Balancing': 'متعادل‌سازی بار',
+	'HAProxy, from App Update, spreads connections over the servers below and leaves out one that stops answering. Point a config at 127.0.0.1 and the port to use them.': 'HAProxy (از صفحه به‌روزرسانی) اتصال‌ها را بین سرورهای زیر پخش می‌کند و سروری را که جواب ندهد کنار می‌گذارد. برای استفاده، یک کانفیگ را روی 127.0.0.1 و همین پورت بگذارید.',
+	'Enable Load Balancing': 'فعال‌سازی متعادل‌سازی بار',
+	'Health Check Inter (s)': 'فاصله بررسی سلامت (ثانیه)',
+	'Console Port': 'پورت صفحه وضعیت',
+	'A page showing each server as up or down. Empty for none.': 'صفحه‌ای که وضعیت هر سرور را نشان می‌دهد. خالی یعنی ندارد.',
+	'Console Username': 'نام کاربری صفحه وضعیت',
+	'Console Password': 'رمز صفحه وضعیت',
+	'Load balancing servers': 'سرورهای متعادل‌سازی بار',
+	'Server address': 'آدرس سرور',
+	'host:port': 'میزبان:پورت',
+	'Weight': 'وزن',
+	'Backup': 'پشتیبان',
+	'Client key': 'کلید کلاینت',
 	'Obfuscation parameter': 'پارامتر مبهم‌سازی',
-	'gecko (needs the hysteria program)': 'gecko (برنامه hysteria لازم است)',
 	'Carry with shadowsocks-rust': 'اجرا با shadowsocks-rust',
 	'Its own client, from App Update, in place of the core.': 'با کلاینت خودش (از صفحه به‌روزرسانی)، به‌جای هسته.',
 	'Mihomo App Path': 'مسیر برنامه Mihomo',
@@ -1569,7 +1593,7 @@ function patchLuci() {
 /* Our own words first, then LuCI's: a page that draws a button of its own
    with a word LuCI also uses - Save, Add - finds it there rather than coming
    out in English. */
-/* In English a server on the list is a node, as PassWall2 calls it; the
+/* In English a server on the list is a node; the
    strings say config, the word the Persian text uses. Where config means a
    file of settings, it stays. */
 var CONFIG_KEPT = {

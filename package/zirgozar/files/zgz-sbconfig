@@ -114,10 +114,10 @@ const ENDPOINT_TYPES = { wireguard: true, openconnect: true, tailscale: true };
 function bridge_node(b, tag, mark) {
 	if (b.type == 'amneziawg')
 		return awg_endpoint(b, tag, mark);
-	// A Realm and Gecko are the official hysteria client's alone; it runs
-	// beside the engine and is reached as a SOCKS port.
-	if (b.type == 'hysteria2' && (b.realm || b.obfs == 'gecko'))
-		return null;
+	// A pinned certificate is sing-box 1.15's.
+	if (b.pin && args.certpin != '1') {
+		warn(`the pinned certificate of this ${b.type} node needs sing-box 1.15 or newer - it is connected without the pin`);
+	}
 	let sni = b.sni ? b.sni : b.server;
 	let r = { type: b.type, tag, routing_mark: mark };
 	// A subscription's own way out.
@@ -140,6 +140,11 @@ function bridge_node(b, tag, mark) {
 		r.server_port = int(b.port);
 		break;
 	}
+	let pin = (t) => {
+		if (b.pin && args.certpin == '1')
+			t.certificate_sha256 = [ b.pin ];
+		return t;
+	};
 	switch (b.type) {
 	case 'hysteria2':
 		r.password = b.password;
@@ -147,15 +152,32 @@ function bridge_node(b, tag, mark) {
 			r.up_mbps = int(b.up_mbps);
 		if (int(b.down_mbps) > 0)
 			r.down_mbps = int(b.down_mbps);
-		if (b.obfs)
+		if (b.obfs) {
 			r.obfs = { type: b.obfs, password: b.obfs_password };
+			if (b.obfs == 'gecko') {
+				r.obfs.min_packet_size = 512;
+				r.obfs.max_packet_size = 1200;
+			}
+		}
+		// A server behind a Realm: reached through its rendezvous, not by
+		// address. realm[+http]://<token>@<host[:port]>/<realm>
+		let rm = match(b.realm ?? '', /^realm(\+http)?:\/\/([^@]+)@([^\/]+)\/(.+)$/);
+		if (rm) {
+			delete r.server;
+			delete r.server_port;
+			r.realm = { server_url: `${rm[1] ? 'http' : 'https'}://${rm[3]}`, token: rm[2], realm_id: rm[4] };
+			if (b.stun)
+				r.realm.stun_servers = split(b.stun, ',');
+			if (b.portmap)
+				r.realm.port_mapping = { enabled: true };
+		}
 		// Port hopping: the server's port and the range it hops over.
-		if (b.ports) {
+		if (b.ports && !rm) {
 			r.server_ports = map(split(b.ports, ','), (x) => replace(x, '-', ':'));
 			if (b.hop_interval)
 				r.hop_interval = b.hop_interval;
 		}
-		r.tls = { enabled: true, server_name: sni, insecure: !!b.insecure };
+		r.tls = pin({ enabled: true, server_name: sni, insecure: !!b.insecure });
 		break;
 	case 'hysteria':
 		if (b.auth)
@@ -181,7 +203,7 @@ function bridge_node(b, tag, mark) {
 			r.zero_rtt_handshake = true;
 		if (b.heartbeat)
 			r.heartbeat = b.heartbeat;
-		r.tls = { enabled: true, server_name: sni, insecure: !!b.insecure, alpn: [ 'h3' ] };
+		r.tls = pin({ enabled: true, server_name: sni, insecure: !!b.insecure, alpn: [ 'h3' ] });
 		break;
 	case 'ssh':
 		r.user = b.user;
@@ -221,7 +243,7 @@ function bridge_node(b, tag, mark) {
 		break;
 	case 'anytls':
 		r.password = b.password;
-		r.tls = { enabled: true, server_name: sni, insecure: !!b.insecure };
+		r.tls = pin({ enabled: true, server_name: sni, insecure: !!b.insecure });
 		if (b.fp)
 			r.tls.utls = { enabled: true, fingerprint: b.fp };
 		if (b.alpn)
@@ -775,7 +797,7 @@ for (let i in X.inbounds) {
 
 // -------------------------------------------------------------- name lists
 
-// A sing-box rule-set named in a shunt rule, as PassWall2 writes one:
+// A sing-box rule-set named in a shunt rule:
 // rule-set:remote:URL or rule-set:local:PATH, rs: for short. A remote one is
 // fetched by sing-box itself, through the default way out.
 let user_sets = {};      // tag -> definition
@@ -977,7 +999,7 @@ for (let ri, r in xr) {
 	if ((r.domain || r.ip) && !length(groups))
 		continue;
 
-	// PassWall2's invert, written by zgz-mkconfig only for sing-box: the whole
+	// The invert, written by zgz-mkconfig only for sing-box: the whole
 	// rule, names and addresses together, the other way round - one logical
 	// rule when there is more than one kind of thing to match.
 	if (r.invert) {

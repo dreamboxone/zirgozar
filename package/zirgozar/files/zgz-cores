@@ -7,9 +7,9 @@
 # zgz-cores - install, update and remove the proxy engines.
 #
 #   zgz-cores list
-#   zgz-cores install xray|sing-box|hysteria|warp-plus
+#   zgz-cores install xray|sing-box|warp-plus
 #   zgz-cores install zirgozar       (this program, from its latest release)
-#   zgz-cores remove  sing-box|hysteria|warp-plus
+#   zgz-cores remove  sing-box|warp-plus
 #   zgz-cores install|remove openvpn (through the package manager)
 #
 # Xray is the engine. It is what the configuration generator writes for, what
@@ -17,15 +17,15 @@
 # it ships with this package so that a fresh router works without downloading
 # anything.
 #
-# sing-box and hysteria are here for the protocols Xray does not speak -
-# hysteria2 and tuic. They are not a second engine: zgz-bridge runs one of
-# them as a local SOCKS port for a single server, and Xray reaches it through
+# sing-box is here for the protocols Xray does not speak -
+# hysteria2 and tuic. It is not a second engine: zgz-bridge runs it
+# as a local SOCKS port for a single server, and Xray reaches it through
 # an ordinary socks outbound. That way there is one routing engine, one DNS
 # arrangement and one set of firewall rules no matter which protocol the
 # chosen server happens to use, instead of two of everything.
 #
 # Nothing here touches /usr/bin/xray. That belongs to OpenWrt's xray-core
-# package, which PassWall2 and others pull in, and a router that already has
+# package, which other programs pull in, and a router that already has
 # one is a router that needs nothing downloaded at all - find_xray will use
 # it. Installing over it, or removing it, would break the other program.
 
@@ -41,7 +41,6 @@ SINGBOX_REPO=SagerNet/sing-box
 # a sing-box like any other as far as running goes, kept in a file of its own
 # so that the helper copy of the official one is never replaced by it.
 LX_REPO=Leadaxe/sing-box-lx
-HYSTERIA_REPO=apernet/hysteria
 GEOVIEW_REPO=snowie2000/geoview
 # Cloudflare WARP for a WARP node: registers its own account, scans for an
 # address that answers, and can put WARP or Psiphon behind it.
@@ -83,7 +82,6 @@ asset_for() {
 		# sing-box-lx has builds for amd64, arm64, armv7 and the two soft-float
 		# mips ones, and nothing else.
 		sing-box-lx) echo "$_a" | awk '{ s = $2; if (s == "mips" || s == "mipsle") s = s "-softfloat"; print (s == "amd64" || s == "arm64" || s == "armv7" || s == "mips-softfloat" || s == "mipsle-softfloat") ? s : "-" }' ;;
-		hysteria) echo "$_a" | awk '{print $3}' ;;
 		# The soft-float MIPS builds, as for sing-box; the "compatible" x86
 		# build runs on any 64-bit x86.
 		mihomo) echo "$_a" | awk '{ s = $2
@@ -107,7 +105,7 @@ asset_for() {
 		# warp-plus: arm7 rather than armv7, soft-float MIPS spelled without a
 		# dash, and nothing for 32-bit x86 or ARM older than v7.
 		# OpenVPN comes from the router's own packages, built for it already.
-		openvpn) [ "$(ovpn_pkg_manager)" != "none" ] && echo pkg || echo - ;;
+		openvpn|haproxy) [ "$(ovpn_pkg_manager)" != "none" ] && echo pkg || echo - ;;
 		warp-plus|vwarp) echo "$_a" | awk '{ s = $2
 			if (s == "armv7") s = "arm7"
 			else if (s ~ /^mips/) s = s "softfloat"
@@ -356,28 +354,6 @@ install_singbox() {
 	return $?
 }
 
-# ---------------------------------------------------------------- hysteria
-
-install_hysteria() {
-	_asset="$(asset_for hysteria)"
-	[ "$_asset" != "-" ] && [ -n "$_asset" ] || {
-		say_message "hysteria publishes no build for this router's processor."
-		return 1
-	}
-	# A plain executable, not an archive.
-	_url="https://github.com/$HYSTERIA_REPO/releases/latest/download/hysteria-linux-$_asset"
-	# _bin, not _tmp: the other two installers name their download for what it
-	# is, and this one did not - which is how it came to hand a helper the one
-	# variable name that helper was about to reuse.
-	_bin="$ZGZ_RUN/hysteria.bin"
-
-	_size="$(remote_size "$_url")"
-	need_room $((_size * 2)) "$(dirname "$(hysteria_path)")" || return 1
-	download_checked "$_url" "$_bin" "$_size" || return 1
-	install_binary "$_bin" "$(hysteria_path)" hysteria
-	return $?
-}
-
 # ----------------------------------------------------------------- geoview
 
 install_geoview() {
@@ -470,6 +446,13 @@ install_sslocal() {
 		rm -f "$_txz" "$_bin"
 		say_message "The shadowsocks-rust download did not contain sslocal."
 		return 1
+	fi
+	# The server too, for the Server-Side page.
+	_srv="$(dirname "$_target")/ssserver"
+	if xz -dc "$_txz" 2>/dev/null | tar -xOf - ssserver > "$_srv.part" 2>/dev/null && [ -s "$_srv.part" ]; then
+		chmod 0755 "$_srv.part" && mv -f "$_srv.part" "$_srv"
+	else
+		rm -f "$_srv.part"
 	fi
 	rm -f "$_txz"
 	install_binary "$_bin" "$_target" sslocal
@@ -722,7 +705,7 @@ install_openvpn() {
 	if [ -z "$(openvpn_path)" ]; then
 		# OpenVPN 2.7 needs a kernel module. Kernel modules come from one
 		# package source of their own, kmods, made for this kernel only - and
-		# installing PassWall by its script is known to leave that line out of
+		# some third-party install scripts are known to leave that line out of
 		# the list, after which no kernel module can be installed at all. The
 		# package manager's own words for it, "required by: openvpn-…
 		# [kmod-ovpn-backports]", tell nobody any of this, so it is said
@@ -747,6 +730,38 @@ install_openvpn() {
 		return 1
 	fi
 	log "OpenVPN $(core_version /usr/sbin/openvpn) installed ($_op)"
+	return 0
+}
+
+# HAProxy, for load balancing, from the router's own packages.
+haproxy_path() {
+	[ -x /usr/sbin/haproxy ] && echo /usr/sbin/haproxy
+	return 0
+}
+
+install_haproxy() {
+	case "$(ovpn_pkg_manager)" in
+		apk)  apk update >/dev/null 2>&1 || true; apk add haproxy >"$ZGZ_RUN/lb-install.log" 2>&1 ;;
+		opkg) opkg update >/dev/null 2>&1 || true; opkg install haproxy >"$ZGZ_RUN/lb-install.log" 2>&1 ;;
+		*) say_message "This router has neither opkg nor apk, so HAProxy cannot be installed automatically."; return 1 ;;
+	esac
+	if [ -z "$(haproxy_path)" ]; then
+		say_message "HAProxy could not be installed: $(tail -1 "$ZGZ_RUN/lb-install.log" 2>/dev/null | cut -c1-160)"
+		return 1
+	fi
+	# Installed for this program, which runs it itself.
+	/etc/init.d/haproxy disable >/dev/null 2>&1 || true
+	/etc/init.d/haproxy stop >/dev/null 2>&1 || true
+	log "HAProxy $(core_version /usr/sbin/haproxy) installed"
+	return 0
+}
+
+remove_haproxy() {
+	case "$(ovpn_pkg_manager)" in
+		apk)  apk del haproxy >/dev/null 2>&1 ;;
+		opkg) opkg remove haproxy >/dev/null 2>&1 ;;
+	esac
+	[ -z "$(haproxy_path)" ] && log "HAProxy removed"
 	return 0
 }
 
@@ -780,7 +795,6 @@ repo_of() {
 		xray)     echo "$XRAY_REPO" ;;
 		sing-box) echo "$SINGBOX_REPO" ;;
 		sing-box-lx) echo "$LX_REPO" ;;
-		hysteria) echo "$HYSTERIA_REPO" ;;
 		geoview)  echo "$GEOVIEW_REPO" ;;
 		warp-plus) echo "$WARPPLUS_REPO" ;;
 		vwarp)    echo "$VWARP_REPO" ;;
@@ -880,7 +894,7 @@ cmd_latest() {
 		_old="$(latest_of xray)"
 		[ -n "$_old" ] && printf 'xray\t%s\n' "$_old" >> "$_tmp"
 	fi
-	for _c in xray-patterniha sing-box sing-box-lx hysteria geoview warp-plus vwarp aether mihomo sslocal zirgozar; do
+	for _c in xray-patterniha sing-box sing-box-lx geoview warp-plus vwarp aether mihomo sslocal zirgozar; do
 		_repo="$(repo_of "$_c")"
 		[ -n "$_repo" ] || continue
 		# The tag is all that is wanted. A source that will not answer
@@ -947,7 +961,7 @@ one() {
 			"$(json_escape "$_have")" \
 			"$(json_escape "$_latest")" "$_new" \
 			"$(file_size "$_path")" \
-			"$(case "$_path" in "$DIR"/*|/usr/sbin/openvpn|"$(singbox_path)"|"$(singbox_lx_path)"|"$(hysteria_path)"|"$(geoview_path)"|"$(warpplus_path)"|"$(vwarp_path)"|"$(mihomo_path)"|"$(sslocal_path)") echo true ;; *) echo false ;; esac)" \
+			"$(case "$_path" in "$DIR"/*|/usr/sbin/openvpn|"$(singbox_path)"|"$(singbox_lx_path)"|"$(geoview_path)"|"$(warpplus_path)"|"$(vwarp_path)"|"$(mihomo_path)"|"$(sslocal_path)"|/usr/sbin/haproxy) echo true ;; *) echo false ;; esac)" \
 			"$([ "$(asset_for "$_name")" != "-" ] && echo true || echo false)"
 	else
 		printf '{"name":"%s","installed":false,"path":"","version":"","latest":"%s","update":false,"bytes":0,"ours":false,"arch_ok":%s}' \
@@ -968,7 +982,6 @@ cmd_list() {
 	fi
 	_s="$(singbox_path)"; [ -x "$_s" ] || _s=""
 	_l="$(singbox_lx_path)"; [ -x "$_l" ] || _l=""
-	_h="$(hysteria_path)"; [ -x "$_h" ] || _h=""
 	_g="$(geoview_path)"; [ -x "$_g" ] || _g=""
 	_w="$(warpplus_path)"; [ -x "$_w" ] || _w=""
 	_v="$(vwarp_path)"; [ -x "$_v" ] || _v=""
@@ -980,7 +993,6 @@ cmd_list() {
 	one xray-patterniha "$_xp"; printf ','
 	one sing-box "$_s"; printf ','
 	one sing-box-lx "$_l"; printf ','
-	one hysteria "$_h"; printf ','
 	one geoview "$_g"; printf ","
 	one warp-plus "$_w"; printf ","
 	one vwarp "$_v"; printf ","
@@ -990,7 +1002,8 @@ cmd_list() {
 	one mihomo "$_mh"; printf ","
 	_sl="$(sslocal_path)"; [ -x "$_sl" ] || _sl=""
 	one sslocal "$_sl"; printf ","
-	one openvpn "$(openvpn_path)"
+	one openvpn "$(openvpn_path)"; printf ","
+	one haproxy "$(haproxy_path)"
 	printf ']'
 	# This program itself, for the App Update page: what is installed and
 	# what has been published. It is updated by installing the new package,
@@ -1201,14 +1214,13 @@ $_b/$_n"
 
 cmd_remove() {
 	case "$1" in
-		sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|xray-patterniha|aether|mihomo|sslocal)
+		sing-box|sing-box-lx|geoview|warp-plus|vwarp|xray-patterniha|aether|mihomo|sslocal)
 			# Only ever our own copy - the one at its App Path. Something
 			# else on this router installed anything else, and it is not
 			# ours to delete.
 			case "$1" in
 				sing-box) _rm="$(singbox_path)" ;;
 				sing-box-lx) _rm="$(singbox_lx_path)" ;;
-				hysteria) _rm="$(hysteria_path)" ;;
 				warp-plus) _rm="$(warpplus_path)" ;;
 				vwarp) _rm="$(vwarp_path)" ;;
 				xray-patterniha) _rm="$DIR/xray-patterniha" ;;
@@ -1219,6 +1231,7 @@ cmd_remove() {
 			esac
 			if [ -e "$_rm" ]; then
 				rm -f "$_rm"
+				[ "$1" = sslocal ] && rm -f "$(dirname "$_rm")/ssserver"
 				if [ "$1" = aether ] && [ "$_rm" = "$DIR/aether/aether" ]; then
 					rm -f "$DIR/aether/pt/psiphon-tunnel-core" "$DIR/aether/pt/lyrebird"
 				fi
@@ -1228,11 +1241,14 @@ cmd_remove() {
 		openvpn)
 			remove_openvpn
 			;;
+		haproxy)
+			remove_haproxy
+			;;
 		xray)
 			say_message "Xray is the engine and cannot be removed - it can only be updated."
 			return 1
 			;;
-		*) echo "usage: $0 remove sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|xray-patterniha|openvpn" >&2; return 1 ;;
+		*) echo "usage: $0 remove sing-box|sing-box-lx|geoview|warp-plus|vwarp|xray-patterniha|openvpn" >&2; return 1 ;;
 	esac
 	return 0
 }
@@ -1250,13 +1266,13 @@ case "${1:-list}" in
 		case "${2:-}" in
 			xray)     install_xray "${3:-}" || _rc=$? ;;
 			sing-box|sing-box-lx) install_singbox "$2" || _rc=$? ;;
-			hysteria) install_hysteria || _rc=$? ;;
 			geoview)  install_geoview || _rc=$? ;;
 			warp-plus|vwarp) install_warpplus "$2" || _rc=$? ;;
 			xray-patterniha) install_xray_patterniha || _rc=$? ;;
 			aether) install_aether || _rc=$? ;;
 			mihomo) install_mihomo || _rc=$? ;;
 			sslocal) install_sslocal || _rc=$? ;;
+			haproxy) install_haproxy || _rc=$? ;;
 			openvpn)
 				install_openvpn || _rc=$?
 				if [ "$_rc" != 0 ] && grep -qi 'no space left' "$ZGZ_RUN/ovpn-install.log" 2>/dev/null; then
@@ -1266,7 +1282,7 @@ case "${1:-list}" in
 			# This file is among those the install replaces, so nothing
 			# after it may be read from here: it ends the script outright.
 			zirgozar) install_self; exit $? ;;
-			*) echo "usage: $0 install xray|xray-patterniha|sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|openvpn|zirgozar" >&2; exit 1 ;;
+			*) echo "usage: $0 install xray|xray-patterniha|sing-box|sing-box-lx|geoview|warp-plus|vwarp|openvpn|zirgozar" >&2; exit 1 ;;
 		esac
 		if [ "$_rc" != 0 ] && [ -s "$ZGZ_RUN/no-room" ]; then
 			printf '%s room %s\n' "$2" "$(cat "$ZGZ_RUN/no-room")" > "$CORE_RESULT"

@@ -12,7 +12,7 @@
 # The package metadata already declares these, so a normal install pulls them
 # in. This exists for the cases where that is not enough: a package installed
 # by hand from a release page, an image built without the kernel modules, an
-# upgrade that dropped one. None of it assumes PassWall2 or anything else has
+# upgrade that dropped one. None of it assumes any other program has
 # already been here - it is a fresh OpenWrt that has to work.
 #
 # It reports two different things, and the difference matters. A package can
@@ -24,7 +24,7 @@
 # the tunnel will work, and it is the second set the page shows first.
 #
 # Nothing here installs, removes or upgrades xray-core. A router that already
-# has one - because PassWall2 put it there - is a router that needs nothing,
+# has one - because another program put it there - is a router that needs nothing,
 # and touching that package would break the other program for no gain.
 
 set -e

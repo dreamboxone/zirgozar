@@ -3,19 +3,19 @@
  * Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
  * Part of Zirgozar - https://github.com/dreamboxone/zirgozar
  *
- * One node added by hand, field by field - PassWall2's Node Config page.
+ * One node added by hand, field by field - the Node Config page.
  *
  * A node is kept as its share link, because that is what every other part of
  * the program reads. This page takes the link apart into its fields, and on
  * save puts it back together from them, so nothing else has to change. What a
  * link has no place for - ECH, the certificate checks, TCP Fast Open and the
- * rest of PassWall2's lower half - is kept as settings of the node beside it,
+ * rest of the lower half - is kept as settings of the node beside it,
  * and zgz-parse puts them into the outbound.
  *
  * A node that is a whole file - a WireGuard or AmneziaWG .conf, an OpenVPN
  * profile - or several links pasted into one, is edited as the text it is.
  *
- * Above the fields, PassWall2's four buttons: a link to replace this one, the
+ * Above the fields, the four buttons: a link to replace this one, the
  * link the fields now make, that link as a QR code, and the node as a whole
  * Xray configuration to download.
  */
@@ -773,6 +773,8 @@ return view.extend({
 				o = s.option(form.Flag, 'warpplus', _('Carry with warp-plus'),
 					_('warp-plus sends junk ahead of every WireGuard handshake, which gets it past a filter that drops WireGuard on sight. It needs warp-plus, from App Update. As a pre-proxy or a landing node, the config is still carried by Xray.'));
 			}
+			if (/^\s*hysteria2\+realm(\+http)?:\/\//im.test(link))
+				s.option(form.Flag, 'hy_portmap', _('Port mapping'), _('Opens a port on the modem by UPnP or NAT-PMP, for a better chance of a direct connection.'));
 			if (/^\s*(client\s*$|remote\s+\S+|<ca>)/im.test(link)) {
 				o = s.option(form.Value, 'ovpn_user', _('OpenVPN user name'));
 				o = s.option(form.Value, 'ovpn_pass', _('OpenVPN password'));
@@ -784,7 +786,7 @@ return view.extend({
 			var XR = [ 'vless', 'vmess', 'trojan', 'shadowsocks', 'socks', 'http' ];
 			var TLSP = [ 'vless', 'vmess', 'trojan' ];
 			/* What has a transport to choose: the TLS protocols, and SOCKS and
-			   HTTP, as in PassWall2. */
+			   HTTP. */
 			var TRP = TLSP.concat([ 'socks', 'http' ]);
 
 			o = field(form.ListValue, 'proto', _('Protocol'));
@@ -1327,7 +1329,7 @@ return view.extend({
 			o = field(form.ListValue, 'hy2_obfs', _('Obfuscation'));
 			o.value('', _('None'));
 			o.value('salamander', 'salamander');
-			o.value('gecko', _('gecko (needs the hysteria program)'));
+			o.value('gecko', 'gecko');
 			o.depends('_proto', 'hysteria2');
 			o = field(form.Value, 'hy2_obfs_password', _('Obfuscation password'));
 			o.depends('_hy2_obfs', 'salamander');
@@ -1468,7 +1470,7 @@ return view.extend({
 			o.datatype = 'uinteger';
 			onType(o, [ 'grpc' ]);
 
-			/* ------------------- PassWall2's lower half: settings of the node */
+			/* ------------------- The lower half: settings of the node */
 			function xr(x) { XR.forEach(function(p) { x.depends('_proto', p); }); return x; }
 			function tlsOnly(x) { TLSP.forEach(function(p) { x.depends({ '_proto': p, '_security': 'tls' }); }); return x; }
 
@@ -1544,7 +1546,7 @@ return view.extend({
 			o.depends('sb_mux', /.+/);
 		}
 
-		/* PassWall2's Chain Proxy, with its option names. */
+		/* The Chain Proxy, with its option names. */
 		var others = uci.sections('zirgozar', 'node').filter(function(n) { return n['.name'] != sid; });
 		o = s.option(form.ListValue, 'chain_proxy', _('Chain Proxy'));
 		[ 'vless', 'vmess', 'trojan', 'shadowsocks', 'socks', 'http', 'hysteria2', 'tuic', 'warp', 'wireguard', 'openvpn' ]
@@ -1728,7 +1730,7 @@ return view.extend({
 		]);
 
 		return m.render().then(function(mapEl) {
-			/* Under the page's title, as in PassWall2. */
+			/* Under the page's title. */
 			var head = mapEl.querySelector('.cbi-section > h3, .cbi-section > legend');
 			if (head) head.parentNode.insertBefore(tools, head.nextSibling);
 			else mapEl.insertBefore(tools, mapEl.firstChild);

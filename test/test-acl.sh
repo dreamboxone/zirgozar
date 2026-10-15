@@ -138,7 +138,7 @@ else
 	bad "the jumps sit between the reserved returns and the catch-all"
 fi
 
-echo "== access control under REDIRECT, PassWall2's default"
+echo "== access control under REDIRECT, the default"
 rig_set tcp_proxy_way ""
 dump "REDIRECT"
 if chain acl_2 | grep -qF 'meta l4proto tcp meta mark set 0x164 counter accept'; then

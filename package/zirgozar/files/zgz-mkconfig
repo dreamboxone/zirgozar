@@ -19,7 +19,7 @@
 # completely on the very servers this is built to use. The DNS tab can say
 # otherwise; TCP is only where it starts.
 #
-# The DNS follows PassWall2's rules and uses its option names. Names that go
+# The DNS follows the rules and uses its option names. Names that go
 # straight out are answered by the Direct DNS, which never goes through the
 # tunnel; everything else by the Remote DNS, through the tunnel unless the
 # tab says direct. And the names of the nodes themselves always go to the
@@ -53,7 +53,7 @@ route_ir="$(cfg_bool route_ir 0)"
 block_ads="$(cfg_bool block_ads 0)"
 block_torrent="$(cfg_bool block_torrent 0)"
 loglevel="$(cfg loglevel warning)"
-# PassWall2's switch for the core's own log. Off is a core that says nothing.
+# The switch for the core's own log. Off is a core that says nothing.
 [ "$(cfg_bool log_node 1)" = "1" ] || loglevel=none
 
 PRIVATE_V4='"0.0.0.0/8","10.0.0.0/8","100.64.0.0/10","127.0.0.0/8","169.254.0.0/16","172.16.0.0/12","192.168.0.0/16","224.0.0.0/4","240.0.0.0/4"'
@@ -98,7 +98,7 @@ if [ "$(cfg_bool remote_fakedns 0)" = "1" ] && [ "$(cfg dns_mode dnsmasq)" = "di
 	fakedns=1
 fi
 
-# The Shunt Rule tab's FakeDNS, as PassWall2 has it: a main switch, then a
+# The Shunt Rule tab's FakeDNS: a main switch, then a
 # tick per rule and one for the Default row. A rule's names are answered with
 # made-up addresses whichever way lookups reach the tunnel, because it is only
 # those names - the router's own downloads are not among them, and the
@@ -115,7 +115,7 @@ if [ "$(cfg_bool shunt_fakedns 0)" = "1" ]; then
 	fi
 fi
 
-# Sniffing, as PassWall2's Xray settings have it. Override the connection's
+# Sniffing. Override the connection's
 # destination with the name found in it - except for the names listed as
 # excluded, which break when their address is replaced - or use the name for
 # routing only. The Iran split routes on names, so sniffing itself is always
@@ -279,7 +279,7 @@ acl_count=0
 acl_base=$((tproxy_port + 100))
 
 acl_ports() {
-	# PassWall2 writes ranges with a colon and accepts a dash. Anything else
+	# Ranges are written with a colon; a dash is accepted. Anything else
 	# is not a port list, and a rule with a broken one is better without it.
 	_p="$(printf '%s' "$1" | tr -d ' \t' | tr '-' ':')"
 	case "$_p" in
@@ -408,7 +408,7 @@ mv -f "$ACL_TSV.new" "$ACL_TSV" 2>/dev/null || true
 
 # ------------------------------------------------------------ SOCKS ports
 
-# PassWall2's node SOCKS port: the tunnel's own way out, offered as a SOCKS
+# The node SOCKS port: the tunnel's own way out, offered as a SOCKS
 # server on the router - to itself only, unless Bind Local is off.
 socks_inbounds=""
 socks_outbounds=""
@@ -440,7 +440,7 @@ if bridge_is_aether; then
     { \"tag\": \"aether-via\", \"listen\": \"127.0.0.1\", \"port\": $(cfg aether_upstream_port 10809), \"protocol\": \"socks\", \"settings\": { \"udp\": true } }"
 fi
 
-# And PassWall2's Socks Config: more SOCKS ports, each through a node of its
+# And the Socks Config: more SOCKS ports, each through a node of its
 # own - or, with no node named, the way the tunnel goes. A node that cannot be
 # used goes the tunnel's way rather than leaving the port dead.
 socks_one() {
@@ -547,7 +547,7 @@ if [ "$(cfg_bool socks_enabled 0)" = "1" ] && [ -r /lib/functions.sh ]; then
 fi
 mv -f "$SOCKSW_TSV.new" "$SOCKSW_TSV" 2>/dev/null || true
 
-# TCP Proxy Way, as PassWall2 offers it. REDIRECT is the default, as there:
+# TCP Proxy Way. REDIRECT is the default, as there:
 # TCP to a port of its own and UDP by TPROXY, which carries both on one port
 # when it is chosen instead. UDP has no other way than TPROXY.
 redir_inbound=""
@@ -594,8 +594,8 @@ fi
 
 # ------------------------------------------------------------ shunt rules
 
-# PassWall2's Shunt Rule tab. The rules are `config shunt_rules` sections,
-# made on the Traffic Rules page with PassWall2's fields; the tab in Basic
+# The Shunt Rule tab. The rules are `config shunt_rules` sections,
+# made on the Traffic Rules page with the fields; the tab in Basic
 # Settings says where each one goes, in the rule's own `node` option:
 #
 #   (empty)     not used
@@ -607,7 +607,7 @@ fi
 #
 # default_node is the Default row: where everything no rule claims goes - the
 # node the tunnel is using, unless it says otherwise. Only the rules of the
-# group chosen in shunt_group count, as in PassWall2.
+# group chosen in shunt_group count.
 #
 # They steer the tunnel's own traffic only: the transparent proxy, the node
 # SOCKS port, and a SOCKS port with no node of its own. A device on the Access
@@ -666,8 +666,8 @@ add_shunt() {
 }
 
 # A node's outbound - added by hand or a subscription's - dialling through the
-# pre-proxy node given: PassWall2's per-rule Preproxy. A node with a chain of
-# its own keeps it: one layer of pre-proxy, as PassWall2 says. The pre-proxy's
+# pre-proxy node given: the per-rule Preproxy. A node with a chain of
+# its own keeps it: one layer of pre-proxy. The pre-proxy's
 # own outbound is made with the others that dial through something, from the
 # dialer tag.
 shunt_outbound() {
@@ -727,7 +727,7 @@ $(printf '%s\n' "$_so" | sed -e 's/^[[:space:]]*//' -e "s/^{/{\"tag\":\"shunt$sh
 	return 0
 }
 
-# One entry a line, as PassWall2 writes them, into a JSON list. # starts a
+# One entry a line, into a JSON list. # starts a
 # comment, and a sing-box rule-set means nothing to Xray - it is kept only in
 # a configuration that zgz-sbconfig will turn into sing-box's.
 shunt_list() {
@@ -765,7 +765,7 @@ shunt_one() {
 	fi
 	[ -n "$node" ] || return 0
 
-	# PassWall2's invert, which only sing-box has. Run the right way round
+	# The invert, which only sing-box has. Run the right way round
 	# under Xray it would send exactly the other traffic there, so under
 	# Xray the rule is left out, and the log says so.
 	config_get_bool invert "$1" invert 0
@@ -793,7 +793,7 @@ shunt_one() {
 	config_get domain_list "$1" domain_list ""
 	config_get ip_list "$1" ip_list ""
 
-	# PassWall2's Inbound Tag: the transparent proxy, SOCKS, or both - and
+	# The Inbound Tag: the transparent proxy, SOCKS, or both - and
 	# with nothing ticked, both.
 	_in=""
 	case " $inbound " in *" tproxy "*) _in="$main_in" ;; esac
@@ -1041,7 +1041,7 @@ $shunt_outbounds" | awk 'NF { printf "%s%s,\n", "    ", $0 }')"
 
 # ---------------------------------------------------------------------- DNS
 
-# PassWall2's DNS tab, option for option.
+# The DNS tab, option for option.
 set -- $(direct_dns)
 dd_proto="$1"; dd_addr="$2"; dd_port="$3"
 direct_qs="$(cfg direct_dns_query_strategy UseIP)"
@@ -1173,7 +1173,7 @@ fi
 dns_servers=""
 
 # A node added by hand may name the resolver its own server name is looked up
-# with - PassWall2's Domain DNS Resolve. Each such name gets a server of its
+# with - the Domain DNS Resolve. Each such name gets a server of its
 # own, ahead of the direct one so that it is the one asked, and its queries go
 # straight out like the direct resolver's. "udp://ip[:port]", "tcp://..." and
 # "https://..." as Xray reads them; a bare address is UDP.
@@ -1248,7 +1248,7 @@ if [ "$fakedns" = "1" ] || [ "$shunt_fake" = "1" ]; then
 	fakedns_block='"fakedns": [ { "ipPool": "198.18.0.0/15", "poolSize": 65535 } ],'
 fi
 
-# Buffer Size, from PassWall2's Xray settings: per connection, in kB.
+# Buffer Size, from the Xray settings: per connection, in kB.
 levels=""
 _buf="$(cfg buffer_size '')"
 case "$_buf" in

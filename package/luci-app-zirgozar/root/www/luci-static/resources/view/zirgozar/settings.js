@@ -3,14 +3,14 @@
  * Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
  * Part of Zirgozar - https://github.com/dreamboxone/zirgozar
  *
- * Basic Settings, PassWall2's page of that name and this program's first
+ * Basic Settings, the page of that name and this program's first
  * page: the row of tiles and what the tunnel is doing at the top, then the
  * Main tab with the main switch, the node, the router's own traffic and the
  * LAN's, and the SOCKS ports; the DNS tab; the Log tab; and at the foot what
  * has gone through the tunnel. There is one main switch, the one in the Main
- * tab, and it is saved and applied the way PassWall2's is.
+ * tab, and it is saved and applied's is.
  *
- * How a node is chosen is on Configs, and everything else PassWall2 keeps
+ * How a node is chosen is on Configs, and everything else kept
  * in Other Settings is on that page here as well, and nowhere else.
  */
 
@@ -27,7 +27,7 @@ var callSubNodes = rpc.declare({ object: 'luci.zirgozar', method: 'subnodes', ex
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
 
-/* PassWall2's Backup and Restore. The archive goes to and from the browser
+/* The Backup and Restore. The archive goes to and from the browser
    through LuCI's own file transfer, at the two paths the ACL allows. */
 var BACKUP_PATH = '/tmp/zirgozar-backup.tar';
 var RESTORE_PATH = '/tmp/zirgozar-restore';
@@ -221,7 +221,7 @@ return view.extend({
 			});
 		}
 		/* And for the tunnel's own node, the nodes of the subscriptions too, as
-		   PassWall2 offers them. A subscription's nodes are read afresh every
+		   they are offered. A subscription's nodes are read afresh every
 		   time, so one is kept by what it is - subscription, protocol, address,
 		   port and name - and found again in each new list. */
 		var subNodes = (data[2] && data[2].nodes) || [];
@@ -262,7 +262,7 @@ return view.extend({
 		s = m.section(form.NamedSection, 'config', 'zirgozar');
 		s.anonymous = true;
 
-		/* PassWall2's tabs, in PassWall2's order. */
+		/* The tabs. */
 		s.tab('main', _('Main'));
 		s.tab('shunt', _('Shunt Rule'));
 		s.tab('dns', _('DNS'));
@@ -284,13 +284,13 @@ return view.extend({
 		o.rmempty = false;
 
 		o = s.taboption('main', form.ListValue, 'node', _('Choose node'),
-			_('Auto measures the nodes and uses the fastest. A node chosen here - added by hand or from a subscription - is used as it is, and nothing is measured. A subscription’s node is found again each time its list is read, as PassWall2 does.'));
+			_('Auto measures the nodes and uses the fastest. A node chosen here - added by hand or from a subscription - is used as it is, and nothing is measured. A subscription’s node is found again each time its list is read.'));
 		o.value('', _('Auto (fastest)'));
 		nodeChoices(o);
 		subChoices(o);
 
 		o = s.taboption('main', form.Flag, 'preproxy_enabled', _('Preproxy'),
-			_('Every node the tunnel may choose dials out through this node first — PassWall2’s pre-proxy. For a node that cannot be reached from here directly, or to hide which nodes are being used. With it on, the first-pass handshake is skipped, because no node is reached directly.'));
+			_('Every node the tunnel may choose dials out through this node first — the pre-proxy. For a node that cannot be reached from here directly, or to hide which nodes are being used. With it on, the first-pass handshake is skipped, because no node is reached directly.'));
 		o.default = '0';
 		o.rmempty = false;
 
@@ -300,7 +300,7 @@ return view.extend({
 		nodeChoices(o);
 
 		o = s.taboption('main', form.Flag, 'localhost_proxy', _('Localhost Proxy'),
-			_('When selected, the router’s own traffic goes through the tunnel as well — its downloads, its clock, its package manager, and so the routing data and the cores from GitHub. While a node is being measured or a subscription read it goes direct, so the router can always repair its own tunnel. On by default, as in PassWall2.'));
+			_('When selected, the router’s own traffic goes through the tunnel as well — its downloads, its clock, its package manager, and so the routing data and the cores from GitHub. While a node is being measured or a subscription read it goes direct, so the router can always repair its own tunnel. On by default.'));
 		o.default = '1';
 		o.rmempty = false;
 
@@ -335,7 +335,7 @@ return view.extend({
 		o.default = '0';
 		o.rmempty = false;
 
-		/* PassWall2's Socks Config, inside this tab rather than under the
+		/* The Socks Config, inside this tab rather than under the
 		   page, so it is seen with the switch that turns it on. */
 		o = s.taboption('main', form.SectionValue, '_socks', form.GridSection, 'socks', _('Socks Config'));
 		o.depends('socks_enabled', '1');
@@ -448,7 +448,7 @@ return view.extend({
 		};
 
 		/* ---------------------------------------------------- shunt rule
-		   PassWall2's Shunt Rule tab, with the rules themselves in it too:
+		   The Shunt Rule tab, with the rules themselves in it too:
 		   which traffic each rule is about, and where it goes. */
 		var rules = uci.sections('zirgozar', 'shunt_rules');
 		var groups = {};

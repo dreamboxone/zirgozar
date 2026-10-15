@@ -21,9 +21,6 @@
 # everything else in the program - measuring, routing, statistics, the rules -
 # carries on exactly as it does for a vless server and does not need to know.
 #
-# sing-box is preferred because it speaks both. The official hysteria client
-# is used when it is the only one installed and the server is hysteria2.
-#
 # A WARP node is warp-plus's, whichever engine carries the tunnel: it finds a
 # WARP address by scanning, puts a second WARP or Psiphon behind the first,
 # and sends junk ahead of a WireGuard handshake - none of which a core does.
@@ -72,18 +69,6 @@ bridge_singbox() {
 	return 1
 }
 
-# The subscription of the node in use asks for the official hysteria client.
-wants_hysteria() {
-	[ "$(jget type)" = "hysteria2" ] || return 1
-	# A Realm and Gecko are the official client's alone.
-	hysteria_only && return 0
-	_wh="$(sed -n 's/^sub=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)"
-	case "$_wh" in ''|*[!A-Za-z0-9_]*) return 1 ;; esac
-	[ "$(uci -q get "zirgozar.$_wh.hysteria2_type" 2>/dev/null)" = "hysteria" ] || return 1
-	find_hysteria >/dev/null || return 1
-	return 0
-}
-
 cmd_needed() {
 	[ -s "$NODE" ] || return 1
 	return 0
@@ -103,7 +88,9 @@ singbox_config() {
 			mkdir -p "$ZGZ_ETC/tailscale"
 			chmod 700 "$ZGZ_ETC/tailscale" 2>/dev/null || true
 		fi
-		ucode "$ZGZ_LIB/zgz-sbconfig" mode=bridge bridge="$NODE" bridgeport="$PORT" etc="$ZGZ_ETC" \
+		_pin=""
+		sb_certpin "$_sb" && _pin=1
+		ucode "$ZGZ_LIB/zgz-sbconfig" mode=bridge bridge="$NODE" bridgeport="$PORT" etc="$ZGZ_ETC" certpin="$_pin" \
 			lib="$ZGZ_LIB" rsdir="$ZGZ_RUN/rs" mark="$ZGZ_OUT_MARK" > "$ZGZ_BRIDGE_JSON.new" 2>"$ZGZ_RUN/bridge.err" || {
 			rm -f "$ZGZ_BRIDGE_JSON.new"
 			say_message "$(sed -n 's/^error: //p' "$ZGZ_RUN/bridge.err" | head -1)"
@@ -198,62 +185,9 @@ warp_config() {
 	return 0
 }
 
-# --------------------------------------------------------------- hysteria
-
-hysteria_only() {
-	[ -n "$(jget realm)" ] || [ "$(jget obfs)" = "gecko" ]
-}
-
 # A YAML string in single quotes, where a quote is written twice.
 yq() {
 	printf "'%s'" "$(printf '%s' "$1" | sed "s/'/''/g")"
-	return 0
-}
-
-hysteria_config() {
-	[ "$(jget type)" = "hysteria2" ] || return 1
-	_server="$(jget server)"
-	_port="$(jnum port)"
-	_sni="$(jget sni)"
-	_realm="$(jget realm)"
-	[ -n "$_sni" ] || [ -n "$_realm" ] || _sni="$_server"
-
-	# hysteria's own client reads YAML, not JSON.
-	{
-		# Port hopping: hysteria takes the range in place of the port.
-		_hp="$(jget ports)"
-		if [ -n "$_realm" ]; then
-			_hp=""
-			printf 'server: %s\n' "$(yq "$_realm")"
-		elif [ -n "$_hp" ]; then
-			printf 'server: %s:%s\n' "$_server" "$_hp"
-		else
-			printf 'server: %s:%s\n' "$_server" "$_port"
-		fi
-		printf 'auth: %s\n' "$(jget password)"
-		printf 'tls:\n'
-		[ -z "$_sni" ] || printf '  sni: %s\n' "$_sni"
-		printf '  insecure: %s\n' "$(jbool insecure)"
-		_stun="$(jget stun)"
-		if [ -n "$_realm" ] && [ -n "$_stun" ]; then
-			printf 'realm:\n  stunServers:\n'
-			printf '%s\n' "$_stun" | tr ',' '\n' | while read -r _st; do [ -z "$_st" ] || printf '    - %s\n' "$(yq "$_st")"; done
-		fi
-		_obfs="$(jget obfs)"
-		if [ -n "$_obfs" ]; then
-			printf 'obfs:\n  type: %s\n  %s:\n    password: %s\n' \
-				"$_obfs" "$_obfs" "$(jget obfs_password)"
-		fi
-		if [ -n "$(jnum up_mbps)" ] || [ -n "$(jnum down_mbps)" ]; then
-			printf 'bandwidth:\n'
-			[ -z "$(jnum up_mbps)" ] || printf '  up: %s mbps\n' "$(jnum up_mbps)"
-			[ -z "$(jnum down_mbps)" ] || printf '  down: %s mbps\n' "$(jnum down_mbps)"
-		fi
-		printf 'socks5:\n  listen: 127.0.0.1:%s\n' "$PORT"
-		printf 'fastOpen: true\n'
-		_hi="$(jget hop_interval)"
-		[ -z "$_hp" ] || [ -z "$_hi" ] || printf 'transport:\n  udp:\n    hopInterval: %s\n' "$_hi"
-	} > "$ZGZ_BRIDGE_JSON.yaml"
 	return 0
 }
 
@@ -467,20 +401,9 @@ cmd_config() {
 			return 0
 			;;
 	esac
-	if hysteria_only && ! find_hysteria >/dev/null; then
-		own_program_missing "A Hysteria2 config with a Realm or Gecko obfuscation needs the hysteria program. Install it on the App Update page." "no hysteria installed for a Realm or Gecko node"
-		return 1
-	fi
-
-	if ! wants_hysteria && _sb="$(bridge_singbox)"; then
+	if _sb="$(bridge_singbox)"; then
 		if singbox_config; then
 			echo "$ZGZ_BRIDGE_JSON"
-			return 0
-		fi
-	fi
-	if _hy="$(find_hysteria)"; then
-		if hysteria_config; then
-			echo "$ZGZ_BRIDGE_JSON.yaml"
 			return 0
 		fi
 	fi
@@ -547,12 +470,8 @@ cmd_command() {
 		echo "$_sl -c $ZGZ_BRIDGE_JSON.ssrust.json"
 		return 0
 	fi
-	if ! wants_hysteria && _sb="$(bridge_singbox)" && singbox_config; then
+	if _sb="$(bridge_singbox)" && singbox_config; then
 		echo "$_sb run -c $ZGZ_BRIDGE_JSON"
-		return 0
-	fi
-	if _hy="$(find_hysteria)" && hysteria_config; then
-		echo "$_hy client -c $ZGZ_BRIDGE_JSON.yaml"
 		return 0
 	fi
 	return 1

@@ -35,7 +35,7 @@ CHAIN_TSV="$ZGZ_RUN/chain.tsv"
 # (a list of share links) or <section>.tsv (a configuration, already read into
 # records), with <section>.status beside it. That is what lets one of them be
 # read again, or have its nodes deleted, without touching the others - which
-# is how PassWall2's Node Subscribe page works, button for button. The files
+# is how the Node Subscribe page works, button for button. The files
 # the rest of the program reads are then put together from these.
 
 SUBS_DIR="$ZGZ_RUN/subs"
@@ -44,7 +44,7 @@ SUBS_KEEP="$ZGZ_ETC/subs"
 # The nodes a subscription's landing chain goes through - see sub_records.
 CHAINS="$ZGZ_RUN/chains.tsv"
 
-# The User-Agent PassWall2 sends unless told otherwise. Some providers answer
+# The User-Agent sent unless told otherwise. Some providers answer
 # a client they do not recognise with a page instead of the list.
 SUB_UA_DEFAULT="v2rayN/9.99"
 
@@ -61,7 +61,7 @@ sub_list() {
 	return 0
 }
 
-# PassWall2's keyword filter: a subscription's own mode and lists, or with
+# The keyword filter: a subscription's own mode and lists, or with
 # "Use global config" - which is what a new one has - the global ones.
 sub_filter() {
 	local mode
@@ -85,7 +85,7 @@ sub_filter() {
 # One address, one way: "proxy" through the tunnel's own SOCKS port, "direct"
 # with the name looked up by the direct resolver - never through a tunnel
 # that may be the very thing that is down - and "plain" as the router would.
-# PassWall2's three, and its names for them.
+# The three, and its names for them.
 #
 #   sub_curl <url> <out> <connect-timeout> <max-time> <retries> <way>
 proxy_ready() {
@@ -133,6 +133,8 @@ sub_curl() {
 			fi
 		fi
 	fi
+	# A provider that hands the list out only to a signed-in browser.
+	[ -z "$SUB_COOKIE" ] || set -- "$@" -H "Cookie: $SUB_COOKIE"
 	curl -fsSL --connect-timeout "$_sc_c" --max-time "$_sc_m" --retry "$_sc_r" \
 		-H 'Accept: */*' -D "$SUB_HDR" -o "$_sc_o" "$@" "$_sc_u" 2>/dev/null
 }
@@ -193,7 +195,7 @@ sub_failed() {
 
 fetch_one() {
 	_sec="$1"
-	local url name enabled content ua mode hwid
+	local url name enabled content ua mode hwid cookie
 	config_get url "$_sec" url ""
 	config_get name "$_sec" name "$_sec"
 	config_get content "$_sec" content ""
@@ -201,6 +203,7 @@ fetch_one() {
 	config_get ua "$_sec" user_agent "$SUB_UA_DEFAULT"
 	config_get mode "$_sec" access_mode ""
 	config_get_bool hwid "$_sec" hwid 0
+	config_get cookie "$_sec" cookie ""
 
 	# One subscription asked for by name is read whether or not it is
 	# switched on: somebody pressed its button.
@@ -219,6 +222,7 @@ fetch_one() {
 	SUB_HDR="$SUBS_DIR/$_sec.hdr"
 	SUB_UA="$ua"
 	SUB_HWID="$hwid"
+	SUB_COOKIE="$(printf '%s' "$cookie" | tr -d '\r\n')"
 	: > "$SUB_HDR"
 
 	# A source the reader handed over as a file rather than as an address.
@@ -232,7 +236,7 @@ fetch_one() {
 	if [ -n "$content" ]; then
 		printf '%s\n' "$content" > "$_tmp"
 	else
-		# Which ways, in which order. Auto is PassWall2's: with the router's
+		# Which ways, in which order. Auto: with the router's
 		# own traffic already going through the tunnel, as the router would;
 		# otherwise through the tunnel if it is up, and straight out if not.
 		case "$mode" in
@@ -530,7 +534,7 @@ cmd_fetch() {
 	return 0
 }
 
-# PassWall2's "Delete the subscribed node" and "Delete All Subscribe Node":
+# The "Delete the subscribed node" and "Delete All Subscribe Node":
 # what one subscription, or all of them, brought is dropped from the router.
 # The subscription itself stays, and is read again at the next refresh.
 cmd_forget() {
@@ -615,7 +619,7 @@ add_node() {
 	return 0
 }
 
-# The records one subscription brings, with its own chain - PassWall2's Chain
+# The records one subscription brings, with its own chain - the Chain
 # Proxy on a subscription, for every node in it:
 #
 #   chain_proxy 1, preproxy_node P   each node dials out through P
@@ -888,7 +892,7 @@ cmd_inuse() {
 # known by another number from then on, and every setting that named it -
 # the node in Basic Settings, a pre-proxy, a rule's node - names whichever
 # section now stands where it stood. So nodes and subscriptions get a name
-# of their own, the way PassWall2 names its nodes, and keep it.
+# of their own, and keep it.
 
 # new_name <prefix>: a name no section has.
 new_name() {
@@ -966,9 +970,9 @@ cmd_fixnames() {
 	return 0
 }
 
-# ------------------------------------------------ PassWall2's Node List
+# ------------------------------------------------ The Node List
 
-# The buttons on PassWall2's Node List, done here rather than in the page so
+# The buttons on the Node List, done here rather than in the page so
 # that each is one step on the router: the page asks, and reloads.
 
 # A hand-added node's section, and only that.
@@ -1097,7 +1101,7 @@ cmd_top() {
 	return 0
 }
 
-# PassWall2's Reassign Group: the group, then the nodes.
+# The Reassign Group: the group, then the nodes.
 cmd_group() {
 	_g="$1"; shift
 	for _s in "$@"; do
@@ -1114,7 +1118,7 @@ cmd_group() {
 
 # ------------------------------------------------- a subscription's node by name
 #
-# PassWall2 keeps every subscription node as a section of its own, so any of
+# Every subscription node is a section of its own, so any of
 # them can be the node in Basic Settings, and after each read of the list it
 # finds the chosen one again among the new ones. Here the nodes of a
 # subscription are not sections - they are read from its list every time - so
@@ -1122,7 +1126,7 @@ cmd_group() {
 #
 #   sub:<subscription>:<protocol>|<address>|<port>|<name>
 #
-# and found again the way PassWall2 finds it: everything the same; then
+# and found again: everything the same; then
 # protocol, address and port; address and port; address; name - all within
 # the same subscription. When none of them is there any more, its first node,
 # and the log says so.
@@ -1303,7 +1307,7 @@ case "${1:-update}" in
 		cmd_build
 		# The node chosen in Basic Settings may be one of a subscription that
 		# was just read again: the tunnel finds it again in the new list now,
-		# as PassWall2 does, rather than at its next start.
+		#, rather than at its next start.
 		case "$(cfg node '')" in
 			sub:*) /etc/init.d/zirgozar reload >/dev/null 2>&1 || true ;;
 		esac

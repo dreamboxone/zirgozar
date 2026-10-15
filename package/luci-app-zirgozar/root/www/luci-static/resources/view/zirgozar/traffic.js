@@ -3,9 +3,9 @@
  * Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
  * Part of Zirgozar - https://github.com/dreamboxone/zirgozar
  *
- * Rule Manage, PassWall2's page of that name: the routing data - where it
+ * Rule Manage, the page of that name: the routing data - where it
  * comes from, where it is kept, when it is updated, and going back to the
- * copy before - and PassWall2's Sing-Box/Xray Shunt Rule list: the rules by
+ * copy before - and the Sing-Box/Xray Shunt Rule list: the rules by
  * group, added by name here and each edited on a page of its own. Where each
  * rule goes is in the Shunt Rule tab of Basic Settings, beside the rule.
  *
@@ -37,7 +37,7 @@ var WEEK = [
 	[ '4', 'Every Thursday' ], [ '5', 'Every Friday' ]
 ];
 
-/* Where the two files can come from: PassWall2's list, with the Iranian
+/* Where the two files can come from: the list, with the Iranian
    project this program has always used first, and its small editions for a
    router short of flash. */
 function sources(what) {
@@ -132,11 +132,11 @@ function renderGeo(g) {
    has actually been applied. */
 var listening = false;
 
-/* PassWall2's Sing-Box/Xray Shunt Rule list. A tab for each group, "default"
+/* The Sing-Box/Xray Shunt Rule list. A tab for each group, "default"
    first; in each, the rules in the order they are tried, and under them a
-   name and Add. The name is the rule's ID, as in PassWall2, and Add opens the
+   name and Add. The name is the rule's ID, and Add opens the
    new rule's own page. Delete, Add and Edit keep what has been done here
-   among the unsaved changes - as PassWall2 does - and the order, moved with
+   among the unsaved changes - - and the order, moved with
    To Top or by dragging, is saved with the page. */
 var shuntGroup = null;
 
@@ -214,7 +214,7 @@ function drawShuntRules(box) {
 		]));
 	});
 
-	/* The name is the rule's ID, as in PassWall2, when it can be one - letters,
+	/* The name is the rule's ID, when it can be one - letters,
 	   digits and _ are what a section of the configuration may be called. Any
 	   other name, a Persian one among them, is the rule's Remarks, and the ID
 	   is made up for it. */
@@ -302,7 +302,7 @@ return view.extend({
 		m = new form.Map('zirgozar');
 
 		/* ----------------------------------------------------- rule status
-		   PassWall2's, option for option. */
+		   option for option. */
 		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Rule status'));
 		s.anonymous = true;
 
@@ -465,7 +465,7 @@ return view.extend({
 		};
 
 		return m.render().then(function(el) {
-			/* Under the rule status, where PassWall2 has it. */
+			/* Under the rule status. */
 			var first = el.querySelector('.cbi-section');
 			var shunt = shuntRuleSection();
 			if (first && first.parentNode) first.parentNode.insertBefore(shunt, first.nextSibling);

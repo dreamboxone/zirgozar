@@ -3,14 +3,14 @@
  * Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
  * Part of Zirgozar - https://github.com/dreamboxone/zirgozar
  *
- * What PassWall2 shows at the top of its Basic Settings page, and this
+ * What is shown at the top of the Basic Settings page, and this
  * program's first page shows the same way: a row of tiles - the core and
  * whether it is running, and three sites to press for a connection check -
  * then what the tunnel is doing and through which node, and at the foot of
  * the page how much has gone through it.
  *
  * There is no switch here. The main switch is the one in the form below,
- * saved and applied the way PassWall2's is; two switches for one thing is one
+ * saved and applied's is; two switches for one thing is one
  * too many.
  */
 
@@ -300,7 +300,7 @@ function setNode(id, content) {
 		: document.createTextNode(content === '' ? '-' : String(content)));
 }
 
-/* One of PassWall2's row of tiles, drawn as Makhzan's metric card, with the
+/* One of the row of tiles, drawn as Makhzan's metric card, with the
    icon given as an element so a brand mark can stand in for a line icon. */
 function tile(id, ico, colour, title, value, onclick) {
 	return E('div', {
@@ -349,7 +349,7 @@ function renderState(st) {
 		                : _('Iran split is on, but the routing data is missing'))
 		: _('Everything goes through the tunnel'));
 
-	/* The core, the way PassWall2 shows it: its name beside the word, on
+	/* The core: its name beside the word, on
 	   one line, and under it whether it is running, in green or in red. The
 	   version is there when the pointer rests on the tile. */
 	coreTile('pwp-core', _('Core'), coreName(st.core_name), st.core_version, st.core_running);
@@ -451,7 +451,7 @@ function refreshState() {
 	}).catch(function() {});
 }
 
-/* PassWall2's connection check: press the tile, one request, timed. */
+/* The connection check: press the tile, one request, timed. */
 function check(id, url) {
 	var v = byId(id + '-v');
 	if (v) {

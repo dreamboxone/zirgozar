@@ -3,7 +3,7 @@
  * Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
  * Part of Zirgozar - https://github.com/dreamboxone/zirgozar
  *
- * PassWall2's Server-Side: the router as a proxy server, for phones and
+ * The Server-Side: the router as a proxy server, for phones and
  * laptops away from home. Xray serves VLESS, VMess, Trojan, Shadowsocks,
  * SOCKS and HTTP; sing-box serves Hysteria2 and TUIC. The settings are a
  * file of their own, /etc/config/zirgozar_server, and a service of their own
@@ -31,7 +31,7 @@ var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
 
 var CONF = 'zirgozar_server';
 var TLS_PROTOS = [ 'vless', 'vmess', 'trojan' ];
-var SB_PROTOS = [ 'hysteria2', 'tuic' ];
+var SB_PROTOS = [ 'hysteria2', 'tuic', 'hysteria', 'anytls', 'naive' ];
 
 function randomHex(n) {
 	var a = new Uint8Array(n);
@@ -120,7 +120,29 @@ function shareLink(sid) {
 		};
 		return 'vmess://' + b64(JSON.stringify(j));
 	}
-	if (proto == 'shadowsocks')
+	if (proto == 'hysteria') {
+		var h1 = { auth: get(sid, 'password'), peer: sni, insecure: get(sid, 'link_insecure') == '1' ? '1' : '',
+		           upmbps: get(sid, 'hy2_up_mbps') || '100', downmbps: get(sid, 'hy2_down_mbps') || '100', obfsParam: get(sid, 'hy2_obfs_password') };
+		return 'hysteria://' + host + ':' + port + '?' + query(h1) + name;
+	}
+	if (proto == 'anytls')
+		return 'anytls://' + encodeURIComponent(get(sid, 'password')) + '@' + host + ':' + port + '?' +
+			query({ sni: sni, insecure: get(sid, 'link_insecure') == '1' ? '1' : '' }) + name;
+	if (proto == 'naive')
+		return 'naive+https://' + encodeURIComponent(get(sid, 'username')) + ':' + encodeURIComponent(get(sid, 'password')) + '@' + host + ':' + port + name;
+	if (proto == 'snell')
+		return 'snell://' + encodeURIComponent(get(sid, 'password')) + '@' + host + ':' + port + '?version=' + (get(sid, 'snell_version') == '6' ? '6' : '5') + name;
+	if (proto == 'mixed') {
+		var ma = get(sid, 'auth') == '1' ? b64(get(sid, 'username') + ':' + get(sid, 'password')) + '@' : '';
+		return 'socks://' + ma + host + ':' + port + name;
+	}
+	if (proto == 'wireguard') {
+		var wa = (get(sid, 'wg_address') || '10.7.0.1/24').replace(/\/.*$/, '').split('.');
+		wa[3] = String(Number(wa[3]) + 1);
+		return 'wireguard://' + encodeURIComponent(get(sid, 'wg_client_private_key')) + '@' + host + ':' + port + '?' +
+			query({ publickey: get(sid, 'wg_public_key'), address: wa.join('.') + '/32', mtu: '1420' }) + name;
+	}
+	if (proto == 'shadowsocks' || proto == 'ssrust')
 		return 'ss://' + b64((get(sid, 'method') || 'aes-256-gcm') + ':' + get(sid, 'password')).replace(/=+$/, '') +
 			'@' + host + ':' + port + name;
 	if (proto == 'socks' || proto == 'http') {
@@ -183,8 +205,10 @@ function statusText(d) {
 	var parts = [], bad = [];
 	if (d.xray) parts.push('Xray');
 	if (d.singbox) parts.push('sing-box');
+	if (d.ssrust) parts.push('shadowsocks-rust');
 	if (d.xray_error) bad.push('Xray: ' + d.xray_error);
 	if (d.singbox_error) bad.push('sing-box: ' + d.singbox_error);
+	if (d.ssrust_error) bad.push('shadowsocks-rust: ' + d.ssrust_error);
 	if (bad.length) return [ _('Could not start: %s').format(bad.join(' / ')), 'error' ];
 	if (!parts.length) return [ _('No server is running. Add one below and press Save & Apply.'), 'warn' ];
 	return [ _('Running (%s), listening on %s.').format(parts.join(', '), String(d.ports || '').trim() || '-'), 'ok' ];
@@ -254,7 +278,9 @@ return view.extend({
 
 		o = s.taboption('main', form.ListValue, 'protocol', _('Protocol'));
 		[ [ 'vless', 'VLESS' ], [ 'vmess', 'VMess' ], [ 'trojan', 'Trojan' ], [ 'shadowsocks', 'Shadowsocks' ],
-		  [ 'socks', 'Socks' ], [ 'http', 'HTTP' ], [ 'hysteria2', 'Hysteria2' ], [ 'tuic', 'TUIC' ] ]
+		  [ 'ssrust', _('Shadowsocks (shadowsocks-rust)') ], [ 'socks', 'Socks' ], [ 'http', 'HTTP' ], [ 'mixed', 'Mixed (Socks + HTTP)' ],
+		  [ 'hysteria2', 'Hysteria2' ], [ 'hysteria', 'Hysteria (v1)' ], [ 'tuic', 'TUIC' ], [ 'anytls', 'AnyTLS' ], [ 'naive', 'NaiveProxy' ],
+		  [ 'snell', 'Snell' ], [ 'wireguard', 'WireGuard' ], [ 'tunnel', _('Tunnel (port forward)') ] ]
 			.forEach(function(v) { o.value(v[0], v[1]); });
 		o.default = 'vless';
 
@@ -286,37 +312,90 @@ return view.extend({
 			.forEach(function(v) { o.value(v); });
 		o.default = 'aes-256-gcm';
 		o.depends('protocol', 'shadowsocks');
+		o.depends('protocol', 'ssrust');
 
 		o = s.taboption('main', form.Flag, 'auth', _('Auth'));
 		o.modalonly = true;
 		o.depends('protocol', 'socks');
 		o.depends('protocol', 'http');
+		o.depends('protocol', 'mixed');
 
 		o = s.taboption('main', form.Value, 'username', _('Username'));
 		o.modalonly = true;
 		o.depends('auth', '1');
+		o.depends('protocol', 'naive');
 
 		o = s.taboption('main', form.Value, 'password', _('Password'),
 			_('A 2022 Shadowsocks method needs a base64 key of its own length: 16 bytes for aes-128, 32 for the others.'));
 		o.modalonly = true;
 		o.password = true;
 		o.default = randomHex(12);
-		[ 'shadowsocks', 'hysteria2', 'tuic' ].forEach(function(p) { o.depends('protocol', p); });
+		[ 'shadowsocks', 'ssrust', 'hysteria2', 'tuic', 'hysteria', 'anytls', 'naive', 'snell' ].forEach(function(p) { o.depends('protocol', p); });
 		o.depends('auth', '1');
+
+		o = s.taboption('main', form.ListValue, 'snell_version', _('Version'));
+		o.modalonly = true;
+		o.value('5', 'v4 / v5');
+		o.value('6', _('v6 (a password of 12 characters or more)'));
+		o.depends('protocol', 'snell');
+
+		o = s.taboption('main', form.Value, 'tunnel_address', _('Target address'));
+		o.modalonly = true;
+		o.depends('protocol', 'tunnel');
+		o = s.taboption('main', form.Value, 'tunnel_port', _('Target port'));
+		o.modalonly = true;
+		o.datatype = 'port';
+		o.depends('protocol', 'tunnel');
+
+		o = s.taboption('main', form.Value, 'wg_address', _('Local Address'), _('The router’s address in the tunnel; the client gets the next one.'));
+		o.modalonly = true;
+		o.placeholder = '10.7.0.1/24';
+		o.depends('protocol', 'wireguard');
+		[ [ 'wg_private_key', 'wg_public_key', _('Router key') ], [ 'wg_client_private_key', 'wg_client_public_key', _('Client key') ] ].forEach(function(k) {
+			var priv = s.taboption('main', form.Value, k[0], k[2]);
+			priv.modalonly = true;
+			priv.password = true;
+			priv.depends('protocol', 'wireguard');
+			priv.renderWidget = function(section_id, option_index, cfgvalue) {
+				var self = this;
+				var w = form.Value.prototype.renderWidget.apply(this, [ section_id, option_index, cfgvalue ]);
+				var btn = E('button', {
+					'class': 'btn cbi-button cbi-button-action',
+					'click': ui.createHandlerFn(this, function(ev) {
+						ev.preventDefault();
+						var b = ev.currentTarget;
+						return callAction('server_keys', 'wg').then(function(r) {
+							if (!r || !r.ok) { pui.note(b, _((r && r.error) || 'Xray could not make a key pair.'), 'error'); return; }
+							self.getUIElement(section_id).setValue(r.private);
+							var pub = self.section.getUIElement(section_id, k[1]);
+							if (pub) pub.setValue(r.public);
+							pui.note(b, _('A new key pair. Save & Apply to use it.'), 'ok');
+						});
+					})
+				}, _('Generate'));
+				return E([ w, E('div', { 'style': 'margin-top:6px' }, [ btn ]) ]);
+			};
+			var pub = s.taboption('main', form.Value, k[1], _('Public Key'));
+			pub.modalonly = true;
+			pub.depends('protocol', 'wireguard');
+		});
 
 		o = s.taboption('main', form.Value, 'hy2_obfs_password', _('Obfuscation password'),
 			_('salamander. Empty is no obfuscation.'));
 		o.modalonly = true;
 		o.depends('protocol', 'hysteria2');
+		o.depends('protocol', 'hysteria');
 
 		o = s.taboption('main', form.Value, 'hy2_up_mbps', _('Max upload Mbps'));
 		o.modalonly = true;
 		o.datatype = 'uinteger';
 		o.depends('protocol', 'hysteria2');
+		o.depends('protocol', 'hysteria');
 		o = s.taboption('main', form.Value, 'hy2_down_mbps', _('Max download Mbps'));
 		o.modalonly = true;
 		o.datatype = 'uinteger';
 		o.depends('protocol', 'hysteria2');
+		o.depends('protocol', 'hysteria');
 
 		o = s.taboption('main', form.ListValue, 'tuic_cc', _('Congestion control'));
 		o.modalonly = true;
@@ -380,7 +459,7 @@ return view.extend({
 		}
 
 		o = s.taboption('transport', form.Value, 'tls_cert', _('Public key absolute path'),
-			_('The certificate, as a file on the router. Hysteria2 and TUIC always need one.'));
+			_('The certificate, as a file on the router. Hysteria, TUIC, AnyTLS and NaiveProxy always need one.'));
 		o.modalonly = true;
 		o.placeholder = '/etc/zirgozar/server.crt';
 		onTls(o);

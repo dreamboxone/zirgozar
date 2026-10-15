@@ -402,7 +402,7 @@ body.pwp-fa #modal_overlay>.modal textarea,body.pwp-fa #modal_overlay>.modal inp
 .mk-dark input[type=checkbox]:not(:checked),body.pwp-dark #modal_overlay>.modal input[type=checkbox]:not(:checked){background:#3a4a6b}
 :is(.mk,#modal_overlay>.modal) .cbi-checkbox>label{display:none}
 /* Except the tick box that selects a row for the buttons above the table:
-   a switch there reads as turning the node on or off. A box, as in PassWall2. */
+   a switch there reads as turning the node on or off. A box. */
 /* Under the same :is() as the switch, which carries an id's weight, so that
    these win over it. */
 :is(.mk,#modal_overlay>.modal) input[type=checkbox].pwp-sel,:is(.mk,#modal_overlay>.modal) input[type=checkbox].zgz-tick{width:20px!important;height:20px!important;border-radius:6px!important;border:2px solid #94a3b8!important;background:transparent!important;margin:0!important}

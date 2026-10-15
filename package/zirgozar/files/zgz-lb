@@ -1,0 +1,81 @@
+#!/bin/sh
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+# Part of Zirgozar - https://github.com/dreamboxone/zirgozar
+#
+# zgz-lb - load balancing with HAProxy.
+#
+#   zgz-lb config    the HAProxy configuration, on stdout; exit 1 when off
+#   zgz-lb path      the haproxy program, when it is installed
+#
+# Each `config haproxy_config` section is one server, host:port, listened
+# for on a port of the router. Servers that share a port are one group:
+# HAProxy hands each new connection to one of them by weight, checks them
+# every few seconds and leaves out one that stops answering; a backup server
+# is used only while every other one of its group is down. A node pointed at
+# 127.0.0.1 and that port then reaches whichever of them is up.
+#
+# HAProxy's own connections to the servers carry the core's mark, so that
+# the router's traffic going into the tunnel does not take them along.
+
+. "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
+
+lb_path() {
+	for _h in /usr/sbin/haproxy /usr/bin/haproxy; do
+		[ -x "$_h" ] && { echo "$_h"; return 0; }
+	done
+	return 1
+}
+
+lb_config() {
+	[ "$(cfg_bool balancing_enable 0)" = "1" ] || return 1
+	_rows="$(uci -q show zirgozar 2>/dev/null | sed -n 's/^zirgozar\.\([A-Za-z0-9_]*\)=haproxy_config$/\1/p' | while read -r _s; do
+		[ "$(uci -q get "zirgozar.$_s.enabled")" = "0" ] && continue
+		_ss="$(uci -q get "zirgozar.$_s.lbss")"; _lp="$(uci -q get "zirgozar.$_s.lbort")"
+		_w="$(uci -q get "zirgozar.$_s.lbweight")"; _b="$(uci -q get "zirgozar.$_s.backup")"
+		case "$_lp" in ''|*[!0-9]*) continue ;; esac
+		case "$_w" in ''|*[!0-9]*) _w=5 ;; esac
+		# host:port, or [v6]:port.
+		case "$_ss" in
+			\[*\]:[0-9]*|[!:]*:[0-9]*) : ;;
+			*) continue ;;
+		esac
+		case "${_ss##*:}" in *[!0-9]*) continue ;; esac
+		printf '%s %s %s %s %s\n' "$_lp" "$_s" "$_ss" "$_w" "$([ "$_b" = "1" ] && echo backup)"
+	done | sort -n)"
+	[ -n "$_rows" ] || return 1
+
+	# Marking HAProxy's own connections needs 2.9 or newer.
+	_mk="$ZGZ_OUT_MARK"
+	_lv="$("$(lb_path)" -v 2>/dev/null | awk 'NR == 1 { print $3 }')"
+	printf '%s' "$_lv" | awk -F. '{ exit !(($1 + 0) > 2 || (($1 + 0) == 2 && ($2 + 0) >= 9)) }' || _mk=""
+	_inter="$(cfg health_check_inter 60)"
+	case "$_inter" in ''|*[!0-9]*) _inter=60 ;; esac
+	printf 'global\n\tmaxconn 4096\n\tlog stdout format short local0 warning\n\n'
+	printf 'defaults\n\tmode tcp\n\tlog global\n\toption dontlognull\n\ttimeout connect 5s\n\ttimeout client 2m\n\ttimeout server 2m\n\tretries 2\n\toption redispatch\n\n'
+	printf '%s\n' "$_rows" | awk -v inter="$_inter" -v mark="$_mk" '
+		$1 != port {
+			port = $1
+			printf "listen lb-%s\n\tbind :::%s v4v6\n\tbalance roundrobin\n", port, port
+			if (mark != "") printf "\ttcp-request content set-bc-mark %s\n", mark
+		}
+		{ printf "\tserver %s %s weight %s check inter %ss rise 1 fall 3%s\n", $2, $3, $4, inter, ($5 == "backup" ? " backup" : "") }
+		END { print "" }'
+
+	# The page that shows each server as up or down.
+	_cp="$(cfg console_port '')"
+	case "$_cp" in ''|*[!0-9]*) : ;; *)
+		printf 'listen console\n\tbind :::%s v4v6\n\tmode http\n\tstats enable\n\tstats uri /\n\tstats refresh 30s\n' "$_cp"
+		_cu="$(cfg console_user '')"; _cw="$(cfg console_password '')"
+		[ -n "$_cu" ] && [ -n "$_cw" ] && printf '\tstats auth %s:%s\n' "$_cu" "$_cw"
+		;;
+	esac
+	return 0
+}
+
+case "${1:-}" in
+	config) lb_config ;;
+	path)   lb_path ;;
+	*) echo "usage: $0 config|path" >&2; exit 1 ;;
+esac

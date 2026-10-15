@@ -44,10 +44,11 @@ ROUTE_TABLE=100
 RULE_PRIO=100
 # The way for anything else on this router to opt out. 0xff is the value the
 # older transparent-proxy scripts settled on and it is honoured here for that
-# reason - not, as an earlier comment in this file claimed, because PassWall2
-# uses it. PassWall2's mark is 0x50535732, which is a different number and
-# does not collide with this one.
+# reason. It does not collide with the marks other proxy programs use.
 BYPASS=0xff
+# Matched on its own byte only: mwan3 keeps its choice of line in 0x3f00 of
+# The same mark, and the core's own traffic, marked 0xff and then given a
+# line, would otherwise be taken for the router's and sent round again.
 
 RESERVED_V4="0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 224.0.0.0/4 240.0.0.0/4"
 
@@ -73,7 +74,7 @@ case "$block_quic" in
 esac
 dns_hijack="$(cfg_bool dns_hijack 1)"
 
-# PassWall2's Basic Settings and Forwarding Settings.
+# The Basic Settings and Forwarding Settings.
 #
 # Client Proxy off leaves the LAN alone except for the devices the Access
 # Control page names. Localhost Proxy sends the router's own traffic in too.
@@ -97,7 +98,7 @@ LOCAL_TABLE=zirgozar-local
 # being chosen the router's own traffic is left out of the tunnel.
 LOCAL_PAUSE="$ZGZ_RUN/local.pause"
 
-# A port list as PassWall2 writes it - 80,443,1000:2000 - or "-" for none.
+# A port list - 80,443,1000:2000 - or "-" for none.
 port_list() {
 	_pl="$(printf '%s' "$1" | tr -d ' \t' | tr '-' ':')"
 	case "$_pl" in
@@ -383,7 +384,7 @@ nft_ruleset() {
 		fi
 		if [ "$_macs" = "-" ] && [ "$_ips" = "-" ]; then
 			# Nothing to match on but the interface, or on nothing at all -
-			# which PassWall2 reads as everyone, and so does this. A rule whose
+			# which is read as everyone. A rule whose
 			# only sources were ipsets is not that, and is left out.
 			[ "$_sets" = "-" ] && _m="		${_ifm}jump $_c
 "
@@ -509,7 +510,7 @@ $_aclnat"
 	if [ "$client_proxy" = "1" ]; then
 		if [ "$accept_icmp" = "1" ]; then
 			_natrules="$_natrules		iifname != { $_iflist } return
-		meta mark $BYPASS return
+		meta mark & 0xff == $BYPASS return
 		ip daddr @reserved return
 "
 			[ -n "$_direct" ] && _natrules="$_natrules		ip daddr @direct return
@@ -520,7 +521,7 @@ $_aclnat"
 		# And IPv6's, when IPv6 goes through the tunnel too.
 		if [ "$ipv6_mode" = "proxy" ] && [ "$(cfg_bool accept_icmpv6 0)" = "1" ]; then
 			_natrules="$_natrules		iifname != { $_iflist } return
-		meta mark $BYPASS return
+		meta mark & 0xff == $BYPASS return
 		ip6 daddr @reserved6 return
 		meta l4proto ipv6-icmp icmpv6 type echo-request counter redirect
 "
@@ -540,7 +541,7 @@ $_natrules	}
 		type filter hook forward priority filter; policy accept;
 
 		iifname != { $_iflist } return
-		meta mark $BYPASS return
+		meta mark & 0xff == $BYPASS return
 $_aclfwd$_v6
 	}
 "
@@ -555,7 +556,7 @@ $_aclfwd$_v6
 
 		iifname != { $_iflist } return
 		ct direction reply return
-		meta mark $BYPASS return
+		meta mark & 0xff == $BYPASS return
 		meta l4proto { tcp, udp } th dport 53 counter redirect to :$(dns_target)
 	}
 "
@@ -582,7 +583,7 @@ $_lo		iifname != { $_iflist } return
 		# A reply belongs to a connection that was already decided on its way
 		# out. Looking at it again only risks deciding differently.
 		ct direction reply return
-		meta mark $BYPASS return
+		meta mark & 0xff == $BYPASS return
 $_divert
 		# name lookups are the nat chain's business, not this one's
 		meta l4proto { tcp, udp } th dport 53 return
@@ -618,7 +619,7 @@ $([ -n "$_lex" ] && printf '\tset exclude {\n\t\ttype ipv4_addr\n\t\tflags inter
 	chain output {
 		type route hook output priority mangle; policy accept;
 
-		meta mark $BYPASS return
+		meta mark & 0xff == $BYPASS return
 		# Tailscale marks its own packets - the ones to its coordination server,
 		# its relays and its peers - so that they do not follow its own routes.
 		# Sent into the tunnel they would arrive from somewhere else and the
@@ -635,9 +636,9 @@ $(if [ "$tcp_way" = "redirect" ]; then printf '\t\tmeta l4proto udp meta mark se
 	}
 $(if [ "$tcp_way" = "redirect" ]; then
 	printf '\n\t# The same, for TCP under REDIRECT: sent to the REDIRECT port as it\n'
-	printf '\t# leaves, the way PassWall2 does, rather than routed back in.\n'
+	printf '\t# leaves, rather than routed back in.\n'
 	printf '\tchain output_nat {\n\t\ttype nat hook output priority dstnat; policy accept;\n\n'
-	printf '\t\tmeta mark %s return\n' "$BYPASS"
+	printf '\t\tmeta mark & 0xff == %s return\n' "$BYPASS"
 	printf '\t\tmeta mark & 0xff0000 == 0x80000 return\n'
 	printf '\t\tmeta nfproto ipv6 return\n'
 	printf '\t\tmeta l4proto tcp th dport 53 return\n'
@@ -714,7 +715,7 @@ ipt_up() {
 	ipt -t mangle -A ZGZ_DIVERT -j ACCEPT
 
 	ipt -t mangle -N ZGZ_PRE
-	ipt -t mangle -A ZGZ_PRE -m mark --mark "$BYPASS" -j RETURN
+	ipt -t mangle -A ZGZ_PRE -m mark --mark "$BYPASS/0xff" -j RETURN
 	# Same reasoning as the nftables side: a reply was already decided on the
 	# way out. Neither -m conntrack nor -m socket is on every build, so
 	# neither is required - they make this faster, not correct.
@@ -810,7 +811,7 @@ ipt_up() {
 			done
 		fi
 		if [ "$client_proxy" = "1" ] && [ "$accept_icmp" = "1" ]; then
-			ipt -t nat -A ZGZ_NAT -m mark --mark "$BYPASS" -j RETURN
+			ipt -t nat -A ZGZ_NAT -m mark --mark "$BYPASS/0xff" -j RETURN
 			for _c in $RESERVED_V4 $(direct_ips); do
 				ipt -t nat -A ZGZ_NAT -d "$_c" -j RETURN
 			done
@@ -824,7 +825,7 @@ ipt_up() {
 	if [ "$dns_hijack" = "1" ]; then
 		_t="$(dns_target)"
 		ipt -t nat -N ZGZ_DNS
-		ipt -t nat -A ZGZ_DNS -m mark --mark "$BYPASS" -j RETURN
+		ipt -t nat -A ZGZ_DNS -m mark --mark "$BYPASS/0xff" -j RETURN
 		ipt_must -t nat -A ZGZ_DNS -p udp --dport 53 -j REDIRECT --to-ports "$_t" || return 1
 		ipt_must -t nat -A ZGZ_DNS -p tcp --dport 53 -j REDIRECT --to-ports "$_t" || return 1
 		for _d in $_devs; do
@@ -839,7 +840,7 @@ ipt_up() {
 	fi
 	if [ "$ipv6_mode" != "off" ] && command -v ip6tables >/dev/null 2>&1; then
 		ipt6 -t filter -N ZGZ_FWD6 2>/dev/null || true
-		ipt6 -t filter -A ZGZ_FWD6 -m mark --mark "$BYPASS" -j RETURN 2>/dev/null || true
+		ipt6 -t filter -A ZGZ_FWD6 -m mark --mark "$BYPASS/0xff" -j RETURN 2>/dev/null || true
 		ipt6 -t filter -A ZGZ_FWD6 -d ::1/128 -j RETURN 2>/dev/null || true
 		ipt6 -t filter -A ZGZ_FWD6 -d fc00::/7 -j RETURN 2>/dev/null || true
 		ipt6 -t filter -A ZGZ_FWD6 -d fe80::/10 -j RETURN 2>/dev/null || true
@@ -984,7 +985,7 @@ ipt_kill_chain() {
 ipt_local_up() {
 	ipt_local_down
 	ipt -t mangle -N ZGZ_OUT
-	ipt -t mangle -A ZGZ_OUT -m mark --mark "$BYPASS" -j RETURN
+	ipt -t mangle -A ZGZ_OUT -m mark --mark "$BYPASS/0xff" -j RETURN
 	ipt -t mangle -A ZGZ_OUT -m mark --mark 0x80000/0xff0000 -j RETURN
 	ipt -t mangle -A ZGZ_OUT -m conntrack --ctdir REPLY -j RETURN
 	ipt -t mangle -A ZGZ_OUT -p tcp --dport 53 -j RETURN
@@ -992,11 +993,11 @@ ipt_local_up() {
 	for _c in $RESERVED_V4 $(direct_ips) $(local_exclusions); do
 		ipt -t mangle -A ZGZ_OUT -d "$_c" -j RETURN
 	done
-	# Under REDIRECT, TCP goes to the REDIRECT port as it leaves, as PassWall2
-	# sends it, instead of being routed back in.
+	# Under REDIRECT, TCP goes to the REDIRECT port as it leaves, instead of
+	# being routed back in.
 	if [ "$tcp_way" = "redirect" ]; then
 		ipt -t nat -N ZGZ_ONAT
-		ipt -t nat -A ZGZ_ONAT -m mark --mark "$BYPASS" -j RETURN
+		ipt -t nat -A ZGZ_ONAT -m mark --mark "$BYPASS/0xff" -j RETURN
 		ipt -t nat -A ZGZ_ONAT -m mark --mark 0x80000/0xff0000 -j RETURN
 		ipt -t nat -A ZGZ_ONAT -p tcp --dport 53 -j RETURN
 		for _c in $RESERVED_V4 $(direct_ips) $(local_exclusions); do

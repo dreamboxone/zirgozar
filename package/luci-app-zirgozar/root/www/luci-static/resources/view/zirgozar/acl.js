@@ -3,12 +3,12 @@
  * Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
  * Part of Zirgozar - https://github.com/dreamboxone/zirgozar
  *
- * Access Control: PassWall2's page of the same name, field for field - the
+ * Access Control: the page of the same name, field for field - the
  * main switch, then a sortable table of rules, each one opened to edit with a
  * Main and a Proxy tab. The same option names are written to the
  * configuration, so a rule reads the same here as it did there.
  *
- * What PassWall2 has and this does not: the DNS and Log tabs. PassWall2 runs
+ * Not here: the DNS and Log tabs. A separate core per rule would run
  * a resolver and a core per rule; this runs one of each for the whole router,
  * so a per-rule resolver or log would have nothing behind it.
  *
@@ -116,7 +116,7 @@ return view.extend({
 		};
 
 		/* The devices the router knows about, offered by MAC with their
-		   address beside it, sorted by address as PassWall2 sorts them. */
+		   address beside it, sorted by address. */
 		o = s.taboption('main', form.DynamicList, 'sources', _('Source'),
 			E('ul', {}, [
 				E('li', {}, _('Example:')),

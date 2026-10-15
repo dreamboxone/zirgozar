@@ -93,7 +93,7 @@ method_state() {
 
 	geo_dir >/dev/null 2>&1 && geo=1
 	passwall_running && pw=1
-	# The core, as PassWall2 shows it at the top of its page, read from what
+	# The core, read from what
 	# the service wrote when it started it - not by starting a core every few
 	# seconds to learn its version number. Before any has run, the one that
 	# would be.
@@ -296,7 +296,7 @@ method_inuse() {
 # browser every five seconds.
 method_log() {
 	json_init
-	# The runtime log, PassWall2's way: this program's own file, a date on
+	# The runtime log, the way: this program's own file, a date on
 	# every line, emptied by the button on the page. Before this release
 	# there was no file, so the system log stands in until there is one.
 	# The file's being there is what counts, not its having something in it:
@@ -337,7 +337,7 @@ core_log_all_marked() {
 	return 0
 }
 
-# PassWall2's connection check: one request to a well-known site, timed.
+# The connection check: one request to a well-known site, timed.
 # From the router, so what it measures is the router's own way out - which
 # for a site the tunnel carries is the tunnel, once the router's own lookups
 # go through it.
@@ -371,7 +371,7 @@ method_lan() {
 ' "$(interfaces_json)"
 }
 
-# PassWall2's Export Config File: one hand-added node as a whole Xray client
+# The Export Config File: one hand-added node as a whole Xray client
 # configuration, to be run somewhere else - a SOCKS port on 1080 and an HTTP
 # port on 1081 in front of it. The node as saved, with its own chain and the
 # Xray tab, but without what belongs to this router: the firewall's mark and
@@ -432,6 +432,8 @@ method_server() {
 	json_add_boolean "singbox" "$(pgrep -f 'zirgozar-server-sb.json' >/dev/null 2>&1 && echo 1 || echo 0)"
 	json_add_string "xray_error" "$(sed -n 's/^xray_error=//p' "$_si" 2>/dev/null | tail -1)"
 	json_add_string "singbox_error" "$(sed -n 's/^singbox_error=//p' "$_si" 2>/dev/null | tail -1)"
+	json_add_boolean "ssrust" "$(pgrep -f 'zirgozar-server-ssrust.json' >/dev/null 2>&1 && echo 1 || echo 0)"
+	json_add_string "ssrust_error" "$(sed -n 's/^ssrust_error=//p' "$_si" 2>/dev/null | tail -1)"
 	json_add_string "ports" "$("$ZGZ_LIB/zgz-server" ports 2>/dev/null | tr '\n' ' ')"
 	json_dump
 }
@@ -563,12 +565,20 @@ method_system() {
 	fi
 	[ -n "$_deps" ] || _deps='{"pending":true}'
 
-	printf '{"geo":%s,"cores":%s,"deps":%s,"interfaces":%s,"job":"%s","self":"%s","core_result":"%s"}\n' \
+	# A download under way: how much of it is here, in percent.
+	_pct=-1
+	if [ -n "$(cat "$JOB" 2>/dev/null)" ] && read -r _dsz _dpart < "$ZGZ_RUN/download" 2>/dev/null && [ "${_dsz:-0}" -gt 0 ] 2>/dev/null; then
+		_pct=$(( $(file_size "$_dpart") * 100 / _dsz ))
+		[ "$_pct" -le 100 ] || _pct=100
+	fi
+
+	printf '{"geo":%s,"cores":%s,"deps":%s,"interfaces":%s,"job":"%s","progress":%s,"self":"%s","core_result":"%s"}\n' \
 		"$("$GEO" status 2>/dev/null || echo '{}')" \
 		"$("$CORES" list 2>/dev/null || echo '{}')" \
 		"${_deps:-{\}}" \
 		"$(interfaces_json)" \
 		"$(cat "$JOB" 2>/dev/null)" \
+		"$_pct" \
 		"$(json_escape "$(cat "$ZGZ_RUN/self-update" 2>/dev/null)")" \
 		"$(json_escape "$(cat "$ZGZ_RUN/core-result" 2>/dev/null)")"
 }
@@ -657,7 +667,7 @@ method_action() {
 			fi
 			;;
 		refresh_nodes)
-			# Every subscription, or the one named - PassWall2's "Manual
+			# Every subscription, or the one named - the "Manual
 			# subscription All" and "Manual subscription".
 			case "$arg" in
 				'') arg=all ;;
@@ -688,7 +698,7 @@ method_action() {
 			"$NODES" forget $arg >/dev/null 2>&1
 			;;
 		add_links)
-			# PassWall2's "Add the node via the link": one node per link.
+			# The "Add the node via the link": one node per link.
 			_n="$(printf '%s\n' "$arg" | "$NODES" addlinks 2>/dev/null)" || _n="0 0"
 			detach "$NODES" build
 			json_init
@@ -733,7 +743,7 @@ method_action() {
 				top_node)     "$NODES" top "$_ids" >/dev/null 2>&1 ;;
 				group_nodes)  "$NODES" group "$_grp" $_ids >/dev/null 2>&1 ;;
 				use_node)
-					# PassWall2's Use: the node in Basic Settings, applied.
+					# The Use: the node in Basic Settings, applied.
 					[ "$(uci -q get "zirgozar.$_ids")" = "node" ] || { fail "unknown node"; return; }
 					# Already the node, and the tunnel on its way up or up
 					# with it: a second press would only start it again.
@@ -814,7 +824,7 @@ method_action() {
 			;;
 		core_install)
 			case "$arg" in
-				xray|xray-patterniha|sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|aether|mihomo|sslocal|openvpn) run_job "Installing $arg" "$CORES install $arg" ;;
+				xray|xray-patterniha|sing-box|sing-box-lx|geoview|warp-plus|vwarp|aether|mihomo|sslocal|haproxy|openvpn) run_job "Installing $arg" "$CORES install $arg" ;;
 				# One particular Xray, picked from the list on the page.
 				xray@v[0-9]*)
 					_v="${arg#xray@}"
@@ -833,7 +843,7 @@ method_action() {
 			;;
 		core_remove)
 			case "$arg" in
-				sing-box|sing-box-lx|hysteria|geoview|warp-plus|vwarp|xray-patterniha|aether|mihomo|sslocal|openvpn) "$CORES" remove "$arg" >/dev/null 2>&1 ;;
+				sing-box|sing-box-lx|geoview|warp-plus|vwarp|xray-patterniha|aether|mihomo|sslocal|haproxy|openvpn) "$CORES" remove "$arg" >/dev/null 2>&1 ;;
 				*) fail "unknown core"; return ;;
 			esac
 			;;
@@ -887,7 +897,8 @@ method_action() {
 			;;
 		server_keys)
 			# A REALITY key pair for a server on the Server-Side page.
-			_k="$("$ZGZ_LIB/zgz-server" keys 2>/dev/null)" || _k=""
+			case "$arg" in wg) : ;; *) arg="" ;; esac
+			_k="$("$ZGZ_LIB/zgz-server" keys $arg 2>/dev/null)" || _k=""
 			[ -n "$_k" ] || { fail "Xray could not make a key pair."; return; }
 			json_init
 			json_add_boolean "ok" 1
@@ -904,7 +915,7 @@ method_action() {
 			uci -q set zirgozar.config.lang="$arg" && uci -q commit zirgozar
 			;;
 		clear_log)
-			# PassWall2's "Clear logs". Only the runtime log: the core's
+			# The "Clear logs". Only the runtime log: the core's
 			# own lines are the system log's, not this program's to empty.
 			: > "$ZGZ_LOG" 2>/dev/null || true
 			;;

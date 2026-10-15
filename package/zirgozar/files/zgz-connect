@@ -51,7 +51,7 @@ on_exit() {
 trap 'say_status failed; on_exit' INT TERM
 trap on_exit EXIT
 
-# PassWall2's Node setting. A node chosen in Basic Settings is the node: it is
+# The Node setting. A node chosen in Basic Settings is the node: it is
 # used as it is, whatever mode this was called in, and nothing is measured.
 FIXED="$(cfg node '')"
 if [ "$MODE" = degraded ]; then
@@ -191,7 +191,7 @@ fi
 say_status starting
 
 if bounded 180 /etc/init.d/zirgozar restart >/dev/null 2>&1; then
-	# The main switch decides, as in PassWall2: the service is always in the
+	# The main switch decides: the service is always in the
 	# boot sequence and starts only when the switch is on. So a switch left
 	# on brings the tunnel back after a power cut, and one turned off keeps
 	# it off. Done here rather than inside the init script, which would be

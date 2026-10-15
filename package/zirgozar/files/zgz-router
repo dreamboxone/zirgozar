@@ -103,7 +103,7 @@ cmd_clock() {
 	return 0
 }
 
-# PassWall2's Delay Settings: stop, start and restart on a schedule.
+# The Delay Settings: stop, start and restart on a schedule.
 #
 #   zgz-router schedule sync      bring the crontab in step with the settings
 #   zgz-router schedule stop      what the crontab runs
@@ -113,7 +113,7 @@ cmd_clock() {
 # A scheduled stop is written down, because the quarter-hourly repair would
 # otherwise see a tunnel that is meant to be up and is not, and bring it back
 # within fifteen minutes of being stopped. A scheduled start, or the main
-# switch, clears it. As in PassWall2, the schedule only exists while the main
+# switch, clears it. The schedule only exists while the main
 # switch is on.
 SCHEDULE_STOPPED="$ZGZ_RUN/schedule.stopped"
 CRONTAB="${ZGZ_CRONTAB:-/etc/crontabs/root}"
@@ -150,7 +150,7 @@ cmd_schedule_sync() {
 			echo "$((_mm + 0)) $((_hh + 0)) * * $_dow $ZGZ_LIB/zgz-router schedule $_w >/dev/null 2>&1" >> "$CRONTAB.zgz"
 		done
 	fi
-	# Rule Manage's automatic update of the routing data, as PassWall2 has
+	# Rule Manage's automatic update of the routing data
 	# it: every day, one day of the week, or every so many hours. Whatever
 	# the main switch says - the files are there for when it is turned on.
 	_week="$(cfg geo_update_week_mode '')"
@@ -169,7 +169,7 @@ cmd_schedule_sync() {
 			echo "$((_mm + 0)) $((_hh + 0)) * * $_dow $ZGZ_LIB/zgz-router schedule geo >/dev/null 2>&1" >> "$CRONTAB.zgz"
 		fi
 	fi
-	# Node Subscribe's schedule for each subscription, as PassWall2 has it.
+	# Node Subscribe's schedule for each subscription.
 	# Quarter-hourly subscriptions have separate entries so their downloads
 	# can be staggered without delaying the tunnel health check.
 	for _s in $(uci -q -X show zirgozar 2>/dev/null |
@@ -239,7 +239,7 @@ cmd_schedule() {
 			;;
 		geo)
 			# The files ticked on Rule Manage, and a restart when the tunnel
-			# is running, so that it reads them - as PassWall2 does.
+			# is running, so that it reads them -.
 			_ip="$(cfg_bool geoip_update 1)"; _site="$(cfg_bool geosite_update 1)"
 			if [ "$_ip" = "1" ] && [ "$_site" = "1" ]; then
 				_which=all
@@ -415,7 +415,7 @@ cmd_defmove() {
 	return 0
 }
 
-# Once: TCP Proxy Way from TPROXY, the old default, to REDIRECT, PassWall2's -
+# Once: TCP Proxy Way from TPROXY, the old default, to REDIRECT, the -
 # under TPROXY Supercell's games lost their connection while loading, and
 # under REDIRECT they did not. Chosen again by hand afterwards is left alone.
 cmd_tcpmove() {
@@ -429,7 +429,7 @@ cmd_tcpmove() {
 	return 0
 }
 
-# PassWall2's Backup and Restore: the settings of both sides - every config,
+# The Backup and Restore: the settings of both sides - every config,
 # subscription, rule and setting, the shunt rules among them, is in the two
 # files under /etc/config - the WARP and Aether accounts, which cannot be made
 # again with the same keys, and the routing data, so that a router restored
@@ -618,6 +618,46 @@ cmd_restore() {
 	return 0
 }
 
+# A router with no battery-backed clock starts in the past, and TLS refuses
+# every certificate as not yet valid: no node answers until the system's own
+# NTP gets round to it. So the clock is set once, before the tunnel starts,
+# when it is plainly behind - earlier than this program's own files. The time
+# servers are Iranian and looked up through the direct resolver, since the
+# router's own DNS is the tunnel that is not up yet.
+cmd_timesync() {
+	_now="$(date +%s)"
+	_floor="$(date -r "$ZGZ_LIB/zgz-common.sh" +%s 2>/dev/null)" || _floor=0
+	[ "$_now" -lt "${_floor:-0}" ] 2>/dev/null || return 0
+	command -v ntpd >/dev/null 2>&1 || return 0
+	for _s in $NTP_SERVERS $(uci -q get system.ntp.server 2>/dev/null); do
+		_ip="$(resolve_direct "$_s" 2>/dev/null)" || _ip=""
+		[ -n "$_ip" ] || continue
+		if bounded 8 ntpd -n -q -p "$_ip" >/dev/null 2>&1; then
+			log "the router's clock was behind - set from $_s: $(date '+%Y-%m-%d %H:%M')"
+			return 0
+		fi
+	done
+	warn "the router's clock is behind and no time server answered - TLS connections may fail until it is set"
+	return 0
+}
+
+# Once: the official hysteria client is gone - sing-box carries every
+# Hysteria2 node. A subscription that named it goes back to the automatic
+# choice, and this program's own copy of it is deleted.
+cmd_hymove() {
+	_hc=0
+	for _s in $(uci -q show zirgozar 2>/dev/null | sed -n "s/^zirgozar\.\([A-Za-z0-9_]*\)\.hysteria2_type=.*/\1/p"); do
+		uci -q delete "zirgozar.$_s.hysteria2_type" && _hc=1
+	done
+	uci -q get zirgozar.config.core_hysteria >/dev/null 2>&1 && { uci -q delete zirgozar.config.core_hysteria; _hc=1; }
+	[ "$_hc" = 1 ] && uci -q commit zirgozar
+	if [ -f "$(core_dir)/hysteria" ]; then
+		rm -f "$(core_dir)/hysteria"
+		log "the hysteria program is no longer used - sing-box carries Hysteria2 - and was removed"
+	fi
+	return 0
+}
+
 case "${1:-}" in
 	reset)    cmd_reset ;;
 	backup)   cmd_backup ;;
@@ -628,6 +668,8 @@ case "${1:-}" in
 	tcpmove)  cmd_tcpmove ;;
 	defmove)  cmd_defmove ;;
 	clock)    cmd_clock ;;
+	timesync) cmd_timesync ;;
+	hymove)   cmd_hymove ;;
 	schedule) cmd_schedule "${2:-}" "${3:-}" ;;
-	*) echo "usage: $0 reset|backup|restore|rebind|dnsmove|quicmove|tcpmove|defmove|clock|schedule sync|stop|start|restart|geo|sub <section>" >&2; exit 1 ;;
+	*) echo "usage: $0 reset|backup|restore|rebind|dnsmove|quicmove|tcpmove|defmove|clock|timesync|schedule sync|stop|start|restart|geo|sub <section>" >&2; exit 1 ;;
 esac

@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.7.23-r4';
+var BUILD = '5.7.23-r5';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -574,7 +574,7 @@ function spinWhileBusy(b, done) {
 /* checkboxes(option)
 
    A MultiValue drawn as a row of tick boxes, one for each value, as
-   PassWall2 draws Protocol and Inbound Tag - rather than LuCI's drop-down,
+   Protocol and Inbound Tag are drawn - rather than LuCI's drop-down,
    which some LuCI versions show as a list to Ctrl-click in. What is ticked is
    read straight from the boxes, so it works in a page and in a dialog. */
 function checkboxes(o) {

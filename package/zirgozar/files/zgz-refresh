@@ -63,7 +63,7 @@ fi
 
 [ "$(cfg enabled 0)" = "1" ] || exit 0
 
-# PassWall2's "Open and close Daemon": off, and the tunnel is left as it is -
+# The "Open and close Daemon": off, and the tunnel is left as it is -
 # nothing is repaired and no other node is chosen behind the reader's back.
 [ "$(cfg_bool start_daemon 1)" = "1" ] || exit 0
 

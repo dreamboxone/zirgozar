@@ -49,7 +49,7 @@ poison_port() {
 }
 
 # Under TCP Proxy Way REDIRECT, TCP has a port of its own beside every TPROXY
-# port, as PassWall2 gives it: the filtering addresses' beside poison_port,
+# port: the filtering addresses' beside poison_port,
 # and an Access Control rule's beside the port of its node.
 tcp_redirect() {
 	[ "$(cfg tcp_proxy_way redirect)" = "redirect" ]
@@ -65,7 +65,7 @@ acl_redir_port() {
 	return 0
 }
 
-# The runtime log the Log page shows, the way PassWall2 keeps one: a file in
+# The runtime log the Log page shows: a file in
 # RAM, a date on every line, and a button that empties it. Everything also
 # goes to syslog as before - the file is what the page reads, the system log
 # is what survives the page being cleared.
@@ -78,7 +78,7 @@ log_line() {
 }
 
 # A step inside a longer run, indented under the line that started it - the
-# shape PassWall2's own log has, so the two read the same way.
+# shape the log has, so the two read the same way.
 log_step() {
 	log_line "  - $*"
 	logger -t zirgozar -p daemon.info "$*" 2>/dev/null || true
@@ -241,7 +241,7 @@ zgz_version() {
 
 # Which engine to run.
 #
-# A router that already has a core - the xray-core package, which PassWall2
+# A router that already has a core - the xray-core package, which another program
 # and other front-ends pull in - should use it rather than a second copy of
 # the same thing sitting in flash. So try what is installed first and fall
 # back to the copy this package carries.
@@ -333,7 +333,7 @@ core_engine() {
 # that a node Xray cannot speak at all (AmneziaWG, hysteria2, tuic)
 # is carried by sing-box from end to end, when there is a sing-box that can.
 # Xray stands aside rather than sending everything through sing-box as a
-# SOCKS port beside it: one core, doing the whole job, as PassWall2 does with
+# SOCKS port beside it: one core, doing the whole job, as with
 # a node whose type is sing-box. Only when there is no such sing-box does the
 # old arrangement - Xray, with sing-box as a helper - remain.
 #
@@ -360,7 +360,6 @@ wanted_engine() {
 		case "$(uci -q get "zirgozar.$_ws.${_wk}_type" 2>/dev/null)" in
 			singbox) [ -x "$(engine_singbox_path)" ] && _we=singbox ;;
 			xray) case "$_wp" in vless|vmess|trojan|shadowsocks|socks|http) _we=xray ;; esac ;;
-			hysteria) [ "$_wp" = "hysteria2" ] && _we=xray ;;
 		esac
 	fi
 	# WARP over MASQUE is Xray's alone: sing-box has no such outbound.
@@ -397,12 +396,10 @@ bridge_is_ovpn() {
 }
 
 # A node only a program of its own carries, under either engine: SSR
-# (Mihomo), Shadowsocks through shadowsocks-rust, and a Hysteria2 server behind
-# a Realm or Gecko obfuscation (the official hysteria client).
+# (Mihomo) and Shadowsocks through shadowsocks-rust.
 bridge_is_own() {
 	case "$(bridge_type)" in
 		ssr|ssrust) return 0 ;;
-		hysteria2) grep -q '"realm":"[^"]\|"obfs":"gecko"' "$ZGZ_ETC/bridge.json" 2>/dev/null && return 0 ;;
 	esac
 	return 1
 }
@@ -501,12 +498,20 @@ core_title() {
 # carried over is said on stderr, one line each, and ends up in the log.
 sbconfig() {
 	_sb_level="$(cfg loglevel warning)"
+	_sb_pin=""
+	sb_certpin "$(engine_singbox_path)" && _sb_pin=1
 	[ "$(cfg_bool log_node 1)" = "1" ] || _sb_level=none
 	ucode "$ZGZ_LIB/zgz-sbconfig" \
 		geoview="$(geoview_path)" geodir="$(geo_dir 2>/dev/null)" \
 		rsdir="$ZGZ_RUN/rs" api="$(cfg api_port 10853)" \
 		bridge="$ZGZ_ETC/bridge.json" bridgeport="$(cfg bridge_port 10808)" etc="$ZGZ_ETC" \
-		mark="$ZGZ_OUT_MARK" level="$_sb_level" "$@"
+		mark="$ZGZ_OUT_MARK" level="$_sb_level" certpin="$_sb_pin" "$@"
+}
+
+# Does this sing-box pin a server's certificate by its hash - 1.15 on?
+sb_certpin() {
+	[ -n "$1" ] && [ -x "$1" ] || return 1
+	core_version_cached "$1" | awk -F. '{ exit !(($1 + 0) > 1 || (($1 + 0) == 1 && ($2 + 0) >= 15)) }'
 }
 
 # The core a measurement is taken with: the one the settings run the tunnel
@@ -608,8 +613,8 @@ find_engine_singbox() {
 }
 
 # The helper cores are this program's own, kept in its own folder, and never
-# another package's. A sing-box that PassWall2 installed is PassWall2's: it is
-# upgraded, downgraded or removed on PassWall2's schedule, and a bridge built
+# another package's. A sing-box another program installed is that program's: it is
+# upgraded, downgraded or removed on that program's schedule, and a bridge built
 # on it would change underneath this one without anything here knowing. So
 # only the copy in core_dir is used - installed from the App Update page -
 # and a router that has another program's copy simply shows this one as not
@@ -619,7 +624,7 @@ core_dir() {
 	return 0
 }
 
-# PassWall2's App Path for sing-box and hysteria: the file itself when one is
+# The App Path for sing-box: the file itself when one is
 # set - to run from memory, a path under /tmp - and otherwise this program's
 # own copy in the cores folder. Either way it is the one file this program
 # installs, updates and uses, and nobody else's.
@@ -635,12 +640,6 @@ singbox_path() {
 singbox_lx_path() {
 	_lp="$(cfg core_singbox_lx '')"
 	echo "${_lp:-$(core_dir)/sing-box-lx}"
-	return 0
-}
-
-hysteria_path() {
-	_hp="$(cfg core_hysteria '')"
-	echo "${_hp:-$(core_dir)/hysteria}"
 	return 0
 }
 
@@ -718,7 +717,7 @@ warp_dir() {
 # starting again there is no tunnel to measure.
 ZGZ_WARP_V4="162.159.192.0/24 162.159.195.0/24 188.114.96.0/22 162.159.198.0/24"
 
-# Geoview, for the Geo View page - PassWall2's tool for reading the routing
+# Geoview, for the Geo View page - the tool for reading the routing
 # data: which lists hold a name or an address, and what one list holds.
 geoview_path() {
 	_gp="$(cfg core_geoview '')"
@@ -740,6 +739,12 @@ sslocal_path() {
 	return 0
 }
 
+# And its server, installed beside it, for the Server-Side page.
+ssserver_path() {
+	echo "$(dirname "$(sslocal_path)")/ssserver"
+	return 0
+}
+
 find_geoview() {
 	_fg="$(geoview_path)"
 	[ -x "$_fg" ] && { echo "$_fg"; return 0; }
@@ -749,12 +754,6 @@ find_geoview() {
 find_singbox() {
 	_fs="$(singbox_path)"
 	[ -x "$_fs" ] && "$_fs" version >/dev/null 2>&1 && { echo "$_fs"; return 0; }
-	return 1
-}
-
-find_hysteria() {
-	_fh="$(hysteria_path)"
-	[ -x "$_fh" ] && { echo "$_fh"; return 0; }
 	return 1
 }
 
@@ -792,7 +791,7 @@ core_version_cached() {
 # first whatever its age, and a router that had a newer one from another
 # package went on using ours - which is how large uploads over xhttp, fixed
 # in Xray months earlier, kept failing here while the same server worked
-# from a laptop and from PassWall2 on the very same router. Versions are
+# from a laptop and from another program on the very same router. Versions are
 # compared as numbers, part by part; one that will not say comes last.
 #
 # patterniha's build is not among them: it is newer than the official one
@@ -844,13 +843,14 @@ core_version() {
 	[ -x "$1" ] || { echo ""; return 1; }
 	case "$1" in
 		*/aether) "$1" --version 2>/dev/null | awk 'NR == 1 { print $2 }' ;;
-		*hysteria*) "$1" version 2>/dev/null | sed -n 's/^Version:[[:space:]]*//p' | head -1 ;;
 		# "OpenVPN 2.7.7 arm-openwrt-linux-gnu [SSL (OpenSSL)] ..."
 		*openvpn*)  "$1" --version 2>/dev/null | awk 'NR == 1 && $1 == "OpenVPN" { print $2 }' ;;
 		*sing-box*) "$1" version 2>/dev/null | sed -n 's/^sing-box version //p' | head -1 ;;
 		*geoview*)  "$1" -version 2>/dev/null | awk 'NR == 1 && $1 == "Geoview" { print $2 }' ;;
 		# "Mihomo Meta v1.19.32 linux arm ..."
 		*mihomo*)   "$1" -v 2>/dev/null | awk 'NR == 1 { print $3 }' ;;
+		# "HAProxy version 3.2.21-..."
+		*haproxy*) "$1" -v 2>/dev/null | awk 'NR == 1 { sub(/-.*/, "", $3); print $3 }' ;;
 		# "shadowsocks 1.25.0"
 		*sslocal*)  "$1" --version 2>/dev/null | awk 'NR == 1 { print $2 }' ;;
 		# warp-plus says it on stderr, as the tag it was built from:
@@ -1024,6 +1024,9 @@ download_checked() {
 	_dl_part="$_dest.part"
 	rm -f "$_dl_part"
 	_dl_ok=0
+	# How far it has got, for the App Update page: the size expected and the
+	# file growing towards it.
+	printf '%s %s\n' "$_size" "$_dl_part" > "$ZGZ_RUN/download" 2>/dev/null || true
 	for _dl_try in "$_url" $(mirrors_for "$_url"); do
 		if curl -fsSL --connect-timeout 15 --max-time 900 --retry 2 -o "$_dl_part" "$_dl_try"; then
 			_dl_ok=1
@@ -1032,6 +1035,7 @@ download_checked() {
 		fi
 		rm -f "$_dl_part"
 	done
+	rm -f "$ZGZ_RUN/download"
 	if [ "$_dl_ok" != "1" ]; then
 		rm -f "$_dl_part"
 		say_message "Download failed: $_url"
@@ -1318,12 +1322,12 @@ json_escape() {
 # -------------------------------------------------------------- direct DNS
 
 # The resolver that answers for everything that goes straight out, as
-# "proto address port". PassWall2's rule, and its option names:
+# "proto address port". The rule, and its option names:
 # direct_dns_protocol empty is Auto - the upstream dnsmasq was configured
 # with, and failing that whatever the ISP handed out - and udp or tcp is the
 # one in direct_dns.
 #
-# It matters more here than in PassWall2, because here dnsmasq's upstream is
+# It matters here, because here dnsmasq's upstream is
 # the tunnel itself. A node whose address is a name, resolved the ordinary
 # way, asks dnsmasq, which asks the tunnel, which needs that very node to
 # answer - and a dead tunnel cannot answer at all, so the moment a node dies
@@ -1351,7 +1355,7 @@ direct_dns() {
 			fi
 			;;
 	esac
-	# Auto. dnsmasq's own upstream first, as PassWall2 does - but only the
+	# Auto. dnsmasq's own upstream first - but only the
 	# plain ones: an entry with a slash in it answers for one domain only.
 	for _dd_s in $(uci -q get 'dhcp.@dnsmasq[0].server' 2>/dev/null); do
 		case "$_dd_s" in */*|'') continue ;; esac
@@ -1426,7 +1430,7 @@ fragment_json() {
 	return 0
 }
 
-# PassWall2's noise table: `config xray_noise_packets` sections, each with a
+# The noise table: `config xray_noise_packets` sections, each with a
 # type, a packet (or, for rand, a length) and a delay.
 noise_json() {
 	[ "$(cfg_bool noise 0)" = "1" ] || return 0
@@ -1468,7 +1472,7 @@ mux_json() {
 }
 
 # The section named as the pre-proxy for every node, when it is switched on.
-# PassWall2 calls this the pre-proxy of a shunt node; here the tunnel is that
+# The pre-proxy of a shunt node, elsewhere; here the tunnel is that
 # shunt - Iran one way, everything else the other - so it is set once, here,
 # and every node the tunnel may choose dials out through it.
 global_preproxy() {
@@ -1671,14 +1675,14 @@ node_domain_strategy() {
 # as the lines zgz-parse reads them from: "#!zgz-x.<key>=<value>". A
 # certificate keeps its lines with a bar between them, a JSON object loses its
 # line breaks. Nothing at all for a node that has none.
-NODE_EXTRA_KEYS="ech tls_pin cert_name tls_pem cipher_suites user_agent finalmask tcp_fast_open tcp_mptcp domain_strategy happy_eyeballs warpplus ws_heartbeat grpc_idle grpc_health grpc_window grpc_permit kcp_mtu kcp_tti kcp_uplink kcp_downlink kcp_read kcp_write kcp_congestion sb_mux sb_mux_streams sb_mux_padding sb_brutal_up sb_brutal_down wg_system ssrust"
+NODE_EXTRA_KEYS="ech tls_pin cert_name tls_pem cipher_suites user_agent finalmask tcp_fast_open tcp_mptcp domain_strategy happy_eyeballs warpplus ws_heartbeat grpc_idle grpc_health grpc_window grpc_permit kcp_mtu kcp_tti kcp_uplink kcp_downlink kcp_read kcp_write kcp_congestion sb_mux sb_mux_streams sb_mux_padding sb_brutal_up sb_brutal_down wg_system ssrust hy_portmap"
 
 node_extras() {
 	for _nk in $NODE_EXTRA_KEYS; do
 		_nv="$(uci -q get "zirgozar.$1.$_nk" 2>/dev/null)" || _nv=""
 		[ -n "$_nv" ] || continue
 		case "$_nk" in
-			tcp_fast_open|tcp_mptcp|happy_eyeballs|warpplus|grpc_permit|kcp_congestion|sb_mux_padding|wg_system|ssrust) [ "$_nv" = "1" ] || continue ;;
+			tcp_fast_open|tcp_mptcp|happy_eyeballs|warpplus|grpc_permit|kcp_congestion|sb_mux_padding|wg_system|ssrust|hy_portmap) [ "$_nv" = "1" ] || continue ;;
 		esac
 		_nv="$(printf '%s' "$_nv" | tr '\r' '\n' | awk -v k="$_nk" '
 			NF { sub(/^[ \t]+/, ""); sub(/[ \t]+$/, ""); out = out (n++ ? (k == "tls_pem" ? "|" : " ") : "") $0 }
@@ -1741,7 +1745,7 @@ section_links() {
 }
 
 # The records a hand-added node puts into the running, with its own chain
-# applied - PassWall2's chain_proxy, option for option:
+# applied - the chain_proxy, option for option:
 #
 #   chain_proxy 1, preproxy_node P   this node, dialling out through P
 #   chain_proxy 2, to_node L         the landing node: traffic goes through
@@ -1886,7 +1890,7 @@ node_records() {
 # ------------------------------------------------------------ kernel modules
 #
 # Kernel modules come from one package source of their own, kmods, made for
-# this router's kernel only. Some ways of installing PassWall rewrite the
+# this router's kernel only. Some third-party install scripts rewrite the
 # package list without it, and from then on no kernel module installs at all:
 # not OpenVPN's, not PPTP's MPPE, not L2TP's - only "required by: …[kmod-…]"
 # from the package manager, which tells nobody what is wrong.

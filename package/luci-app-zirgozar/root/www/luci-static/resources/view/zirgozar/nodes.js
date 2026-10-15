@@ -3,7 +3,7 @@
  * Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
  * Part of Zirgozar - https://github.com/dreamboxone/zirgozar
  *
- * PassWall2's Node List: which nodes are used and how they are measured, the
+ * The Node List: which nodes are used and how they are measured, the
  * nodes added by hand, and every node the router has, with what the last
  * measurement made of each. The subscriptions are on Node Subscribe.
  */
@@ -44,7 +44,7 @@ function pill(text, colour) {
 
 /* ------------------------------------------------------------- three tests
 
-   Three columns, the way PassWall has them, and they are three because they
+   Three columns, and they are three because they
    answer three different questions.
 
    Ping is ICMP and nothing more: it says how far away the address is, and
@@ -151,11 +151,11 @@ function renderTests(d) {
 	}
 }
 
-/* ---------------------------------------------- PassWall2's buttons
+/* ---------------------------------------------- The buttons
 
-   The buttons above and beside PassWall2's list of nodes. Each is one step
+   The buttons above and beside the list of nodes. Each is one step
    on the router, which then has the list the page shows - so the page is
-   read again afterwards, the way PassWall2's is. */
+   read again afterwards's is. */
 function nodeAct(b, name, arg, reload, ok) {
 	return callAction(name, arg).then(function(r) {
 		if (r && r.error) {
@@ -185,7 +185,7 @@ function linkType(link) {
 	return /^\s*(client\s*$|remote\s+\S+|<ca>)/im.test(l) ? 'openvpn' : '-';
 }
 
-/* Where a node added by hand connects to, as "host:port", for PassWall2's
+/* Where a node added by hand connects to, as "host:port", for the
    "Show server address and port". Read from the link here, in the browser:
    the table is drawn from the configuration file, not from the parsed list. */
 function b64text(b) {
@@ -326,7 +326,7 @@ function reassign(b) {
 function toolbar(s) {
 	var all = false;
 	return E('div', { 'class': 'mk-row', 'style': 'gap:8px;flex-wrap:wrap;margin:0 0 12px' }, [
-		/* PassWall2's Add: the whole Node Config page, empty. Nothing is
+		/* The Add: the whole Node Config page, empty. Nothing is
 		   written until it is saved there, so leaving it adds nothing. */
 		pui.btn(_('Add'), 'success mk-small', function() {
 			window.location.href = L.url('admin', 'services', 'zirgozar', 'node') + '?new=1';
@@ -371,7 +371,7 @@ function toolbar(s) {
 	]);
 }
 
-/* A name of its own for a new section, the way PassWall2 names its nodes.
+/* A name of its own for a new section.
    A section without one is known by its place in the file, and loses that
    name - and every setting naming it - as soon as one ahead of it is added,
    moved or deleted. */
@@ -383,7 +383,7 @@ function sectionName(prefix) {
 	return n;
 }
 
-/* PassWall2's "Show server address and port". Every address is drawn, and
+/* The "Show server address and port". Every address is drawn, and
    shown or hidden with the switch, so that ticking it shows them at once
    rather than after Save. */
 var showInfo = false;
@@ -540,7 +540,7 @@ return view.extend({
 		/* Add is in the row of buttons above the table, not under it. */
 		s.renderSectionAdd = function() { return E([]); };
 		var manual = s;
-		/* Edit opens PassWall2's Node Config page, with every field of the
+		/* Edit opens the Node Config page, with every field of the
 		   link and the settings a link has no place for. A node being added
 		   is not in the file yet, so it still gets the window: a link pasted
 		   in there, and the page has something to take apart. */
@@ -575,7 +575,7 @@ return view.extend({
 			]);
 		};
 
-		/* PassWall2's Type column: what the link is. */
+		/* The Type column: what the link is. */
 		o = s.option(form.DummyValue, '_type', _('Type'));
 		o.modalonly = false;
 		o.textvalue = function(section_id) {
@@ -639,7 +639,7 @@ return view.extend({
 			return rv;
 		};
 
-		/* PassWall2's Chain Proxy, with its option names. A pre-proxy node is
+		/* The Chain Proxy, with its option names. A pre-proxy node is
 		   dialled first and this node through it; a landing node is where the
 		   traffic goes on to after this one, and where it finally leaves from.
 		   Only nodes added by hand can be named: a subscription is re-read
@@ -755,7 +755,7 @@ return view.extend({
 
 		var self = this;
 
-		/* ------------------------------------------ PassWall2's three */
+		/* ------------------------------------------ The three */
 		s = m.section(form.NamedSection, 'config', 'zirgozar');
 		s.anonymous = true;
 
@@ -794,7 +794,7 @@ return view.extend({
 		};
 
 		/* ------------------------------------------- automatic choice
-		   This program's own, and it has no PassWall2 equivalent: how the
+		   This program's own: how the
 		   fastest node is found when the node in Basic Settings is Auto. */
 		/* The three numbers in this sentence are the settings below it, read as
 		   they are saved and kept in step as they are typed. */
@@ -836,7 +836,7 @@ return view.extend({
 		o.default = '30';
 
 		return m.render().then(function(mapEl) {
-			/* PassWall2's buttons, above the table of nodes added by hand. */
+			/* The buttons, above the table of nodes added by hand. */
 			var grid = mapEl.querySelector('#cbi-zirgozar-node');
 			var table = grid && grid.querySelector('.cbi-section-table');
 			if (table) table.parentNode.insertBefore(toolbar(manual), table);
@@ -866,7 +866,7 @@ return view.extend({
 			}, 5);
 
 			/* Once LuCI has put the page in the document, where these can find
-			   the boxes they fill - and then PassWall2's automatic detection:
+			   the boxes they fill - and then the automatic detection:
 			   every node added by hand measured once, the way the setting
 			   says. */
 			window.setTimeout(function() {

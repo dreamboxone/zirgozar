@@ -11,9 +11,9 @@
 #   zgz-geo status
 #   zgz-geo remove
 #
-# PassWall2's Rollback: the file an update replaces is kept, in memory, until
+# The Rollback: the file an update replaces is kept, in memory, until
 # the next reboot or the next update, and can be put back. In memory and not
-# on flash, as PassWall2 keeps it, because two copies of seventeen megabytes
+# on flash, because two copies of seventeen megabytes
 # on flash is exactly what a small router has not got - and only when there
 # is room in memory to spare, because running out of it is worse still.
 #
@@ -302,7 +302,7 @@ cmd_status() {
 	return 0
 }
 
-# PassWall2's Geo View, with its tool.
+# The Geo View, with its tool.
 #
 #   view lookup <name or address>   which lists hold it - and which shunt
 #                                   rules name one of those lists, or it

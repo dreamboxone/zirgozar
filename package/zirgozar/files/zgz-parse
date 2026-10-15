@@ -308,7 +308,7 @@ function stream(net, sec, host, path, sni, fp, alpn, pbk, sid, spx, svc, hdr, mo
 
 # ------------------------------------------------------------------ output
 
-# PassWall2's keyword filter on node names, with its five modes: -v FMODE,
+# The keyword filter on node names, with its five modes: -v FMODE,
 # and the two lists from the environment, one keyword a line. A keyword
 # matches anywhere in the name, exactly as written.
 #   1 drop what matches the discard list
@@ -350,7 +350,7 @@ function filtered(label) {
 # --------------------------------------------------------- a node's own settings
 #
 # What the edit page of a node added by hand sets beyond its link - the ones
-# PassWall2 has on its node page and a share link has no place for. They
+# a share link has no place for. They
 # arrive as "#!zgz-x.<key>=<value>" lines in front of the node (see
 # node_extras in zgz-common.sh) and are put into every outbound made from it:
 #
@@ -486,7 +486,7 @@ function emit(label, proto, payload,   key, tag) {
 # tls, sni, scy, ps.
 function do_vmess(body,   j, k, v, o, label) {
 	j = b64(body)
-	if (j !~ /"add"/) return
+	if (j !~ /"add"/) { do_vmess_sr(body); return }
 	# One link must never inherit the previous one's xhttp settings.
 	XEXTRA = ""
 	split("", o)
@@ -508,6 +508,37 @@ function do_vmess(body,   j, k, v, o, label) {
 	emit(label, "vmess", mk_vmess(o["id"], o["aid"], o["scy"], \
 		stream(o["net"], (o["tls"] != "" ? o["tls"] : "none"), o["host"], o["path"], \
 		       o["sni"], o["fp"], o["alpn"], "", "", "", o["path"], o["type"], o["mode"])))
+}
+
+# vmess://base64(security:uuid@host:port)?remarks=&obfs=websocket&obfsParam=&path=&tls=1&peer=&alterId=
+# The form Shadowrocket writes.
+function do_vmess_sr(body,   label, query, p, d, scy, id, net, host, sec, hdr) {
+	p = index(body, "#")
+	if (p > 0) { label = clean_label(substr(body, p + 1)); body = substr(body, 1, p - 1) }
+	p = index(body, "?")
+	if (p > 0) { query = substr(body, p + 1); body = substr(body, 1, p - 1) }
+	d = b64(body)
+	p = index(d, "@")
+	if (p <= 0) return
+	id = substr(d, 1, p - 1)
+	if (!hostport(substr(d, p + 1))) return
+	p = index(id, ":")
+	if (p <= 0) return
+	scy = substr(id, 1, p - 1); id = substr(id, p + 1)
+	if (label == "") label = clean_label(qs(query, "remarks"))
+	net = tolower(qs(query, "obfs"))
+	hdr = ""
+	if (net == "websocket" || net == "ws") net = "ws"
+	else if (net == "http") { net = "tcp"; hdr = "http" }
+	else if (net != "grpc" && net != "h2" && net != "httpupgrade" && net != "xhttp") net = "tcp"
+	host = qs(query, "obfsParam")
+	# Sometimes a JSON object of headers rather than a name.
+	if (host ~ /^[ \t]*\{/) { d = host; host = jstr(d, "Host"); if (host == "") host = jstr(d, "host") }
+	sec = (qs(query, "tls") == "1" || qs(query, "tls") == "true") ? "tls" : "none"
+	XEXTRA = ""
+	emit(label, "vmess", mk_vmess(id, qs(query, "alterId"), scy, \
+		stream(net, sec, host, qs(query, "path"), qs(query, "peer") != "" ? qs(query, "peer") : qs(query, "sni"), \
+		       qs(query, "fp"), qs(query, "alpn"), "", "", "", qs(query, "path"), hdr, "")))
 }
 
 # ---------------------------------------------------------------- vless://
@@ -756,6 +787,8 @@ function do_hy2realm(body, http,   label, query, p, path, tok, name, o, n, a, i,
 		",\"insecure\":" (qs(query, "insecure") == "1" ? "true" : "false")
 	if (st != "") o = o ",\"stun\":\"" jesc(st) "\""
 	if (qs(query, "lport") ~ /^[0-9]+$/) o = o ",\"lport\":" (qs(query, "lport") + 0)
+	# The modem's port opened by UPnP or NAT-PMP, set on the node's page.
+	if (NX["hy_portmap"] == "1") o = o ",\"portmap\":true"
 	emit(label, "hysteria2", o hy_extra(query) "}")
 }
 
@@ -789,10 +822,19 @@ function mk_ssrust(method, pass) {
 		",\"method\":\"" jesc(method) "\",\"password\":\"" jesc(pass) "\"}"
 }
 
+# The server certificate's SHA-256, pinned: pinSHA256, as hex with or
+# without colons.
+function pin_extra(query,   v) {
+	v = qs(query, "pinSHA256"); if (v == "") v = qs(query, "pinsha256")
+	gsub(/:/, "", v)
+	v = tolower(v)
+	return (v ~ /^[0-9a-f]+$/ && length(v) == 64) ? ",\"pin\":\"" v "\"" : ""
+}
+
 # Port hopping and bandwidth, as the clients write them: mport (or ports) a
 # list of ports and ranges, hop_interval, up and down in Mbps.
 function hy_extra(query,   o, v) {
-	o = ""
+	o = pin_extra(query)
 	v = qs(query, "mport"); if (v == "") v = qs(query, "ports")
 	gsub(/[ \t]/, "", v)
 	if (v ~ /^[0-9]+([-:][0-9]+)?(,[0-9]+([-:][0-9]+)?)*$/) o = o ",\"ports\":\"" v "\""
@@ -884,7 +926,7 @@ function do_tuic(body,   label, cred, uuid, pass, query, p, q) {
 
 # TUIC's own options: how UDP is relayed, the 0-RTT handshake, the heartbeat.
 function tuic_extra(query,   o, v) {
-	o = ""
+	o = pin_extra(query)
 	v = qs(query, "udp_relay_mode")
 	if (v == "native" || v == "quic") o = o ",\"udp_relay_mode\":\"" v "\""
 	v = qs(query, "reduce_rtt"); if (v == "") v = qs(query, "zero_rtt")
@@ -908,10 +950,10 @@ function tuic_extra(query,   o, v) {
 #   openconnect://[user:pass@]host:port[/path]?flavor=&group=&fingerprint=&insecure=1#name
 #   tailscale://AUTHKEY@control-host[:port]?exit_node=&hostname=#name
 
-function mk_anytls(pass, sni, ins, fp, alpn) {
+function mk_anytls(pass, sni, ins, fp, alpn, pin) {
 	return "{\"type\":\"anytls\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT \
 		",\"password\":\"" jesc(pass) "\",\"sni\":\"" jesc(sni) "\",\"fp\":\"" jesc(fp) "\"" \
-		",\"alpn\":\"" jesc(alpn) "\",\"insecure\":" (ins ? "true" : "false") "}"
+		",\"alpn\":\"" jesc(alpn) "\",\"insecure\":" (ins ? "true" : "false") pin "}"
 }
 
 # Version 5 is version 4 on the wire; 1 to 3 sing-box does not speak.
@@ -983,7 +1025,7 @@ function do_anytls(body,   alpn) {
 	if (!LCRED || LUSER == "" || !hostport(body)) return
 	alpn = qs(LQUERY, "alpn")
 	emit(LLABEL, "anytls", mk_anytls(LPASS != "" ? LUSER ":" LPASS : LUSER, qs(LQUERY, "sni") != "" ? qs(LQUERY, "sni") : qs(LQUERY, "peer"), \
-		lbool("insecure") || lbool("allowInsecure"), qs(LQUERY, "fp"), alpn))
+		lbool("insecure") || lbool("allowInsecure"), qs(LQUERY, "fp"), alpn, pin_extra(LQUERY)))
 }
 
 function do_snell(body,   psk, pl) {
@@ -1533,7 +1575,7 @@ function jappend(a, item) {
 
 # ------------------------------------------------------------- decorating
 #
-# What the Xray tab adds to an outbound, the way PassWall2 adds it:
+# What the Xray tab adds to an outbound adds it:
 #
 #   dialerProxy  the outbound dials out through another one - the pre-proxy
 #   finalmask    fragment on the TCP side, noise on the UDP side
@@ -1545,7 +1587,7 @@ function jappend(a, item) {
 # work for nothing - so the mask goes on the pre-proxy instead, which is
 # decorated as a first hop in its own right.
 #
-# The transports each mask applies to are PassWall2's: fragment for raw, ws,
+# The transports each mask applies to: fragment for raw, ws,
 # httpupgrade, grpc and xhttp; noise for mKCP and for xhttp over HTTP/3.
 #
 # Mux is left off where it cannot work: a VLESS flow (Vision does its own
@@ -2151,7 +2193,7 @@ DECORATE {
 	next
 }
 
-# -v LANDING=1: PassWall2's landing node, for every node of a subscription.
+# -v LANDING=1: the landing node, for every node of a subscription.
 # Each record on stdin is one of its nodes, and comes back as the landing
 # node - $LAND, a record - reached through that node: the first hop's address
 # is kept, because that is the hop the router actually reaches, and the name

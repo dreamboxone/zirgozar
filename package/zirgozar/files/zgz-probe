@@ -539,7 +539,7 @@ select_tag() {
 	select_row "$_row" "$_ms"
 }
 
-# PassWall2's Node setting: one hand-added node, used as it is, with nothing
+# The Node setting: one hand-added node, used as it is, with nothing
 # measured. Its record is made here from the section - the candidate list may
 # not have been built since it was added - with its own chain if it has one.
 cmd_use() {
@@ -616,7 +616,7 @@ select_row() {
 	# The subscription the node came from, when one of them says which core
 	# carries which protocol - looked up once here, read by wanted_engine.
 	_msub=""
-	if uci -q show zirgozar 2>/dev/null | grep -qE "_type='(xray|singbox|hysteria)'"; then
+	if uci -q show zirgozar 2>/dev/null | grep -qE "_type='(xray|singbox)'"; then
 		_mo="$("$ZGZ_LIB/zgz-nodes" origin "$_tag" 2>/dev/null)" || _mo=""
 		case "$_mo" in sub:*) _msub="${_mo#sub:}"; _msub="${_msub%%:*}" ;; esac
 	fi

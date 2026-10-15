@@ -3,7 +3,7 @@
  * Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
  * Part of Zirgozar - https://github.com/dreamboxone/zirgozar
  *
- * Runtime Logs, the way PassWall2 has them: this program's own log, a date on
+ * Runtime Logs: this program's own log, a date on
  * every line and each step of a start indented under it - the node, the
  * core, the DNS, the firewall - with a button that empties it. And under it,
  * what the core itself said, which is where the reason is when a node is

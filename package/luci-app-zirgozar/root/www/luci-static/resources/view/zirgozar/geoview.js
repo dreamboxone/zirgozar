@@ -3,7 +3,7 @@
  * Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
  * Part of Zirgozar - https://github.com/dreamboxone/zirgozar
  *
- * PassWall2's Geo View: two questions put to the routing data with its tool,
+ * The Geo View: two questions put to the routing data with its tool,
  * Geoview. Which lists hold a name or an address - and which shunt rules
  * name one of them - and what one list holds.
  */

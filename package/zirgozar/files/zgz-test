@@ -14,7 +14,7 @@
 #   zgz-test json         every answer collected so far
 #   zgz-test clear        forget them
 #
-# The three are the same three PassWall offers beside each node, and they are
+# The three tests offered beside each node, and they are
 # three because they answer three different questions and disagree often.
 #
 #   ping  is the network layer and nothing else. It says how far away the

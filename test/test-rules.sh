@@ -89,6 +89,13 @@ else
 	bad "IPv6 through the tunnel goes to the core by TPROXY"
 fi
 rig_set ipv6 block
+# mwan3 adds its line to the same mark: the core's own 0xff is matched on its
+# byte alone, and never exactly.
+if grep -q 'meta mark & 0xff == 0xff return' "$WORK/rules.nft" && ! grep -q 'meta mark 0xff return' "$WORK/rules.nft"; then
+	ok "the core's own mark is matched under a mask, beside mwan3"
+else
+	bad "the core's own mark is matched under a mask, beside mwan3"
+fi
 
 # A single interface has to work as well as several: `!= { "a" }` and
 # `!= { "a", "b" }` are different enough syntactically to get wrong.

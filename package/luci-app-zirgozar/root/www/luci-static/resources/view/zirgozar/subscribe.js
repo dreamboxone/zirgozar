@@ -3,7 +3,7 @@
  * Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
  * Part of Zirgozar - https://github.com/dreamboxone/zirgozar
  *
- * PassWall2's Node Subscribe: the keyword filter for every subscription, the
+ * The Node Subscribe: the keyword filter for every subscription, the
  * two buttons for all of them at once, and the table of subscriptions with
  * what each one last brought and a button to read it again or to delete what
  * it brought. Each subscription's own settings are in its edit window.
@@ -45,7 +45,7 @@ function ago(when) {
 	return _('%d days ago').format(Math.floor(s / 86400));
 }
 
-/* PassWall2's Subscribe Info column: how many nodes, what is left of the
+/* The Subscribe Info column: how many nodes, what is left of the
    allowance and when it runs out - the last two only when the provider says
    - and here also when it was last read, or why it could not be. */
 function infoCell(sid) {
@@ -133,7 +133,7 @@ function withBrowse(o, hint) {
 	return o;
 }
 
-/* A name of its own for a new section, the way PassWall2 names its nodes.
+/* A name of its own for a new section.
    A section without one is known by its place in the file, and loses that
    name - and every setting naming it - as soon as one ahead of it is added,
    moved or deleted. */
@@ -145,7 +145,7 @@ function sectionName(prefix) {
 	return n;
 }
 
-/* PassWall2's five filter modes, the same numbers. */
+/* The five filter modes, the same numbers. */
 function filterModes(o, withGlobal) {
 	o.value('0', _('Close'));
 	o.value('1', _('Discard List'));
@@ -280,7 +280,7 @@ return view.extend({
 			return td;
 		};
 
-		/* The table shows what PassWall2's does; everything else is in the
+		/* The table shows what the does; everything else is in the
 		   edit window. */
 		s.tab('main', _('Main'));
 		s.tab('keywords', _('Keyword filter method inside the config'));
@@ -361,6 +361,10 @@ return view.extend({
 		o.value('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0', 'Edge for Windows');
 		o.value('v2rayN/9.99', 'v2rayN');
 
+		o = s.taboption('main', form.Value, 'cookie', 'Cookie',
+			_('Only if the provider asks for one, such as session=abc; token=xyz'));
+		o.modalonly = true;
+
 		o = s.taboption('main', form.Flag, 'hwid', _('Send HWID'),
 			_('Some providers count devices: this sends what the router is and a hash of its model and address when the list is read.'));
 		o.default = '0';
@@ -375,12 +379,6 @@ return view.extend({
 			if (p[0] == 'ss') c.value('ssrust', 'shadowsocks-rust');
 			c.modalonly = true;
 		});
-		o = s.taboption('core', form.ListValue, 'hysteria2_type', _('%s core').format('Hysteria2'));
-		o.value('', _('Auto'));
-		o.value('singbox', 'sing-box');
-		o.value('hysteria', 'hysteria');
-		o.modalonly = true;
-
 		o = s.taboption('core', widgets.DeviceSelect, 'outbound_iface', _('Outbound Interface'),
 			_('The interface this subscription’s nodes go out by. Empty is the router’s usual way.'));
 		o.noaliases = true;
@@ -413,7 +411,7 @@ return view.extend({
 		o.depends('filter_keyword_mode', '4');
 
 		/* ------------------------------------------ when it is read
-		   PassWall2's own schedule for a subscription, and one choice more:
+		   The schedule for a subscription, and one choice more:
 		   with the node list's quarter-hourly refresh, which is how the
 		   default list is read. */
 		o = s.taboption('sched', form.Flag, 'boot_update', _('Update Once on Boot'),
@@ -452,7 +450,7 @@ return view.extend({
 		o.depends('update_week_mode', '8');
 
 		/* ---------------------------------------------------- its chain
-		   PassWall2's Chain Proxy on a subscription, for every node in it.
+		   The Chain Proxy on a subscription, for every node in it.
 		   Only nodes added by hand can be named: they are the only ones that
 		   stay put. */
 		var manual = uci.sections('zirgozar', 'node');

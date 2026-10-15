@@ -12,7 +12,7 @@ const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname,
 	'../package/luci-app-zirgozar/root/www/luci-static/resources/view/zirgozar/subscribe.js'), 'utf8');
 const piece = (from, to) => source.slice(source.indexOf(from), source.indexOf(to));
-const code = piece('function sectionName(', '/* PassWall2\'s five filter modes') +
+const code = piece('function sectionName(', '/* The five filter modes') +
 	piece('var NAME_KEYS', 'function done(') + 'return { subsInFile, importSubs };';
 
 const sections = [ { '.name': 'default', name: 'Top 100', url: 'https://example.com/top100.txt' } ];

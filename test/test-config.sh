@@ -52,6 +52,8 @@ ss://YWVzLTEyOC1nY206aHVudGVyMg==@st.example.com:443?plugin=shadow-tls%3Bhost%3D
 ss://YWVzLTEyOC1nY206aHVudGVyMg==@sx.example.com:443?plugin=kcptun#SS-KCPTUN
 ssr://c3NyLmV4YW1wbGUuY29tOjgzODg6YXV0aF9hZXMxMjhfbWQ1OmFlcy0yNTYtY2ZiOnRsczEuMl90aWNrZXRfYXV0aDpjR0U2YzNNLz9vYmZzcGFyYW09WW1sdVp5NWpiMjAmcHJvdG9wYXJhbT1NVEk2WVdKaiZyZW1hcmtzPVUxTlNJRzV2WkdV
 hysteria2+realm://tok123@rv.example.com/myrealm?auth=pw&obfs=gecko&obfs-password=op&stun=stun.a.com:3478#HY2-REALM
+vmess://YXV0bzoxMTExMTExMS0yMjIyLTMzMzMtNDQ0NC01NTU1NTU1NTU1NTVAc3IuZXhhbXBsZS5jb206NDQz?remarks=ROCKET&obfsParam=cdn.example.com&path=/ws&obfs=websocket&tls=1&peer=sni.example.com&alterId=0
+anytls://hunter2@pn.example.com:443?sni=pn.example.com&pinSHA256=AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89#PINNED
 # a comment, and below it two things that must be refused rather than guessed at
 vless://not-a-link
 ss://bm9wZQ==
@@ -126,6 +128,8 @@ case "$(pl SSH)" in 'ssh {"type":"ssh","server":"sh.example.com","port":22,"user
 case "$(pl SS-OBFS)" in *'"plugin":"obfs-local","plugin_opts":"obfs=http;obfs-host=bing.com"'*) ok "a shadowsocks link with obfs is read" ;; *) bad "a shadowsocks link with obfs is read: $(pl SS-OBFS)" ;; esac
 case "$(pl SS-STLS)" in *'"plugin":"shadow-tls","plugin_opts":"host=bing.com;password=p2;version=3"'*) ok "a shadowsocks link with ShadowTLS is read" ;; *) bad "a shadowsocks link with ShadowTLS is read: $(pl SS-STLS)" ;; esac
 check "$(pl SS-KCPTUN)" "" "a shadowsocks plugin that is not shipped is refused"
+case "$(pl ROCKET)" in 'vmess {"protocol":"vmess"'*'"address":"sr.example.com","port":443'*'"network":"ws","security":"tls","tlsSettings":{"serverName":"sni.example.com"},"wsSettings":{"path":"/ws","headers":{"Host":"cdn.example.com"}}'*) ok "a Shadowrocket vmess link is read" ;; *) bad "a Shadowrocket vmess link is read: $(pl ROCKET)" ;; esac
+case "$(pl PINNED)" in *'"pin":"abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"'*) ok "a pinned certificate is kept, without its colons" ;; *) bad "a pinned certificate is kept: $(pl PINNED)" ;; esac
 case "$(pl 'SSR node')" in 'ssr {"type":"ssr","server":"ssr.example.com","port":8388,"protocol":"auth_aes128_md5","method":"aes-256-cfb","obfs":"tls1.2_ticket_auth","password":"pa:ss","obfs_param":"bing.com","protocol_param":"12:abc"}') ok "an ssr link is read" ;; *) bad "an ssr link is read: $(pl 'SSR node')" ;; esac
 case "$(pl HY2-REALM)" in *'"realm":"realm://tok123@rv.example.com:443/myrealm","password":"pw"'*'"obfs":"gecko"'*'"stun":"stun.a.com:3478"'*) ok "a hysteria2 realm link is read" ;; *) bad "a hysteria2 realm link is read: $(pl HY2-REALM)" ;; esac
 SSRUST="$(printf '%s\n' '#!zgz-x.ssrust=1' 'ss://YWVzLTEyOC1nY206aHVudGVyMg==@sr.example.com:443#R' | LC_ALL=C awk -f "$RIG/lib/zgz-parse" | cut -f3,6)"
@@ -391,7 +395,7 @@ fi
 # inside somebody else's JSON both worked, and the file people are actually
 # given did not.
 echo "== a shunt rule that is inverted, and one with a rule-set"
-# PassWall2's invert, which only sing-box has. Under Xray the rule is left out
+# The invert, which only sing-box has. Under Xray the rule is left out
 # - run the right way round it would send exactly the other traffic - and a
 # sing-box rule-set means nothing to Xray either. For sing-box both go across.
 rig_clear
@@ -1051,7 +1055,7 @@ for want in \
 	fi
 done
 
-# BitTorrent is refused only when asked, as in PassWall2.
+# BitTorrent is refused only when asked.
 rig_set block_torrent ''
 sh "$RIG/lib/zgz-mkconfig" 2>/dev/null | grep -q '"bittorrent"' &&
 	bad "BitTorrent is not refused by default" || ok "BitTorrent is not refused by default"
@@ -1060,7 +1064,7 @@ sh "$RIG/lib/zgz-mkconfig" 2>/dev/null | grep -q '"protocol":\["bittorrent"\],"o
 	ok "and is when turned on" || bad "and is when turned on"
 rig_set block_torrent ''
 
-# Unset, TCP goes by REDIRECT, as PassWall2 has it; TPROXY only when chosen.
+# Unset, TCP goes by REDIRECT; TPROXY only when chosen.
 rig_set tcp_proxy_way ''
 sh "$RIG/lib/zgz-mkconfig" 2>/dev/null | tr -d '\n' | grep -q '"tag": "redir-in"' &&
 	ok "REDIRECT by default" || bad "REDIRECT by default"
@@ -1068,7 +1072,7 @@ rig_set tcp_proxy_way tproxy
 sh "$RIG/lib/zgz-mkconfig" 2>/dev/null | tr -d '\n' | grep -qE '"tag": "(redir-in|poison-redir)"' &&
 	bad "no REDIRECT inbound under TPROXY" || ok "no REDIRECT inbound under TPROXY"
 
-# Unset, the sniffed name is for routing only, as PassWall2 has it.
+# Unset, the sniffed name is for routing only.
 rig_set sniffing_override_dest ''
 sh "$RIG/lib/zgz-mkconfig" 2>/dev/null | tr -d '
 ' | grep -q '"tag": "tproxy-in".*"routeOnly": true' &&
@@ -1097,7 +1101,7 @@ rig_clear
 
 # ------------------------------------------------------- a node's own settings
 #
-# What the edit page of a node sets beyond its link, PassWall2's lower half,
+# What the edit page of a node sets beyond its link, the lower half,
 # carried into the outbound - and the node's own resolver into the DNS.
 echo "== a node's own settings"
 NX='vless://11111111-2222-3333-4444-555555555555@nx.example.com:443?encryption=none&security=tls&sni=nx.example.com&type=ws&path=%2Fw#NX'

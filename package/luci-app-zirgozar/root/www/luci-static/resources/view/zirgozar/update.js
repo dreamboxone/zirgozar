@@ -3,10 +3,10 @@
  * Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
  * Part of Zirgozar - https://github.com/dreamboxone/zirgozar
  *
- * App Update, the way PassWall2 has it: this program's version and the
+ * App Update: this program's version and the
  * latest one published, each core with its version, a Check update and a
  * Force update, and where each core lives. The routing data is here too -
- * PassWall2 keeps its rule files beside its cores, and so does this.
+ * The rule files are kept beside the cores.
  */
 
 'use strict';
@@ -253,8 +253,8 @@ function renderDeps(deps) {
    in place and its version still to come - and filled in when the router
    answers. Waiting for the answer left three empty cards on the screen. */
 var KEPT = 'zirgozar.update.last';
-var CORE_NAMES = [ 'xray', 'xray-patterniha', 'sing-box', 'sing-box-lx', 'hysteria',
-                   'geoview', 'warp-plus', 'vwarp', 'aether', 'mihomo', 'sslocal', 'openvpn' ];
+var CORE_NAMES = [ 'xray', 'xray-patterniha', 'sing-box', 'sing-box-lx',
+                   'geoview', 'warp-plus', 'vwarp', 'aether', 'mihomo', 'sslocal', 'openvpn', 'haproxy' ];
 
 var answered = false;
 
@@ -272,13 +272,13 @@ function kept() {
 	   so it is shown from the start rather than waited for. */
 	var dir = uci.get('zirgozar', 'config', 'core_dir') || '/usr/libexec/zirgozar';
 	var set = { xray: 'core_xray', 'sing-box': 'core_singbox', 'sing-box-lx': 'core_singbox_lx',
-	            hysteria: 'core_hysteria', geoview: 'core_geoview', 'warp-plus': 'core_warpplus',
+	            geoview: 'core_geoview', 'warp-plus': 'core_warpplus',
 	            vwarp: 'core_vwarp', aether: 'core_aether', mihomo: 'core_mihomo', sslocal: 'core_sslocal' };
 	var own = { aether: 'aether/aether' };
 	return {
 		cores: { app: { unknown: true }, unknown: true, dir: dir,
 		         cores: CORE_NAMES.map(function(n) {
-		             var path = n == 'openvpn' ? '/usr/sbin/openvpn'
+		             var path = n == 'openvpn' ? '/usr/sbin/openvpn' : n == 'haproxy' ? '/usr/sbin/haproxy'
 		                 : (set[n] && uci.get('zirgozar', 'config', set[n])) || dir + '/' + (own[n] || n);
 		             return { name: n, arch_ok: true, unknown: true, path: path };
 		         }) },
@@ -295,7 +295,9 @@ function render(d, early) {
 	if (job) {
 		var shown = d.job && d.job != CHECK_JOB;
 		job.style.display = shown ? 'flex' : 'none';
-		job.textContent = shown ? jobName(d.job) + '…' : '';
+		job.textContent = shown ? jobName(d.job) + (d.progress >= 0 ? ' ' + d.progress + '%' : '…') : '';
+		job.style.background = shown && d.progress >= 0
+			? 'linear-gradient(90deg, rgba(37,99,235,.18) ' + d.progress + '%, transparent ' + d.progress + '%)' : '';
 	}
 
 	/* This program's own update. The install restarts the services the page
@@ -328,7 +330,7 @@ function render(d, early) {
 	/* While a check runs, what was known before it is not shown as an
 	   answer, and the page asks again sooner than its usual ten seconds. */
 	var busy = checking(d);
-	if (!early && (busy || (d.deps || {}).pending) && !quickRefresh)
+	if (!early && (busy || (d.deps || {}).pending || (d.job && d.progress >= 0)) && !quickRefresh)
 		quickRefresh = window.setTimeout(function() { quickRefresh = 0; refreshNow(); }, 2000);
 	if (!busy) checkAsked = 0;
 
@@ -418,12 +420,12 @@ function render(d, early) {
 					return act('core:' + c.name, 'core_remove', c.name, _('%s removed.').format(c.name));
 				}, 'trash'));
 
-			cbox.appendChild(row({ xray: 'Xray', geoview: 'Geoview', 'sing-box-lx': 'sing-box-lx', 'warp-plus': 'warp-plus', vwarp: 'Vwarp', aether: 'Aether', mihomo: 'Mihomo', sslocal: 'shadowsocks-rust', 'xray-patterniha': _('Xray (patterniha)'), openvpn: 'OpenVPN' }[c.name] || c.name, value, actions, 'core:' + c.name));
+			cbox.appendChild(row({ xray: 'Xray', geoview: 'Geoview', 'sing-box-lx': 'sing-box-lx', 'warp-plus': 'warp-plus', vwarp: 'Vwarp', aether: 'Aether', mihomo: 'Mihomo', sslocal: 'shadowsocks-rust', haproxy: 'HAProxy', 'xray-patterniha': _('Xray (patterniha)'), openvpn: 'OpenVPN' }[c.name] || c.name, value, actions, 'core:' + c.name));
 		});
 		cbox.appendChild(row(_('Free space'),
 			[ E('span', {}, cores.unknown ? '…' : bytes(cores.free)), E('code', { 'style': 'font-size:11.5px;color:var(--muted)' }, cores.dir || '') ]));
 		cbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:8px 0 0' },
-			_('Xray carries the traffic. sing-box and hysteria are only needed for nodes that speak hysteria2 or tuic, which Xray does not — one of them is then run as a local helper for that one node, and everything else works exactly as before.')));
+			_('Xray carries the traffic. sing-box is only needed for nodes that speak what Xray does not — it is then run as a local helper for that one node, and everything else works exactly as before.')));
 		cbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:6px 0 0' },
 			_('Geoview shows where a name or an address belongs, on the Geoview page. sing-box cannot read the routing data without it: when sing-box carries the tunnel with the Iran split or ad blocking on, Geoview is installed by itself if it is missing.')));
 		cbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:6px 0 0' },
@@ -449,10 +451,10 @@ return view.extend({
 
 		var m, s, o;
 
-		/* Where each core lives. PassWall2 has an App Path per core; here one
+		/* Where each core lives. An App Path per core; here one
 		   folder holds the cores this package downloads, and one setting can
 		   insist on a particular Xray. The routing data is on Rule Manage, as
-		   it is in PassWall2. */
+		   it is elsewhere. */
 		m = new form.Map('zirgozar');
 		s = m.section(form.NamedSection, 'config', 'zirgozar', _('App Path'));
 		s.anonymous = true;
@@ -465,7 +467,7 @@ return view.extend({
 			_('Empty means: whichever Xray on this router accepts the configuration, preferring one already installed.'));
 		o.placeholder = '/usr/bin/xray';
 
-		/* PassWall2's App Path for the other two: the file this program
+		/* The App Path for the other two: the file this program
 		   installs, updates and runs. Empty is its own copy in the folder
 		   above. */
 		o = s.option(form.Value, 'core_singbox', _('Sing-Box App Path'),
@@ -475,10 +477,6 @@ return view.extend({
 		o = s.option(form.Value, 'core_singbox_lx', _('Sing-Box-LX App Path'),
 			_('The sing-box build that speaks xhttp. Empty means this program’s own copy in the folder above.'));
 		o.placeholder = '/usr/libexec/zirgozar/sing-box-lx';
-
-		o = s.option(form.Value, 'core_hysteria', _('Hysteria App Path'),
-			_('Empty means this program’s own copy in the folder above.'));
-		o.placeholder = '/usr/libexec/zirgozar/hysteria';
 
 		o = s.option(form.Value, 'core_geoview', _('Geoview App Path'),
 			_('The Geoview page needs it, and so does sing-box whenever the Iran split or ad blocking is on - it is then installed by itself. Empty means this program’s own copy in the folder above.'));

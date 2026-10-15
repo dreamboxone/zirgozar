@@ -135,7 +135,7 @@ done
 
 echo "== settings the scripts read all have a default in the shipped config"
 CONF="$ROOT/package/zirgozar/files/zirgozar.config"
-# Capitals too: PassWall2 names some of its options that way - fragment_maxSplit -
+# Capitals too: some options are named that way - fragment_maxSplit -
 # and a name cut short at its first capital is a name that is never found.
 for k in $(grep -ho 'cfg\(_bool\)\? [a-zA-Z_0-9]*' "$ROOT"/package/zirgozar/files/* |
            awk '{print $2}' | sort -u); do
@@ -209,7 +209,7 @@ fi
 # A shared helper must not take a variable name away from whoever called it.
 #
 # There is no `local` in this shell, so every name a function assigns is
-# global. download_checked kept its partial file in _tmp; install_hysteria
+# global. download_checked kept its partial file in _tmp; an installer
 # kept the file it wanted in _tmp; and after the download the caller's path
 # pointed at the temporary name that had just been moved away. The core
 # downloaded perfectly and the program then reported that it "will not run on
