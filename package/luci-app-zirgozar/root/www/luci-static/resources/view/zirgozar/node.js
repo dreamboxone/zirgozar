@@ -65,6 +65,10 @@ SCHEMES.tailscale = 'tailscale';
 SCHEMES.hysteria = 'hysteria';
 SCHEMES.ssh = 'ssh';
 SCHEMES.ssr = 'ssr';
+SCHEMES.mierus = 'mieru';
+SCHEMES.mieru = 'mieru';
+SCHEMES.sq = 'shadowquic';
+SCHEMES.shadowquic = 'shadowquic';
 var OC_FLAVORS = [ [ 'anyconnect', 'Cisco AnyConnect / ocserv' ], [ 'gp', 'GlobalProtect' ], [ 'fortinet', 'Fortinet' ],
 	[ 'f5', 'F5' ], [ 'pulse', 'Pulse Secure' ], [ 'nc', 'Juniper Network Connect' ] ];
 /* The PPP accounts, each with the port its servers listen on: providers hand
@@ -249,6 +253,29 @@ function parseLink(link) {
 		return f;
 	}
 
+	/* mieru: the port is in the query, as port and protocol. A link with more
+	   than one pair is several nodes, and is kept as text. */
+	if (proto == 'mieru') {
+		var mq = (s.split('?')[1] || '').split('#')[0];
+		if ((mq.match(/(^|&)port=/g) || []).length != 1) return null;
+		var mat = body.lastIndexOf('@');
+		if (mat < 0) return null;
+		var mc = body.slice(0, mat), mi = mc.indexOf(':');
+		f.user = dec(mi >= 0 ? mc.slice(0, mi) : mc); f.password = mi >= 0 ? dec(mc.slice(mi + 1)) : '';
+		f.address = body.slice(mat + 1).replace(/:\d+$/, '').replace(/^\[|\]$/g, '');
+		var mp = String(q.port || ''); delete q.port;
+		if (!/^\d+(-\d+)?$/.test(mp)) return null;
+		f.port = mp.replace(/-.*/, ''); f.mieru_range = /-/.test(mp) ? mp : '';
+		f.mieru_transport = String(q.protocol || 'TCP').toUpperCase() == 'UDP' ? 'UDP' : 'TCP'; delete q.protocol;
+		f.mieru_mux = q.multiplexing || ''; delete q.multiplexing;
+		f.mieru_handshake = q['handshake-mode'] || ''; delete q['handshake-mode'];
+		if (!f.name && q.profile) f.name = q.profile;
+		delete q.profile;
+		f.rest = q;
+		return f;
+	}
+	if (proto == 'shadowquic' && !/:[0-9]+$/.test(body)) body += ':443';
+
 	var at = body.lastIndexOf('@'), cred = '', hp;
 	/* L2TP, PPTP and SSTP have one port each, and providers give the
 	   server without it. */
@@ -345,6 +372,13 @@ function parseLink(link) {
 		var zr = take('reduce_rtt') || take('zero_rtt');
 		f.tuic_zero_rtt = (zr == '1' || zr == 'true') ? '1' : '0';
 		f.tuic_heartbeat = String(take('heartbeat')).replace(/s$/, '');
+	} else if (proto == 'shadowquic') {
+		var qi2 = cred.indexOf(':');
+		f.user = dec(qi2 >= 0 ? cred.slice(0, qi2) : cred); f.password = qi2 >= 0 ? dec(cred.slice(qi2 + 1)) : '';
+		f.sni = take('sni'); f.alpn = take('alpn');
+		f.sq_udp = take('udp_mode') == 'datagram' ? 'datagram' : 'stream';
+		var zq = q.zero_rtt; delete q.zero_rtt;
+		f.sq_zero_rtt = (zq != null && zq !== 'false' && zq !== '0') ? '1' : '0';
 	} else if (proto == 'ssh') {
 		var si = cred.indexOf(':');
 		f.user = dec(si >= 0 ? cred.slice(0, si) : cred); f.password = si >= 0 ? dec(cred.slice(si + 1)) : '';
@@ -461,6 +495,18 @@ function buildLink(f, name) {
 		var cred = p == 'vless' ? f.uuid : f.password;
 		var qs = buildQuery(q);
 		return p + '://' + enc(cred) + '@' + hp + (qs ? '?' + qs : '') + frag;
+	}
+	if (p == 'mieru') {
+		var mq2 = { profile: name || '', port: f.mieru_range || f.port, protocol: f.mieru_transport || 'TCP',
+		            multiplexing: f.mieru_mux, 'handshake-mode': f.mieru_handshake };
+		Object.keys(q).forEach(function(k) { if (!(k in mq2)) mq2[k] = q[k]; });
+		return 'mierus://' + enc(f.user || '') + ':' + enc(f.password || '') + '@' +
+			(String(f.address).indexOf(':') >= 0 ? '[' + f.address + ']' : f.address) + '?' + buildQuery(mq2) + frag;
+	}
+	if (p == 'shadowquic') {
+		q.sni = f.sni; q.alpn = f.alpn; q.udp_mode = f.sq_udp == 'datagram' ? 'datagram' : 'stream';
+		q.zero_rtt = f.sq_zero_rtt == '1' ? 'true' : '';
+		return 'sq://' + enc(f.user || '') + ':' + enc(f.password || '') + '@' + hp + '?' + buildQuery(q) + frag;
 	}
 	if (p == 'ssr') {
 		var b6 = function(v) { return b64enc(v || '').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
@@ -790,7 +836,7 @@ return view.extend({
 			var TRP = TLSP.concat([ 'socks', 'http' ]);
 
 			o = field(form.ListValue, 'proto', _('Protocol'));
-			[ [ 'vless', 'VLESS' ], [ 'vmess', 'VMess' ], [ 'trojan', 'Trojan' ], [ 'shadowsocks', 'Shadowsocks' ], [ 'ssr', 'SSR' ],
+			[ [ 'vless', 'VLESS' ], [ 'vmess', 'VMess' ], [ 'trojan', 'Trojan' ], [ 'shadowsocks', 'Shadowsocks' ], [ 'ssr', 'SSR' ], [ 'mieru', 'mieru' ], [ 'shadowquic', 'ShadowQUIC' ],
 			  [ 'socks', 'Socks' ], [ 'http', 'HTTP' ], [ 'hysteria2', 'Hysteria2' ], [ 'hysteria', 'Hysteria (v1)' ], [ 'tuic', 'TUIC' ], [ 'ssh', 'SSH' ],
 			  [ 'anytls', 'AnyTLS' ], [ 'snell', 'Snell' ], [ 'naive', 'NaiveProxy' ], [ 'openconnect', 'OpenConnect' ],
 			  [ 'tailscale', 'Tailscale' ], [ 'warp', 'WARP' ],
@@ -801,7 +847,7 @@ return view.extend({
 			var candidates = (data && data[1] && data[1].nodes) || [];
 			var origins = (data && data[3]) || {};
 			var nodes = candidates.filter(function(n) {
-				return !/^(hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|openvpn|amneziawg|l2tp|pptp|sstp|balancing|shunt|interface|aether)$/.test(n.protocol);
+				return !/^(hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|balancing|shunt|interface|aether)$/.test(n.protocol);
 			}).map(function(n) {
 				var origin = origins[n.tag];
 				return origin ? { tag: origin, label: n.label || n.tag } : null;
@@ -1000,7 +1046,7 @@ return view.extend({
 
 			/* A server of its own for all but WARP and OpenVPN, whose profile
 			   names its own. */
-			var SERVERS = XR.concat([ 'ssr', 'hysteria2', 'hysteria', 'tuic', 'ssh', 'anytls', 'snell', 'naive', 'openconnect', 'wireguard', 'l2tp', 'pptp', 'sstp' ]);
+			var SERVERS = XR.concat([ 'ssr', 'mieru', 'shadowquic', 'hysteria2', 'hysteria', 'tuic', 'ssh', 'anytls', 'snell', 'naive', 'openconnect', 'wireguard', 'l2tp', 'pptp', 'sstp' ]);
 			o = field(form.Value, 'address', _('Address (Support Domain Name)'));
 			o.rmempty = false;
 			o.validate = function(section_id, value) {
@@ -1176,14 +1222,14 @@ return view.extend({
 			o.validate = function(section_id, value) {
 				return !PPP_PORT[this.section.formvalue(section_id, '_proto')] || !!value ? true : _('This account requires a username and password.');
 			};
-			[ 'socks', 'http', 'l2tp', 'pptp', 'sstp', 'naive', 'openconnect', 'ssh' ].forEach(function(p) { o.depends('_proto', p); });
+			[ 'socks', 'http', 'l2tp', 'pptp', 'sstp', 'naive', 'openconnect', 'ssh', 'mieru', 'shadowquic' ].forEach(function(p) { o.depends('_proto', p); });
 
 			o = field(form.Value, 'password', _('Password'));
 			o.password = true;
 			o.validate = function(section_id, value) {
 				return !PPP_PORT[this.section.formvalue(section_id, '_proto')] || !!value ? true : _('This account requires a username and password.');
 			};
-			[ 'trojan', 'shadowsocks', 'ssr', 'socks', 'http', 'hysteria2', 'hysteria', 'tuic', 'anytls', 'naive', 'openconnect', 'ssh', 'l2tp', 'pptp', 'sstp' ].forEach(function(p) { o.depends('_proto', p); });
+			[ 'trojan', 'shadowsocks', 'ssr', 'mieru', 'shadowquic', 'socks', 'http', 'hysteria2', 'hysteria', 'tuic', 'anytls', 'naive', 'openconnect', 'ssh', 'l2tp', 'pptp', 'sstp' ].forEach(function(p) { o.depends('_proto', p); });
 
 			o = field(form.Value, 'snell_psk', 'PSK');
 			o.password = true; o.rmempty = false;
@@ -1273,6 +1319,33 @@ return view.extend({
 			o = field(form.Value, 'ssr_obfs_param', _('Obfuscation parameter'));
 			o.depends('_proto', 'ssr');
 
+			/* mieru and ShadowQUIC, carried by Mihomo. */
+			o = field(form.ListValue, 'mieru_transport', _('Transport'));
+			o.value('TCP', 'TCP');
+			o.value('UDP', 'UDP');
+			o.depends('_proto', 'mieru');
+			o = field(form.Value, 'mieru_range', _('Port range'), _('Such as 2090-2099, in place of the port. Empty for one port.'));
+			o.validate = function(section_id, value) {
+				return (!value || /^\d+-\d+$/.test(value)) ? true : _('Not valid, please re-enter: %s').format(value);
+			};
+			o.depends('_proto', 'mieru');
+			o = field(form.ListValue, 'mieru_mux', _('Multiplexing'));
+			o.value('', _('Default'));
+			[ 'MULTIPLEXING_OFF', 'MULTIPLEXING_LOW', 'MULTIPLEXING_MIDDLE', 'MULTIPLEXING_HIGH' ].forEach(function(v) { o.value(v, v.replace('MULTIPLEXING_', '').toLowerCase()); });
+			o.depends('_proto', 'mieru');
+			o = field(form.ListValue, 'mieru_handshake', _('Handshake'));
+			o.value('', _('Default'));
+			o.value('HANDSHAKE_STANDARD', _('Standard'));
+			o.value('HANDSHAKE_NO_WAIT', _('No wait (0-RTT)'));
+			o.depends('_proto', 'mieru');
+
+			o = field(form.ListValue, 'sq_udp', _('UDP relay mode'));
+			o.value('stream', 'stream');
+			o.value('datagram', 'datagram');
+			o.depends('_proto', 'shadowquic');
+			o = field(form.Flag, 'sq_zero_rtt', _('0-RTT handshake'));
+			o.depends('_proto', 'shadowquic');
+
 			/* ------------------------------------------------ security */
 			o = field(form.ListValue, 'security', _('Security'));
 			o.value('none', _('None'));
@@ -1291,12 +1364,14 @@ return view.extend({
 
 			o = field(form.Value, 'sni', _('SNI Domain'));
 			onTls(o, true);
+			o.depends('_proto', 'shadowquic');
 
 			o = field(form.Value, 'alpn', 'alpn');
 			[ 'h3', 'h2', 'http/1.1', 'h2,http/1.1', 'h3,h2,http/1.1' ].forEach(function(v) { o.value(v); });
 			TLSP.forEach(function(p) { o.depends({ '_proto': p, '_security': 'tls' }); });
 			o.depends('_proto', 'tuic');
 			o.depends('_proto', 'anytls');
+			o.depends('_proto', 'shadowquic');
 			o.depends('_proto', 'hysteria');
 
 			o = field(form.Value, 'fp', _('Finger Print'));

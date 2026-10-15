@@ -236,7 +236,7 @@ do_url() {
 			_aether_ms="$(printf '%s\n' "$_payload2" | "$ZGZ_LIB/zgz-aether" test "$1" 2>/dev/null)" || _aether_ms=0
 			printf '%s\n' "$_aether_ms" > "$_out"
 			return 0 ;;
-		hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|openvpn|amneziawg) echo -2 > "$_out"; return 0 ;;
+		hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg) echo -2 > "$_out"; return 0 ;;
 		# WARP is the exception: warp-plus is one small program and is stood
 		# up for the test, because without it the column could only ever
 		# say that it cannot say.
@@ -390,7 +390,7 @@ cmd_run() {
 			URL_REPEAT=1 url_ms "$_payload" "$_host" "$_port" > "$DIR/$_id.tcp" 2>/dev/null || true
 			return 0
 			;;
-		tcp:hysteria2|tcp:hysteria|tcp:tuic|tcp:anytls|tcp:snell|tcp:naive|tcp:openconnect|tcp:tailscale|tcp:ssh|tcp:ssplugin|tcp:ssr|tcp:ssrust|tcp:openvpn|tcp:amneziawg|tcp:warp)
+		tcp:hysteria2|tcp:hysteria|tcp:tuic|tcp:anytls|tcp:snell|tcp:naive|tcp:openconnect|tcp:tailscale|tcp:ssh|tcp:ssplugin|tcp:ssr|tcp:ssrust|tcp:mieru|tcp:shadowquic|tcp:trusttunnel|tcp:openvpn|tcp:amneziawg|tcp:warp)
 			# Not something Xray can carry, and the column has no other
 			# honest answer for them.
 			put "$_id.tcp" -2

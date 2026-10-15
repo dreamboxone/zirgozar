@@ -54,6 +54,9 @@ ssr://c3NyLmV4YW1wbGUuY29tOjgzODg6YXV0aF9hZXMxMjhfbWQ1OmFlcy0yNTYtY2ZiOnRsczEuMl
 hysteria2+realm://tok123@rv.example.com/myrealm?auth=pw&obfs=gecko&obfs-password=op&stun=stun.a.com:3478#HY2-REALM
 vmess://YXV0bzoxMTExMTExMS0yMjIyLTMzMzMtNDQ0NC01NTU1NTU1NTU1NTVAc3IuZXhhbXBsZS5jb206NDQz?remarks=ROCKET&obfsParam=cdn.example.com&path=/ws&obfs=websocket&tls=1&peer=sni.example.com&alterId=0
 anytls://hunter2@pn.example.com:443?sni=pn.example.com&pinSHA256=AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89#PINNED
+mierus://bob:pw@mi.example.com?profile=MIERU&port=2999&protocol=TCP&port=3000-3010&protocol=UDP&multiplexing=MULTIPLEXING_HIGH
+sq://u:p@sq.example.com:10443?sni=sq.example.com&udp_mode=datagram&zero_rtt&alpn=h3#SQUIC
+tt://?AAEBAQ92cG4uZXhhbXBsZS5jb20CCzEuMi4zLjQ6NDQzAgw1LjYuNy44Ojg0NDMFBWFsaWNlBgZzZWNyZXQHAQAJAQIMAlRU
 # a comment, and below it two things that must be refused rather than guessed at
 vless://not-a-link
 ss://bm9wZQ==
@@ -128,6 +131,10 @@ case "$(pl SSH)" in 'ssh {"type":"ssh","server":"sh.example.com","port":22,"user
 case "$(pl SS-OBFS)" in *'"plugin":"obfs-local","plugin_opts":"obfs=http;obfs-host=bing.com"'*) ok "a shadowsocks link with obfs is read" ;; *) bad "a shadowsocks link with obfs is read: $(pl SS-OBFS)" ;; esac
 case "$(pl SS-STLS)" in *'"plugin":"shadow-tls","plugin_opts":"host=bing.com;password=p2;version=3"'*) ok "a shadowsocks link with ShadowTLS is read" ;; *) bad "a shadowsocks link with ShadowTLS is read: $(pl SS-STLS)" ;; esac
 check "$(pl SS-KCPTUN)" "" "a shadowsocks plugin that is not shipped is refused"
+case "$(pl 'MIERU TCP')" in 'mieru {"type":"mieru","server":"mi.example.com","port":2999,"transport":"TCP","username":"bob","password":"pw","multiplexing":"MULTIPLEXING_HIGH"}') ok "a mieru link is read, a node for each port" ;; *) bad "a mieru link is read: $(pl 'MIERU TCP')" ;; esac
+case "$(pl 'MIERU UDP')" in *'"port":3000,"port_range":"3000-3010","transport":"UDP"'*) ok "and a range of ports is kept" ;; *) bad "a mieru port range is kept: $(pl 'MIERU UDP')" ;; esac
+case "$(pl SQUIC)" in 'shadowquic {"type":"shadowquic","server":"sq.example.com","port":10443,"username":"u","password":"p","sni":"sq.example.com","udp_over_stream":false,"zero_rtt":true,"alpn":"h3"}') ok "a ShadowQUIC link is read" ;; *) bad "a ShadowQUIC link is read: $(pl SQUIC)" ;; esac
+case "$(pl 'TT 2')" in 'trusttunnel {"type":"trusttunnel","server":"5.6.7.8","port":8443,"username":"alice","password":"secret","sni":"vpn.example.com","insecure":false,"quic":true}') ok "a TrustTunnel link is read, a node for each address" ;; *) bad "a TrustTunnel link is read: $(pl 'TT 2')" ;; esac
 case "$(pl ROCKET)" in 'vmess {"protocol":"vmess"'*'"address":"sr.example.com","port":443'*'"network":"ws","security":"tls","tlsSettings":{"serverName":"sni.example.com"},"wsSettings":{"path":"/ws","headers":{"Host":"cdn.example.com"}}'*) ok "a Shadowrocket vmess link is read" ;; *) bad "a Shadowrocket vmess link is read: $(pl ROCKET)" ;; esac
 case "$(pl PINNED)" in *'"pin":"abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"'*) ok "a pinned certificate is kept, without its colons" ;; *) bad "a pinned certificate is kept: $(pl PINNED)" ;; esac
 case "$(pl 'SSR node')" in 'ssr {"type":"ssr","server":"ssr.example.com","port":8388,"protocol":"auth_aes128_md5","method":"aes-256-cfb","obfs":"tls1.2_ticket_auth","password":"pa:ss","obfs_param":"bing.com","protocol_param":"12:abc"}') ok "an ssr link is read" ;; *) bad "an ssr link is read: $(pl 'SSR node')" ;; esac
@@ -263,7 +270,7 @@ if [ -x "$RIG/core/xray" ]; then
 	jtot=0
 	while IFS='	' read -r tag label proto host port payload; do
 		[ -n "$tag" ] || continue
-		case "$proto" in hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust) continue ;; esac
+		case "$proto" in hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel) continue ;; esac
 		jtot=$((jtot + 1))
 		printf '{"log":{"loglevel":"none"},"outbounds":[%s]}' \
 			"$(printf '%s' "$payload" | sed 's/^{/{"tag":"proxy",/')" > "$WORK/j.json"
@@ -282,7 +289,7 @@ if [ -x "$RIG/core/xray" ]; then
 	tot=0
 	while IFS='	' read -r tag label proto host port payload; do
 		[ -n "$tag" ] || continue
-		case "$proto" in hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust) continue ;; esac
+		case "$proto" in hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel) continue ;; esac
 		tot=$((tot + 1))
 		printf '{"log":{"loglevel":"none"},"outbounds":[%s]}' \
 			"$(printf '%s' "$payload" | sed 's/^{/{"tag":"proxy",/')" > "$WORK/one.json"

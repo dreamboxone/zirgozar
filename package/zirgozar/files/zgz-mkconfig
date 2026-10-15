@@ -955,7 +955,7 @@ if [ "$(sed -n 's/^protocol=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)" = "bal
 		esac
 		[ -n "$_bal_row" ] || continue
 		case "$(printf '%s' "$_bal_row" | cut -f3)" in
-			hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|openvpn|amneziawg|l2tp|pptp|sstp|aether|balancing|shunt|interface) continue ;;
+			hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|aether|balancing|shunt|interface) continue ;;
 		esac
 		_bal_payload="$(printf '%s\n' "$_bal_row" | warp_natives |
 			decorate "${preproxy:+chain-$preproxy}" "$pre_hp" | cut -f6-)" || continue
@@ -979,7 +979,7 @@ $_bal_item,"
 					*) _bal_fb_row="$(node_records "$_bal_fallback" 1 2>/dev/null | head -1)" ;;
 				esac
 				case "$(printf '%s' "$_bal_fb_row" | cut -f3)" in
-					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|openvpn|amneziawg|l2tp|pptp|sstp|aether|balancing|shunt|interface) _bal_fb_row="" ;;
+					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|aether|balancing|shunt|interface) _bal_fb_row="" ;;
 				esac
 				if [ -n "$_bal_fb_row" ]; then
 					_bal_fb="$(printf '%s\n' "$_bal_fb_row" | warp_natives |

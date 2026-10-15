@@ -541,6 +541,151 @@ function do_vmess_sr(body,   label, query, p, d, scy, id, net, host, sec, hdr) {
 		       qs(query, "fp"), qs(query, "alpn"), "", "", "", qs(query, "path"), hdr, "")))
 }
 
+# ------------------------------------------- mieru, ShadowQUIC, TrustTunnel
+# Three protocols Mihomo carries, as the Android clients write their links.
+
+# mierus://user:pass@host?port=2999&protocol=TCP&multiplexing=&handshake-mode=&traffic-pattern=#name
+# One node for each port (or range of ports) and protocol the link names.
+function do_mieru(body,   label, query, p, user, pass, host, n, a, i, k, ports, protos, np, pt, pr, o, lo) {
+	p = index(body, "#")
+	if (p > 0) { label = clean_label(substr(body, p + 1)); body = substr(body, 1, p - 1) }
+	p = index(body, "?")
+	if (p <= 0) return
+	query = substr(body, p + 1); body = substr(body, 1, p - 1)
+	sub(/\/+$/, "", body)
+	p = index(body, "@")
+	if (p <= 0) return
+	user = substr(body, 1, p - 1); host = substr(body, p + 1)
+	p = index(user, ":")
+	if (p <= 0) return
+	pass = urldec(substr(user, p + 1)); user = urldec(substr(user, 1, p - 1))
+	if (user == "" || pass == "") return
+	sub(/:[0-9]+$/, "", host)
+	gsub(/^\[|\]$/, "", host)
+	if (label == "") label = clean_label(qs(query, "profile"))
+	n = split(query, a, "&")
+	np = 0
+	for (i = 1; i <= n; i++) {
+		k = substr(a[i], 1, index(a[i], "=") - 1)
+		if (k == "port") ports[++np] = urldec(substr(a[i], 6))
+		else if (k == "protocol") protos[np] = toupper(urldec(substr(a[i], 10)))
+	}
+	for (i = 1; i <= np; i++) {
+		pt = ports[i]; pr = protos[i]
+		if (pr != "TCP" && pr != "UDP") continue
+		if (pt !~ /^[0-9]+(-[0-9]+)?$/) continue
+		lo = pt; sub(/-.*/, "", lo)
+		HOST = host; PORT = lo + 0
+		o = "{\"type\":\"mieru\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT
+		if (pt ~ /-/) o = o ",\"port_range\":\"" pt "\""
+		o = o ",\"transport\":\"" pr "\",\"username\":\"" jesc(user) "\",\"password\":\"" jesc(pass) "\""
+		if (qs(query, "multiplexing") ~ /^MULTIPLEXING_(OFF|LOW|MIDDLE|HIGH)$/) o = o ",\"multiplexing\":\"" qs(query, "multiplexing") "\""
+		if (qs(query, "handshake-mode") ~ /^HANDSHAKE_(STANDARD|NO_WAIT)$/) o = o ",\"handshake\":\"" qs(query, "handshake-mode") "\""
+		if (qs(query, "traffic-pattern") ~ /^[A-Za-z0-9+\/=_-]+$/) o = o ",\"traffic_pattern\":\"" qs(query, "traffic-pattern") "\""
+		emit(label (np > 1 ? " " pr : ""), "mieru", o "}")
+	}
+}
+
+# sq://user:pass@host:port?sni=&udp_mode=stream|datagram&zero_rtt&alpn=#name
+function do_shadowquic(body,   label, query, p, user, pass, o) {
+	p = index(body, "#")
+	if (p > 0) { label = clean_label(substr(body, p + 1)); body = substr(body, 1, p - 1) }
+	p = index(body, "?")
+	if (p > 0) { query = substr(body, p + 1); body = substr(body, 1, p - 1) }
+	sub(/\/+$/, "", body)
+	p = index(body, "@")
+	if (p <= 0) return
+	user = substr(body, 1, p - 1); body = substr(body, p + 1)
+	if (body !~ /:[0-9]+$/ || body ~ /^\[[^]]*\]$/) body = body ":443"
+	if (!hostport(body)) return
+	p = index(user, ":")
+	if (p <= 0) return
+	pass = urldec(substr(user, p + 1)); user = urldec(substr(user, 1, p - 1))
+	if (user == "" || pass == "") return
+	o = "{\"type\":\"shadowquic\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT \
+		",\"username\":\"" jesc(user) "\",\"password\":\"" jesc(pass) "\"" \
+		",\"sni\":\"" jesc(qs(query, "sni")) "\"" \
+		",\"udp_over_stream\":" (qs(query, "udp_mode") == "datagram" ? "false" : "true")
+	if (("&" query "&") ~ /&zero_rtt(=[^&]*)?&/ && qs(query, "zero_rtt") != "false" && qs(query, "zero_rtt") != "0") o = o ",\"zero_rtt\":true"
+	if (qs(query, "alpn") != "") o = o ",\"alpn\":\"" jesc(qs(query, "alpn")) "\""
+	emit(label, "shadowquic", o "}")
+}
+
+# base64 to numbers, one per byte, zero bytes included - b64() above gives
+# characters and cannot carry a zero. The count of bytes is returned.
+function b64bytes(s, out,   i, c, bits, nbits, n, cnt) {
+	gsub(/-/, "+", s); gsub(/_/, "/", s)
+	bits = 0; nbits = 0; cnt = 0
+	for (i = 1; i <= length(s); i++) {
+		c = substr(s, i, 1)
+		if (!(c in B64)) continue
+		bits = bits * 64 + B64[c]
+		nbits += 6
+		if (nbits >= 8) {
+			nbits -= 8
+			n = int(bits / exp2(nbits))
+			bits = bits - n * exp2(nbits)
+			out[++cnt] = n % 256
+		}
+	}
+	return cnt
+}
+
+# A QUIC variable-length integer at byte i of b: its value in TLVV, and the
+# number of bytes it took is returned (0 past the end).
+function tt_varint(b, i, cnt,   len, v, k) {
+	if (i > cnt) return 0
+	len = 2 ^ int(b[i] / 64)
+	if (i + len - 1 > cnt) return 0
+	v = b[i] % 64
+	for (k = 1; k < len; k++) v = v * 256 + b[i + k]
+	TLVV = v
+	return len
+}
+
+function tt_str(b, i, len,   s, k) {
+	s = ""
+	for (k = 0; k < len; k++) s = s CHR[b[i + k]]
+	return s
+}
+
+# tt://?<base64url of tag-length-value fields> - TrustTunnel's deep link.
+# One node for each address it lists.
+function do_trusttunnel(body,   b, cnt, i, l, tag, len, host, sni, user, pass, insecure, quic, label, naddr, addr, k, a, o) {
+	sub(/^\?/, "", body)
+	sub(/#.*$/, "", body)
+	cnt = b64bytes(body, b)
+	i = 1; naddr = 0; insecure = 0; quic = 0
+	while (i <= cnt) {
+		l = tt_varint(b, i, cnt); if (!l) return
+		tag = TLVV; i += l
+		l = tt_varint(b, i, cnt); if (!l) return
+		len = TLVV; i += l
+		if (i + len - 1 > cnt) return
+		if (tag == 1) host = tt_str(b, i, len)
+		else if (tag == 2) addr[++naddr] = tt_str(b, i, len)
+		else if (tag == 3) sni = tt_str(b, i, len)
+		else if (tag == 5) user = tt_str(b, i, len)
+		else if (tag == 6) pass = tt_str(b, i, len)
+		else if (tag == 7 && len == 1) insecure = (b[i] == 1)
+		else if (tag == 9 && len == 1) quic = (b[i] == 2)
+		else if (tag == 12) label = clean_label(tt_str(b, i, len))
+		i += len
+	}
+	if (host == "" || user == "" || pass == "" || !naddr) return
+	if (sni == "") sni = host
+	for (k = 1; k <= naddr; k++) {
+		a = addr[k]
+		if (a !~ /:[0-9]+$/ || a ~ /^[0-9a-fA-F:]+$/ && a !~ /^\[/) a = (a ~ /:/ && a !~ /^\[/ ? "[" a "]" : a) ":443"
+		if (!hostport(a)) continue
+		o = "{\"type\":\"trusttunnel\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT \
+			",\"username\":\"" jesc(user) "\",\"password\":\"" jesc(pass) "\"" \
+			",\"sni\":\"" jesc(sni) "\",\"insecure\":" (insecure ? "true" : "false") \
+			",\"quic\":" (quic ? "true" : "false") "}"
+		emit(label != "" ? label (naddr > 1 ? " " k : "") : "", "trusttunnel", o)
+	}
+}
+
 # ---------------------------------------------------------------- vless://
 
 function do_vless(body,   label, uuid, query, p, sec, flow, enc) {
@@ -2205,7 +2350,7 @@ LANDING {
 	line = $0
 	gsub(/\r/, "", line)
 	if (line == "" || split(line, rec, "\t") < 6) next
-	if (rec[3] ~ /^(hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|openvpn|amneziawg|l2tp|pptp|sstp|warp|aether)$/) next
+	if (rec[3] ~ /^(hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|warp|aether)$/) next
 	if (!lready) {
 		split(ENVIRON["LAND"], land, "\t")
 		lp = ENVIRON["LAND"]
@@ -2327,6 +2472,11 @@ function do_line(line) {
 	else if (index(line, "hysteria2+realm://") == 1) do_hy2realm(substr(line, 19), 0)
 	else if (index(line, "hysteria2+realm+http://") == 1) do_hy2realm(substr(line, 24), 1)
 	else if (index(line, "ssr://")       == 1) do_ssr(substr(line, 7))
+	else if (index(line, "mierus://")    == 1) do_mieru(substr(line, 10))
+	else if (index(line, "mieru://")     == 1) do_mieru(substr(line, 9))
+	else if (index(line, "sq://")        == 1) do_shadowquic(substr(line, 6))
+	else if (index(line, "shadowquic://") == 1) do_shadowquic(substr(line, 14))
+	else if (index(line, "tt://")        == 1) do_trusttunnel(substr(line, 6))
 	else if (index(line, "hy2://")       == 1) do_hysteria2(substr(line, 7))
 	else if (index(line, "tuic://")      == 1) do_tuic(substr(line, 8))
 	else if (index(line, "hysteria://")  == 1) do_hysteria1(substr(line, 12))

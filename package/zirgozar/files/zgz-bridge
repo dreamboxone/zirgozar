@@ -191,22 +191,57 @@ yq() {
 	return 0
 }
 
-# -------------------------------------------------------------------- SSR
+# ------------------------------------------------------------------ Mihomo
 
-# Mihomo, for one SSR server: a mixed port on loopback and everything to it.
+# The kinds Mihomo carries: SSR, mieru, ShadowQUIC and TrustTunnel.
+is_mihomo_type() {
+	case "$(jget type)" in ssr|mieru|shadowquic|trusttunnel) return 0 ;; esac
+	return 1
+}
+
+# Mihomo, for one server: a mixed port on loopback and everything to it.
 ssr_config() {
-	[ "$(jget type)" = "ssr" ] || return 1
+	is_mihomo_type || return 1
 	mkdir -p "$ZGZ_RUN/mihomo"
 	{
 		printf 'mixed-port: %s\nbind-address: 127.0.0.1\nallow-lan: false\n' "$PORT"
 		printf 'mode: rule\nlog-level: warning\nipv6: true\nrouting-mark: %s\n' "$ZGZ_OUT_MARK"
 		printf 'geodata-auto-update: false\n'
-		printf 'proxies:\n  - name: out\n    type: ssr\n'
-		printf '    server: %s\n    port: %s\n' "$(yq "$(jget server)")" "$(jnum port)"
-		printf '    cipher: %s\n    password: %s\n' "$(yq "$(jget method)")" "$(yq "$(jget password)")"
-		printf '    obfs: %s\n    protocol: %s\n' "$(yq "$(jget obfs)")" "$(yq "$(jget protocol)")"
-		[ -z "$(jget obfs_param)" ] || printf '    obfs-param: %s\n' "$(yq "$(jget obfs_param)")"
-		[ -z "$(jget protocol_param)" ] || printf '    protocol-param: %s\n' "$(yq "$(jget protocol_param)")"
+		printf 'proxies:\n  - name: out\n    type: %s\n' "$(jget type)"
+		printf '    server: %s\n' "$(yq "$(jget server)")"
+		if [ -n "$(jget port_range)" ]; then
+			printf '    port-range: %s\n' "$(jget port_range)"
+		else
+			printf '    port: %s\n' "$(jnum port)"
+		fi
+		case "$(jget type)" in
+			ssr)
+				printf '    cipher: %s\n    password: %s\n' "$(yq "$(jget method)")" "$(yq "$(jget password)")"
+				printf '    obfs: %s\n    protocol: %s\n' "$(yq "$(jget obfs)")" "$(yq "$(jget protocol)")"
+				[ -z "$(jget obfs_param)" ] || printf '    obfs-param: %s\n' "$(yq "$(jget obfs_param)")"
+				[ -z "$(jget protocol_param)" ] || printf '    protocol-param: %s\n' "$(yq "$(jget protocol_param)")"
+				;;
+			mieru)
+				printf '    transport: %s\n' "$(jget transport)"
+				printf '    username: %s\n    password: %s\n' "$(yq "$(jget username)")" "$(yq "$(jget password)")"
+				[ -z "$(jget multiplexing)" ] || printf '    multiplexing: %s\n' "$(jget multiplexing)"
+				[ -z "$(jget handshake)" ] || printf '    handshake-mode: %s\n' "$(jget handshake)"
+				[ -z "$(jget traffic_pattern)" ] || printf '    traffic-pattern: %s\n' "$(yq "$(jget traffic_pattern)")"
+				;;
+			shadowquic)
+				printf '    username: %s\n    password: %s\n' "$(yq "$(jget username)")" "$(yq "$(jget password)")"
+				[ -z "$(jget sni)" ] || printf '    sni: %s\n' "$(yq "$(jget sni)")"
+				printf '    udp-over-stream: %s\n' "$(jbool udp_over_stream)"
+				[ "$(jbool zero_rtt)" = false ] || printf '    zero-rtt: true\n'
+				[ -z "$(jget alpn)" ] || printf '    alpn: [%s]\n' "$(jget alpn | sed "s/[^,][^,]*/'&'/g")"
+				;;
+			trusttunnel)
+				printf '    username: %s\n    password: %s\n' "$(yq "$(jget username)")" "$(yq "$(jget password)")"
+				[ -z "$(jget sni)" ] || printf '    sni: %s\n' "$(yq "$(jget sni)")"
+				[ "$(jbool insecure)" = false ] || printf '    skip-cert-verify: true\n'
+				[ "$(jbool quic)" = false ] || printf '    quic: true\n'
+				;;
+		esac
 		printf '    udp: true\nrules:\n  - MATCH,out\n'
 	} > "$ZGZ_BRIDGE_JSON.mihomo.yaml"
 	chmod 600 "$ZGZ_BRIDGE_JSON.mihomo.yaml" 2>/dev/null || true
@@ -388,8 +423,8 @@ cmd_config() {
 	fi
 
 	case "$(jget type)" in
-		ssr)
-			[ -x "$(mihomo_path)" ] || { own_program_missing "An SSR config needs Mihomo. Install it on the App Update page." "no mihomo installed to carry the SSR node"; return 1; }
+		ssr|mieru|shadowquic|trusttunnel)
+			[ -x "$(mihomo_path)" ] || { own_program_missing "This config ($(jget type)) needs Mihomo. Install it on the App Update page." "no mihomo installed to carry the $(jget type) node"; return 1; }
 			ssr_config || return 1
 			echo "$ZGZ_BRIDGE_JSON.mihomo.yaml"
 			return 0
@@ -458,7 +493,7 @@ cmd_command() {
 		fi
 		return 0
 	fi
-	if [ "$(jget type)" = "ssr" ]; then
+	if is_mihomo_type; then
 		_mh="$(mihomo_path)"
 		[ -x "$_mh" ] && ssr_config || return 1
 		echo "$_mh -d $ZGZ_RUN/mihomo -f $ZGZ_BRIDGE_JSON.mihomo.yaml"
