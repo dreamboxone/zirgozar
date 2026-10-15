@@ -160,7 +160,7 @@ var T = [
 	[ 'Settings moved to the new defaults', 'تنظیمات به پیش‌فرض‌های تازه منتقل شد' ],
 	[ 'SOCKS port {}: the main node failed - switched to the best working backup', 'پورت SOCKS {1}: کانفیگ اصلی از کار افتاد - به بهترین کانفیگ پشتیبانِ سالم رفت' ],
 	[ 'SOCKS port {}: the main node works again - switched back to it', 'پورت SOCKS {1}: کانفیگ اصلی دوباره کار می‌کند - به آن برگشت' ],
-	[ 'SOCKS port {}: backup node '{}' cannot be used - left out', 'پورت SOCKS {1}: کانفیگ پشتیبان «{2}» قابل استفاده نیست و کنار گذاشته شد' ],
+	[ "SOCKS port {}: backup node '{}' cannot be used - left out", 'پورت SOCKS {1}: کانفیگ پشتیبان «{2}» قابل استفاده نیست و کنار گذاشته شد' ],
 	[ 'no core installed that can carry {}', 'هسته‌ای که {1} را ببرد نصب نیست' ],
 
 	/* ------------------------------------------------------------- WARP */

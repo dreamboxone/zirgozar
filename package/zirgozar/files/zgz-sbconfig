@@ -121,10 +121,17 @@ function bridge_node(b, tag, mark) {
 		r.bind_interface = b.iface;
 	switch (b.type) {
 	case 'hysteria2':
+	case 'hysteria':
 	case 'tuic':
 	case 'anytls':
 	case 'snell':
 	case 'naive':
+	case 'ssh':
+		r.server = b.server;
+		r.server_port = int(b.port);
+		break;
+	case 'ssplugin':
+		r.type = 'shadowsocks';
 		r.server = b.server;
 		r.server_port = int(b.port);
 		break;
@@ -138,13 +145,75 @@ function bridge_node(b, tag, mark) {
 			r.down_mbps = int(b.down_mbps);
 		if (b.obfs)
 			r.obfs = { type: b.obfs, password: b.obfs_password };
+		// Port hopping: the server's port and the range it hops over.
+		if (b.ports) {
+			r.server_ports = map(split(b.ports, ','), (x) => replace(x, '-', ':'));
+			if (b.hop_interval)
+				r.hop_interval = b.hop_interval;
+		}
 		r.tls = { enabled: true, server_name: sni, insecure: !!b.insecure };
+		break;
+	case 'hysteria':
+		if (b.auth)
+			r.auth_str = b.auth;
+		r.up_mbps = int(b.up_mbps) > 0 ? int(b.up_mbps) : 10;
+		r.down_mbps = int(b.down_mbps) > 0 ? int(b.down_mbps) : 50;
+		if (b.obfs)
+			r.obfs = b.obfs;
+		if (b.ports) {
+			r.server_ports = map(split(b.ports, ','), (x) => replace(x, '-', ':'));
+			if (b.hop_interval)
+				r.hop_interval = b.hop_interval;
+		}
+		r.tls = { enabled: true, server_name: sni, insecure: !!b.insecure, alpn: b.alpn ? split(b.alpn, ',') : [ 'hysteria' ] };
 		break;
 	case 'tuic':
 		r.uuid = b.uuid;
 		r.password = b.password;
 		r.congestion_control = b.congestion_control ? b.congestion_control : 'bbr';
+		if (b.udp_relay_mode)
+			r.udp_relay_mode = b.udp_relay_mode;
+		if (b.zero_rtt)
+			r.zero_rtt_handshake = true;
+		if (b.heartbeat)
+			r.heartbeat = b.heartbeat;
 		r.tls = { enabled: true, server_name: sni, insecure: !!b.insecure, alpn: [ 'h3' ] };
+		break;
+	case 'ssh':
+		r.user = b.user;
+		if (b.password)
+			r.password = b.password;
+		if (b.key)
+			r.private_key = b.key;
+		break;
+	case 'ssplugin':
+		r.method = b.method;
+		r.password = b.password;
+		if (b.plugin == 'shadow-tls') {
+			// Shadowsocks inside ShadowTLS: a second outbound that carries it.
+			let o = {};
+			for (let kv in split(b.plugin_opts ?? '', ';')) {
+				let i = index(kv, '=');
+				if (i > 0)
+					o[trim(substr(kv, 0, i))] = trim(substr(kv, i + 1));
+			}
+			let st = { type: 'shadowtls', tag: `${tag}-stls`, server: b.server, server_port: int(b.port), routing_mark: mark,
+			           version: int(o.version ?? 3), tls: { enabled: true, server_name: o.host ? o.host : sni } };
+			if (st.version > 1)
+				st.password = o.password;
+			if (b.iface)
+				st.bind_interface = b.iface;
+			delete r.server;
+			delete r.server_port;
+			delete r.routing_mark;
+			delete r.bind_interface;
+			r.detour = st.tag;
+			r._extra = st;
+			break;
+		}
+		r.plugin = b.plugin;
+		if (b.plugin_opts)
+			r.plugin_opts = b.plugin_opts;
 		break;
 	case 'anytls':
 		r.password = b.password;
@@ -237,6 +306,10 @@ if (args.mode == 'bridge') {
 		c.endpoints = [ node ];
 	else
 		c.outbounds = [ node ];
+	if (node._extra) {
+		push(c.outbounds, node._extra);
+		delete node._extra;
+	}
 	print(sprintf('%J', c), '\n');
 	exit(0);
 }
@@ -382,8 +455,17 @@ function transport_of(ss, tag) {
 			t.headers = { Host: w.host };
 		return t;
 	}
-	case 'grpc':
-		return { type: 'grpc', service_name: ss.grpcSettings?.serviceName ?? '' };
+	case 'grpc': {
+		let g = ss.grpcSettings ?? {};
+		let t = { type: 'grpc', service_name: g.serviceName ?? '' };
+		if (int(g.idle_timeout) > 0)
+			t.idle_timeout = `${int(g.idle_timeout)}s`;
+		if (int(g.health_check_timeout) > 0)
+			t.ping_timeout = `${int(g.health_check_timeout)}s`;
+		if (g.permit_without_stream)
+			t.permit_without_stream = true;
+		return t;
+	}
 	case 'http':
 	case 'h2': {
 		let h = ss.httpSettings ?? {};
@@ -448,6 +530,10 @@ function conv_outbound(o) {
 	if (nb) {
 		// AmneziaWG, OpenConnect and Tailscale are endpoints in sing-box.
 		push(ENDPOINT_TYPES[nb.type] ? endpoints : outbounds, nb);
+		if (nb._extra) {
+			push(outbounds, nb._extra);
+			delete nb._extra;
+		}
 		out_tags[tag] = true;
 		return;
 	}
@@ -489,6 +575,11 @@ function conv_outbound(o) {
 			e.routing_mark = sock.mark ?? MARK;
 		if (sock.interface && !sock.dialerProxy)
 			e.bind_interface = sock.interface;
+		// A tunnel of the system's own, which tools on the router can see.
+		if (o.sbSystem) {
+			e.system = true;
+			e.name = `zgzwg${length(endpoints)}`;
+		}
 		push(endpoints, e);
 		out_tags[tag] = true;
 		return;
@@ -561,7 +652,17 @@ function conv_outbound(o) {
 			r.tls = tls;
 		if (tr)
 			r.transport = tr;
-		if (o.mux?.enabled)
+		// The node's own sing-box multiplex, set on its page.
+		let mx = o.sbMux;
+		if (type(mx) == 'object' && mx.protocol && proto != 'socks' && proto != 'http') {
+			r.multiplex = { enabled: true, protocol: mx.protocol };
+			if (int(mx.max_streams) > 0)
+				r.multiplex.max_streams = int(mx.max_streams);
+			if (mx.padding)
+				r.multiplex.padding = true;
+			if (mx.brutal?.enabled)
+				r.multiplex.brutal = { enabled: true, up_mbps: int(mx.brutal.up_mbps), down_mbps: int(mx.brutal.down_mbps) };
+		} else if (o.mux?.enabled)
 			warn(`outbound ${tag}: mux.cool has no sing-box equivalent and is left off`);
 	}
 

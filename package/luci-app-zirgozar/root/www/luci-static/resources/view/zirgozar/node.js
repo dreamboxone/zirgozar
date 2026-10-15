@@ -62,6 +62,8 @@ SCHEMES['naive+https'] = 'naive';
 SCHEMES['naive+quic'] = 'naive';
 SCHEMES.openconnect = 'openconnect';
 SCHEMES.tailscale = 'tailscale';
+SCHEMES.hysteria = 'hysteria';
+SCHEMES.ssh = 'ssh';
 var OC_FLAVORS = [ [ 'anyconnect', 'Cisco AnyConnect / ocserv' ], [ 'gp', 'GlobalProtect' ], [ 'fortinet', 'Fortinet' ],
 	[ 'f5', 'F5' ], [ 'pulse', 'Pulse Secure' ], [ 'nc', 'Juniper Network Connect' ] ];
 /* The PPP accounts, each with the port its servers listen on: providers hand
@@ -285,6 +287,9 @@ function parseLink(link) {
 		if (c.indexOf(':') < 0) c = dec(cred);
 		var ci = c.indexOf(':');
 		f.ss_method = c.slice(0, ci); f.password = c.slice(ci + 1);
+		var pl = take('plugin'), pi = pl.indexOf(';');
+		f.ss_plugin = pi >= 0 ? pl.slice(0, pi) : pl; f.ss_plugin_opts = pi >= 0 ? pl.slice(pi + 1) : '';
+		if (f.ss_plugin == 'simple-obfs' || f.ss_plugin == 'obfs') f.ss_plugin = 'obfs-local';
 	} else if (proto == 'socks' || proto == 'http') {
 		if (cred) {
 			var u = b64dec(cred);
@@ -300,15 +305,35 @@ function parseLink(link) {
 		if (f.type == 'grpc') f.grpc_mode = pmode; else f.xhttp_mode = pmode;
 		f.extra = take('extra');
 		if (f.type == 'kcp') { f.kcp_seed = take('seed') || f.path; f.path = ''; }
-	} else if (proto == 'hysteria2') {
-		f.password = dec(cred); f.sni = take('sni');
-		f.hy2_obfs = take('obfs'); f.hy2_obfs_password = take('obfs-password');
+	} else if (proto == 'hysteria2' || proto == 'hysteria') {
+		f.password = dec(cred);
+		if (proto == 'hysteria') {
+			f.password = take('auth') || f.password;
+			f.sni = take('peer') || take('sni');
+			f.hy1_obfs = take('obfsParam'); f.alpn = take('alpn');
+		} else {
+			f.sni = take('sni');
+			f.hy2_obfs = take('obfs'); f.hy2_obfs_password = take('obfs-password');
+		}
 		f.insecure = take('insecure') == '1' ? '1' : '0';
+		f.hy_ports = take('mport') || take('ports');
+		f.hy_hop = String(take('hop_interval') || take('hopInterval')).replace(/s$/, '');
+		f.hy_up = String(take('upmbps') || take('up')).replace(/\D.*$/, '');
+		f.hy_down = String(take('downmbps') || take('down')).replace(/\D.*$/, '');
 	} else if (proto == 'tuic') {
 		var t = dec(cred), ti = t.indexOf(':');
 		f.uuid = ti >= 0 ? t.slice(0, ti) : t; f.password = ti >= 0 ? t.slice(ti + 1) : '';
 		f.sni = take('sni'); f.alpn = take('alpn'); f.cc = take('congestion_control');
 		f.insecure = take('allow_insecure') == '1' ? '1' : '0';
+		f.tuic_udp = take('udp_relay_mode');
+		var zr = take('reduce_rtt') || take('zero_rtt');
+		f.tuic_zero_rtt = (zr == '1' || zr == 'true') ? '1' : '0';
+		f.tuic_heartbeat = String(take('heartbeat')).replace(/s$/, '');
+	} else if (proto == 'ssh') {
+		var si = cred.indexOf(':');
+		f.user = dec(si >= 0 ? cred.slice(0, si) : cred); f.password = si >= 0 ? dec(cred.slice(si + 1)) : '';
+		var k = take('key');
+		f.ssh_key = k ? (b64dec(k) || '') : '';
 	} else if (proto == 'anytls') {
 		f.password = dec(cred); f.sni = take('sni') || take('peer'); f.fp = take('fp'); f.alpn = take('alpn');
 		f.insecure = (take('insecure') == '1' || take('allowInsecure') == '1') ? '1' : '0';
@@ -422,6 +447,7 @@ function buildLink(f, name) {
 		return p + '://' + enc(cred) + '@' + hp + (qs ? '?' + qs : '') + frag;
 	}
 	if (p == 'shadowsocks') {
+		q.plugin = f.ss_plugin ? f.ss_plugin + (f.ss_plugin_opts ? ';' + f.ss_plugin_opts : '') : '';
 		var qs2 = buildQuery(q);
 		return 'ss://' + b64enc((f.ss_method || '') + ':' + (f.password || '')).replace(/=+$/, '') + '@' + hp +
 			(qs2 ? '?' + qs2 : '') + frag;
@@ -447,15 +473,30 @@ function buildLink(f, name) {
 		var qs5 = buildQuery(q);
 		return p + '://' + auth + hp + (qs5 ? '?' + qs5 : '') + frag;
 	}
-	if (p == 'hysteria2') {
-		q.sni = f.sni; q.obfs = f.hy2_obfs; q['obfs-password'] = f.hy2_obfs ? f.hy2_obfs_password : '';
+	if (p == 'hysteria2' || p == 'hysteria') {
+		if (p == 'hysteria') {
+			q.auth = f.password; q.peer = f.sni; q.obfsParam = f.hy1_obfs; q.alpn = f.alpn;
+		} else {
+			q.sni = f.sni; q.obfs = f.hy2_obfs; q['obfs-password'] = f.hy2_obfs ? f.hy2_obfs_password : '';
+		}
 		q.insecure = f.insecure == '1' ? '1' : '';
+		q.mport = f.hy_ports; q.hop_interval = f.hy_ports ? f.hy_hop : '';
+		q.upmbps = f.hy_up; q.downmbps = f.hy_down;
 		var qs3 = buildQuery(q);
-		return 'hysteria2://' + enc(f.password) + '@' + hp + (qs3 ? '?' + qs3 : '') + frag;
+		return p == 'hysteria'
+			? 'hysteria://' + hp + (qs3 ? '?' + qs3 : '') + frag
+			: 'hysteria2://' + enc(f.password) + '@' + hp + (qs3 ? '?' + qs3 : '') + frag;
+	}
+	if (p == 'ssh') {
+		q.key = f.ssh_key ? b64enc(f.ssh_key).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') : '';
+		var qsh = buildQuery(q);
+		return 'ssh://' + enc(f.user || '') + (f.password ? ':' + enc(f.password) : '') + '@' + joinHostPort(f.address, f.port || '22') + (qsh ? '?' + qsh : '') + frag;
 	}
 	if (p == 'tuic') {
 		q.sni = f.sni; q.alpn = f.alpn; q.congestion_control = f.cc;
 		q.allow_insecure = f.insecure == '1' ? '1' : '';
+		q.udp_relay_mode = f.tuic_udp; q.reduce_rtt = f.tuic_zero_rtt == '1' ? '1' : '';
+		q.heartbeat = f.tuic_heartbeat ? f.tuic_heartbeat + 's' : '';
 		var qs4 = buildQuery(q);
 		return 'tuic://' + enc(f.uuid) + ':' + enc(f.password) + '@' + hp + (qs4 ? '?' + qs4 : '') + frag;
 	}
@@ -725,7 +766,7 @@ return view.extend({
 
 			o = field(form.ListValue, 'proto', _('Protocol'));
 			[ [ 'vless', 'VLESS' ], [ 'vmess', 'VMess' ], [ 'trojan', 'Trojan' ], [ 'shadowsocks', 'Shadowsocks' ],
-			  [ 'socks', 'Socks' ], [ 'http', 'HTTP' ], [ 'hysteria2', 'Hysteria2' ], [ 'tuic', 'TUIC' ],
+			  [ 'socks', 'Socks' ], [ 'http', 'HTTP' ], [ 'hysteria2', 'Hysteria2' ], [ 'hysteria', 'Hysteria (v1)' ], [ 'tuic', 'TUIC' ], [ 'ssh', 'SSH' ],
 			  [ 'anytls', 'AnyTLS' ], [ 'snell', 'Snell' ], [ 'naive', 'NaiveProxy' ], [ 'openconnect', 'OpenConnect' ],
 			  [ 'tailscale', 'Tailscale' ], [ 'warp', 'WARP' ],
 			  [ 'wireguard', 'WireGuard' ], [ 'openvpn', 'OpenVPN' ], [ 'l2tp', 'L2TP / IPsec' ], [ 'pptp', 'PPTP' ], [ 'sstp', 'SSTP' ], [ '_balancing', 'Balancing' ],
@@ -735,7 +776,7 @@ return view.extend({
 			var candidates = (data && data[1] && data[1].nodes) || [];
 			var origins = (data && data[3]) || {};
 			var nodes = candidates.filter(function(n) {
-				return !/^(hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|openvpn|amneziawg|l2tp|pptp|sstp|balancing|shunt|interface|aether)$/.test(n.protocol);
+				return !/^(hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|openvpn|amneziawg|l2tp|pptp|sstp|balancing|shunt|interface|aether)$/.test(n.protocol);
 			}).map(function(n) {
 				var origin = origins[n.tag];
 				return origin ? { tag: origin, label: n.label || n.tag } : null;
@@ -934,7 +975,7 @@ return view.extend({
 
 			/* A server of its own for all but WARP and OpenVPN, whose profile
 			   names its own. */
-			var SERVERS = XR.concat([ 'hysteria2', 'tuic', 'anytls', 'snell', 'naive', 'openconnect', 'wireguard', 'l2tp', 'pptp', 'sstp' ]);
+			var SERVERS = XR.concat([ 'hysteria2', 'hysteria', 'tuic', 'ssh', 'anytls', 'snell', 'naive', 'openconnect', 'wireguard', 'l2tp', 'pptp', 'sstp' ]);
 			o = field(form.Value, 'address', _('Address (Support Domain Name)'));
 			o.rmempty = false;
 			o.validate = function(section_id, value) {
@@ -1016,6 +1057,8 @@ return view.extend({
 			o.depends('_proto', 'wireguard');
 			o = s.option(form.Flag, 'warpplus', _('Carry with warp-plus'),
 				_('warp-plus sends junk ahead of every WireGuard handshake, which gets it past a filter that drops WireGuard on sight. It needs warp-plus, from App Update. As a pre-proxy or a landing node, the config is still carried by Xray.'));
+			o.depends('_proto', 'wireguard');
+			o = s.option(form.Flag, 'wg_system', _('System interface'), _('Only with the sing-box engine: the tunnel is a network interface of the router.'));
 			o.depends('_proto', 'wireguard');
 
 			/* ------------------------------------------------------ WARP */
@@ -1108,14 +1151,14 @@ return view.extend({
 			o.validate = function(section_id, value) {
 				return !PPP_PORT[this.section.formvalue(section_id, '_proto')] || !!value ? true : _('This account requires a username and password.');
 			};
-			[ 'socks', 'http', 'l2tp', 'pptp', 'sstp', 'naive', 'openconnect' ].forEach(function(p) { o.depends('_proto', p); });
+			[ 'socks', 'http', 'l2tp', 'pptp', 'sstp', 'naive', 'openconnect', 'ssh' ].forEach(function(p) { o.depends('_proto', p); });
 
 			o = field(form.Value, 'password', _('Password'));
 			o.password = true;
 			o.validate = function(section_id, value) {
 				return !PPP_PORT[this.section.formvalue(section_id, '_proto')] || !!value ? true : _('This account requires a username and password.');
 			};
-			[ 'trojan', 'shadowsocks', 'socks', 'http', 'hysteria2', 'tuic', 'anytls', 'naive', 'openconnect', 'l2tp', 'pptp', 'sstp' ].forEach(function(p) { o.depends('_proto', p); });
+			[ 'trojan', 'shadowsocks', 'socks', 'http', 'hysteria2', 'hysteria', 'tuic', 'anytls', 'naive', 'openconnect', 'ssh', 'l2tp', 'pptp', 'sstp' ].forEach(function(p) { o.depends('_proto', p); });
 
 			o = field(form.Value, 'snell_psk', 'PSK');
 			o.password = true; o.rmempty = false;
@@ -1200,7 +1243,7 @@ return view.extend({
 					x.depends({ '_proto': p, '_security': 'tls' });
 					x.depends({ '_proto': p, '_security': 'reality' });
 				});
-				if (withHyTuic) { x.depends('_proto', 'hysteria2'); x.depends('_proto', 'tuic'); x.depends('_proto', 'naive'); }
+				if (withHyTuic) { x.depends('_proto', 'hysteria2'); x.depends('_proto', 'hysteria'); x.depends('_proto', 'tuic'); x.depends('_proto', 'naive'); }
 				x.depends('_proto', 'anytls');
 			}
 
@@ -1212,6 +1255,7 @@ return view.extend({
 			TLSP.forEach(function(p) { o.depends({ '_proto': p, '_security': 'tls' }); });
 			o.depends('_proto', 'tuic');
 			o.depends('_proto', 'anytls');
+			o.depends('_proto', 'hysteria');
 
 			o = field(form.Value, 'fp', _('Finger Print'));
 			o.value('', _('Default'));
@@ -1238,7 +1282,7 @@ return view.extend({
 			TLSP.forEach(function(p) { o.depends({ '_proto': p, '_security': 'reality' }); });
 
 			o = field(form.Flag, 'insecure', _('allowInsecure'));
-			[ 'hysteria2', 'tuic', 'anytls', 'openconnect' ].forEach(function(p) { o.depends('_proto', p); });
+			[ 'hysteria2', 'hysteria', 'tuic', 'anytls', 'openconnect' ].forEach(function(p) { o.depends('_proto', p); });
 
 			o = field(form.ListValue, 'hy2_obfs', _('Obfuscation'));
 			o.value('', _('None'));
@@ -1251,6 +1295,56 @@ return view.extend({
 			o.value('', _('Default'));
 			[ 'bbr', 'cubic', 'new_reno' ].forEach(function(v) { o.value(v); });
 			o.depends('_proto', 'tuic');
+
+			o = field(form.ListValue, 'tuic_udp', _('UDP relay mode'));
+			o.value('', _('Default'));
+			o.value('native', 'native');
+			o.value('quic', 'quic');
+			o.depends('_proto', 'tuic');
+			o = field(form.Flag, 'tuic_zero_rtt', _('0-RTT handshake'));
+			o.depends('_proto', 'tuic');
+			o = field(form.Value, 'tuic_heartbeat', _('Heartbeat (s)'));
+			o.datatype = 'uinteger';
+			o.depends('_proto', 'tuic');
+
+			/* Hysteria, both versions. */
+			o = field(form.Value, 'hy1_obfs', _('Obfuscation password'));
+			o.depends('_proto', 'hysteria');
+			o = field(form.Value, 'hy_ports', _('Port hopping'), _('Ports the server hops over, such as 20000-30000. Empty for none.'));
+			o.validate = function(section_id, value) {
+				return (!value || /^\d+([-:]\d+)?(,\d+([-:]\d+)?)*$/.test(value)) ? true : _('Not valid, please re-enter: %s').format(value);
+			};
+			o.depends('_proto', 'hysteria2');
+			o.depends('_proto', 'hysteria');
+			o = field(form.Value, 'hy_hop', _('Hop interval (s)'));
+			o.datatype = 'uinteger';
+			o.placeholder = '30';
+			o.depends('_proto', 'hysteria2');
+			o.depends('_proto', 'hysteria');
+			o = field(form.Value, 'hy_up', _('Upload (Mbps)'));
+			o.datatype = 'uinteger';
+			o.depends('_proto', 'hysteria2');
+			o.depends('_proto', 'hysteria');
+			o = field(form.Value, 'hy_down', _('Download (Mbps)'));
+			o.datatype = 'uinteger';
+			o.depends('_proto', 'hysteria2');
+			o.depends('_proto', 'hysteria');
+
+			o = field(form.TextValue, 'ssh_key', _('Private key'), _('Optional, instead of the password.'));
+			o.rows = 4;
+			o.monospace = true;
+			o.depends('_proto', 'ssh');
+
+			o = field(form.ListValue, 'ss_plugin', _('Plugin'));
+			o.value('', _('None'));
+			o.value('obfs-local', 'obfs-local (simple-obfs)');
+			o.value('v2ray-plugin', 'v2ray-plugin');
+			o.value('shadow-tls', 'ShadowTLS');
+			o.depends('_proto', 'shadowsocks');
+			o = field(form.Value, 'ss_plugin_opts', _('Plugin options'), _('Such as obfs=http;obfs-host=bing.com'));
+			o.depends({ '_proto': 'shadowsocks', '_ss_plugin': 'obfs-local' });
+			o.depends({ '_proto': 'shadowsocks', '_ss_plugin': 'v2ray-plugin' });
+			o.depends({ '_proto': 'shadowsocks', '_ss_plugin': 'shadow-tls' });
 
 			/* ----------------------------------------------- transport */
 			o = field(form.ListValue, 'type', _('Transport'));
@@ -1303,6 +1397,32 @@ return view.extend({
 			onType(o, [ 'kcp' ]);
 			o = field(form.Value, 'kcp_seed', _('mKCP Seed'));
 			onType(o, [ 'kcp' ]);
+			[ [ 'kcp_mtu', 'MTU', '1350' ], [ 'kcp_tti', 'TTI (ms)', '50' ],
+			  [ 'kcp_uplink', _('Uplink capacity (MB/s)'), '5' ], [ 'kcp_downlink', _('Downlink capacity (MB/s)'), '20' ],
+			  [ 'kcp_read', _('Read buffer (MB)'), '2' ], [ 'kcp_write', _('Write buffer (MB)'), '2' ] ].forEach(function(k) {
+				o = s.option(form.Value, k[0], k[1]);
+				o.datatype = 'uinteger';
+				o.placeholder = k[2];
+				onType(o, [ 'kcp' ]);
+			});
+			o = s.option(form.Flag, 'kcp_congestion', _('Congestion control'));
+			onType(o, [ 'kcp' ]);
+
+			o = s.option(form.Value, 'ws_heartbeat', _('Heartbeat (s)'), _('Keeps an idle WebSocket open. Empty for none.'));
+			o.datatype = 'uinteger';
+			onType(o, [ 'ws' ]);
+			o = s.option(form.Value, 'grpc_idle', _('Health check interval (s)'), _('Empty for none.'));
+			o.datatype = 'uinteger';
+			onType(o, [ 'grpc' ]);
+			o = s.option(form.Value, 'grpc_health', _('Health check timeout (s)'));
+			o.datatype = 'uinteger';
+			o.placeholder = '20';
+			onType(o, [ 'grpc' ]);
+			o = s.option(form.Flag, 'grpc_permit', _('Health check without streams'));
+			onType(o, [ 'grpc' ]);
+			o = s.option(form.Value, 'grpc_window', _('Initial window size'));
+			o.datatype = 'uinteger';
+			onType(o, [ 'grpc' ]);
 
 			/* ------------------- PassWall2's lower half: settings of the node */
 			function xr(x) { XR.forEach(function(p) { x.depends('_proto', p); }); return x; }
@@ -1360,6 +1480,24 @@ return view.extend({
 
 			o = xr(s.option(form.Flag, 'happy_eyeballs', _('Enable Happy Eyeballs'),
 				_('Attempts IPv4 and IPv6 simultaneously; automatically uses the faster connection.')));
+
+			/* Multiplex, for the sing-box engine. */
+			o = s.option(form.ListValue, 'sb_mux', _('sing-box Mux'), _('Only with the sing-box engine.'));
+			o.value('', _('Off'));
+			[ 'smux', 'yamux', 'h2mux' ].forEach(function(v) { o.value(v); });
+			[ 'vless', 'vmess', 'trojan', 'shadowsocks' ].forEach(function(p) { o.depends('_proto', p); });
+			o = s.option(form.Value, 'sb_mux_streams', _('Max streams'));
+			o.datatype = 'uinteger';
+			o.placeholder = '0';
+			o.depends('sb_mux', /.+/);
+			o = s.option(form.Flag, 'sb_mux_padding', _('Padding'));
+			o.depends('sb_mux', /.+/);
+			o = s.option(form.Value, 'sb_brutal_up', _('TCP Brutal upload (Mbps)'), _('The server must support it. Empty for off.'));
+			o.datatype = 'uinteger';
+			o.depends('sb_mux', /.+/);
+			o = s.option(form.Value, 'sb_brutal_down', _('TCP Brutal download (Mbps)'));
+			o.datatype = 'uinteger';
+			o.depends('sb_mux', /.+/);
 		}
 
 		/* PassWall2's Chain Proxy, with its option names. */

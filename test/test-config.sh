@@ -43,6 +43,13 @@ naive+quic://user:pass@nv.example.com:443#NAIVE
 openconnect://user:pass@oc.example.com/staff?flavor=gp#OC
 tailscale://tskey-auth-1@controlplane.tailscale.com?exit_node=100.64.0.1#TS
 tailscale://tskey-auth-1@controlplane.tailscale.com#TS-NOEXIT
+hysteria2://hunter2@hp.example.com:443?sni=hp.example.com&mport=20000-30000&hop_interval=20&upmbps=50&downmbps=100#HY2-HOP
+hysteria://h1.example.com:443?auth=hunter2&peer=h1.example.com&obfsParam=xyz&upmbps=20#HY1
+tuic://11111111-2222-3333-4444-555555555555:hunter2@tu2.example.com:443?sni=tu2.example.com&udp_relay_mode=quic&reduce_rtt=1&heartbeat=10s#TUIC-OPTS
+ssh://root:hunter2@sh.example.com#SSH
+ss://YWVzLTEyOC1nY206aHVudGVyMg==@sp.example.com:443?plugin=obfs-local%3Bobfs%3Dhttp%3Bobfs-host%3Dbing.com#SS-OBFS
+ss://YWVzLTEyOC1nY206aHVudGVyMg==@st.example.com:443?plugin=shadow-tls%3Bhost%3Dbing.com%3Bpassword%3Dp2%3Bversion%3D3#SS-STLS
+ss://YWVzLTEyOC1nY206aHVudGVyMg==@sx.example.com:443?plugin=kcptun#SS-KCPTUN
 # a comment, and below it two things that must be refused rather than guessed at
 vless://not-a-link
 ss://bm9wZQ==
@@ -110,6 +117,13 @@ case "$(pl NAIVE)" in 'naive {"type":"naive","server":"nv.example.com","port":44
 case "$(pl OC)" in *'"port":443,"path":"/staff"'*'"flavor":"gp"'*) ok "an openconnect link without a port is on 443" ;; *) bad "an openconnect link without a port is on 443: $(pl OC)" ;; esac
 case "$(pl TS)" in *'"exit_node":"100.64.0.1"'*'"state":"ts'*) ok "a tailscale link is read" ;; *) bad "a tailscale link is read: $(pl TS)" ;; esac
 check "$(pl TS-NOEXIT)" "" "a tailscale link without an exit node is refused"
+case "$(pl HY2-HOP)" in *'"ports":"20000-30000","hop_interval":"20s","up_mbps":50,"down_mbps":100'*) ok "a hysteria2 link with port hopping is read" ;; *) bad "a hysteria2 link with port hopping is read: $(pl HY2-HOP)" ;; esac
+case "$(pl HY1)" in 'hysteria {"type":"hysteria","server":"h1.example.com","port":443,"auth":"hunter2","sni":"h1.example.com","obfs":"xyz"'*'"up_mbps":20'*'"down_mbps":50'*) ok "a hysteria v1 link is read, with a default download" ;; *) bad "a hysteria v1 link is read: $(pl HY1)" ;; esac
+case "$(pl TUIC-OPTS)" in *'"udp_relay_mode":"quic","zero_rtt":true,"heartbeat":"10s"'*) ok "a tuic link's relay mode, 0-RTT and heartbeat are read" ;; *) bad "a tuic link's options are read: $(pl TUIC-OPTS)" ;; esac
+case "$(pl SSH)" in 'ssh {"type":"ssh","server":"sh.example.com","port":22,"user":"root","password":"hunter2"'*) ok "an ssh link without a port is on 22" ;; *) bad "an ssh link without a port is on 22: $(pl SSH)" ;; esac
+case "$(pl SS-OBFS)" in *'"plugin":"obfs-local","plugin_opts":"obfs=http;obfs-host=bing.com"'*) ok "a shadowsocks link with obfs is read" ;; *) bad "a shadowsocks link with obfs is read: $(pl SS-OBFS)" ;; esac
+case "$(pl SS-STLS)" in *'"plugin":"shadow-tls","plugin_opts":"host=bing.com;password=p2;version=3"'*) ok "a shadowsocks link with ShadowTLS is read" ;; *) bad "a shadowsocks link with ShadowTLS is read: $(pl SS-STLS)" ;; esac
+check "$(pl SS-KCPTUN)" "" "a shadowsocks plugin that is not shipped is refused"
 
 # base64 in awk has to agree with base64 everywhere else.
 if command -v base64 >/dev/null 2>&1; then
@@ -237,7 +251,7 @@ if [ -x "$RIG/core/xray" ]; then
 	jtot=0
 	while IFS='	' read -r tag label proto host port payload; do
 		[ -n "$tag" ] || continue
-		case "$proto" in hysteria2|tuic|anytls|snell|naive|openconnect|tailscale) continue ;; esac
+		case "$proto" in hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin) continue ;; esac
 		jtot=$((jtot + 1))
 		printf '{"log":{"loglevel":"none"},"outbounds":[%s]}' \
 			"$(printf '%s' "$payload" | sed 's/^{/{"tag":"proxy",/')" > "$WORK/j.json"
@@ -256,7 +270,7 @@ if [ -x "$RIG/core/xray" ]; then
 	tot=0
 	while IFS='	' read -r tag label proto host port payload; do
 		[ -n "$tag" ] || continue
-		case "$proto" in hysteria2|tuic|anytls|snell|naive|openconnect|tailscale) continue ;; esac
+		case "$proto" in hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin) continue ;; esac
 		tot=$((tot + 1))
 		printf '{"log":{"loglevel":"none"},"outbounds":[%s]}' \
 			"$(printf '%s' "$payload" | sed 's/^{/{"tag":"proxy",/')" > "$WORK/one.json"
@@ -1091,6 +1105,9 @@ rig_set cfgnx.tcp_mptcp 1
 rig_set cfgnx.domain_strategy UseIPv4
 rig_set cfgnx.happy_eyeballs 1
 rig_set cfgnx.dns_resolver "udp://1.1.1.1"
+rig_set cfgnx.ws_heartbeat 30
+rig_set cfgnx.sb_mux h2mux
+rig_set cfgnx.sb_mux_padding 1
 NXREC="$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; node_records cfgnx' | head -1)"
 NXOUT="$(printf '%s' "$NXREC" | cut -f6- | tr -d ' ')"
 for want in \
@@ -1102,7 +1119,7 @@ for want in \
 	'"tcpFastOpen":true' \
 	'"tcpMptcp":true' \
 	'"domainStrategy":"UseIPv4"' \
-	'"happyEyeballs":{'; do
+	'"happyEyeballs":{' 	'"heartbeatPeriod":30' 	'"sbMux":{"protocol":"h2mux","padding":true}'; do
 	if printf '%s' "$NXOUT" | grep -qF "$want"; then
 		ok "into the outbound: $want"
 	else

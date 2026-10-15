@@ -94,7 +94,7 @@ singbox_config() {
 	# An OpenVPN profile has too many parts - certificates, keys, a wrapped
 	# control channel - for a line of shell to build; zgz-sbconfig does it, and
 	# decrypts the key on the way.
-	case "$_type" in openvpn|amneziawg|anytls|snell|naive|openconnect|tailscale) _uc=1 ;; *) _uc="" ;; esac
+	case "$_type" in openvpn|amneziawg|hysteria2|hysteria|tuic|anytls|snell|naive|ssh|ssplugin|openconnect|tailscale) _uc=1 ;; *) _uc="" ;; esac
 	if [ -n "$_uc" ]; then
 		command -v ucode >/dev/null 2>&1 || return 1
 		if [ "$_type" = "tailscale" ]; then
@@ -207,7 +207,13 @@ hysteria_config() {
 
 	# hysteria's own client reads YAML, not JSON.
 	{
-		printf 'server: %s:%s\n' "$_server" "$_port"
+		# Port hopping: hysteria takes the range in place of the port.
+		_hp="$(jget ports)"
+		if [ -n "$_hp" ]; then
+			printf 'server: %s:%s\n' "$_server" "$_hp"
+		else
+			printf 'server: %s:%s\n' "$_server" "$_port"
+		fi
 		printf 'auth: %s\n' "$(jget password)"
 		printf 'tls:\n  sni: %s\n  insecure: %s\n' "$_sni" "$(jbool insecure)"
 		_obfs="$(jget obfs)"
@@ -222,6 +228,8 @@ hysteria_config() {
 		fi
 		printf 'socks5:\n  listen: 127.0.0.1:%s\n' "$PORT"
 		printf 'fastOpen: true\n'
+		_hi="$(jget hop_interval)"
+		[ -z "$_hp" ] || [ -z "$_hi" ] || printf 'transport:\n  udp:\n    hopInterval: %s\n' "$_hi"
 	} > "$ZGZ_BRIDGE_JSON.yaml"
 	return 0
 }

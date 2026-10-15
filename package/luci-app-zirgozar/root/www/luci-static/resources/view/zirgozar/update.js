@@ -100,12 +100,22 @@ function row(label, value, action, key) {
 	]);
 }
 
+/* The router's web services restart while this program is installed, and
+   for those seconds a request to it is not found or cut off. That is the
+   update under way, not a failure: the page reloads itself when it is done. */
+function restarting(e) {
+	return /Object not found|-32000|XHR request (timed out|aborted)|NetworkError|Failed to fetch/i.test(String(e && e.message || e));
+}
+
 function act(key, name, arg, note) {
 	return callAction(name, arg || '').then(function(r) {
 		if (r && r.error) say(key, _(r.error), 'error');
 		else if (note) say(key, note, 'info');
 	}).catch(function(e) {
-		say(key, String(e && e.message || e), 'error');
+		if (restarting(e))
+			say(key, name == 'app_update' ? note : _('The router’s services are restarting. Try again in a few seconds.'), 'info');
+		else
+			say(key, String(e && e.message || e), 'error');
 	});
 }
 

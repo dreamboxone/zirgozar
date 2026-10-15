@@ -410,6 +410,33 @@ function node_extras(p,   ss, sec, t, sock, net, ws, k, v, pem, n, a, i, arr, h)
 			ss = jset(ss, "grpcSettings", jset(ws, "user_agent", v))
 		}
 	}
+	net = tolower(jstr(ss, "network"))
+	if (net == "ws" && NX["ws_heartbeat"] ~ /^[0-9]+$/ && NX["ws_heartbeat"] + 0 > 0) {
+		ws = jraw(ss, "wsSettings")
+		if (ws == "") ws = "{}"
+		ss = jset(ss, "wsSettings", jset(ws, "heartbeatPeriod", NX["ws_heartbeat"] + 0))
+	}
+	if (net == "grpc" && (NX["grpc_idle"] NX["grpc_health"] NX["grpc_window"] NX["grpc_permit"]) != "") {
+		ws = jraw(ss, "grpcSettings")
+		if (ws == "") ws = "{}"
+		if (NX["grpc_idle"] ~ /^[0-9]+$/)   ws = jset(ws, "idle_timeout", NX["grpc_idle"] + 0)
+		if (NX["grpc_health"] ~ /^[0-9]+$/) ws = jset(ws, "health_check_timeout", NX["grpc_health"] + 0)
+		if (NX["grpc_window"] ~ /^[0-9]+$/) ws = jset(ws, "initial_windows_size", NX["grpc_window"] + 0)
+		if (NX["grpc_permit"] == "1")       ws = jset(ws, "permit_without_stream", "true")
+		ss = jset(ss, "grpcSettings", ws)
+	}
+	if (net == "kcp" || net == "mkcp") {
+		ws = jraw(ss, "kcpSettings")
+		if (ws == "") ws = "{}"
+		if (NX["kcp_mtu"] ~ /^[0-9]+$/)      ws = jset(ws, "mtu", NX["kcp_mtu"] + 0)
+		if (NX["kcp_tti"] ~ /^[0-9]+$/)      ws = jset(ws, "tti", NX["kcp_tti"] + 0)
+		if (NX["kcp_uplink"] ~ /^[0-9]+$/)   ws = jset(ws, "uplinkCapacity", NX["kcp_uplink"] + 0)
+		if (NX["kcp_downlink"] ~ /^[0-9]+$/) ws = jset(ws, "downlinkCapacity", NX["kcp_downlink"] + 0)
+		if (NX["kcp_read"] ~ /^[0-9]+$/)     ws = jset(ws, "readBufferSize", NX["kcp_read"] + 0)
+		if (NX["kcp_write"] ~ /^[0-9]+$/)    ws = jset(ws, "writeBufferSize", NX["kcp_write"] + 0)
+		if (NX["kcp_congestion"] == "1")     ws = jset(ws, "congestion", "true")
+		if (ws != "{}") ss = jset(ss, "kcpSettings", ws)
+	}
 	if (NX["finalmask"] ~ /^[ \t]*\{.*\}[ \t]*$/) ss = jset(ss, "finalmask", NX["finalmask"])
 	sock = jraw(ss, "sockopt")
 	if (sock == "") sock = "{}"
@@ -421,6 +448,16 @@ function node_extras(p,   ss, sec, t, sock, net, ws, k, v, pem, n, a, i, arr, h)
 		sock = jset(sock, "happyEyeballs", "{\"tryDelayMs\":250,\"prioritizeIPv6\":false,\"interleave\":1,\"maxConcurrentTry\":4}")
 	if (sock != "{}") ss = jset(ss, "sockopt", sock)
 	if (ss != "{}") p = jset(p, "streamSettings", ss)
+	# For the sing-box engine only; Xray passes over the keys.
+	if (NX["sb_mux"] ~ /^(smux|yamux|h2mux)$/) {
+		v = "{\"protocol\":\"" NX["sb_mux"] "\""
+		if (NX["sb_mux_streams"] ~ /^[0-9]+$/ && NX["sb_mux_streams"] + 0 > 0) v = v ",\"max_streams\":" (NX["sb_mux_streams"] + 0)
+		if (NX["sb_mux_padding"] == "1") v = v ",\"padding\":true"
+		if (NX["sb_brutal_up"] + 0 > 0 && NX["sb_brutal_down"] + 0 > 0)
+			v = v ",\"brutal\":{\"enabled\":true,\"up_mbps\":" int(NX["sb_brutal_up"]) ",\"down_mbps\":" int(NX["sb_brutal_down"]) "}"
+		p = jset(p, "sbMux", v "}")
+	}
+	if (NX["wg_system"] == "1" && jstr(p, "protocol") == "wireguard") p = jset(p, "sbSystem", "true")
 	return p
 }
 
@@ -532,7 +569,7 @@ function do_trojan(body,   label, pass, query, p, sec) {
 # ------------------------------------------------------------------- ss://
 # either base64(method:pass@host:port) or SIP002 base64(method:pass)@host:port
 
-function do_ss(body,   label, p, cred, method, pass, dec, plug) {
+function do_ss(body,   label, p, cred, method, pass, dec, plug, pl) {
 	p = index(body, "#")
 	if (p > 0) { label = clean_label(substr(body, p + 1)); body = substr(body, 1, p - 1) }
 	p = index(body, "?")
@@ -560,9 +597,14 @@ function do_ss(body,   label, p, cred, method, pass, dec, plug) {
 	pass = substr(cred, p + 1)
 	if (method == "") return
 
-	# An obfuscation plugin needs a helper binary this does not ship. Better
-	# to drop the entry than to select it and have the tunnel refuse to start.
-	if (qs(plug, "plugin") != "") return
+	# With a plugin it is sing-box's: obfs-local and v2ray-plugin are built
+	# into it. Any other plugin needs a program this does not ship, and the
+	# entry is dropped rather than chosen and refused.
+	if (qs(plug, "plugin") != "") {
+		pl = mk_ssplugin(method, pass, qs(plug, "plugin"))
+		if (pl != "") emit(label, "ssplugin", pl)
+		return
+	}
 
 	emit(label, "shadowsocks", mk_ss(method, pass))
 }
@@ -679,7 +721,77 @@ function do_hysteria2(body,   label, auth, query, p) {
 		",\"sni\":\"" jesc(qs(query, "sni")) "\"" \
 		",\"obfs\":\"" jesc(qs(query, "obfs")) "\"" \
 		",\"obfs_password\":\"" jesc(qs(query, "obfs-password")) "\"" \
-		",\"insecure\":" (qs(query, "insecure") == "1" ? "true" : "false") "}")
+		",\"insecure\":" (qs(query, "insecure") == "1" ? "true" : "false") \
+		hy_extra(query) "}")
+}
+
+# Port hopping and bandwidth, as the clients write them: mport (or ports) a
+# list of ports and ranges, hop_interval, up and down in Mbps.
+function hy_extra(query,   o, v) {
+	o = ""
+	v = qs(query, "mport"); if (v == "") v = qs(query, "ports")
+	gsub(/[ \t]/, "", v)
+	if (v ~ /^[0-9]+([-:][0-9]+)?(,[0-9]+([-:][0-9]+)?)*$/) o = o ",\"ports\":\"" v "\""
+	v = qs(query, "hop_interval"); if (v == "") v = qs(query, "hopInterval")
+	if (v ~ /^[0-9]+$/) v = v "s"
+	if (v ~ /^[0-9]+[smh]$/) o = o ",\"hop_interval\":\"" v "\""
+	v = qs(query, "upmbps"); if (v == "") v = qs(query, "up")
+	sub(/[^0-9].*$/, "", v)
+	if (v + 0 > 0) o = o ",\"up_mbps\":" (v + 0)
+	v = qs(query, "downmbps"); if (v == "") v = qs(query, "down")
+	sub(/[^0-9].*$/, "", v)
+	if (v + 0 > 0) o = o ",\"down_mbps\":" (v + 0)
+	return o
+}
+
+# A Shadowsocks server behind a plugin sing-box has: obfs-local (simple-obfs)
+# and v2ray-plugin. The options as SIP003 writes them, "name;k=v;...".
+function mk_ssplugin(method, pass, plugin,   name, opts, i) {
+	name = plugin; opts = ""
+	i = index(plugin, ";")
+	if (i > 0) { name = substr(plugin, 1, i - 1); opts = substr(plugin, i + 1) }
+	if (name == "simple-obfs" || name == "obfs") name = "obfs-local"
+	if (name == "shadowtls") name = "shadow-tls"
+	if (name != "obfs-local" && name != "v2ray-plugin" && name != "shadow-tls") return ""
+	return "{\"type\":\"ssplugin\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT \
+		",\"method\":\"" jesc(method) "\",\"password\":\"" jesc(pass) "\"" \
+		",\"plugin\":\"" name "\",\"plugin_opts\":\"" jesc(opts) "\"}"
+}
+
+# hysteria://host:port?auth=&peer=&insecure=1&upmbps=&downmbps=&obfs=xplus&obfsParam=&alpn=#name
+# Hysteria's first version, which sing-box speaks.
+function do_hysteria1(body,   label, query, p, v, o) {
+	p = index(body, "#")
+	if (p > 0) { label = clean_label(substr(body, p + 1)); body = substr(body, 1, p - 1) }
+	p = index(body, "?")
+	if (p > 0) { query = substr(body, p + 1); body = substr(body, 1, p - 1) }
+	p = index(body, "@")
+	v = ""
+	if (p > 0) { v = urldec(substr(body, 1, p - 1)); body = substr(body, p + 1) }
+	if (!hostport(body)) return
+	if (qs(query, "auth") != "") v = qs(query, "auth")
+	o = "{\"type\":\"hysteria\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT \
+		",\"auth\":\"" jesc(v) "\",\"sni\":\"" jesc(qs(query, "peer") != "" ? qs(query, "peer") : qs(query, "sni")) "\"" \
+		",\"obfs\":\"" jesc(qs(query, "obfsParam") != "" ? qs(query, "obfsParam") : qs(query, "obfs-password")) "\"" \
+		",\"alpn\":\"" jesc(qs(query, "alpn")) "\"" \
+		",\"insecure\":" (qs(query, "insecure") == "1" ? "true" : "false") hy_extra(query)
+	# Hysteria 1 has to be told a bandwidth: 10/50 Mbps when the link says none.
+	if (o !~ /"up_mbps"/) o = o ",\"up_mbps\":10"
+	if (o !~ /"down_mbps"/) o = o ",\"down_mbps\":50"
+	emit(label, "hysteria", o "}")
+}
+
+# ssh://user:password@host:port?key=<base64url of the private key>#name
+function do_ssh(body,   label, query, p, user, pass, key) {
+	body = link_split(body)
+	if (!LCRED || LUSER == "") return
+	if (body !~ /:[0-9]+$/) body = body ":22"
+	if (!hostport(body)) return
+	key = qs(LQUERY, "key")
+	if (key != "") key = b64(key)
+	if (LPASS == "" && key == "") return
+	emit(LLABEL, "ssh", "{\"type\":\"ssh\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT \
+		",\"user\":\"" jesc(LUSER) "\",\"password\":\"" jesc(LPASS) "\",\"key\":\"" jesc(key) "\"}")
 }
 
 function do_tuic(body,   label, cred, uuid, pass, query, p, q) {
@@ -702,7 +814,21 @@ function do_tuic(body,   label, cred, uuid, pass, query, p, q) {
 		",\"sni\":\"" jesc(qs(query, "sni")) "\"" \
 		",\"congestion_control\":\"" jesc(qs(query, "congestion_control")) "\"" \
 		",\"alpn\":\"" jesc(qs(query, "alpn")) "\"" \
-		",\"insecure\":" (qs(query, "allow_insecure") == "1" ? "true" : "false") "}")
+		",\"insecure\":" (qs(query, "allow_insecure") == "1" ? "true" : "false") \
+		tuic_extra(query) "}")
+}
+
+# TUIC's own options: how UDP is relayed, the 0-RTT handshake, the heartbeat.
+function tuic_extra(query,   o, v) {
+	o = ""
+	v = qs(query, "udp_relay_mode")
+	if (v == "native" || v == "quic") o = o ",\"udp_relay_mode\":\"" v "\""
+	v = qs(query, "reduce_rtt"); if (v == "") v = qs(query, "zero_rtt")
+	if (v == "1" || v == "true") o = o ",\"zero_rtt\":true"
+	v = qs(query, "heartbeat")
+	if (v ~ /^[0-9]+$/) v = v "s"
+	if (v ~ /^[0-9]+(ms|s|m)$/) o = o ",\"heartbeat\":\"" v "\""
+	return o
 }
 
 # --------------------------------- anytls, snell, naive, openconnect, tailscale
@@ -1961,7 +2087,7 @@ LANDING {
 	line = $0
 	gsub(/\r/, "", line)
 	if (line == "" || split(line, rec, "\t") < 6) next
-	if (rec[3] ~ /^(hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|openvpn|amneziawg|l2tp|pptp|sstp|warp|aether)$/) next
+	if (rec[3] ~ /^(hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|openvpn|amneziawg|l2tp|pptp|sstp|warp|aether)$/) next
 	if (!lready) {
 		split(ENVIRON["LAND"], land, "\t")
 		lp = ENVIRON["LAND"]
@@ -2082,6 +2208,8 @@ function do_line(line) {
 	else if (index(line, "hysteria2://") == 1) do_hysteria2(substr(line, 13))
 	else if (index(line, "hy2://")       == 1) do_hysteria2(substr(line, 7))
 	else if (index(line, "tuic://")      == 1) do_tuic(substr(line, 8))
+	else if (index(line, "hysteria://")  == 1) do_hysteria1(substr(line, 12))
+	else if (index(line, "ssh://")       == 1) do_ssh(substr(line, 7))
 	else if (index(line, "anytls://")    == 1) do_anytls(substr(line, 10))
 	else if (index(line, "snell://")     == 1) do_snell(substr(line, 9))
 	else if (index(line, "naive+https://") == 1) do_naive(substr(line, 15), 0)

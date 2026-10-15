@@ -484,6 +484,23 @@ case "$(sh "$RIG/ul/luci.zirgozar" call nodes 2>/dev/null)" in
 	*) bad "and nodes with a list is that list" ;;
 esac
 
+echo "== every script of the web interface parses"
+# One stray quote in one file and a whole page stops loading - the Runtime
+# Logs page did, over logfa.js. LuCI's files end in a top-level return, so
+# each is read as the body of a function, the way LuCI itself runs it.
+if command -v node >/dev/null 2>&1; then
+	for _js in "$RIG_SRC"/package/luci-app-zirgozar/root/www/luci-static/resources/zirgozar/*.js \
+	           "$RIG_SRC"/package/luci-app-zirgozar/root/www/luci-static/resources/view/zirgozar/*.js; do
+		if node -e 'new Function(require("fs").readFileSync(process.argv[1], "utf8"))' "$_js" 2>"$RIG/js.err"; then
+			ok "parses: ${_js##*/resources/}"
+		else
+			bad "parses: ${_js##*/resources/}: $(grep -m1 -i 'error' "$RIG/js.err")"
+		fi
+	done
+else
+	echo "  skip - no node on this machine"
+fi
+
 echo "== one version everywhere"
 _pv="$(sed -n 's/^VERSION=//p' "$ROOT/build/packages.inc.sh")-r$(sed -n 's/^RELEASE=//p' "$ROOT/build/packages.inc.sh")"
 for mk in "$ROOT/package/zirgozar/Makefile" "$ROOT/package/luci-app-zirgozar/Makefile"; do
