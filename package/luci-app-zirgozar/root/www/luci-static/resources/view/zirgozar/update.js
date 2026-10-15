@@ -113,6 +113,8 @@ function restarting(e) {
    router's own word for it is its job; until that is first seen, the press
    itself stands for it. */
 var actAsked = 0, actKey = '';
+/* The Xray version chosen in the list, kept across the redraws. */
+var xrayPicked = '';
 
 function working(d) {
 	return !!(d && d.job && d.job != CHECK_JOB) || (actAsked && Date.now() - actAsked < 8000);
@@ -410,7 +412,11 @@ function render(d, early) {
 
 	/* ------------------------------------------------------------- cores */
 	var cbox = document.getElementById('pwp-cores');
-	if (cbox) {
+	/* Not while the version list is open: redrawing would shut it under the
+	   reader's hand. The next turn draws it, once they are done. */
+	var picking = document.activeElement && document.activeElement.classList &&
+		document.activeElement.classList.contains('pwp-vsel') && !working(d);
+	if (cbox && !picking) {
 		while (cbox.firstChild) cbox.removeChild(cbox.firstChild);
 		(cores.cores || []).forEach(function(c) {
 			var value = [];
@@ -454,10 +460,15 @@ function render(d, early) {
 			/* Any recent Xray, pre-releases included - those are what most
 			   people run, and GitHub's "latest" leaves them out. */
 			if (c.name == 'xray' && c.arch_ok && (cores.xray_versions || []).length) {
-				var sel = E('select', { 'class': 'pwp-vsel' }, (cores.xray_versions || []).map(function(v) {
-					var t = v.tag.replace(/^v/, '');
-					return E('option', { 'value': v.tag }, v.pre ? _('%s (pre-release)').format(t) : t);
-				}));
+				/* The row is drawn afresh every few seconds; the version picked
+				   here stays picked through that. */
+				var sel = E('select', { 'class': 'pwp-vsel', 'change': function(ev) { xrayPicked = ev.target.value; } },
+					(cores.xray_versions || []).map(function(v) {
+						var t = v.tag.replace(/^v/, '');
+						return E('option', { 'value': v.tag }, v.pre ? _('%s (pre-release)').format(t) : t);
+					}));
+				if (xrayPicked && (cores.xray_versions || []).some(function(v) { return v.tag == xrayPicked; }))
+					sel.value = xrayPicked;
 				actions.push(sel);
 				actions.push(actBtn(_('Install this version'), 'soft-blue mk-small', 'core:xray', function() {
 					return act('core:xray', 'core_install', 'xray@' + sel.value,
