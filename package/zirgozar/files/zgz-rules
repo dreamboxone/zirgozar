@@ -690,7 +690,7 @@ nft_status() {
 		# in the field might be carrying.
 		nft list chain inet $TABLE prerouting 2>/dev/null |
 			awk '/tproxy/ { for (i = 1; i <= NF; i++) { if ($i == "packets") p += $(i + 1); if ($i == "bytes") b += $(i + 1) } }
-			     END { printf "captured: %d packets, %d bytes\n", p + 0, b + 0 }'
+			     END { printf "captured: %.0f packets, %.0f bytes\n", p + 0, b + 0 }'
 	else
 		echo "active:  no"
 	fi
@@ -1069,7 +1069,7 @@ ipt_status() {
 	if iptables -t mangle -S ZGZ_PRE >/dev/null 2>&1; then
 		echo "active:  yes"
 		iptables -t mangle -L ZGZ_PRE -n -v 2>/dev/null |
-			awk '/TPROXY/ { p += $1; b += $2 } END { printf "captured: %d packets, %d bytes\n", p, b }'
+			awk '/TPROXY/ { p += $1; b += $2 } END { printf "captured: %.0f packets, %.0f bytes\n", p, b }'
 	else
 		echo "active:  no"
 	fi

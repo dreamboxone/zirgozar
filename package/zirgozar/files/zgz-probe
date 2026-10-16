@@ -387,13 +387,16 @@ run_batch() {
 
 	"$_xray" $(core_run_args "$_eng" "$TEST_CFG") >/dev/null 2>&1 &
 	_xpid=$!
-	trap 'kill "$_xpid" 2>/dev/null || true' INT TERM
+	# Stopped means stopped: without the exit, every server of the batch was
+	# then tried against the tester just killed.
+	trap 'kill "$_xpid" 2>/dev/null; rm -f "$TEST_CFG"; exit 1' INT TERM
 	# Without this the first server in every batch is scored on the core's
 	# start-up rather than on its own latency.
 	sleep 1
 
 	if ! kill -0 "$_xpid" 2>/dev/null; then
 		warn "the batch tester did not start - ports busy, or a bad entry"
+		trap - INT TERM
 		return 1
 	fi
 

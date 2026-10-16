@@ -465,6 +465,11 @@ function node_extras(p,   ss, sec, t, sock, net, ws, k, v, pem, n, a, i, arr, h)
 # it twice costs a slot in a batch that another server could have used.
 function emit(label, proto, payload,   key, tag) {
 	if (HOST == "" || PORT + 0 <= 0) return
+	# A server is a name or an address, and nothing else: a quote or a
+	# backslash in one - from a link written by hand or a broken
+	# subscription - went on into the core's configuration and the page's
+	# list unescaped, and the one bad node took the whole list down with it.
+	if (HOST !~ /^[A-Za-z0-9._:-]+$/) return
 	if (NXN > 0) payload = node_extras(payload)
 	if (label == "") label = HOST ":" PORT
 	if (filtered(label)) return

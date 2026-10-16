@@ -158,6 +158,13 @@ check "$IKE" 'E	ikev2	{"type":"ikev2","server":"vpn.example.com","port":500,"use
 P	ikev2	{"type":"ikev2","server":"1.2.3.4","port":4500,"username":"","password":"","psk":"k","local_id":"me","ca":"LS0t_-","mtu":1400}' \
 	"an IKEv2 link is read, with a password or a shared key"
 
+# A server is a name or an address: one with a quote or a backslash in it
+# would go on unescaped into the core's configuration and the page's list.
+BADHOST="$(printf '%s\n' 'vless://11111111-1111-1111-1111-111111111111@ho"st.example:443?security=none#Q' \
+	'trojan://p@back\slash.example:443#B' 'vless://11111111-1111-1111-1111-111111111111@[2001:db8::1]:443?security=none#V6' \
+	'ss://YWVzLTEyOC1nY206cA@my_host.example:8388#U' | LC_ALL=C awk -f "$RIG/lib/zgz-parse" | cut -f2,4 | tr '\t\n' ' ,')"
+check "$BADHOST" 'V6 2001:db8::1,U my_host.example,' "a server with a quote or backslash is dropped, an IPv6 or underscored one kept"
+
 # A JSON \u escape is the character it names, a surrogate pair one character;
 # and a sing-box Hysteria 1 stays Hysteria 1, with its auth_str.
 SBJ="$(printf '%s\n' '{"outbounds":[{"type":"trojan","tag":"سلام 😀","server":"t.example.com","server_port":443,"password":"pass"},{"type":"hysteria","tag":"H1","server":"h.example.com","server_port":443,"auth_str":"real-password","obfs":"xp","up_mbps":20,"down_mbps":100,"tls":{"enabled":true,"server_name":"sni.example","alpn":["h3"],"insecure":true}}]}' |
