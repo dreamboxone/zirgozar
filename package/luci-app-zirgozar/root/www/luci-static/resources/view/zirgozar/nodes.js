@@ -243,7 +243,7 @@ function addViaLinks() {
 	var box = E('textarea', {
 		'rows': 8, 'wrap': 'off',
 		'style': 'width:100%;direction:ltr;text-align:left;font-family:monospace',
-		'placeholder': 'vless://…\nvmess://…\naether://…\nl2tp://user:password@server:1701?ipsec=0\nl2tp://user:password@server:1701?ipsec=1&psk=key\npptp://user:password@server:1723\nsstp://user:password@server:443'
+		'placeholder': 'vless://…\nvmess://…\naether://…\nl2tp://user:password@server:1701?ipsec=0\nl2tp://user:password@server:1701?ipsec=1&psk=key\npptp://user:password@server:1723\nsstp://user:password@server:443\nikev2://user:password@server:500'
 	});
 	ui.showModal(_('Add the node via the link'), [
 		E('p', {}, _('Enter share links, one per line. Subscription links are not supported!')),

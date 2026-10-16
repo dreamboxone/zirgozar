@@ -43,6 +43,8 @@ var T = [
 	[ 'no {} on this router can run the generated configuration', 'هیچ {1} روی این روتر نمی‌تواند کانفیگ ساخته‌شده را اجرا کند' ],
 	[ 'the chosen server needs a core this router does not have', 'سرور انتخاب‌شده هسته‌ای لازم دارد که روی این روتر نیست' ],
 	[ '{} did not connect within two minutes', '{1} در دو دقیقه وصل نشد' ],
+	[ '{}: cleared what an earlier connection left behind', '{1}: باقی‌مانده اتصال قبلی پاک شد' ],
+	[ 'IKEv2: the connection was lost', 'IKEv2: اتصال قطع شد' ],
 	[ 'the bridge never started listening on {}', 'پل هیچ‌وقت روی {1} شروع به گوش دادن نکرد' ],
 	[ 'the core is still starting - waiting for it', 'هسته هنوز در حال راه‌اندازی است - منتظر آن' ],
 	[ '{} never started listening on {} - leaving the network untouched', '{1} هیچ‌وقت روی {2} شروع به گوش دادن نکرد - شبکه دست‌نخورده ماند' ],

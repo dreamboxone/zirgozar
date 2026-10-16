@@ -108,7 +108,7 @@ method_state() {
 		if [ "$bridge_on" = "0" ]; then
 			_bb="$(sed -n 's/^bridge=//p' "$ZGZ_RUN/core.info" 2>/dev/null | head -1)"
 			[ -n "$_bb" ] && pgrep -f "^$_bb --bind" >/dev/null 2>&1 && bridge_on=1
-			case "$_bb" in */zgz-l2tp|*/zgz-pppvpn|*/zgz-aether)
+			case "$_bb" in */zgz-l2tp|*/zgz-pppvpn|*/zgz-ikev2|*/zgz-aether)
 				pgrep -f "$_bb run" >/dev/null 2>&1 && bridge_on=1 ;;
 			esac
 		fi
@@ -393,7 +393,7 @@ method_nodeconfig() {
 	[ -n "$rec" ] || { fail "not xray"; return; }
 	proto="$(printf '%s' "$rec" | cut -f3)"
 	case "$proto" in
-		hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|warp|l2tp|pptp|sstp) fail "not xray"; return ;;
+		hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|warp|l2tp|pptp|sstp|ikev2) fail "not xray"; return ;;
 	esac
 	out="$(printf '%s\n' "$rec" | DOMSTRAT="" decorate | cut -f6- | sed 's/^{/{"tag":"proxy",/')"
 	chains="$(chain_outbounds "$out" | while read -r _co; do [ -n "$_co" ] && printf ',%s' "$_co"; done)"

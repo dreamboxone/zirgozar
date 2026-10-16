@@ -1,0 +1,232 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+# Part of Zirgozar - https://github.com/dreamboxone/zirgozar
+#
+# zgz-ikev2 - IKEv2 accounts, the way zgz-pppvpn carries PPTP and SSTP ones:
+# a device of their own, with a routing table of its own, which the core then
+# sends the tunnel's traffic out of. Nothing on the router is routed over it
+# otherwise.
+#
+#   zgz-ikev2 check          is everything there for the node in bridge.json
+#   zgz-ikev2 run            connect, and stay until the link goes (procd)
+#   zgz-ikev2 test tcp|url   connect the node on stdin, measure, disconnect
+#
+# strongSwan does the IKEv2; its IPsec is bound to an XFRM device by an
+# interface ID, so only what is routed into that device is encrypted, and the
+# address the server gives is put on the device here rather than by strongSwan.
+
+set -e
+. "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
+MODE="${1:-check}"
+NODE="${ZGZ_IKEV2_NODE:-$ZGZ_ETC/bridge.json}"
+DEV=zgzikev2
+TABLE=19016
+STATE="$ZGZ_RUN/ikev2"
+
+fail() {
+	[ "$MODE" = test ] || say_message "$1"
+	echo "$1" >&2
+	exit 1
+}
+
+ikev2config() {
+	ucode "$ZGZ_LIB/zgz-ikev2config" "$@"
+}
+
+conn() {
+	echo "zirgozar-$DEV"
+}
+
+check() {
+	command -v swanctl >/dev/null 2>&1 && [ -x /etc/init.d/swanctl ] ||
+		fail 'IKEv2 needs strongSwan. Install dependencies under Router requirements.'
+	if ! grep -q '"psk":"[^"]' "$NODE"; then
+		[ -f /usr/lib/ipsec/plugins/libstrongswan-eap-mschapv2.so ] ||
+			fail 'IKEv2 needs strongSwan EAP. Install dependencies under Router requirements.'
+	fi
+	[ -d /sys/module/xfrm_interface ] || modprobe xfrm_interface >/dev/null 2>&1 || true
+	[ -d /sys/module/xfrm_interface ] ||
+		fail 'IKEv2 needs the XFRM interface kernel module. Install dependencies under Router requirements.'
+	ikev2config check "$NODE" "$DEV" ||
+		fail 'Invalid IKEv2 account or missing ucode socket module. Install dependencies and check the account.'
+}
+
+cleanup() {
+	trap - EXIT INT TERM
+	[ "${IKE:-0}" != 1 ] || ikev2config stop "$NODE" "$DEV" >/dev/null 2>&1 || true
+	if [ "${ROUTES:-0}" = 1 ]; then
+		ip -4 rule del pref "$TABLE" oif "$DEV" lookup "$TABLE" 2>/dev/null || true
+		ip -4 route flush table "$TABLE" 2>/dev/null || true
+		ip -6 rule del pref "$TABLE" oif "$DEV" lookup "$TABLE" 2>/dev/null || true
+		ip -6 route flush table "$TABLE" 2>/dev/null || true
+	fi
+	# The device is left, down and without its address: deleting an XFRM
+	# device can hang in the kernel on OpenWrt 25, and the next connection
+	# uses it again.
+	if [ "${LINK:-0}" = 1 ]; then
+		ip -4 addr flush dev "$DEV" 2>/dev/null || true
+		ip link set dev "$DEV" down 2>/dev/null || true
+	fi
+	[ "${PAUSED:-0}" != 1 ] || "$ZGZ_LIB/zgz-rules" local resume >/dev/null 2>&1 || true
+	rm -rf "$STATE"
+	[ -z "${TEST_IN:-}" ] || rm -f "$TEST_IN"
+	[ "${TEST_LOCK:-0}" != 1 ] || rmdir "$ZGZ_RUN/.l2tp-test-lock" 2>/dev/null || true
+}
+
+# Is another run of this very connection still going?
+alive() {
+	_pid="$(cat "$STATE/pid" 2>/dev/null)" || return 1
+	case "$_pid" in ''|*[!0-9]*) return 1 ;; esac
+	[ "$_pid" != $$ ] && [ -r "/proc/$_pid/cmdline" ] &&
+		tr '\000' ' ' < "/proc/$_pid/cmdline" 2>/dev/null | grep -q 'zgz-ikev2'
+}
+
+# Is the connection up, both the IKE and the IPsec part of it?
+established() {
+	_sas="$(swanctl --list-sas --ike "$(conn)" --raw 2>/dev/null)" || return 1
+	case "$_sas" in *state=ESTABLISHED*state=INSTALLED*) return 0 ;; esac
+	return 1
+}
+
+connect() {
+	check
+	# What an earlier connection left behind when it was cut off - by a
+	# power cut, a kill or a crash, with no chance to clean up - is cleared:
+	# otherwise every later try stopped here for good. A connection another
+	# live run holds is still never touched.
+	if [ -f "$STATE/pid" ] || [ -n "$(ip -4 route show table "$TABLE" 2>/dev/null)" ]; then
+		alive && fail 'The IKEv2 routing table is already in use.'
+		[ ! -S /var/run/charon.vici ] || ikev2config stop "$NODE" "$DEV" >/dev/null 2>&1 || true
+		ip -4 rule del pref "$TABLE" oif "$DEV" lookup "$TABLE" 2>/dev/null || true
+		ip -4 route flush table "$TABLE" 2>/dev/null || true
+		ip -6 rule del pref "$TABLE" oif "$DEV" lookup "$TABLE" 2>/dev/null || true
+		ip -6 route flush table "$TABLE" 2>/dev/null || true
+		ip -4 addr flush dev "$DEV" 2>/dev/null || true
+		rm -rf "$STATE"
+		log "IKEv2: cleared what an earlier connection left behind"
+	fi
+	umask 077
+	mkdir -p "$STATE"
+	echo $$ > "$STATE/pid"
+	ROUTES=1
+	# A dead tunnel must fail closed, rather than fall back to the WAN.
+	ip -4 route add unreachable default metric 32767 table "$TABLE"
+	ip -4 rule add pref "$TABLE" oif "$DEV" lookup "$TABLE"
+	ip -6 route add unreachable default metric 32767 table "$TABLE" 2>/dev/null || true
+	ip -6 rule add pref "$TABLE" oif "$DEV" lookup "$TABLE" 2>/dev/null || true
+
+	_host="$(jsonfilter -i "$NODE" -e '@.server' 2>/dev/null)" || _host=''
+	_mtu="$(jsonfilter -i "$NODE" -e '@.mtu' 2>/dev/null)" || _mtu=''
+	case "$_mtu" in ''|*[!0-9]*) _mtu=1400 ;; esac
+	# Looked up outside the tunnel: this account is the way into it.
+	_ip="$(resolve_direct "$_host" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
+	[ -n "$_ip" ] || fail 'The IKEv2 server has no reachable IPv4 address.'
+	# Asked before any policy is in place: left to itself, strongSwan can
+	# pick loopback as its own address on a router with TProxy.
+	_src="$(ip -4 route get "$_ip" mark 255 | sed -n 's/.* src \([^ ]*\).*/\1/p' | head -1)"
+	[ -n "$_src" ] || fail 'The IKEv2 server has no direct IPv4 route.'
+
+	LINK=1
+	# Its interface ID is its table number, so the two never share one.
+	if [ ! -d "/sys/class/net/$DEV" ]; then
+		ip link add "$DEV" type xfrm if_id "$TABLE" 2>/dev/null ||
+			fail 'Cannot create the IKEv2 device. Install dependencies under Router requirements.'
+	fi
+	ip -4 addr flush dev "$DEV" 2>/dev/null || true
+	ip link set dev "$DEV" mtu "$_mtu" up
+
+	if [ ! -S /var/run/charon.vici ]; then
+		/etc/init.d/swanctl start >/dev/null 2>&1 || true
+		_n=0
+		while [ ! -S /var/run/charon.vici ] && [ "$_n" -lt 10 ]; do sleep 1; _n=$((_n+1)); done
+		[ -S /var/run/charon.vici ] || fail 'The IPsec service did not start.'
+	fi
+	IKE=1
+	ikev2config load "$NODE" "$DEV" "$_ip" "$_src" > "$STATE/log" 2>&1 || {
+		tail -5 "$STATE/log" >&2
+		fail 'The IKEv2 account could not be loaded. Check Runtime Logs.'
+	}
+	# swanctl prints strongSwan's own account of the handshake, which says
+	# why one failed; no password or key is in it.
+	if ! swanctl --initiate --ike "$(conn)" --child "$(conn)" --timeout 30 > "$STATE/log" 2>&1; then
+		grep -vE '^\[(NET|ENC|CFG)\]' "$STATE/log" | tail -15 >&2
+		if grep -qE 'EAP_FAILURE|EAP method .* failed|AUTHENTICATION_FAILED' "$STATE/log"; then
+			fail 'IKEv2 did not connect: the server refused the account. Check username, password and shared key.'
+		elif grep -qE 'no trusted .* certificate|constraint check failed|no issuer certificate|certificate .* not trusted' "$STATE/log"; then
+			fail 'IKEv2 did not connect: the server certificate is not trusted. Give the certificate authority the provider supplies, or check the server identity.'
+		elif grep -qE 'NO_PROPOSAL_CHOSEN|no acceptable proposal' "$STATE/log"; then
+			fail 'IKEv2 did not connect: the server wants encryption this router does not offer.'
+		fi
+		fail 'IKEv2 did not connect. Check server, username, password and Runtime Logs.'
+	fi
+
+	_vip="$(swanctl --list-sas --ike "$(conn)" --raw 2>/dev/null |
+		sed -n 's/.*local-vips=\[\([^]]*\)\].*/\1/p' | tr ' ' '\n' |
+		grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
+	[ -n "$_vip" ] || fail 'The IKEv2 server gave this router no address in the tunnel.'
+	ip -4 addr add "$_vip/32" dev "$DEV"
+	ip -4 route replace default dev "$DEV" metric 10 table "$TABLE"
+	return 0
+}
+
+measure() {
+	_url="$(cfg test_url 'http://www.gstatic.com/generate_204')"
+	# Resolve outside the tunnel, then make the measured connection on it.
+	_authority="${_url#*://}"; _authority="${_authority%%/*}"
+	_host="${_authority%%:*}"; _port="${_authority##*:}"
+	case "$_url" in http://*) _default=80 ;; https://*) _default=443 ;; *) fail 'Invalid test URL.' ;; esac
+	[ "$_port" != "$_authority" ] || _port="$_default"
+	_ip="$(resolve_direct "$_host" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
+	[ -n "$_ip" ] || { echo 0; return 1; }
+	if [ "$KIND" = tcp ]; then
+		_t="$(curl -4 -sS --noproxy '*' --interface "$DEV" --resolve "$_host:$_port:$_ip" \
+			--connect-timeout 8 --max-time 10 -o /dev/null -w '%{time_connect}' "$_url" 2>/dev/null)" || true
+	else
+		_t="$(curl -4 -fsS --noproxy '*' --interface "$DEV" --resolve "$_host:$_port:$_ip" \
+			--connect-timeout 8 --max-time 10 -o /dev/null -w '%{time_total}' "$_url" 2>/dev/null)" || _t=0
+	fi
+	awk -v t="${_t:-0}" 'BEGIN { print (t > 0 ? (t*1000 < 1 ? 1 : int(t*1000+0.5)) : 0) }'
+}
+
+case "$MODE" in
+	check) check ;;
+	run)
+		trap cleanup EXIT
+		trap 'exit 1' INT TERM
+		connect
+		# procd starts the whole connection again when the server drops it,
+		# dead peer detection gives up on it, or the address is gone.
+		while established && ip -4 addr show dev "$DEV" 2>/dev/null | grep -q 'inet '; do
+			sleep 10
+		done
+		log "IKEv2: the connection was lost"
+		exit 1 ;;
+	test)
+		KIND="${2:-url}"
+		case "$KIND" in tcp|url) : ;; *) exit 1 ;; esac
+		# One account measured at a time, L2TP and PPP ones included: each
+		# pauses the router's own traffic going into the tunnel while it
+		# connects.
+		mkdir "$ZGZ_RUN/.l2tp-test-lock" 2>/dev/null || { echo -2; exit 1; }
+		TEST_LOCK=1
+		DEV=zgzikev2t; TABLE=19017; STATE="$ZGZ_RUN/ikev2-test"
+		TEST_IN="$ZGZ_RUN/ikev2-test.$$"
+		trap cleanup EXIT
+		trap 'exit 1' INT TERM
+		umask 077
+		cat > "$TEST_IN"
+		NODE="$TEST_IN"
+		# An already connected identical account can be measured without reconnecting.
+		if cmp -s "$NODE" "$ZGZ_ETC/bridge.json" && ip -4 addr show dev zgzikev2 2>/dev/null | grep -q 'inet '; then
+			DEV=zgzikev2
+			measure
+			exit 0
+		fi
+		if [ "$(cfg_bool localhost_proxy 1)" = 1 ]; then
+			"$ZGZ_LIB/zgz-rules" local pause >/dev/null 2>&1; PAUSED=1
+		fi
+		connect
+		measure ;;
+	*) echo 'usage: zgz-ikev2 check|run|test tcp|url' >&2; exit 1 ;;
+esac

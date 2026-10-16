@@ -882,6 +882,40 @@ function do_pppvpn(body, kind, defport,   label, query, p, cred, user, pass, mtu
 	emit(label, kind, payload)
 }
 
+# ikev2://user:password@server[:500]?id=vpn.example.com&ca=BASE64&mtu=1400#label
+# ikev2://server[:500]?psk=KEY&id=REMOTE&local_id=LOCAL&mtu=1400#label
+# Accounts carried by zgz-ikev2. With a username the server proves itself by
+# certificate - for its name, or for id - and with a shared key alone both
+# sides use the key. ca is the provider's own certificate authority, in base64.
+function do_ikev2(body,   label, query, p, cred, user, pass, psk, rid, lid, ca, mtu, payload) {
+	p = index(body, "#")
+	if (p > 0) { label = clean_label(substr(body, p + 1)); body = substr(body, 1, p - 1) }
+	p = index(body, "?")
+	if (p > 0) { query = substr(body, p + 1); body = substr(body, 1, p - 1) }
+	p = index(body, "@")
+	if (p > 0) {
+		cred = substr(body, 1, p - 1); body = substr(body, p + 1)
+		p = index(cred, ":"); if (p <= 0) return
+		user = urldec(substr(cred, 1, p - 1)); pass = urldec(substr(cred, p + 1))
+	}
+	sub(/\/+$/, "", body)
+	if (body !~ /:[0-9]+$/) body = body ":500"
+	if (!hostport(body) || HOST !~ /^[A-Za-z0-9_.-]+$/) return
+	mtu = qs(query, "mtu"); if (mtu == "") mtu = 1400
+	if (mtu !~ /^[0-9]+$/ || (mtu + 0) < 576 || (mtu + 0) > 1460) return
+	mtu += 0
+	psk = qs(query, "psk"); rid = qs(query, "id"); lid = qs(query, "local_id"); ca = qs(query, "ca")
+	if (psk == "" && (user == "" || pass == "")) return
+	if (user ~ /[[:cntrl:]]/ || pass ~ /[[:cntrl:]]/ || psk ~ /[[:cntrl:]]/ || rid ~ /[[:cntrl:]]/ || lid ~ /[[:cntrl:]]/) return
+	if (ca !~ /^[A-Za-z0-9+\/_=-]*$/) return
+	payload = "{\"type\":\"ikev2\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT ",\"username\":\"" jesc(user) "\",\"password\":\"" jesc(pass) "\",\"psk\":\"" jesc(psk) "\""
+	if (rid != "") payload = payload ",\"remote_id\":\"" jesc(rid) "\""
+	if (lid != "") payload = payload ",\"local_id\":\"" jesc(lid) "\""
+	if (ca != "") payload = payload ",\"ca\":\"" ca "\""
+	payload = payload ",\"mtu\":" mtu "}"
+	emit(label, "ikev2", payload)
+}
+
 function do_hysteria2(body,   label, auth, query, p) {
 	p = index(body, "#")
 	if (p > 0) { label = clean_label(substr(body, p + 1)); body = substr(body, 1, p - 1) }
@@ -2350,7 +2384,7 @@ LANDING {
 	line = $0
 	gsub(/\r/, "", line)
 	if (line == "" || split(line, rec, "\t") < 6) next
-	if (rec[3] ~ /^(hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|warp|aether)$/) next
+	if (rec[3] ~ /^(hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|ikev2|warp|aether)$/) next
 	if (!lready) {
 		split(ENVIRON["LAND"], land, "\t")
 		lp = ENVIRON["LAND"]
@@ -2495,6 +2529,7 @@ function do_line(line) {
 	else if (index(line, "l2tp+ipsec://") == 1) do_l2tp(substr(line, 14), 1)
 	else if (index(line, "pptp://")      == 1) do_pppvpn(substr(line, 8), "pptp", 1723)
 	else if (index(line, "sstp://")      == 1) do_pppvpn(substr(line, 8), "sstp", 443)
+	else if (index(line, "ikev2://")     == 1) do_ikev2(substr(line, 9))
 }
 
 # ------------------------------------------------------------------- YAML

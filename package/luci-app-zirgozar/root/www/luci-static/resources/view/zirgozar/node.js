@@ -56,6 +56,7 @@ SCHEMES.l2tp = 'l2tp';
 SCHEMES['l2tp+ipsec'] = 'l2tp';
 SCHEMES.pptp = 'pptp';
 SCHEMES.sstp = 'sstp';
+SCHEMES.ikev2 = 'ikev2';
 SCHEMES.anytls = 'anytls';
 SCHEMES.snell = 'snell';
 SCHEMES['naive+https'] = 'naive';
@@ -71,9 +72,9 @@ SCHEMES.sq = 'shadowquic';
 SCHEMES.shadowquic = 'shadowquic';
 var OC_FLAVORS = [ [ 'anyconnect', 'Cisco AnyConnect / ocserv' ], [ 'gp', 'GlobalProtect' ], [ 'fortinet', 'Fortinet' ],
 	[ 'f5', 'F5' ], [ 'pulse', 'Pulse Secure' ], [ 'nc', 'Juniper Network Connect' ] ];
-/* The PPP accounts, each with the port its servers listen on: providers hand
-   them out with only a server name. */
-var PPP_PORT = { l2tp: '1701', pptp: '1723', sstp: '443' };
+/* The PPP and IKEv2 accounts, each with the port its servers listen on:
+   providers hand them out with only a server name. */
+var PPP_PORT = { l2tp: '1701', pptp: '1723', sstp: '443', ikev2: '500' };
 var AETHER_FIELDS = 'protocol scan ip transport outer inner noize dns exit_loc fragment fragment_size fragment_delay ech ech_dns ech_domain api_address api_ech api_ech_dns fingerprint sni psiphon psiphon_mode region tor tor_bridges tor_relays bridges cdn_ips cdn_sni cdn_sets psiphon_bundled psiphon_servers'.split(' ');
 
 /* Vwarp's disguises for the first packets, lightest first. */
@@ -310,6 +311,20 @@ function parseLink(link) {
 		f.user = dec(cred.slice(0, pi)); f.password = dec(cred.slice(pi + 1));
 		f.l2tp_mtu = take('mtu') || '1400';
 		f.pptp_mppe = take('mppe') == '0' ? '0' : '1';
+	} else if (proto == 'ikev2') {
+		/* A username and password, or a shared key alone. */
+		if (cred) {
+			var ii = cred.indexOf(':');
+			if (ii < 0) return null;
+			f.user = dec(cred.slice(0, ii)); f.password = dec(cred.slice(ii + 1));
+		}
+		f.ikev2_psk = take('psk');
+		if (!f.ikev2_psk && !f.user) return null;
+		f.ikev2_auth = f.ikev2_psk ? 'psk' : 'eap';
+		f.ikev2_id = take('id'); f.ikev2_local_id = take('local_id');
+		var ca = take('ca').replace(/ /g, '+');
+		f.ikev2_ca = ca ? (b64dec(ca) || '') : '';
+		f.l2tp_mtu = take('mtu') || '1400';
 	} else if (proto == 'vless' || proto == 'trojan') {
 		if (proto == 'vless') {
 			f.uuid = dec(cred); f.encryption = take('encryption') || 'none'; f.flow = take('flow');
@@ -531,6 +546,18 @@ function buildLink(f, name) {
 		q.mtu = f.l2tp_mtu || '1400';
 		if (p == 'pptp') q.mppe = f.pptp_mppe == '0' ? '0' : '1';
 		return p + '://' + enc(f.user || '') + ':' + enc(f.password || '') + '@' + joinHostPort(f.address, f.port || PPP_PORT[p]) + '?' + buildQuery(q) + frag;
+	}
+	if (p == 'ikev2') {
+		var psk = f.ikev2_auth == 'psk';
+		q.psk = psk ? f.ikev2_psk : '';
+		q.id = f.ikev2_id;
+		q.local_id = psk ? f.ikev2_local_id : '';
+		/* URL-safe, so that a + in it is not read back as a space. */
+		q.ca = !psk && String(f.ikev2_ca || '').trim()
+			? b64enc(String(f.ikev2_ca).trim() + '\n').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') : '';
+		q.mtu = f.l2tp_mtu || '1400';
+		return 'ikev2://' + (psk ? '' : enc(f.user || '') + ':' + enc(f.password || '') + '@') +
+			joinHostPort(f.address, f.port || PPP_PORT[p]) + '?' + buildQuery(q) + frag;
 	}
 	if (p == 'socks' || p == 'http') {
 		var auth = f.user ? enc(f.user) + ':' + enc(f.password) + '@' : '';
@@ -840,14 +867,14 @@ return view.extend({
 			  [ 'socks', 'Socks' ], [ 'http', 'HTTP' ], [ 'hysteria2', 'Hysteria2' ], [ 'hysteria', 'Hysteria (v1)' ], [ 'tuic', 'TUIC' ], [ 'ssh', 'SSH' ],
 			  [ 'anytls', 'AnyTLS' ], [ 'snell', 'Snell' ], [ 'naive', 'NaiveProxy' ], [ 'openconnect', 'OpenConnect' ],
 			  [ 'tailscale', 'Tailscale' ], [ 'warp', 'WARP' ],
-			  [ 'wireguard', 'WireGuard' ], [ 'openvpn', 'OpenVPN' ], [ 'l2tp', 'L2TP / IPsec' ], [ 'pptp', 'PPTP' ], [ 'sstp', 'SSTP' ], [ '_balancing', 'Balancing' ],
+			  [ 'wireguard', 'WireGuard' ], [ 'openvpn', 'OpenVPN' ], [ 'l2tp', 'L2TP / IPsec' ], [ 'pptp', 'PPTP' ], [ 'sstp', 'SSTP' ], [ 'ikev2', 'IKEv2' ], [ '_balancing', 'Balancing' ],
 			  [ '_shunt', 'Shunt' ], [ '_iface', 'Custom Interface' ], [ 'aether', 'Aether' ] ]
 				.forEach(function(v) { o.value(v[0], v[1]); });
 
 			var candidates = (data && data[1] && data[1].nodes) || [];
 			var origins = (data && data[3]) || {};
 			var nodes = candidates.filter(function(n) {
-				return !/^(hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|balancing|shunt|interface|aether)$/.test(n.protocol);
+				return !/^(hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|ikev2|balancing|shunt|interface|aether)$/.test(n.protocol);
 			}).map(function(n) {
 				var origin = origins[n.tag];
 				return origin ? { tag: origin, label: n.label || n.tag } : null;
@@ -1046,7 +1073,7 @@ return view.extend({
 
 			/* A server of its own for all but WARP and OpenVPN, whose profile
 			   names its own. */
-			var SERVERS = XR.concat([ 'ssr', 'mieru', 'shadowquic', 'hysteria2', 'hysteria', 'tuic', 'ssh', 'anytls', 'snell', 'naive', 'openconnect', 'wireguard', 'l2tp', 'pptp', 'sstp' ]);
+			var SERVERS = XR.concat([ 'ssr', 'mieru', 'shadowquic', 'hysteria2', 'hysteria', 'tuic', 'ssh', 'anytls', 'snell', 'naive', 'openconnect', 'wireguard', 'l2tp', 'pptp', 'sstp', 'ikev2' ]);
 			o = field(form.Value, 'address', _('Address (Support Domain Name)'));
 			o.rmempty = false;
 			o.validate = function(section_id, value) {
@@ -1060,7 +1087,7 @@ return view.extend({
 			SERVERS.forEach(function(p) { o.depends('_proto', p); });
 			/* Required, except for L2TP: its port is always 1701 and the
 			   accounts are handed out without one. */
-			o = field(form.Value, 'port', _('Port'), _('For L2TP, PPTP and SSTP it can be left empty: the standard port is used (1701, 1723 and 443).'));
+			o = field(form.Value, 'port', _('Port'), _('For L2TP, PPTP, SSTP and IKEv2 it can be left empty: the standard port is used (1701, 1723, 443 and 500).'));
 			o.datatype = 'port';
 			o.validate = function(section_id, value) {
 				if (value || PPP_PORT[this.section.formvalue(section_id, '_proto')]) return true;
@@ -1076,7 +1103,7 @@ return view.extend({
 			o.depends({ '_proto': 'l2tp', '_l2tp_ipsec': '1' });
 			o = field(form.Value, 'l2tp_mtu', 'MTU', _('Default: 1400. Reduce it if the tunnel connects but some pages do not load.'));
 			o.datatype = 'range(576,1460)'; o.placeholder = '1400';
-			[ 'l2tp', 'pptp', 'sstp' ].forEach(function(p) { o.depends('_proto', p); });
+			[ 'l2tp', 'pptp', 'sstp', 'ikev2' ].forEach(function(p) { o.depends('_proto', p); });
 			o = s.option(form.DummyValue, '_l2tp_help', _('L2TP tests'));
 			o.depends('_proto', 'l2tp');
 			o.cfgvalue = function() { return _('L2TP normally uses UDP port 1701. Ping measures the server address. TCPing measures a TCP connection through the tunnel to the test URL; URL Test measures the full request. Iran routing and traffic rules are applied by the routing core.'); };
@@ -1094,6 +1121,34 @@ return view.extend({
 			o = s.option(form.DummyValue, '_sstp_help', _('SSTP tests'));
 			o.depends('_proto', 'sstp');
 			o.cfgvalue = function() { return _('SSTP runs inside HTTPS, normally on port 443, so it gets through most firewalls. The server certificate is not checked. Ping measures the server address. TCPing measures a TCP connection through the tunnel to the test URL; URL Test measures the full request.'); };
+
+			/* IKEv2: a username and password, with the server proving itself by
+			   certificate, or a shared key alone. Carried by zgz-ikev2. */
+			o = field(form.ListValue, 'ikev2_auth', _('Sign-in'));
+			o.value('eap', _('Username and password'));
+			o.value('psk', _('Shared key (PSK)'));
+			o.cfgvalue = function() { return f.ikev2_auth == 'psk' ? 'psk' : 'eap'; };
+			o.depends('_proto', 'ikev2');
+			o = field(form.Value, 'ikev2_psk', _('Shared key (PSK)'));
+			o.password = true; o.rmempty = false;
+			o.depends({ '_proto': 'ikev2', '_ikev2_auth': 'psk' });
+			o = field(form.Value, 'ikev2_id', _('Server identity'),
+				_('Optional. The name or address in the server certificate, when it is not the server address above.'));
+			o.depends('_proto', 'ikev2');
+			o = field(form.Value, 'ikev2_local_id', _('Local identity'),
+				_('Optional. Only when the provider gives one for this router.'));
+			o.depends({ '_proto': 'ikev2', '_ikev2_auth': 'psk' });
+			o = field(form.TextValue, 'ikev2_ca', _('Certificate authority'),
+				_('Optional. The CA certificate the provider supplies, in PEM form. Left empty, the server certificate must be from a public authority, such as Let’s Encrypt.'));
+			o.rows = 5;
+			o.placeholder = '-----BEGIN CERTIFICATE-----';
+			o.validate = function(section_id, value) {
+				return !value || /^\s*-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----\s*$/.test(value) ? true : _('Paste the whole certificate, from BEGIN CERTIFICATE to END CERTIFICATE.');
+			};
+			o.depends({ '_proto': 'ikev2', '_ikev2_auth': 'eap' });
+			o = s.option(form.DummyValue, '_ikev2_help', _('IKEv2 tests'));
+			o.depends('_proto', 'ikev2');
+			o.cfgvalue = function() { return _('IKEv2 uses UDP ports 500 and 4500, and strongSwan on the router. The server certificate is checked. Ping measures the server address. TCPing measures a TCP connection through the tunnel to the test URL; URL Test measures the full request.'); };
 
 			/* ------------------------------------------------- WireGuard
 			   The fields of a [Interface] and [Peer] pair, entered by hand.
@@ -1223,6 +1278,7 @@ return view.extend({
 				return !PPP_PORT[this.section.formvalue(section_id, '_proto')] || !!value ? true : _('This account requires a username and password.');
 			};
 			[ 'socks', 'http', 'l2tp', 'pptp', 'sstp', 'naive', 'openconnect', 'ssh', 'mieru', 'shadowquic' ].forEach(function(p) { o.depends('_proto', p); });
+			o.depends({ '_proto': 'ikev2', '_ikev2_auth': 'eap' });
 
 			o = field(form.Value, 'password', _('Password'));
 			o.password = true;
@@ -1230,6 +1286,7 @@ return view.extend({
 				return !PPP_PORT[this.section.formvalue(section_id, '_proto')] || !!value ? true : _('This account requires a username and password.');
 			};
 			[ 'trojan', 'shadowsocks', 'ssr', 'mieru', 'shadowquic', 'socks', 'http', 'hysteria2', 'hysteria', 'tuic', 'anytls', 'naive', 'openconnect', 'ssh', 'l2tp', 'pptp', 'sstp' ].forEach(function(p) { o.depends('_proto', p); });
+			o.depends({ '_proto': 'ikev2', '_ikev2_auth': 'eap' });
 
 			o = field(form.Value, 'snell_psk', 'PSK');
 			o.password = true; o.rmempty = false;

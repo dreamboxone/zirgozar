@@ -7,7 +7,7 @@
 <h3 align="center">فیلترشکن سراسری برای روتر OpenWrt</h3>
 
 <p align="center">
-  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.24-r2"></a>
+  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.24-r3"></a>
   <a href="https://github.com/dreamboxone/zirgozar/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/dreamboxone/zirgozar/total?style=for-the-badge&color=0ea5e9"></a>
   <img alt="OpenWrt" src="https://img.shields.io/badge/OpenWrt-23.05%20%7C%2024.10%20%7C%2025.12-00B5E2?style=for-the-badge&logo=openwrt&logoColor=white">
   <img alt="Xray" src="https://img.shields.io/badge/core-Xray-7c3aed?style=for-the-badge">
@@ -92,7 +92,7 @@
 
 به روتر SSH بزنید و دستور زیر را اجرا کنید. این دستور فایل‌های نسخه **5.7.24**
 را برای معماری روتر دانلود می‌کند و با مدیر بسته موجود نصب یا ارتقا می‌دهد.
-ابتدا باید این نسخه در [صفحه ریلیز](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.24-r2) منتشر شده باشد.
+ابتدا باید این نسخه در [صفحه ریلیز](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.24-r3) منتشر شده باشد.
 
 <div dir="ltr">
 
@@ -100,8 +100,8 @@
 (
   set -eu
   . /etc/openwrt_release
-  version='5.7.24-r2'
-  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.24-r2'
+  version='5.7.24-r3'
+  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.24-r3'
   install_dir="/tmp/zirgozar-install-$version"
   mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
@@ -135,11 +135,11 @@
 ```sh
 # OpenWrt 25.12 and later
 apk update
-apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.24-r2.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.24-r2.apk
+apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.24-r3.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.24-r3.apk
 
 # OpenWrt 24.10 / 23.05
 opkg update
-opkg install /tmp/zirgozar_5.7.24-r2_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.24-r2_all.ipk
+opkg install /tmp/zirgozar_5.7.24-r3_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.24-r3_all.ipk
 ```
 
 </div>
@@ -426,6 +426,8 @@ Domain Strategy هم ترجمه می‌شوند؛ اثر انگشت زنجیره
 **L2TP / IPsec.** اکانت را از «افزودن» با انتخاب L2TP / IPsec وارد کنید: سرور IPv4 یا دامنه، پورت (معمولا 1701)، نام کاربری و رمز عبور. برای اکانت IPsec، گزینه «استفاده از IPsec» را روشن کنید و PSK فروشنده را وارد کنید. لینک ساده به شکل `l2tp://user:password@server:1701?ipsec=0#name` و لینک IPsec به شکل `l2tp+ipsec://user:password@server:1701?psk=key#name` است؛ نویسه‌های ویژه نام کاربری، رمز و PSK باید URL-encode شوند. MTU پیش فرض 1400 است. وابستگی‌ها از «نیازمندی‌های روتر» نصب می‌شوند. تونل دستگاه `zgzl2tp` را می‌سازد و هسته مسیریابی ترافیک را به آن می‌فرستد؛ تفکیک ایران و قوانین مسیر پیش فرض همچنان اجرا می‌شوند. پینگ آدرس سرور را می‌سنجد، TCPing زمان اتصال TCP از داخل تونل به مقصد تست و URL Test زمان درخواست کامل را گزارش می‌کند. L2TP ساده رمزگذاری ندارد. این نوع کانفیگ برای مسیر اصلی پشتیبانی می‌شود و در زنجیره یا بالانسر قابل استفاده نیست.
 
 **PPTP و SSTP.** از «افزودن» PPTP یا SSTP را انتخاب کنید و سرور (IPv4 یا دامنه)، نام کاربری و رمز را وارد کنید. پورت را می‌شود خالی گذاشت: PPTP روی 1723 و SSTP روی 443. لینک‌ها به شکل `pptp://user:password@server:1723?mppe=1#name` و `sstp://user:password@server:443#name` هستند؛ نویسه‌های ویژه نام کاربری و رمز باید URL-encode شوند. MTU پیش‌فرض 1400 است. وابستگی‌ها از «نیازمندی‌های روتر» نصب می‌شوند: برای PPTP افزونه PPTP و MPPE، و برای SSTP بسته `sstp-client` و ماژول legacy کتابخانه OpenSSL. مثل L2TP، تونل دستگاه خودش را می‌سازد (`zgzpptp` یا `zgzsstp`) و هسته مسیریابی ترافیک را به آن می‌فرستد؛ تفکیک ایران و قوانین مسیر همچنان اجرا می‌شوند. SSTP داخل HTTPS کار می‌کند و از بیشتر فایروال‌ها رد می‌شود؛ گواهی سرور بررسی نمی‌شود. PPTP رمزگذاری ضعیفی دارد و رمزگذاری MPPE آن به‌طور پیش‌فرض روشن است. این دو هم فقط برای مسیر اصلی هستند و در زنجیره یا بالانسر استفاده نمی‌شوند.
+
+**IKEv2.** از «افزودن» IKEv2 را انتخاب کنید و سرور (IPv4 یا دامنه) را وارد کنید. «روش ورود» یا نام کاربری و رمز است (EAP، که سرور با گواهی خودش را ثابت می‌کند) یا فقط کلید مشترک (PSK). پورت را می‌شود خالی گذاشت: 500. گواهی سرور باید از یک مرجع عمومی مثل Let’s Encrypt باشد؛ اگر فروشنده گواهی CA خودش را داده، آن را در «گواهی مرجع (CA)» بگذارید، و اگر نام داخل گواهی با آدرس سرور فرق دارد، در «شناسه سرور» بنویسید. لینک‌ها به شکل `ikev2://user:password@server:500?id=vpn.example.com#name` و `ikev2://server:500?psk=key#name` هستند؛ گواهی CA با `ca=` به شکل base64 می‌آید. MTU پیش‌فرض 1400 است. وابستگی‌ها از «نیازمندی‌های روتر» نصب می‌شوند: strongSwan با EAP و OpenSSL، و ماژول کرنل XFRM interface. تونل دستگاه خودش را می‌سازد (`zgzikev2`) و هسته مسیریابی ترافیک را به آن می‌فرستد؛ تفکیک ایران و قوانین مسیر همچنان اجرا می‌شوند. اتصال‌های دیگر strongSwan روی روتر دست نمی‌خورند. این هم فقط برای مسیر اصلی است و در زنجیره یا بالانسر استفاده نمی‌شود.
 
 **AmneziaWG.** فایل `.conf` وایرگارد که هر کدام از خط‌های AmneziaWG را داشته باشد - `Jc`، `Jmin`، `Jmax`، `S1` تا `S4`، `H1` تا `H4` (عدد یا بازه) و بسته‌های طعمه‌ی `I1` تا `I5` - یک نود AmneziaWG (نسخه ۲ یا ۳) است. Xray و sing-box رسمی آن را نمی‌فهمند و [sing-box-lx](https://github.com/Leadaxe/sing-box-lx) آن را می‌برد. وقتی این کانفیگ انتخاب شود، sing-box-lx به‌تنهایی کل تونل را اجرا می‌کند و Xray کنار می‌رود. اگر sing-box-lx نصب نباشد صفحه می‌گوید. مثل hysteria2 و OpenVPN دستی انتخاب می‌شود.
 

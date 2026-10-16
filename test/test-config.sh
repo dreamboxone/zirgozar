@@ -149,6 +149,15 @@ check "$SSRUST" 'ssrust	{"type":"ssrust","server":"sr.example.com","port":443,"m
 SSRUSTSUB="$(printf 'n0	x	shadowsocks	q.example	443	{"protocol":"shadowsocks","settings":{"servers":[{"address":"q.example","port":443,"method":"aes-128-gcm","password":"p","uot":true}]},"streamSettings":{"network":"tcp"}}\n' | SSRUST=1 LC_ALL=C awk -v DECORATE=1 -f "$RIG/lib/zgz-parse" | cut -f3,6)"
 check "$SSRUSTSUB" 'ssrust	{"type":"ssrust","server":"q.example","port":443,"method":"aes-128-gcm","password":"p"}' "and so is a subscription's, when the subscription says so"
 
+# IKEv2: a username and password, or a shared key alone, at the standard port
+# unless the link gives one; a link with neither is no account.
+IKE="$(printf '%s\n' 'ikev2://ali%40x:p%3Ass@vpn.example.com?id=gw.example.com#E' \
+	'ikev2://1.2.3.4:4500?psk=k&local_id=me&ca=LS0t_-#P' 'ikev2://vpn.example.com#N' 'ikev2://u:p@bad%20host#B' |
+	LC_ALL=C awk -f "$RIG/lib/zgz-parse" | cut -f2,3,6)"
+check "$IKE" 'E	ikev2	{"type":"ikev2","server":"vpn.example.com","port":500,"username":"ali@x","password":"p:ss","psk":"","remote_id":"gw.example.com","mtu":1400}
+P	ikev2	{"type":"ikev2","server":"1.2.3.4","port":4500,"username":"","password":"","psk":"k","local_id":"me","ca":"LS0t_-","mtu":1400}' \
+	"an IKEv2 link is read, with a password or a shared key"
+
 # base64 in awk has to agree with base64 everywhere else.
 if command -v base64 >/dev/null 2>&1; then
 	IN='the quick brown fox jumps over the lazy dog, 0123456789'

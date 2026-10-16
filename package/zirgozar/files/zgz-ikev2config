@@ -1,0 +1,168 @@
+#!/usr/bin/ucode
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+// Part of Zirgozar - https://github.com/dreamboxone/zirgozar
+//
+// zgz-ikev2config - the strongSwan side of an IKEv2 account, for zgz-ikev2.
+//
+//   check FILE DEV               is the account in FILE usable
+//   load  FILE DEV IP SRC        hand charon the connection and its secrets
+//   stop  FILE DEV               close the connection and take it back out
+//
+// Only this connection and its own secrets are loaded and unloaded, by name:
+// swanctl --load-all would also unload whatever else strongSwan is running.
+
+import { readfile } from 'fs';
+import * as socket from 'socket';
+
+let mode = ARGV[0], file = ARGV[1], dev = ARGV[2];
+let node = json(readfile(file) ?? '{}');
+function fail(message) { warn(message + '\n'); exit(1); }
+function plain(value) {
+	return value == null || (length('' + value) <= 255 && !match('' + value, /[[:cntrl:]]/));
+}
+
+if (!match(dev ?? '', /^zgzikev2(t)?$/)) fail('Invalid IKEv2 device.');
+let name = 'zirgozar-' + dev;
+let ifid = dev == 'zgzikev2t' ? '19017' : '19016';
+let psk = node.psk ?? '';
+if (node.type != 'ikev2' || !match(node.server ?? '', /^[A-Za-z0-9_.-]+$/) ||
+	int(node.port) < 1 || int(node.port) > 65535 || int(node.mtu) < 576 || int(node.mtu) > 1460 ||
+	(psk == '' && (!node.username || !node.password)) ||
+	!plain(node.username) || !plain(node.password) || !plain(psk) ||
+	!plain(node.remote_id) || !plain(node.local_id))
+	fail('Invalid IKEv2 account. Check server, username, password and shared key.');
+
+// The server's certificate authority, when the account brings its own: PEM,
+// or DER, in base64. Otherwise the certificate must chain up to one of the
+// public authorities the router trusts for HTTPS.
+let cacerts = [];
+if (node.ca) {
+	let ca = b64dec(replace(replace(replace(node.ca, /[\r\n ]/g, ''), /-/g, '+'), /_/g, '/'));
+	if (!ca) fail('Invalid IKEv2 certificate authority.');
+	push(cacerts, ca);
+} else if (psk == '') {
+	let bundle = readfile('/etc/ssl/certs/ca-certificates.crt');
+	if (!bundle) fail('IKEv2 needs the router\'s certificate list. Install dependencies under Router requirements.');
+	for (let pem in match(bundle, /-----BEGIN CERTIFICATE-----[^-]+-----END CERTIFICATE-----/g))
+		push(cacerts, pem[0] + '\n');
+	if (!length(cacerts)) fail('IKEv2 needs the router\'s certificate list. Install dependencies under Router requirements.');
+}
+if (mode == 'check') exit(0);
+
+// The VICI protocol, as zgz-l2tpconfig speaks it.
+function byte(n) { return sprintf('%c', n & 255); }
+function uint(n, size) {
+	let out = '';
+	for (let i = size - 1; i >= 0; i--) out += byte(n >> (i * 8));
+	return out;
+}
+function named(kind, key) { return byte(kind) + byte(length(key)) + key; }
+function encode(data) {
+	let out = '';
+	for (let key, value in data) {
+		if (type(value) == 'object') out += named(1, key) + encode(value) + byte(2);
+		else if (type(value) == 'array') {
+			out += named(4, key);
+			for (let item in value) out += byte(5) + uint(length('' + item), 2) + item;
+			out += byte(6);
+		}
+		else { value = '' + value; out += named(3, key) + uint(length(value), 2) + value; }
+	}
+	return out;
+}
+function readn(sock, size) {
+	let out = '';
+	while (length(out) < size) {
+		let part = sock.recv(size - length(out));
+		if (!part) fail('IPsec control connection closed.');
+		out += part;
+	}
+	return out;
+}
+// What charon says went wrong, for the log.
+function errmsg(response) {
+	let at = index(response, named(3, 'errmsg'));
+	if (at < 0) return '';
+	at += length(named(3, 'errmsg'));
+	return substr(response, at + 2, ord(response, at) * 256 + ord(response, at + 1));
+}
+function request(command, data, optional) {
+	let sock = socket.create(socket.AF_UNIX, socket.SOCK_STREAM, 0);
+	if (!sock || !sock.connect('/var/run/charon.vici')) fail('IPsec service is unavailable.');
+	sock.setopt(socket.SOL_SOCKET, socket.SO_RCVTIMEO, 40);
+	sock.setopt(socket.SOL_SOCKET, socket.SO_SNDTIMEO, 5);
+	let body = named(0, command) + encode(data), packet = uint(length(body), 4) + body;
+	while (length(packet)) {
+		let sent = sock.send(packet);
+		if (!sent) fail('Cannot send IPsec control request.');
+		packet = substr(packet, sent);
+	}
+	let header = readn(sock, 4), size = 0;
+	for (let i = 0; i < 4; i++) size = size * 256 + ord(header, i);
+	if (size < 1 || size > 524288) fail('Invalid IPsec response.');
+	let response = readn(sock, size); sock.close();
+	let success = index(response, named(3, 'success') + uint(3, 2) + 'yes') >= 0;
+	if (!success && !optional) {
+		let why = errmsg(response);
+		fail('IPsec ' + command + ' failed' + (why ? ': ' + why : '') + '.');
+	}
+	return success;
+}
+
+if (mode == 'stop') {
+	request('terminate', { ike: name, force: 'yes', timeout: '3000' }, true);
+	request('unload-conn', { name }, true);
+	request('unload-shared', { id: name + '-eap' }, true);
+	request('unload-shared', { id: name + '-psk' }, true);
+	exit(0);
+}
+if (mode != 'load') fail('Invalid IKEv2 config command.');
+
+let ip = ARGV[3], src = ARGV[4];
+if (!match(ip ?? '', /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/)) fail('Invalid IKEv2 server IPv4 address.');
+if (!match(src ?? '', /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/)) fail('Invalid IKEv2 local IPv4 address.');
+
+// The server proves itself with a certificate for its own name, or address,
+// unless the account says which identity to expect. With a shared key it is
+// whatever the server calls itself.
+let remote_id = node.remote_id || (psk == '' ? node.server : '%any');
+let local = psk == ''
+	? { auth: 'eap', id: node.username, eap_id: node.username }
+	: { auth: 'psk' };
+if (psk != '' && node.local_id) local.id = node.local_id;
+let remote = { auth: psk == '' ? 'pubkey' : 'psk', id: remote_id };
+if (length(cacerts)) remote.cacerts = cacerts;
+
+let connection = {};
+connection[name] = {
+	version: '2', local_addrs: [ src ], remote_addrs: [ ip ], remote_port: '' + int(node.port),
+	// Modern first, then what older servers - Windows, MikroTik, phones'
+	// own - still offer.
+	proposals: [
+		'aes256gcm16-aes128gcm16-prfsha384-prfsha256-curve25519-ecp384-ecp256-modp2048',
+		'aes256-aes128-sha384-sha256-sha1-ecp384-ecp256-modp2048-modp1536-modp1024'
+	],
+	vips: [ '0.0.0.0' ], fragmentation: 'yes', mobike: 'no', encap: 'no',
+	dpd_delay: '20s', reauth_time: '0', keyingtries: '1', unique: 'never',
+	local, remote,
+	children: {}
+};
+// Everything, in and out of the device: the core decides what goes there.
+connection[name].children[name] = {
+	local_ts: [ '0.0.0.0/0' ], remote_ts: [ '0.0.0.0/0' ],
+	if_id_in: ifid, if_id_out: ifid,
+	esp_proposals: [ 'aes256gcm16-aes128gcm16', 'aes256-aes128-sha256-sha1',
+		'aes256gcm16-aes128gcm16-ecp384-ecp256-modp2048', 'aes256-aes128-sha256-sha1-ecp384-ecp256-modp2048' ],
+	start_action: 'none', dpd_action: 'clear', close_action: 'none'
+};
+
+request('unload-conn', { name }, true);
+if (psk == '')
+	request('load-shared', { id: name + '-eap', type: 'EAP', data: node.password, owners: [ node.username ] });
+else {
+	let owners = [ ip, node.server ];
+	if (node.remote_id) push(owners, node.remote_id);
+	request('load-shared', { id: name + '-psk', type: 'IKE', data: psk, owners });
+}
+request('load-conn', connection);

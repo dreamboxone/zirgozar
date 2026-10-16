@@ -390,6 +390,11 @@ cmd_config() {
 		echo "$NODE"
 		return 0
 	fi
+	if bridge_is_ikev2; then
+		"$ZGZ_LIB/zgz-ikev2" check || return 1
+		echo "$NODE"
+		return 0
+	fi
 	if bridge_is_aether; then
 		"$ZGZ_LIB/zgz-aether" check || return 1
 		echo "$NODE"
@@ -470,6 +475,11 @@ cmd_command() {
 	if bridge_is_ppp; then
 		"$ZGZ_LIB/zgz-pppvpn" check || return 1
 		echo "$ZGZ_LIB/zgz-pppvpn run"
+		return 0
+	fi
+	if bridge_is_ikev2; then
+		"$ZGZ_LIB/zgz-ikev2" check || return 1
+		echo "$ZGZ_LIB/zgz-ikev2 run"
 		return 0
 	fi
 	if bridge_is_aether; then

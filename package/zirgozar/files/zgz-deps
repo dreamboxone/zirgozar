@@ -76,6 +76,14 @@ wanted() {
 	if uci -q show zirgozar 2>/dev/null | grep -q "sstp://"; then
 		echo "sstp-client kmod-mppe libopenssl-legacy"
 	fi
+	# IKEv2: strongSwan with the ciphers today's servers ask for (OpenSSL's
+	# GCM and elliptic curves), EAP for a username and password - MD4 for
+	# its MSCHAPv2 - and the kernel's XFRM device the tunnel is carried on.
+	if uci -q show zirgozar 2>/dev/null | grep -q "ikev2://"; then
+		echo "strongswan-default strongswan-swanctl strongswan-mod-openssl strongswan-mod-eap-identity"
+		echo "strongswan-mod-eap-mschapv2 strongswan-mod-md4 kmod-xfrm-interface kmod-crypto-gcm"
+		echo "kmod-crypto-seqiv ucode-mod-socket"
+	fi
 	# An OpenVPN config is carried by OpenVPN itself, and by nothing else.
 	# Any build of it will do; the OpenSSL one when there is none.
 	if [ ! -x /usr/sbin/openvpn ] && ! command -v openvpn >/dev/null 2>&1 && has_ovpn_node; then

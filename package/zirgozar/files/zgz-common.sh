@@ -344,7 +344,7 @@ core_engine() {
 # every directive of a profile works - see ovpn_conf in zgz-parse.
 wanted_engine() {
 	_we="$(core_engine)"
-	if [ "$_we" = "xray" ] && [ -s "$ZGZ_ETC/bridge.json" ] && ! bridge_is_warp && ! bridge_is_ovpn && ! bridge_is_aether && ! bridge_is_l2tp && ! bridge_is_ppp && ! bridge_is_own &&
+	if [ "$_we" = "xray" ] && [ -s "$ZGZ_ETC/bridge.json" ] && ! bridge_is_warp && ! bridge_is_ovpn && ! bridge_is_aether && ! bridge_is_l2tp && ! bridge_is_ppp && ! bridge_is_ikev2 && ! bridge_is_own &&
 	   [ -x "$(engine_singbox_path)" ]; then
 		_we=singbox
 	fi
@@ -418,12 +418,28 @@ bridge_is_ppp() {
 	return 1
 }
 
-# The device a PPP account is carried on, by its protocol.
+# IKEv2: an XFRM device of its own, made by zgz-ikev2.
+bridge_is_ikev2() {
+	[ "$(bridge_type)" = "ikev2" ]
+}
+
+# The device a PPP or IKEv2 account is carried on, by its protocol.
 ppp_dev() {
 	case "$1" in
 		l2tp) echo zgzl2tp ;;
 		pptp) echo zgzpptp ;;
 		sstp) echo zgzsstp ;;
+		ikev2) echo zgzikev2 ;;
+		*) return 1 ;;
+	esac
+}
+
+# The program that connects and measures such an account.
+tunnel_helper() {
+	case "$1" in
+		l2tp) echo zgz-l2tp ;;
+		pptp|sstp) echo zgz-pppvpn ;;
+		ikev2) echo zgz-ikev2 ;;
 		*) return 1 ;;
 	esac
 }
@@ -464,6 +480,7 @@ bridge_wanted() {
 	bridge_is_aether && return 0
 	bridge_is_l2tp && return 0
 	bridge_is_ppp && return 0
+	bridge_is_ikev2 && return 0
 	bridge_is_own && return 0
 	[ "${1:-$(active_engine)}" = "xray" ] && return 0
 	return 1
@@ -1657,7 +1674,7 @@ chain_outbound() {
 	[ -n "$_co" ] || return 1
 	case "$(printf '%s' "$_co" | cut -f3)" in
 		# A pre-proxy Xray cannot speak cannot be dialled through by Xray.
-		hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|aether) return 1 ;;
+		hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|ikev2|aether) return 1 ;;
 	esac
 	printf '%s\n' "$_co" | cut -f6- | DOMSTRAT="${DOMSTRAT:-}" decorate |
 		sed -e "s/^{/{\"tag\":\"chain-$1\",/"
@@ -1804,7 +1821,7 @@ node_records() {
 				esac
 				[ -n "$_nd_r" ] || continue
 				case "$(printf '%s' "$_nd_r" | cut -f3)" in
-					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|aether|balancing|shunt|interface) continue ;;
+					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|ikev2|aether|balancing|shunt|interface) continue ;;
 				esac
 				_nd_first="$_nd_r"
 				break
@@ -1847,7 +1864,7 @@ node_records() {
 				_nd_r="$(printf '%s\n' "$_nd_r" | warp_natives | head -1)"
 				[ -n "$_nd_r" ] || return 1
 				case "$(printf '%s' "$_nd_r" | cut -f3)" in
-					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|aether|balancing|shunt|interface) return 1 ;;
+					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|ikev2|aether|balancing|shunt|interface) return 1 ;;
 				esac
 				_nd_host="$(printf '%s' "$_nd_r" | cut -f4)"
 				_nd_port="$(printf '%s' "$_nd_r" | cut -f5)"
@@ -1889,13 +1906,13 @@ node_records() {
 				_nd_land="$(section_links "$_nd_to" | LC_ALL=C awk -v LIMIT=1 -f "$ZGZ_LIB/zgz-parse" 2>/dev/null | head -1 | warp_natives)"
 				_nd_first="$(printf '%s\n' "$_nd_recs" | head -1)"
 				case "$(printf '%s' "$_nd_first" | cut -f3)" in
-					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|aether) _nd_land="" ;;
+					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|ikev2|aether) _nd_land="" ;;
 					# The first hop is reached as chain-<this node>, which for
 					# WARP is its WireGuard outbound - when it has one.
 					warp) [ -n "$(printf '%s\n' "$_nd_first" | warp_natives)" ] || _nd_land="" ;;
 				esac
 				case "$(printf '%s' "$_nd_land" | cut -f3)" in
-					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|aether|'') _nd_land="" ;;
+					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|ikev2|aether|'') _nd_land="" ;;
 				esac
 				if [ -n "$_nd_land" ]; then
 					printf '%s\t%s → %s\t%s\t%s\t%s\t%s\n' \

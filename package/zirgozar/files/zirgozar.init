@@ -357,12 +357,13 @@ service_started() {
 	tproxy_port="$(cfg tproxy_port 1082)"
 	bridge_port="$(cfg bridge_port 10808)"
 
-	if bridge_wanted && { bridge_is_ovpn || bridge_is_l2tp || bridge_is_ppp; }; then
+	if bridge_wanted && { bridge_is_ovpn || bridge_is_l2tp || bridge_is_ppp || bridge_is_ikev2; }; then
 		_tunnel_dev="$ZGZ_OVPN_DEV"; _tunnel_name=OpenVPN
 		if bridge_is_l2tp; then _tunnel_dev=zgzl2tp; _tunnel_name=L2TP; fi
 		case "$(bridge_type)" in
 			pptp) _tunnel_dev=zgzpptp; _tunnel_name=PPTP ;;
 			sstp) _tunnel_dev=zgzsstp; _tunnel_name=SSTP ;;
+			ikev2) _tunnel_dev=zgzikev2; _tunnel_name=IKEv2 ;;
 		esac
 		# OpenVPN opens no port: what it makes is its tunnel device, with an
 		# address on it once the server has answered. Waited for, so that the
