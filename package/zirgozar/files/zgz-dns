@@ -70,7 +70,9 @@ reload_dnsmasq() {
 # dnsmasq at it - kept and dropped with the drop-in, not with the tunnel's
 # rules, which come down on every restart while the drop-in stays.
 #
-# Two things, in a table of their own:
+# Three things, in a table of their own - the third, a drop of any lookup
+# still passing through the router to a server outside, for a connection
+# that began before the redirect and so never took it; see guard_up:
 #
 # - The devices' lookups, sent to dnsmasq whatever server they were addressed
 #   to. The tunnel's rules do the same, but go with them on a restart, and a
@@ -90,6 +92,7 @@ reload_dnsmasq() {
 GUARD_TABLE=zirgozar_dns
 GUARD_CHAIN=ZGZ_DNSOUT
 LAN_CHAIN=ZGZ_DNSLAN
+FWD_CHAIN=ZGZ_DNSFWD
 BYPASS=0xff
 
 # An address on the router's own network: reached straight out of one of its
@@ -170,6 +173,17 @@ guard_up() {
 					printf '\t\tct direction reply return\n'
 					printf '\t\tmeta mark & 0xff == %s return\n' "$BYPASS"
 					printf '\t\tmeta l4proto { tcp, udp } th dport 53 counter redirect to :%s\n\t}\n' "$_g_to"
+					# A redirect decides once, on a connection's first packet.
+					# A lookup on a connection that began before it - a socket
+					# a device kept open across the start, or across a change
+					# of mode - goes on the way it began, out to the server it
+					# names. A filter sees every packet, so any lookup still
+					# going through the router rather than to it is dropped
+					# here: one that was redirected never comes this way.
+					printf '\tchain dns_fwd {\n\t\ttype filter hook forward priority filter; policy accept;\n'
+					printf '\t\tiifname != { %s } return\n' "$_g_nlan"
+					printf '\t\tmeta mark & 0xff == %s return\n' "$BYPASS"
+					printf '\t\tmeta l4proto { tcp, udp } th dport 53 counter drop\n\t}\n'
 				fi
 				if [ -n "$_g_uid" ]; then
 					printf '\tchain dnsmasq_out {\n\t\ttype filter hook output priority filter; policy accept;\n'
@@ -192,6 +206,16 @@ guard_up() {
 					iptables -w 2 -t nat -I PREROUTING -i "$_d" -j "${LAN_CHAIN}_N" >/dev/null 2>&1 || true
 				done
 				ipt_swap nat "$LAN_CHAIN" PREROUTING
+				# Lookups on connections from before the redirect - see the
+				# nftables side.
+				iptables -w 2 -N "${FWD_CHAIN}_N" >/dev/null 2>&1 || iptables -w 2 -F "${FWD_CHAIN}_N" >/dev/null 2>&1 || true
+				iptables -w 2 -A "${FWD_CHAIN}_N" -m mark --mark "$BYPASS/0xff" -j RETURN >/dev/null 2>&1 || true
+				iptables -w 2 -A "${FWD_CHAIN}_N" -p udp --dport 53 -j DROP >/dev/null 2>&1 || true
+				iptables -w 2 -A "${FWD_CHAIN}_N" -p tcp --dport 53 -j DROP >/dev/null 2>&1 || true
+				for _d in $_g_lan; do
+					iptables -w 2 -I FORWARD -i "$_d" -j "${FWD_CHAIN}_N" >/dev/null 2>&1 || true
+				done
+				ipt_swap filter "$FWD_CHAIN" FORWARD
 			fi
 			# The owner match is not on every build; without it this half is
 			# left undone, and said.
@@ -226,6 +250,15 @@ guard_down() {
 	if command -v iptables >/dev/null 2>&1; then
 		for _gc in "$GUARD_CHAIN" "${GUARD_CHAIN}_N"; do
 			iptables -w 2 -S OUTPUT 2>/dev/null | grep -- "-j $_gc\$" | sed 's/^-A /-D /' |
+				while read -r _r; do
+					# shellcheck disable=SC2086
+					iptables -w 2 $_r >/dev/null 2>&1 || true
+				done
+			iptables -w 2 -F "$_gc" >/dev/null 2>&1 || true
+			iptables -w 2 -X "$_gc" >/dev/null 2>&1 || true
+		done
+		for _gc in "$FWD_CHAIN" "${FWD_CHAIN}_N"; do
+			iptables -w 2 -S FORWARD 2>/dev/null | grep -- "-j $_gc\$" | sed 's/^-A /-D /' |
 				while read -r _r; do
 					# shellcheck disable=SC2086
 					iptables -w 2 $_r >/dev/null 2>&1 || true
@@ -280,15 +313,15 @@ cmd_up() {
 			note "dns_mode is off - leaving name resolution alone"
 			return 0
 			;;
-		direct)
-			# The firewall sends port 53 straight to the core in this mode;
-			# there is nothing for dnsmasq to do. The devices' lookups are
-			# still kept going there through a restart.
-			dropin_down
-			guard_up "$_port" 0
-			return 0
-			;;
 	esac
+
+	# Where the devices' lookups go: to dnsmasq, or, straight into the tunnel,
+	# to the core's own DNS port. dnsmasq itself is pointed at the tunnel in
+	# both. Taken off it in this mode, as it once was, it went back to the
+	# ISP's servers - for the router's own lookups, and for any device's
+	# lookup on a connection made before the change, which still reaches it.
+	_to=53
+	[ "$_mode" = "direct" ] && _to="$_port"
 
 	if ! dnsmasq_running; then
 		guard_up "$_port" 0
@@ -308,7 +341,7 @@ cmd_up() {
 
 	# In place before dnsmasq is pointed at the tunnel, so there is no moment
 	# in which it is and its other servers are still open to it.
-	guard_up 53 1
+	guard_up "$_to" 1
 
 	# no-resolv so the addresses the ISP handed out are not consulted as well:
 	# dnsmasq would ask every upstream at once and take the first answer, and
