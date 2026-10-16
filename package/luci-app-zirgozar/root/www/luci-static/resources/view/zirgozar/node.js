@@ -682,8 +682,7 @@ function warpAccount(sid) {
 	function show(r) {
 		var i = (r && r.info) || {}, busy = !!(r && r.job == 'Registering a WARP account'), lines = [];
 		if (!i.core)
-			lines.push(E('div', { 'style': 'color:#dc2626;font-weight:600' },
-				_('warp-plus is not installed. Install it on the App Update page.')));
+			lines.push(pui.installNotice(_('warp-plus is not installed.'), [ 'warp-plus' ], []));
 		if (i.registered) {
 			lines.push(E('div', {}, [
 				E('strong', {}, i.mode == 'masque' ? _('MASQUE account') : (i.plus ? 'WARP+' : _('Free account'))),
@@ -1735,7 +1734,7 @@ return view.extend({
 			var save = m.save;
 			m.save = function() {
 				var self = this, args = arguments;
-				var needs = '';
+				var needs = '', pkgs = '';
 				return m.parse().then(function() {
 					var l = String(uci.get('zirgozar', sid, 'link') || '').trim();
 					return l ? callAction('node_dup', sid + ';' + l) : {};
@@ -1746,11 +1745,14 @@ return view.extend({
 						return Promise.reject(new Error(msg));
 					}
 					needs = (d && d.needs) || '';
+					pkgs = (d && d.packages) || '';
 					return save.apply(self, args);
 				}).then(function(r) {
 					window.history.replaceState(null, '', back);
-					if (needs)
-						ui.addNotification(null, E('p', {}, _('This config needs %s, which is not installed. Install it on the App Update page.').format(needs.split(',').join(', '))), 'warning');
+					/* Said with the buttons that install what is missing. */
+					var cores = pui.listOf(needs), packages = pui.listOf(pkgs);
+					if (cores.length || packages.length)
+						ui.addNotification(null, pui.installNotice(pui.needsText(cores, packages), cores, packages), 'warning');
 					return r;
 				});
 			};

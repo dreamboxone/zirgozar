@@ -45,6 +45,8 @@ var T = [
 	[ '{} did not connect within two minutes', '{1} در دو دقیقه وصل نشد' ],
 	[ '{}: cleared what an earlier connection left behind', '{1}: باقی‌مانده اتصال قبلی پاک شد' ],
 	[ 'IKEv2: the connection was lost', 'IKEv2: اتصال قطع شد' ],
+	[ 'strongSwan restarted to load what was just installed', 'strongSwan ری‌استارت شد تا بسته‌های تازه‌نصب‌شده را بارگذاری کند' ],
+	[ 'IKEv2: restarting strongSwan, which was started before its EAP plugins were installed', 'IKEv2: strongSwan ری‌استارت می‌شود، چون پیش از نصب ماژول‌های EAP اجرا شده بود' ],
 	[ "dnsmasq would not take the tunnel's name server - the health check tries again", 'dnsmasq سرور DNS تونل را نپذیرفت - بررسی سلامت دوباره تلاش می‌کند' ],
 	[ 'the bridge never started listening on {}', 'پل هیچ‌وقت روی {1} شروع به گوش دادن نکرد' ],
 	[ 'the core is still starting - waiting for it', 'هسته هنوز در حال راه‌اندازی است - منتظر آن' ],

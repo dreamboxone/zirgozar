@@ -603,7 +603,122 @@ function checkboxes(o) {
 	return o;
 }
 
+/* What a config needs that the router lacks, said with the buttons that
+   install it right there, rather than "go to App Update". The core names are
+   the ones the router says, mapped to what it installs them by; the router
+   packages go in one press, as Router requirements does. The install is a job
+   on the router: the button turns until the job is over, and then says how
+   it went - the router's own message if it left one. One install at a time:
+   two package managers at once wait on each other's lock. */
+var CORE_IDS = { 'sing-box': 'sing-box', 'sing-box-lx': 'sing-box-lx', 'Mihomo': 'mihomo',
+	'shadowsocks-rust': 'sslocal', 'Vwarp': 'vwarp', 'warp-plus': 'warp-plus',
+	'Aether': 'aether', 'OpenVPN': 'openvpn' };
+var installing = false;
+
+function installJob(action, arg, out) {
+	if (installing) {
+		out.className = 'pwp-note warn';
+		out.textContent = _('Another install is still running. Try again when it is done.');
+		return Promise.resolve();
+	}
+	installing = true;
+	out.className = 'pwp-note info';
+	out.textContent = _('Installing. This needs a working connection and may take a minute.');
+	var started = Date.now();
+	var finish = function(text, kind) {
+		installing = false;
+		out.className = 'pwp-note ' + kind;
+		out.textContent = text;
+	};
+	return callAction(action, arg || '').then(function(r) {
+		if (r && r.error) return finish(_(r.error), 'error');
+		return new Promise(function(resolve) {
+			var look = function() {
+				callState().then(function(st) {
+					/* A job may not have begun by the first look. */
+					if ((st && st.job) || Date.now() - started < 4000) {
+						if (Date.now() - started < 900000) return window.setTimeout(look, 3000);
+					}
+					if (st && st.message) finish(_(st.message), 'warn');
+					else finish(_('Installed.'), 'ok');
+					resolve();
+				}).catch(function() { window.setTimeout(look, 3000); });
+			};
+			window.setTimeout(look, 2000);
+		});
+	}).catch(function(e) {
+		finish(String(e && e.message || e), 'error');
+	});
+}
+
+/* installNotice(text, cores, packages): cores and packages are lists. */
+function installNotice(text, cores, packages) {
+	return E('div', { 'class': 'pwp-install' }, [
+		E('p', { 'style': 'margin:0 0 8px' }, text),
+		installButtons(cores, packages) || ''
+	]);
+}
+
+/* The buttons alone, with the line under them that says how it went; null
+   when there is nothing among them this page can install. */
+function installButtons(cores, packages) {
+	var out = E('div', { 'class': 'pwp-note', 'role': 'status', 'style': 'display:block;margin-top:8px' });
+	var buttons = [];
+	(cores || []).forEach(function(c) {
+		if (CORE_IDS[c])
+			buttons.push(btn(_('Install %s').format(c), 'primary', function() {
+				return installJob('core_install', CORE_IDS[c], out);
+			}, 'download'));
+	});
+	if (packages && packages.length)
+		buttons.push(btn(_('Install router packages'), 'primary', function() {
+			return installJob('deps_install', '', out);
+		}, 'download'));
+	if (!buttons.length) return null;
+	out.style.display = 'none';
+	var show = function() { out.style.display = 'block'; };
+	buttons.forEach(function(b) { b.addEventListener('click', show); });
+	return E('div', {}, [
+		E('div', { 'style': 'display:flex;gap:8px;flex-wrap:wrap' }, buttons),
+		out
+	]);
+}
+
+/* What a message from the router asks to have installed, for the buttons
+   beside it: the router packages when it sends the reader to Router
+   requirements, and any core it names in a sentence telling them to install
+   it. Read from the message as the router wrote it, in English. */
+function installsIn(message) {
+	var m = String(message || ''), cores = [];
+	if (!/install/i.test(m)) return null;
+	Object.keys(CORE_IDS).forEach(function(c) {
+		if (new RegExp('(^|[^-\\w])' + c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^-\\w])').test(m)) cores.push(c);
+	});
+	var pkgs = /Router requirements/.test(m) ? [ 'router' ] : [];
+	return (cores.length || pkgs.length) ? { cores: cores, packages: pkgs } : null;
+}
+
+/* The sentence for a config's missing cores and packages, or nothing. */
+function needsText(cores, packages) {
+	var parts = [];
+	if (cores && cores.length)
+		parts.push(_('This config needs %s, which is not installed.').format(cores.join(', ')));
+	if (packages && packages.length)
+		parts.push((parts.length ? _('It also needs these router packages: %s.')
+			: _('This config needs these router packages, which are not installed: %s.')).format(packages.join(', ')));
+	return parts.join(' ');
+}
+
+function listOf(s) {
+	return String(s || '').split(',').filter(function(x) { return x; });
+}
+
 return baseclass.extend({
+	installNotice: installNotice,
+	installButtons: installButtons,
+	installsIn: installsIn,
+	needsText: needsText,
+	listOf: listOf,
 	spinWhileBusy: spinWhileBusy,
 	checkboxes: checkboxes,
 	icon: icon,

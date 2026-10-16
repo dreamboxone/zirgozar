@@ -136,6 +136,14 @@ connect() {
 	ip -4 addr flush dev "$DEV" 2>/dev/null || true
 	ip link set dev "$DEV" mtu "$_mtu" up
 
+	# A charon started before its EAP plugins were installed - by hand, or
+	# by anything other than Router requirements - goes on without them, and
+	# the sign-in then fails with nothing saying why. Restarted, it has them.
+	if [ -S /var/run/charon.vici ] && [ -f /usr/lib/ipsec/plugins/libstrongswan-eap-mschapv2.so ] &&
+	   ! swanctl --stats 2>/dev/null | grep -q 'eap-mschapv2'; then
+		log "IKEv2: restarting strongSwan, which was started before its EAP plugins were installed"
+		bounded 30 /etc/init.d/swanctl restart >/dev/null 2>&1 || true
+	fi
 	if [ ! -S /var/run/charon.vici ]; then
 		/etc/init.d/swanctl start >/dev/null 2>&1 || true
 		_n=0

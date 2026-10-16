@@ -245,11 +245,19 @@ function addViaLinks() {
 		'style': 'width:100%;direction:ltr;text-align:left;font-family:monospace',
 		'placeholder': 'vless://…\nvmess://…\naether://…\nl2tp://user:password@server:1701?ipsec=0\nl2tp://user:password@server:1701?ipsec=1&psk=key\npptp://user:password@server:1723\nsstp://user:password@server:443\nikev2://user:password@server:500'
 	});
+	/* Where what the new configs need is said, with its install buttons; and
+	   once something was added, closing shows it in the list. */
+	var needsBox = E('div', {});
+	var added = false;
 	ui.showModal(_('Add the node via the link'), [
 		E('p', {}, _('Enter share links, one per line. Subscription links are not supported!')),
 		box,
+		needsBox,
 		E('div', { 'class': 'right' }, [
-			E('button', { 'class': 'btn cbi-button cbi-button-neutral', 'click': ui.hideModal }, _('Close window')),
+			E('button', { 'class': 'btn cbi-button cbi-button-neutral', 'click': function() {
+				ui.hideModal();
+				if (added) location.reload();
+			} }, _('Close window')),
 			' ',
 			E('button', {
 				'class': 'btn cbi-button cbi-button-positive',
@@ -268,11 +276,15 @@ function addViaLinks() {
 							pui.note(b, _('None of those could be read as a node.'), 'error');
 							return;
 						}
-						/* A core the new configs need and this router lacks is said
-						   now, while the reader is here, not when the tunnel fails. */
-						if (r.needs) {
-							pui.note(b, _('This config needs %s, which is not installed. Install it on the App Update page.').format(r.needs.split(',').join(', ')), 'warn');
-							window.setTimeout(function() { ui.hideModal(); location.reload(); }, 6000);
+						added = true;
+						/* A core or a router package the new configs need and
+						   this router lacks is said now, while the reader is
+						   here, with the button that installs it - not when the
+						   tunnel fails. The window stays until it is closed. */
+						var cores = pui.listOf(r.needs), pkgs = pui.listOf(r.packages);
+						if (cores.length || pkgs.length) {
+							while (needsBox.firstChild) needsBox.removeChild(needsBox.firstChild);
+							needsBox.appendChild(pui.installNotice(pui.needsText(cores, pkgs), cores, pkgs));
 							return;
 						}
 						if (r.skipped) {

@@ -50,6 +50,40 @@ has_ovpn_node() {
 	return $?
 }
 
+# What the accounts in some text need from the router - the settings as a
+# whole, or the links just added - read from stdin.
+link_wanted() {
+	_lw="$(cat)"
+	if printf '%s\n' "$_lw" | grep -qE "l2tp(\+ipsec)?://"; then
+		echo "xl2tpd ppp-mod-pppol2tp ucode-mod-socket"
+		if printf '%s\n' "$_lw" | grep -qE "l2tp\+ipsec://|[?&](psk=|ipsec=1)"; then
+			echo "strongswan-default strongswan-swanctl"
+		fi
+	fi
+	# PPTP: pppd's own plugin, the kernel's PPTP and GRE, and MPPE, which
+	# almost every PPTP server insists on.
+	if printf '%s\n' "$_lw" | grep -q "pptp://"; then
+		echo "ppp-mod-pptp kmod-mppe"
+	fi
+	# SSTP: sstp-client, and OpenSSL's legacy provider for the MD4 its
+	# password hash is made with - without it the link is refused with
+	# "Could not create password hash".
+	if printf '%s\n' "$_lw" | grep -q "sstp://"; then
+		echo "sstp-client kmod-mppe libopenssl-legacy"
+	fi
+	# IKEv2: strongSwan with the ciphers today's servers ask for (OpenSSL's
+	# GCM and elliptic curves), EAP for a username and password - MD4 for
+	# its MSCHAPv2, and MD5, which a server may ask for before anything else
+	# and then not answer a refusal - and the kernel's XFRM device the
+	# tunnel is carried on.
+	if printf '%s\n' "$_lw" | grep -q "ikev2://"; then
+		echo "strongswan-default strongswan-swanctl strongswan-mod-openssl strongswan-mod-eap-identity"
+		echo "strongswan-mod-eap-mschapv2 strongswan-mod-md4 strongswan-mod-eap-md5 kmod-xfrm-interface"
+		echo "kmod-crypto-gcm kmod-crypto-seqiv ucode-mod-socket"
+	fi
+	return 0
+}
+
 # What is needed, given how this router does firewalling.
 wanted() {
 	echo "curl ca-bundle ip-full"
@@ -59,31 +93,7 @@ wanted() {
 	esac
 	# only needed to install a core later, so not worth failing over
 	echo "unzip"
-	if uci -q show zirgozar 2>/dev/null | grep -qE "l2tp(\+ipsec)?://"; then
-		echo "xl2tpd ppp-mod-pppol2tp ucode-mod-socket"
-		if uci -q show zirgozar 2>/dev/null | grep -qE "l2tp\+ipsec://|[?&](psk=|ipsec=1)"; then
-			echo "strongswan-default strongswan-swanctl"
-		fi
-	fi
-	# PPTP: pppd's own plugin, the kernel's PPTP and GRE, and MPPE, which
-	# almost every PPTP server insists on.
-	if uci -q show zirgozar 2>/dev/null | grep -q "pptp://"; then
-		echo "ppp-mod-pptp kmod-mppe"
-	fi
-	# SSTP: sstp-client, and OpenSSL's legacy provider for the MD4 its
-	# password hash is made with - without it the link is refused with
-	# "Could not create password hash".
-	if uci -q show zirgozar 2>/dev/null | grep -q "sstp://"; then
-		echo "sstp-client kmod-mppe libopenssl-legacy"
-	fi
-	# IKEv2: strongSwan with the ciphers today's servers ask for (OpenSSL's
-	# GCM and elliptic curves), EAP for a username and password - MD4 for
-	# its MSCHAPv2 - and the kernel's XFRM device the tunnel is carried on.
-	if uci -q show zirgozar 2>/dev/null | grep -q "ikev2://"; then
-		echo "strongswan-default strongswan-swanctl strongswan-mod-openssl strongswan-mod-eap-identity"
-		echo "strongswan-mod-eap-mschapv2 strongswan-mod-md4 kmod-xfrm-interface kmod-crypto-gcm"
-		echo "kmod-crypto-seqiv ucode-mod-socket"
-	fi
+	uci -q show zirgozar 2>/dev/null | link_wanted
 	# An OpenVPN config is carried by OpenVPN itself, and by nothing else.
 	# Any build of it will do; the OpenSSL one when there is none.
 	if [ ! -x /usr/sbin/openvpn ] && ! command -v openvpn >/dev/null 2>&1 && has_ovpn_node; then
@@ -232,6 +242,19 @@ cmd_install() {
 		fi
 	done
 
+	# charon reads its plugins when it starts, and not again: one already
+	# running goes on without an EAP or a cipher just installed, and the
+	# next connection fails for a reason nothing says. Restarted, it has
+	# them. A connection it was carrying is made again by its own service.
+	case " $_missing " in
+		*" strongswan-"*)
+			if [ -S /var/run/charon.vici ] && [ -x /etc/init.d/swanctl ]; then
+				bounded 30 /etc/init.d/swanctl restart >/dev/null 2>&1 || true
+				log "strongSwan restarted to load what was just installed"
+			fi
+			;;
+	esac
+
 	forget_caps
 
 	if [ -n "$_failed" ]; then
@@ -244,8 +267,19 @@ cmd_install() {
 	return 0
 }
 
+# The router packages the links on stdin need and this router does not have,
+# one a line: said on the node page when a node is added, beside a button that
+# installs them.
+cmd_for() {
+	for _p in $(link_wanted); do
+		installed "$_p" || echo "$_p"
+	done | awk '!seen[$0]++'
+	return 0
+}
+
 case "${1:-check}" in
 	check)   cmd_check ;;
 	install) cmd_install ;;
-	*) echo "usage: $0 check|install" >&2; exit 1 ;;
+	for)     cmd_for ;;
+	*) echo "usage: $0 check|install|for" >&2; exit 1 ;;
 esac

@@ -349,6 +349,17 @@ function renderState(st) {
 		msg.style.display = text ? 'flex' : 'none';
 		msg.setAttribute('data-text', text);
 		setNode('pwp-msg-text', text);
+		/* A message that asks for something to be installed has the button
+		   that installs it beside it. Drawn when the message changes, not on
+		   every refresh, so that an install under way keeps its button. */
+		var act = byId('pwp-msg-act');
+		if (act && act.getAttribute('data-for') !== (st.message || '')) {
+			act.setAttribute('data-for', st.message || '');
+			while (act.firstChild) act.removeChild(act.firstChild);
+			var want = pui.installsIn(st.message);
+			var b = want && pui.installButtons(want.cores, want.packages);
+			if (b) act.appendChild(b);
+		}
 	}
 
 	var busy = (st.status == 'selecting' || st.status == 'starting' || !!st.job);
@@ -481,6 +492,7 @@ return baseclass.extend({
 		var status = pui.card(_('Status'), 'pulse', '#10b981', E('div', {}, [
 			E('div', { 'id': 'pwp-msg', 'class': 'mk-alert', 'style': 'display:none' }, [
 				E('span', { 'id': 'pwp-msg-text', 'style': 'flex:1 1 200px' }, ''),
+				E('div', { 'id': 'pwp-msg-act', 'style': 'flex:1 1 100%;order:3' }),
 				E('button', {
 					'type': 'button',
 					'title': _('Dismiss'),

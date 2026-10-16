@@ -706,6 +706,7 @@ method_action() {
 			json_add_int "added" "$(echo "$_n" | cut -d' ' -f1)"
 			json_add_int "skipped" "$(echo "$_n 0" | cut -d' ' -f2)"
 			json_add_string "needs" "$(printf '%s\n' "$arg" | missing_cores | tr '\n' ',' | sed 's/,$//')"
+			json_add_string "packages" "$(printf '%s\n' "$arg" | "$DEPS" for 2>/dev/null | tr '\n' ',' | sed 's/,$//')"
 			json_dump
 			return
 			;;
@@ -721,6 +722,7 @@ method_action() {
 			json_add_string "dup_id" "$(printf '%s' "$_d" | cut -f1)"
 			json_add_string "dup_name" "$(printf '%s' "$_d" | cut -f2)"
 			json_add_string "needs" "$(printf '%s\n' "${arg#*;}" | missing_cores | tr '\n' ',' | sed 's/,$//')"
+			json_add_string "packages" "$(printf '%s\n' "${arg#*;}" | "$DEPS" for 2>/dev/null | tr '\n' ',' | sed 's/,$//')"
 			json_dump
 			return
 			;;
