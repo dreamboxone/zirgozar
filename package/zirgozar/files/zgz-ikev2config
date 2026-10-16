@@ -143,6 +143,11 @@ connection[name] = {
 		'aes256gcm16-aes128gcm16-prfsha384-prfsha256-curve25519-ecp384-ecp256-modp2048',
 		'aes256-aes128-sha384-sha256-sha1-ecp384-ecp256-modp2048-modp1536-modp1024'
 	],
+	// No certificate requests: with every public authority trusted they
+	// named a hundred and more, made the first message after the handshake
+	// several kilobytes, and a connection that drops fragments never
+	// carried it. The server's certificate is still checked against them.
+	send_certreq: 'no',
 	vips: [ '0.0.0.0' ], fragmentation: 'yes', mobike: 'no', encap: 'no',
 	dpd_delay: '20s', reauth_time: '0', keyingtries: '1', unique: 'never',
 	local, remote,

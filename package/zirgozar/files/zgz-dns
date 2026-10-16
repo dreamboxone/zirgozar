@@ -92,13 +92,17 @@ GUARD_CHAIN=ZGZ_DNSOUT
 LAN_CHAIN=ZGZ_DNSLAN
 BYPASS=0xff
 
-# An address on a network of the router's own, not on the internet.
-local_address() {
-	case "$1" in
-		10.*|192.168.*|127.*|169.254.*) return 0 ;;
-		172.1[6-9].*|172.2[0-9].*|172.3[01].*) return 0 ;;
-		100.6[4-9].*|100.[7-9][0-9].*|100.1[01][0-9].*|100.12[0-7].*) return 0 ;;
-	esac
+# An address on the router's own network: reached straight out of one of its
+# LAN interfaces, not by way of a gateway. A private address is not enough -
+# 10.202.10.10, a resolver many here set by hand, is private and on the
+# provider's network, reached by the WAN like any other.
+lan_routed() {
+	_lr="$(ip -4 route get "$1" 2>/dev/null | head -1)"
+	case "$_lr" in ''|*" via "*) return 1 ;; esac
+	_lr_dev="$(printf '%s\n' "$_lr" | sed -n 's/.* dev \([^ ]*\).*/\1/p')"
+	for _lr_d in $(lan_devices); do
+		[ "$_lr_d" = "$_lr_dev" ] && return 0
+	done
 	return 1
 }
 
@@ -117,9 +121,19 @@ ipt_swap() {
 	iptables -w 2 -t "$1" -E "${2}_N" "$2" >/dev/null 2>&1 || true
 }
 
+#   guard_up <port> <dnsmasq>
+# The devices' lookups go to <port>: 53, dnsmasq, which then asks the tunnel;
+# or the core's own DNS port when lookups go straight into the tunnel, which
+# during a restart simply has nothing listening - a lookup that fails, not one
+# that leaves. dnsmasq's own way out is closed only when it is <dnsmasq> 1,
+# the one pointed at the tunnel.
 guard_up() {
-	_g_uid="$(awk -F: '$1 == "dnsmasq" { print $3; exit }' /etc/passwd 2>/dev/null)"
-	case "$_g_uid" in ''|*[!0-9]*|0) _g_uid="" ;; esac
+	_g_to="${1:-53}"
+	_g_uid=""
+	if [ "${2:-1}" = "1" ]; then
+		_g_uid="$(awk -F: '$1 == "dnsmasq" { print $3; exit }' /etc/passwd 2>/dev/null)"
+		case "$_g_uid" in ''|*[!0-9]*|0) _g_uid="" ;; esac
+	fi
 	_g_lan=""
 	[ "$(cfg_bool dns_hijack 1)" = "1" ] && _g_lan="$(lan_devices)"
 	_g_ports="53"; _g_ex=""
@@ -127,7 +141,7 @@ guard_up() {
 		case "$_g_s" in
 			*/*)
 				_g_a="${_g_s##*/}"; _g_a="${_g_a%%#*}"; _g_a="${_g_a%%@*}"
-				case "$_g_a" in *.*.*.*) local_address "$_g_a" && _g_ex="$_g_ex $_g_a" ;; esac
+				case "$_g_a" in *.*.*.*) lan_routed "$_g_a" && _g_ex="$_g_ex $_g_a" ;; esac
 				;;
 			*'#'*)
 				_g_p="${_g_s#*#}"; _g_p="${_g_p%%@*}"
@@ -155,7 +169,7 @@ guard_up() {
 					printf '\t\tiifname != { %s } return\n' "$_g_nlan"
 					printf '\t\tct direction reply return\n'
 					printf '\t\tmeta mark & 0xff == %s return\n' "$BYPASS"
-					printf '\t\tmeta l4proto { tcp, udp } th dport 53 counter redirect to :53\n\t}\n'
+					printf '\t\tmeta l4proto { tcp, udp } th dport 53 counter redirect to :%s\n\t}\n' "$_g_to"
 				fi
 				if [ -n "$_g_uid" ]; then
 					printf '\tchain dnsmasq_out {\n\t\ttype filter hook output priority filter; policy accept;\n'
@@ -172,8 +186,8 @@ guard_up() {
 			if [ -n "$_g_lan" ]; then
 				iptables -w 2 -t nat -N "${LAN_CHAIN}_N" >/dev/null 2>&1 || iptables -w 2 -t nat -F "${LAN_CHAIN}_N" >/dev/null 2>&1 || true
 				iptables -w 2 -t nat -A "${LAN_CHAIN}_N" -m mark --mark "$BYPASS/0xff" -j RETURN >/dev/null 2>&1 || true
-				iptables -w 2 -t nat -A "${LAN_CHAIN}_N" -p udp --dport 53 -j REDIRECT --to-ports 53 >/dev/null 2>&1 || true
-				iptables -w 2 -t nat -A "${LAN_CHAIN}_N" -p tcp --dport 53 -j REDIRECT --to-ports 53 >/dev/null 2>&1 || true
+				iptables -w 2 -t nat -A "${LAN_CHAIN}_N" -p udp --dport 53 -j REDIRECT --to-ports "$_g_to" >/dev/null 2>&1 || true
+				iptables -w 2 -t nat -A "${LAN_CHAIN}_N" -p tcp --dport 53 -j REDIRECT --to-ports "$_g_to" >/dev/null 2>&1 || true
 				for _d in $_g_lan; do
 					iptables -w 2 -t nat -I PREROUTING -i "$_d" -j "${LAN_CHAIN}_N" >/dev/null 2>&1 || true
 				done
@@ -244,8 +258,14 @@ note() {
 	[ "${ZGZ_DNS_QUIET:-0}" = "1" ] || log "$@"
 }
 
+# The daemon itself, as procd started it: not every process by that name,
+# since dnsmasq forks one for each DNS-over-TCP connection, and those coming
+# and going looked like a new dnsmasq that had to be restarted again.
 dnsmasq_pids() {
-	pgrep -x dnsmasq 2>/dev/null | sort -n | tr '\n' ' '
+	_dp="$(ubus call service list '{"name":"dnsmasq"}' 2>/dev/null |
+		jsonfilter -e '@.dnsmasq.instances[*].pid' 2>/dev/null | sort -n | tr '\n' ' ')"
+	[ -n "$_dp" ] || _dp="$(pgrep -o -x dnsmasq 2>/dev/null)"
+	echo "$_dp"
 }
 
 cmd_up() {
@@ -261,22 +281,24 @@ cmd_up() {
 			return 0
 			;;
 		direct)
-			# The firewall sends port 53 straight to Xray in this mode; there
-			# is nothing for dnsmasq to do.
-			cmd_down
+			# The firewall sends port 53 straight to the core in this mode;
+			# there is nothing for dnsmasq to do. The devices' lookups are
+			# still kept going there through a restart.
+			dropin_down
+			guard_up "$_port" 0
 			return 0
 			;;
 	esac
 
 	if ! dnsmasq_running; then
-		guard_down
+		guard_up "$_port" 0
 		note "no dnsmasq on this router - name lookups will be redirected straight to the tunnel"
 		return 0
 	fi
 
 	_dir="$(dnsmasq_confdir)" || _dir=""
 	if [ -z "$_dir" ]; then
-		guard_down
+		guard_up "$_port" 0
 		if [ "${ZGZ_DNS_QUIET:-0}" != "1" ]; then
 			say_message "Could not find the directory dnsmasq reads its extra configuration from, so name lookups are being redirected straight into the tunnel instead. Local machine names will not resolve while connected."
 			warn "no dnsmasq conf-dir found"
@@ -286,7 +308,7 @@ cmd_up() {
 
 	# In place before dnsmasq is pointed at the tunnel, so there is no moment
 	# in which it is and its other servers are still open to it.
-	guard_up
+	guard_up 53 1
 
 	# no-resolv so the addresses the ISP handed out are not consulted as well:
 	# dnsmasq would ask every upstream at once and take the first answer, and
@@ -326,7 +348,8 @@ EOF
 	return 0
 }
 
-cmd_down() {
+# dnsmasq taken off the tunnel, if it was on it.
+dropin_down() {
 	_dir="$(dnsmasq_confdir)" || _dir=""
 	if [ -n "$_dir" ] && [ -f "$_dir/$DROPIN" ]; then
 		rm -f "$_dir/$DROPIN"
@@ -336,6 +359,10 @@ cmd_down() {
 		log "name lookups are back to normal"
 	fi
 	rm -f "$LOADED"
+}
+
+cmd_down() {
+	dropin_down
 	# Only once dnsmasq has let go of the tunnel, and whatever else happened:
 	# a guard with nothing to guard would still keep dnsmasq off the servers
 	# it is now meant to ask.
