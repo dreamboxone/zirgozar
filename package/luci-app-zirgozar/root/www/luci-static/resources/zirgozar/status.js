@@ -193,35 +193,18 @@ function badge(st) {
 	return E('span', { 'class': 'mk-chip ' + cls, 'style': 'font-size:13px;padding:5px 14px' }, text);
 }
 
-/* The server's address beside its protocol, hidden until asked for - a
-   screenshot of this page is the usual way a server's address gets passed
-   around, and nobody means to. The choice is remembered in this browser. */
-function ipShown() {
-	try { return window.localStorage.getItem('zirgozar-show-ip') == '1'; } catch (e) { return false; }
-}
-
+/* The server's address beside its protocol, blurred until the pointer is on
+   it (or, on a touch screen, until it is tapped) - a screenshot of this page
+   is the usual way a server's address gets passed around, and nobody means to. */
 function protoLine() {
-	var shown = ipShown();
-	var host = E('span', { 'id': 'pwp-host', 'class': 'pwp-ip' + (shown ? '' : ' pwp-ip-hidden'), 'dir': 'ltr' }, '');
-	var eye = E('button', {
-		'type': 'button', 'class': 'pwp-eye',
-		'title': shown ? _('Hide the address') : _('Show the address'),
-		'click': function() {
-			shown = !shown;
-			try { window.localStorage.setItem('zirgozar-show-ip', shown ? '1' : '0'); } catch (e) {}
-			host.className = 'pwp-ip' + (shown ? '' : ' pwp-ip-hidden');
-			eye.title = shown ? _('Hide the address') : _('Show the address');
-			while (eye.firstChild) eye.removeChild(eye.firstChild);
-			eye.appendChild(pui.icon(shown ? 'eye' : 'eye-off'));
-		}
-	}, [ pui.icon(shown ? 'eye' : 'eye-off') ]);
+	var host = E('span', { 'id': 'pwp-host', 'class': 'pwp-ip', 'dir': 'ltr', 'tabindex': '0' }, '');
 	return E('div', { 'class': 'pwp-detail-row', 'style': 'display:flex;gap:10px;padding:4px 0;align-items:baseline' }, [
 		E('span', { 'style': 'flex:0 0 130px;color:var(--muted);font-size:13px' }, _('Protocol')),
 		E('span', { 'class': 'pwp-ticker', 'style': 'flex:1 1 auto;font-weight:600' }, [
 			E('span', { 'class': 'pwp-ticker-track' }, [
 			E('span', { 'id': 'pwp-proto' }, '-'),
 			E('span', { 'id': 'pwp-hostwrap', 'style': 'display:none;gap:6px;align-items:center' }, [
-				E('span', { 'style': 'color:var(--muted)' }, '·'), host, eye,
+				E('span', { 'style': 'color:var(--muted)' }, '·'), host,
 				E('span', { 'id': 'pwp-exit', 'style': 'display:none;gap:6px;align-items:center' })
 			])
 			])

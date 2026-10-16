@@ -392,14 +392,17 @@ function sectionName(prefix) {
 
 /* The "Show server address and port". Every address is drawn, and
    shown or hidden with the switch, so that ticking it shows them at once
-   rather than after Save. */
+   rather than after Save. Shown, it is still blurred until the pointer is
+   on it, as on the status card. */
 var showInfo = false;
 
 function address(text) {
-	return E('div', {
-		'class': 'pwp-addr',
-		'style': 'font-size:11px;opacity:.55;direction:ltr;unicode-bidi:isolate;white-space:nowrap' + (showInfo ? '' : ';display:none')
-	}, '%h'.format(text));
+	return E('div', { 'class': 'pwp-addr', 'style': showInfo ? '' : 'display:none' }, [
+		E('span', {
+			'class': 'pwp-ip', 'tabindex': '0',
+			'style': 'font-size:11px;opacity:.55;direction:ltr;unicode-bidi:isolate;white-space:nowrap'
+		}, '%h'.format(text))
+	]);
 }
 
 function showAddresses(on) {
