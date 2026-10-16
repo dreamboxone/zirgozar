@@ -116,6 +116,14 @@ printf 'day=%s\nlast_proxy_up=1000000\nlast_proxy_down=2000000\nlast_direct_up=0
 
 # There is no core to ask, so sample must fail cleanly rather than writing
 # nonsense over a good running total.
+# Prefer the fixture explicitly so an installed core cannot win discovery.
+cat > "$RIG/core/xray" <<'FAKE'
+#!/bin/sh
+case "$1" in version) echo "Xray 26.0.0 (fixture)"; exit 0 ;; esac
+exit 1
+FAKE
+chmod +x "$RIG/core/xray"
+rig_set core_xray "$RIG/core/xray"
 sh "$STATS" sample >/dev/null 2>&1 || true
 check "$(sed -n 's/^day_proxy_up=//p' "$RIG/run/stats.state")" "1000000" \
 	"a sample with no core to ask leaves the running total alone"
