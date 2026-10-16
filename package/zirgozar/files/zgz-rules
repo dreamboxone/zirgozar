@@ -160,58 +160,6 @@ dns_target() {
 	return 0
 }
 
-# dnsmasq's own way out, while it is pointed at the tunnel. no-resolv puts
-# aside the servers the ISP handed out, but not the ones given under DNS
-# forwardings - 8.8.8.8 and the like - and dnsmasq goes on asking those
-# beside the tunnel, straight out, taking whichever answers first. Rather
-# than take them out of the user's settings and have to put them back, its
-# packets to them are dropped while this lasts, and nothing else's: dnsmasq
-# runs as a user of its own. Servers for one domain only - /lan/10.0.0.5 -
-# are left to answer for it.
-#
-# Prints the user, then the ports and the exempt addresses; nothing when
-# there is nothing to do.
-dnsmasq_guard() {
-	[ "$(cfg dns_mode dnsmasq)" = "dnsmasq" ] || return 0
-	[ "$(dns_target)" = "53" ] || return 0
-	_dg_uid="$(awk -F: '$1 == "dnsmasq" { print $3; exit }' /etc/passwd 2>/dev/null)"
-	case "$_dg_uid" in ''|*[!0-9]*|0) return 0 ;; esac
-	_dg_ports="53"; _dg_ex=""
-	for _dg_s in $(uci -q get 'dhcp.@dnsmasq[0].server' 2>/dev/null); do
-		case "$_dg_s" in
-			*/*)
-				_dg_a="${_dg_s##*/}"; _dg_a="${_dg_a%%#*}"; _dg_a="${_dg_a%%@*}"
-				case "$_dg_a" in *.*.*.*) _dg_ex="$_dg_ex $_dg_a" ;; esac
-				;;
-			*'#'*)
-				_dg_p="${_dg_s#*#}"; _dg_p="${_dg_p%%@*}"
-				case "$_dg_p" in ''|*[!0-9]*) : ;; *) _dg_ports="$_dg_ports $_dg_p" ;; esac
-				;;
-		esac
-	done
-	echo "$_dg_uid"
-	echo "$_dg_ports" | tr ' ' '\n' | sort -un | tr '\n' ' '
-	echo
-	echo "$_dg_ex"
-	return 0
-}
-
-# The same, as a chain of the nftables table.
-nft_dnsmasq_guard() {
-	_ng="$(dnsmasq_guard)"
-	[ -n "$_ng" ] || return 0
-	_ng_uid="$(echo "$_ng" | sed -n 1p)"
-	_ng_ports="$(echo "$_ng" | sed -n 2p | sed 's/ *$//; s/ /, /g')"
-	_ng_ex="$(echo "$_ng" | sed -n 3p | awk '{ for (i = 1; i <= NF; i++) printf "%s%s", (i > 1 ? ", " : ""), $i }')"
-	printf '\tchain dnsmasq_out {\n\t\ttype filter hook output priority filter; policy accept;\n\n'
-	printf '\t\tmeta skuid != %s return\n' "$_ng_uid"
-	printf '\t\tip daddr 127.0.0.0/8 return\n'
-	[ -z "$_ng_ex" ] || printf '\t\tip daddr { %s } return\n' "$_ng_ex"
-	printf '\t\tip6 daddr ::1 return\n'
-	printf '\t\tmeta l4proto { tcp, udp } th dport { %s } counter drop\n\t}\n\n' "$_ng_ports"
-	return 0
-}
-
 # The addresses on the Traffic Rules page that never go into the tunnel.
 # IPv4 only, one address or range per entry.
 direct_ips() {
@@ -621,10 +569,6 @@ $_aclfwd$_v6
 "
 	fi
 
-	_dnsguard="$(nft_dnsmasq_guard)"
-	[ -z "$_dnsguard" ] || _dnsguard="$_dnsguard
-"
-
 	cat <<NFT | tproxy_guard
 table inet $TABLE {
 	set reserved {
@@ -654,7 +598,7 @@ $_poison		ip daddr @reserved return
 		ip6 daddr @reserved6 return
 $_direct$_acljumps$_v6pre$_defaults	}
 
-$_forward$_dnschain$_dnsguard$_nat}
+$_forward$_dnschain$_nat}
 NFT
 	return 0
 }
@@ -896,28 +840,6 @@ ipt_up() {
 		done
 	fi
 
-	# dnsmasq's own way out - see dnsmasq_guard. The owner match is not on
-	# every build; without it this is left undone, as before.
-	_ig="$(dnsmasq_guard)"
-	if [ -n "$_ig" ]; then
-		_ig_uid="$(echo "$_ig" | sed -n 1p)"
-		ipt -t filter -N ZGZ_DNSOUT
-		if ipt_must -t filter -A ZGZ_DNSOUT -m owner ! --uid-owner "$_ig_uid" -j RETURN; then
-			ipt -t filter -A ZGZ_DNSOUT -d 127.0.0.0/8 -j RETURN
-			for _a in $(echo "$_ig" | sed -n 3p); do
-				ipt -t filter -A ZGZ_DNSOUT -d "$_a" -j RETURN
-			done
-			for _p in $(echo "$_ig" | sed -n 2p); do
-				ipt -t filter -A ZGZ_DNSOUT -p udp --dport "$_p" -j DROP
-				ipt -t filter -A ZGZ_DNSOUT -p tcp --dport "$_p" -j DROP
-			done
-			ipt -t filter -I OUTPUT -j ZGZ_DNSOUT
-		else
-			ipt_kill_chain filter ZGZ_DNSOUT iptables
-			warn "iptables has no owner match here - dnsmasq may still ask the DNS forwardings set beside the tunnel"
-		fi
-	fi
-
 	# IPv6 through the tunnel is the nftables backend's; with iptables it is
 	# refused instead, which at least sends nothing out beside the tunnel.
 	if [ "$ipv6_mode" = "proxy" ]; then
@@ -1123,8 +1045,6 @@ ipt_down() {
 	ipt_drop_jumps nat    PREROUTING ZGZ_DNS iptables
 	ipt_drop_jumps nat    PREROUTING ZGZ_NAT iptables
 	ipt_drop_jumps filter FORWARD    ZGZ_FWD iptables
-	ipt_drop_jumps filter OUTPUT     ZGZ_DNSOUT iptables
-	ipt_kill_chain filter ZGZ_DNSOUT iptables
 	ipt_kill_chain mangle ZGZ_PRE    iptables
 	ipt_kill_chain mangle ZGZ_GTR    iptables
 	ipt_kill_chain mangle ZGZ_GUR    iptables

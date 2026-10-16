@@ -340,6 +340,15 @@ wait_for_port() {
 	return 1
 }
 
+# A start that did not bring the tunnel up. dnsmasq, kept pointed at the
+# tunnel across a restart, would otherwise send every lookup into one that
+# is not there - a network with no names rather than one without the tunnel.
+# Under the Kill switch the devices have no way out anyway, and it stays.
+start_failed() {
+	ks_on || "$DNS" down >/dev/null 2>&1 || true
+	return 0
+}
+
 # Nothing is running yet when start_service returns: procd_open_instance only
 # describes the service, and procd is not told to start it until rc.common
 # calls procd_close_service afterwards. Waiting for the socket in there was
@@ -352,7 +361,7 @@ service_started() {
 	# start_service decided not to start anything. Without this the wait below
 	# would run its full course and report a failure about a tunnel nobody
 	# asked for.
-	[ -f "$STARTED_FLAG" ] || return 0
+	[ -f "$STARTED_FLAG" ] || { start_failed; return 0; }
 
 	tproxy_port="$(cfg tproxy_port 1082)"
 	bridge_port="$(cfg bridge_port 10808)"
@@ -378,6 +387,7 @@ service_started() {
 			log "$_tunnel_name did not connect within two minutes"
 			say_status failed
 			say_message "$_tunnel_name did not connect. The Runtime Logs page says how far it got."
+			start_failed
 			return 1
 		fi
 	elif bridge_wanted; then
@@ -399,6 +409,7 @@ service_started() {
 			else
 				say_message "The helper for this node's protocol would not start."
 			fi
+			start_failed
 			return 1
 		fi
 	fi
@@ -433,6 +444,7 @@ service_started() {
 		say_status failed
 		say_message "The tunnel process started but never accepted connections. Check the system log for what it said."
 		"$RULES" down >/dev/null 2>&1 || true
+		start_failed
 		return 1
 	fi
 
@@ -441,6 +453,7 @@ service_started() {
 		ks_on && log "Kill switch is on: devices have no way out by the uplink until the tunnel works"
 		say_status failed
 		"$RULES" down >/dev/null 2>&1 || true
+		start_failed
 		return 1
 	fi
 
@@ -481,7 +494,16 @@ stop_service() {
 	"$STATS" sample >/dev/null 2>&1 || true
 	"$STATS" flush >/dev/null 2>&1 || true
 
-	"$DNS" down >/dev/null 2>&1 || true
+	# On the way to starting again, dnsmasq stays pointed at the tunnel:
+	# taking it back meant restarting it with the ISP's servers for as long as
+	# the new core took to come up, every lookup in that time went to them,
+	# and their answers - the filtering addresses among them - stayed in its
+	# cache after. A lookup in that moment now waits for the tunnel instead.
+	# Should the start then fail, it is taken back there - see start_failed.
+	case "${action:-}" in
+		restart|reload) [ "$(cfg_bool enabled 0)" = "1" ] || "$DNS" down >/dev/null 2>&1 || true ;;
+		*) "$DNS" down >/dev/null 2>&1 || true ;;
+	esac
 	"$RULES" down >/dev/null 2>&1 || true
 	# The Kill switch is not the tunnel's rules and is not taken down with them.
 	rm -f "$ZGZ_CONFIG_JSON" "$ZGZ_BRIDGE_JSON" "$ZGZ_BRIDGE_JSON.conf" "$STARTED_FLAG" "$ZGZ_RUN/core.info" "$ZGZ_RUN/sb.counters"
@@ -609,7 +631,6 @@ reload_service() {
 		"$RULES" dump > "$ZGZ_RUN/rules.applied" 2>/dev/null || true
 	fi
 	if [ "$_dns" = "changed" ]; then
-		"$DNS" down >/dev/null 2>&1 || true
 		"$DNS" up >/dev/null 2>&1 || true
 		dns_signature > "$ZGZ_RUN/dns.applied"
 	fi

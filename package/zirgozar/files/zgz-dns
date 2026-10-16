@@ -66,12 +66,102 @@ reload_dnsmasq() {
 	return 0
 }
 
+# dnsmasq's own way out, for as long as the drop-in points it at the tunnel.
+# no-resolv puts aside the servers the ISP handed out, but not the ones given
+# under DNS forwardings - 8.8.8.8 and the like - and dnsmasq goes on asking
+# those beside the tunnel, straight out, taking whichever answers first.
+# Rather than take them out of the user's settings and have to put them
+# back, its packets to them are dropped, and nothing else's: dnsmasq runs as
+# a user of its own. Servers for one domain only - /lan/10.0.0.5 - are left
+# to answer for it.
+#
+# A table and a chain of its own, kept and dropped with the drop-in rather
+# than with the tunnel's rules: those come down on every restart, and the
+# drop-in, and so this, stays through one.
+GUARD_TABLE=zirgozar_dns
+GUARD_CHAIN=ZGZ_DNSOUT
+
+guard_up() {
+	_g_uid="$(awk -F: '$1 == "dnsmasq" { print $3; exit }' /etc/passwd 2>/dev/null)"
+	case "$_g_uid" in ''|*[!0-9]*|0) guard_down; return 0 ;; esac
+	_g_ports="53"; _g_ex=""
+	for _g_s in $(uci -q get 'dhcp.@dnsmasq[0].server' 2>/dev/null); do
+		case "$_g_s" in
+			*/*)
+				_g_a="${_g_s##*/}"; _g_a="${_g_a%%#*}"; _g_a="${_g_a%%@*}"
+				case "$_g_a" in *.*.*.*) _g_ex="$_g_ex $_g_a" ;; esac
+				;;
+			*'#'*)
+				_g_p="${_g_s#*#}"; _g_p="${_g_p%%@*}"
+				case "$_g_p" in ''|*[!0-9]*) : ;; *) _g_ports="$_g_ports $_g_p" ;; esac
+				;;
+		esac
+	done
+	_g_ports="$(echo $_g_ports | tr ' ' '\n' | sort -un | tr '\n' ' ')"
+	case "$(firewall_backend)" in
+		nft)
+			_g_nports="$(echo $_g_ports | sed 's/ /, /g')"
+			_g_nex="$(echo $_g_ex | sed 's/ /, /g')"
+			# Declared, deleted and written again in one transaction, so the
+			# guard is never missing while it is being replaced.
+			{
+				printf 'table inet %s\ndelete table inet %s\n' "$GUARD_TABLE" "$GUARD_TABLE"
+				printf 'table inet %s {\n\tchain dnsmasq_out {\n' "$GUARD_TABLE"
+				printf '\t\ttype filter hook output priority filter; policy accept;\n'
+				printf '\t\tmeta skuid != %s return\n' "$_g_uid"
+				printf '\t\tip daddr 127.0.0.0/8 return\n'
+				[ -z "$_g_nex" ] || printf '\t\tip daddr { %s } return\n' "$_g_nex"
+				printf '\t\tip6 daddr ::1 return\n'
+				printf '\t\tmeta l4proto { tcp, udp } th dport { %s } counter drop\n\t}\n}\n' "$_g_nports"
+			} | nft -f - 2>/dev/null || warn "could not keep dnsmasq from asking DNS forwardings beside the tunnel"
+			;;
+		ipt)
+			# The owner match is not on every build; without it this is left
+			# undone, and said.
+			iptables -w 2 -N "$GUARD_CHAIN" >/dev/null 2>&1 || iptables -w 2 -F "$GUARD_CHAIN" >/dev/null 2>&1 || true
+			if iptables -w 2 -A "$GUARD_CHAIN" -m owner ! --uid-owner "$_g_uid" -j RETURN >/dev/null 2>&1; then
+				iptables -w 2 -A "$GUARD_CHAIN" -d 127.0.0.0/8 -j RETURN >/dev/null 2>&1 || true
+				for _g_a in $_g_ex; do
+					iptables -w 2 -A "$GUARD_CHAIN" -d "$_g_a" -j RETURN >/dev/null 2>&1 || true
+				done
+				for _g_p in $_g_ports; do
+					iptables -w 2 -A "$GUARD_CHAIN" -p udp --dport "$_g_p" -j DROP >/dev/null 2>&1 || true
+					iptables -w 2 -A "$GUARD_CHAIN" -p tcp --dport "$_g_p" -j DROP >/dev/null 2>&1 || true
+				done
+				iptables -w 2 -C OUTPUT -j "$GUARD_CHAIN" >/dev/null 2>&1 ||
+					iptables -w 2 -I OUTPUT -j "$GUARD_CHAIN" >/dev/null 2>&1 || true
+			else
+				guard_down
+				warn "iptables has no owner match here - dnsmasq may still ask the DNS forwardings set beside the tunnel"
+			fi
+			;;
+	esac
+	return 0
+}
+
+guard_down() {
+	if command -v nft >/dev/null 2>&1; then
+		nft delete table inet "$GUARD_TABLE" >/dev/null 2>&1 || true
+	fi
+	if command -v iptables >/dev/null 2>&1; then
+		while iptables -w 2 -C OUTPUT -j "$GUARD_CHAIN" >/dev/null 2>&1; do
+			iptables -w 2 -D OUTPUT -j "$GUARD_CHAIN" >/dev/null 2>&1 || break
+		done
+		iptables -w 2 -F "$GUARD_CHAIN" >/dev/null 2>&1 || true
+		iptables -w 2 -X "$GUARD_CHAIN" >/dev/null 2>&1 || true
+	fi
+	return 0
+}
+
 cmd_up() {
 	_mode="$(cfg dns_mode dnsmasq)"
 	_port="$(cfg dns_port 1053)"
 
 	case "$_mode" in
 		off)
+			# A drop-in left by a mode before this one, which a restart now
+			# keeps in place, is taken out first.
+			cmd_down
 			log "dns_mode is off - leaving name resolution alone"
 			return 0
 			;;
@@ -84,25 +174,38 @@ cmd_up() {
 	esac
 
 	if ! dnsmasq_running; then
+		guard_down
 		log "no dnsmasq on this router - name lookups will be redirected straight to the tunnel"
 		return 0
 	fi
 
 	_dir="$(dnsmasq_confdir)" || _dir=""
 	if [ -z "$_dir" ]; then
+		guard_down
 		say_message "Could not find the directory dnsmasq reads its extra configuration from, so name lookups are being redirected straight into the tunnel instead. Local machine names will not resolve while connected."
 		warn "no dnsmasq conf-dir found"
 		return 0
 	fi
 
+	# In place before dnsmasq is pointed at the tunnel, so there is no moment
+	# in which it is and its other servers are still open to it.
+	guard_up
+
 	# no-resolv so the addresses the ISP handed out are not consulted as well:
 	# dnsmasq would ask every upstream at once and take the first answer, and
 	# the first answer would routinely be the one this exists to avoid.
-	cat > "$_dir/$DROPIN" <<EOF
+	cat > "$_dir/.$DROPIN.new" <<EOF
 # Written by Zirgozar while the tunnel is up. Removed when it goes down.
 no-resolv
 server=127.0.0.1#$_port
 EOF
+	# Already there, as a restart of the tunnel leaves it: dnsmasq is not
+	# restarted for nothing, and for a moment with the ISP's servers.
+	if cmp -s "$_dir/.$DROPIN.new" "$_dir/$DROPIN" && dnsmasq_running; then
+		rm -f "$_dir/.$DROPIN.new"
+		return 0
+	fi
+	mv -f "$_dir/.$DROPIN.new" "$_dir/$DROPIN"
 
 	reload_dnsmasq || return 0
 	log "name lookups now go through the tunnel (via $_dir/$DROPIN)"
@@ -111,12 +214,17 @@ EOF
 
 cmd_down() {
 	_dir="$(dnsmasq_confdir)" || _dir=""
-	[ -n "$_dir" ] || return 0
-	[ -f "$_dir/$DROPIN" ] || return 0
-	rm -f "$_dir/$DROPIN"
-	dnsmasq_running || return 0
-	reload_dnsmasq || true
-	log "name lookups are back to normal"
+	if [ -n "$_dir" ] && [ -f "$_dir/$DROPIN" ]; then
+		rm -f "$_dir/$DROPIN"
+		if dnsmasq_running; then
+			reload_dnsmasq || true
+		fi
+		log "name lookups are back to normal"
+	fi
+	# Only once dnsmasq has let go of the tunnel, and whatever else happened:
+	# a guard with nothing to guard would still keep dnsmasq off the servers
+	# it is now meant to ask.
+	guard_down
 	return 0
 }
 
