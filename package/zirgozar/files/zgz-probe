@@ -98,10 +98,13 @@ tcp_ms() {
 			[ -n "$_ip" ] && _resolve="$_h:$2:$_ip"
 			;;
 	esac
+	# What follows the handshake does not matter: a TLS or proxy port that
+	# closes on, or never answers, a plain HTTP request is still reachable,
+	# and curl then fails with the connect time already written.
 	_t="$(curl -s -o /dev/null ${_resolve:+--resolve "$_resolve"} \
 		--connect-timeout "$SIFT_TIMEOUT" --max-time "$SIFT_TIMEOUT" \
-		-w '%{time_connect}' "http://$_h:$2/" 2>/dev/null)" || _t=""
-	[ -n "$_t" ] || { echo 0; return 0; }
+		-w '%{time_connect}' "http://$_h:$2/" 2>/dev/null)" || true
+	case "$_t" in ''|*[!0-9.]*) echo 0; return 0 ;; esac
 	# Zero means it never got there. A server that is genuinely under half a
 	# millisecond away would otherwise round to zero and be called dead, so
 	# anything that did connect reports at least one.

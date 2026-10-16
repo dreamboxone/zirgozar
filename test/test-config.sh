@@ -158,6 +158,13 @@ check "$IKE" 'E	ikev2	{"type":"ikev2","server":"vpn.example.com","port":500,"use
 P	ikev2	{"type":"ikev2","server":"1.2.3.4","port":4500,"username":"","password":"","psk":"k","local_id":"me","ca":"LS0t_-","mtu":1400}' \
 	"an IKEv2 link is read, with a password or a shared key"
 
+# A JSON \u escape is the character it names, a surrogate pair one character;
+# and a sing-box Hysteria 1 stays Hysteria 1, with its auth_str.
+SBJ="$(printf '%s\n' '{"outbounds":[{"type":"trojan","tag":"سلام 😀","server":"t.example.com","server_port":443,"password":"pass"},{"type":"hysteria","tag":"H1","server":"h.example.com","server_port":443,"auth_str":"real-password","obfs":"xp","up_mbps":20,"down_mbps":100,"tls":{"enabled":true,"server_name":"sni.example","alpn":["h3"],"insecure":true}}]}' |
+	LC_ALL=C awk -f "$RIG/lib/zgz-parse" | cut -f2,3,6)"
+case "$SBJ" in *'سلام 😀	trojan	'*'"password":"pass"'*) ok "a JSON \\u escape is decoded, in a name and a password" ;; *) bad "a JSON \\u escape is decoded: $SBJ" ;; esac
+case "$SBJ" in *'H1	hysteria	{"type":"hysteria","server":"h.example.com","port":443,"auth":"real-password","sni":"sni.example","obfs":"xp","alpn":"h3","insecure":true,"up_mbps":20,"down_mbps":100}'*) ok "a sing-box Hysteria 1 stays Hysteria 1" ;; *) bad "a sing-box Hysteria 1 stays Hysteria 1: $SBJ" ;; esac
+
 # base64 in awk has to agree with base64 everywhere else.
 if command -v base64 >/dev/null 2>&1; then
 	IN='the quick brown fox jumps over the lazy dog, 0123456789'

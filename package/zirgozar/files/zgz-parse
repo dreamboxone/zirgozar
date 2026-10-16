@@ -1638,7 +1638,20 @@ function jraw(s, key,   i, c, k, e, ke) {
 # A JSON string as text. A \u escape is dropped rather than guessed at: this
 # runs in the C locale so that base64 stays byte exact, and inventing UTF-8
 # here would be the one place that breaks it.
-function junq(v,   out, i, c) {
+# One character, by its number, as the bytes UTF-8 writes it with.
+function utf8(cp) {
+	if (cp <= 0) return ""
+	if (cp < 128) return CHR[cp]
+	if (cp < 2048) return CHR[192 + int(cp / 64)] CHR[128 + cp % 64]
+	if (cp < 65536) return CHR[224 + int(cp / 4096)] CHR[128 + int(cp / 64) % 64] CHR[128 + cp % 64]
+	return CHR[240 + int(cp / 262144)] CHR[128 + int(cp / 4096) % 64] CHR[128 + int(cp / 64) % 64] CHR[128 + cp % 64]
+}
+
+# A JSON string's value. \uXXXX is the character it names - a password or a
+# name in Persian written that way, as Python writes JSON unless told not to,
+# came out with those characters missing - and a pair of them for one beyond
+# the first 65536 is the one character.
+function junq(v,   out, i, c, cp, lo) {
 	if (v == "") return ""
 	if (substr(v, 1, 1) != "\"") return v
 	v = substr(v, 2, length(v) - 2)
@@ -1648,8 +1661,15 @@ function junq(v,   out, i, c) {
 		if (c == "\\") {
 			i++
 			c = substr(v, i, 1)
-			if (c == "n" || c == "t" || c == "r") c = " "
-			else if (c == "u") { i += 4; c = "" }
+			if (c == "n" || c == "t" || c == "r" || c == "b" || c == "f") c = " "
+			else if (c == "u") {
+				cp = hex(substr(v, i + 1, 4)); i += 4
+				if (cp >= 55296 && cp < 56320 && substr(v, i + 1, 2) == "\\u") {
+					lo = hex(substr(v, i + 3, 4))
+					if (lo >= 56320 && lo < 57344) { cp = 65536 + (cp - 55296) * 1024 + (lo - 56320); i += 6 }
+				}
+				c = (cp >= 55296 && cp < 57344) ? "" : utf8(cp)
+			}
 		}
 		out = out c
 	}
@@ -2074,7 +2094,7 @@ function sb_stream(it,   tls, rel, tr, net, sec, sni, fp, alpn, pbk, sid, path, 
 	return stream(net, sec, host, path, sni, fp, alpn, pbk, sid, "", svc, "", jstr(tr, "mode"))
 }
 
-function from_singbox(it,   t, lab, peer, aw, ak, ai, nk, sbp) {
+function from_singbox(it,   t, lab, peer, aw, ak, ai, nk, sbp, hyo) {
 	t = tolower(jstr(it, "type"))
 	if (t == "") return
 	if (t ~ /^(direct|block|dns|selector|urltest|tun|mixed)$/) return
@@ -2125,7 +2145,22 @@ function from_singbox(it,   t, lab, peer, aw, ak, ai, nk, sbp) {
 	if (PORT <= 0) PORT = jnum(it, "port")
 	if (HOST == "" || PORT <= 0 || PORT > 65535) return
 
-	if (t == "hysteria2" || t == "hysteria") {
+	# Hysteria 1 is a protocol of its own, not an older spelling of 2: its
+	# password is auth_str, its obfuscation a plain string, and it has to be
+	# told a bandwidth.
+	if (t == "hysteria") {
+		hyo = "{\"type\":\"hysteria\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT \
+			",\"auth\":\"" jesc(jstr(it, "auth_str")) "\"" \
+			",\"sni\":\"" jesc(jstr(jraw(it, "tls"), "server_name")) "\"" \
+			",\"obfs\":\"" jesc(jstr(it, "obfs")) "\"" \
+			",\"alpn\":\"" jesc(jjoin(jraw(jraw(it, "tls"), "alpn"))) "\"" \
+			",\"insecure\":" (jbool(jraw(it, "tls"), "insecure") ? "true" : "false") \
+			",\"up_mbps\":" (jnum(it, "up_mbps") > 0 ? jnum(it, "up_mbps") : 10) \
+			",\"down_mbps\":" (jnum(it, "down_mbps") > 0 ? jnum(it, "down_mbps") : 50) "}"
+		emit(lab, "hysteria", hyo)
+		return
+	}
+	if (t == "hysteria2") {
 		emit(lab, "hysteria2", \
 			"{\"type\":\"hysteria2\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT \
 			",\"password\":\"" jesc(jstr(it, "password")) "\"" \

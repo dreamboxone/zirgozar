@@ -80,7 +80,7 @@ repair() {
 	exec "$CONNECT" "$@"
 }
 
-_key="$(sha256sum "$ZGZ_BEST" 2>/dev/null)" || _key=''
+_key="$(route_key)"
 if [ "$(cat "$ZGZ_RUN/health.key" 2>/dev/null)" != "$_key" ]; then
 	rm -f "$ZGZ_RUN/health.fail" "$ZGZ_RUN/health.slow" "$ZGZ_RUN/health.baseline" "$ZGZ_RUN/health.sweep"
 	printf '%s\n' "$_key" > "$ZGZ_RUN/health.key"

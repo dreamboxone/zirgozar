@@ -45,10 +45,13 @@ pause_local() {
 	return 0
 }
 on_exit() {
+	trap - EXIT INT TERM
 	[ "$PAUSED" = "1" ] && "$RULES" local resume >/dev/null 2>&1
 	zgz_unlock
 }
-trap 'say_status failed; on_exit' INT TERM
+# Stopped means stopped: without the exit the script went on to start and
+# restart things after giving its lock away.
+trap 'say_status failed; exit 1' INT TERM
 trap on_exit EXIT
 
 # The Node setting. A node chosen in Basic Settings is the node: it is
@@ -56,7 +59,7 @@ trap on_exit EXIT
 FIXED="$(cfg node '')"
 if [ "$MODE" = degraded ]; then
 	[ -z "$FIXED" ] || exit 0
-	[ "$(sha256sum "$ZGZ_BEST" 2>/dev/null)" = "${2:-}" ] || exit 0
+	[ "$(route_key)" = "${2:-}" ] || exit 0
 	pause_local
 	"$NODES" update >/dev/null 2>&1 || true
 	if ! "$PROBE" measure > "$ZGZ_RUN/health.choice" 2>/dev/null; then exit 0; fi
@@ -77,10 +80,10 @@ if [ "$MODE" = degraded ]; then
 	[ "$_current" -ge "$_min" ] || exit 0
 	[ $((_ms * 150)) -le $((_current * 100)) ] || exit 0
 	[ -z "$(cfg node '')" ] || exit 0
-	[ "$(sha256sum "$ZGZ_BEST" 2>/dev/null)" = "${2:-}" ] || exit 0
+	[ "$(route_key)" = "${2:-}" ] || exit 0
 	log "confirmed faster replacement: ${_current}ms to ${_ms}ms"
 	"$PROBE" pick "$_tag" >/dev/null 2>&1 || exit 0
-	[ "$(sha256sum "$ZGZ_BEST" 2>/dev/null)" != "${2:-}" ] || exit 0
+	[ "$(route_key)" != "${2:-}" ] || exit 0
 	MODE=fixed
 	rm -f "$ZGZ_RUN/health.slow"
 fi

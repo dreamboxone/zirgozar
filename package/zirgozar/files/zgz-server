@@ -194,21 +194,26 @@ xray_inbound() {
 }
 
 config_xray() {
-	_ins=""; _outs=""; _rules=""
+	_ins=""; _outs=""; _rules=""; _ds=AsIs
 	for _u in $(users); do
 		case "$XRAY_PROTOS" in *" $(s_get "$_u" protocol) "*) : ;; *) continue ;; esac
 		_in="$(xray_inbound "$_u")" || continue
 		_ins="$_ins${_ins:+,}$_in"
 		_outs="$_outs${_outs:+,}$(xray_out "$_u")"
-		[ "$(s_get "$_u" accept_lan)" = "1" ] ||
+		if [ "$(s_get "$_u" accept_lan)" != "1" ]; then
 			_rules="$_rules${_rules:+,}{\"type\":\"field\",\"inboundTag\":[\"in-$_u\"],\"ip\":$(private_json),\"outboundTag\":\"block\"}"
+			# A name is not an address: "localhost", or any name pointing
+			# at the LAN, passed the rule above untouched. Looked up when an
+			# address rule is reached, it is held to the rule like an address.
+			_ds=IPOnDemand
+		fi
 		_rules="$_rules${_rules:+,}{\"type\":\"field\",\"inboundTag\":[\"in-$_u\"],\"outboundTag\":\"out-$_u\"}"
 	done
 	[ -n "$_ins" ] || return 1
 	_chains="$(chain_outbounds "$_outs" | while read -r _co; do [ -n "$_co" ] && printf ',%s' "$_co"; done)"
 	_lvl="$(uci -q get "$CONF.global.loglevel" 2>/dev/null)"
-	printf '{"log":{"loglevel":"%s"},"inbounds":[%s],"outbounds":[%s%s,{"tag":"block","protocol":"blackhole"}],"routing":{"domainStrategy":"AsIs","rules":[%s]}}\n' \
-		"${_lvl:-warning}" "$_ins" "$_outs" "$_chains" "$_rules"
+	printf '{"log":{"loglevel":"%s"},"inbounds":[%s],"outbounds":[%s%s,{"tag":"block","protocol":"blackhole"}],"routing":{"domainStrategy":"%s","rules":[%s]}}\n' \
+		"${_lvl:-warning}" "$_ins" "$_outs" "$_chains" "$_ds" "$_rules"
 	return 0
 }
 
@@ -315,8 +320,10 @@ config_singbox() {
 			_ins="$_ins${_ins:+,}$_in"
 		fi
 		_outs="$_outs${_outs:+,}$(sb_out "$_u")"
+		# A name is looked up first, so that one pointing at the LAN is held
+		# to the same rule as the address - see config_xray.
 		[ "$(s_get "$_u" accept_lan)" = "1" ] ||
-			_rules="$_rules${_rules:+,}{\"inbound\":[\"in-$_u\"],\"ip_cidr\":$(private_json),\"action\":\"reject\"}"
+			_rules="$_rules${_rules:+,}{\"inbound\":[\"in-$_u\"],\"action\":\"resolve\"},{\"inbound\":[\"in-$_u\"],\"ip_cidr\":$(private_json),\"action\":\"reject\"}"
 		_rules="$_rules${_rules:+,}{\"inbound\":[\"in-$_u\"],\"outbound\":\"out-$_u\"}"
 	done
 	[ -n "$_ins$_eps" ] || return 1

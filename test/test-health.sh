@@ -78,6 +78,8 @@ rig_set start_daemon 1
 
 # Exercise the real replacement operation with measured routes.
 cp "$RIG/connect-real" "$RIG/lib/zgz-connect"
+# The fingerprint zgz-refresh hands over: the outbound and the account beside it.
+route_sig() { cat "$RIG/etc/best.json" "$RIG/etc/bridge.json" 2>/dev/null | sha256sum | cut -d" " -f1; }
 cat > "$RIG/lib/zgz-probe" <<'EOF'
 #!/bin/sh
 case "$1" in
@@ -86,13 +88,13 @@ case "$1" in
 esac
 EOF
 chmod +x "$RIG/lib/zgz-probe"
-signature=$(sha256sum "$RIG/etc/best.json")
+signature=$(route_sig)
 echo 1000 > "$RIG/run/candidate.delay"
 echo 1600 > "$RIG/run/live.delay"
 sh "$RIG/lib/zgz-connect" degraded "$signature" >/dev/null 2>&1
 check "$(cat "$RIG/run/picked")" picked 'confirmed replacement must be more than 1.5 times faster'
 check "$(grep -c 'zirgozar restart' "$RIG/run/service.calls")" 1 'confirmed replacement restarts once'
-signature=$(sha256sum "$RIG/etc/best.json")
+signature=$(route_sig)
 echo 1200 > "$RIG/run/candidate.delay"
 sh "$RIG/lib/zgz-connect" degraded "$signature" >/dev/null 2>&1
 check "$(wc -l < "$RIG/run/picked" | tr -d ' ')" 1 'small improvements do not switch'
@@ -107,4 +109,23 @@ check "$(wc -l < "$RIG/run/picked" | tr -d ' ')" 1 'failed candidate confirmatio
 echo 500 > "$RIG/run/candidate.delay"
 sh "$RIG/lib/zgz-connect" degraded stale >/dev/null 2>&1
 check "$(wc -l < "$RIG/run/picked" | tr -d ' ')" 1 'a changed current config cancels a stale replacement'
+
+# Two accounts on one helper - two L2TP ones - differ in the account alone:
+# the outbound is the same device either way.
+cat > "$RIG/lib/zgz-probe" <<'EOF'
+#!/bin/sh
+case "$1" in
+ measure) printf 'n1\t600\n' ;;
+ pick) echo '{"type":"l2tp","server":"b.example"}' > "$ZGZ_ETC/bridge.json"; echo picked >> "$ZGZ_RUN/picked" ;;
+esac
+EOF
+chmod +x "$RIG/lib/zgz-probe"
+echo '{"type":"l2tp","server":"a.example"}' > "$RIG/etc/bridge.json"
+: > "$RIG/run/service.calls"
+signature=$(route_sig)
+echo 600 > "$RIG/run/candidate.delay"
+echo 3000 > "$RIG/run/live.delay"
+sh "$RIG/lib/zgz-connect" degraded "$signature" >/dev/null 2>&1
+check "$(grep -c 'zirgozar restart' "$RIG/run/service.calls")" 1 'a replacement that changes only the account restarts too'
+rm -f "$RIG/etc/bridge.json"
 rig_report

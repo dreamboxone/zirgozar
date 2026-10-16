@@ -118,6 +118,20 @@ cmd_clock() {
 SCHEDULE_STOPPED="$ZGZ_RUN/schedule.stopped"
 CRONTAB="${ZGZ_CRONTAB:-/etc/crontabs/root}"
 
+# A time of day as the settings keep it, "08:09", as crontab's "9 8". The
+# leading zeros go first: shell arithmetic reads 08 and 09 as octal, which
+# they are not, and the error stopped the whole crontab - the health check
+# with it - from being written.
+cron_time() {
+	_ct_h="${1%%:*}"; _ct_m="${1#*:}"
+	_ct_h="$(printf '%s' "$_ct_h" | sed 's/^0*//')"; _ct_m="$(printf '%s' "$_ct_m" | sed 's/^0*//')"
+	case "$_ct_h" in ''|*[!0-9]*) _ct_h=0 ;; esac
+	case "$_ct_m" in ''|*[!0-9]*) _ct_m=0 ;; esac
+	[ "$_ct_h" -le 23 ] || _ct_h=0
+	[ "$_ct_m" -le 59 ] || _ct_m=0
+	echo "$_ct_m $_ct_h"
+}
+
 cmd_schedule_sync() {
 	[ -f "$CRONTAB" ] || touch "$CRONTAB" 2>/dev/null || return 0
 	grep -v 'zgz-router schedule' "$CRONTAB" > "$CRONTAB.zgz" 2>/dev/null || true
@@ -142,12 +156,9 @@ cmd_schedule_sync() {
 				continue
 			fi
 			_t="$(cfg "${_w}_time_mode" '0:00')"
-			_hh="${_t%%:*}"; _mm="${_t#*:}"
-			case "$_hh" in ''|*[!0-9]*) _hh=0 ;; esac
-			case "$_mm" in ''|*[!0-9]*) _mm=0 ;; esac
 			_dow="$_week"
 			[ "$_week" = "7" ] && _dow='*'
-			echo "$((_mm + 0)) $((_hh + 0)) * * $_dow $ZGZ_LIB/zgz-router schedule $_w >/dev/null 2>&1" >> "$CRONTAB.zgz"
+			echo "$(cron_time "$_t") * * $_dow $ZGZ_LIB/zgz-router schedule $_w >/dev/null 2>&1" >> "$CRONTAB.zgz"
 		done
 	fi
 	# Rule Manage's automatic update of the routing data
@@ -161,12 +172,9 @@ cmd_schedule_sync() {
 			echo "0 */$_h * * * $ZGZ_LIB/zgz-router schedule geo >/dev/null 2>&1" >> "$CRONTAB.zgz"
 		else
 			_t="$(cfg geo_update_time_mode '0:00')"
-			_hh="${_t%%:*}"; _mm="${_t#*:}"
-			case "$_hh" in ''|*[!0-9]*) _hh=0 ;; esac
-			case "$_mm" in ''|*[!0-9]*) _mm=0 ;; esac
 			_dow="$_week"
 			[ "$_week" = "7" ] && _dow='*'
-			echo "$((_mm + 0)) $((_hh + 0)) * * $_dow $ZGZ_LIB/zgz-router schedule geo >/dev/null 2>&1" >> "$CRONTAB.zgz"
+			echo "$(cron_time "$_t") * * $_dow $ZGZ_LIB/zgz-router schedule geo >/dev/null 2>&1" >> "$CRONTAB.zgz"
 		fi
 	fi
 	# Node Subscribe's schedule for each subscription.
@@ -192,12 +200,9 @@ cmd_schedule_sync() {
 				;;
 			[0-7])
 				_t="$(uci -q get "zirgozar.$_s.update_time_mode")" || _t="0:00"
-				_hh="${_t%%:*}"; _mm="${_t#*:}"
-				case "$_hh" in ''|*[!0-9]*) _hh=0 ;; esac
-				case "$_mm" in ''|*[!0-9]*) _mm=0 ;; esac
 				_dow="$_week"
 				[ "$_week" = "7" ] && _dow='*'
-				echo "$((_mm + 0)) $((_hh + 0)) * * $_dow $ZGZ_LIB/zgz-router schedule sub $_s >/dev/null 2>&1" >> "$CRONTAB.zgz"
+				echo "$(cron_time "$_t") * * $_dow $ZGZ_LIB/zgz-router schedule sub $_s >/dev/null 2>&1" >> "$CRONTAB.zgz"
 				;;
 		esac
 	done

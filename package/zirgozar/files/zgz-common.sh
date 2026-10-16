@@ -1306,8 +1306,17 @@ zgz_lock() {
 		return 0
 	fi
 	# A directory left behind by something that died would wedge this for
-	# good, so only respect a lock something is actually holding.
-	_pid="$(cat "$_lock/pid" 2>/dev/null)"
+	# good, so only respect a lock something is actually holding. One with no
+	# owner written in it yet may be one just taken, between the mkdir and
+	# the echo: given a moment for its owner to appear before it is called
+	# abandoned, or two would hold it at once.
+	_lw=0
+	_pid="$(cat "$_lock/pid" 2>/dev/null)" || _pid=""
+	while [ -z "$_pid" ] && [ -d "$_lock" ] && [ "$_lw" -lt 3 ]; do
+		sleep 1
+		_lw=$((_lw + 1))
+		_pid="$(cat "$_lock/pid" 2>/dev/null)" || _pid=""
+	done
 	if [ -n "$_pid" ] && kill -0 "$_pid" 2>/dev/null; then
 		return 1
 	fi
@@ -1319,8 +1328,20 @@ zgz_lock() {
 	return 1
 }
 
+# Only the lock this process holds: one that was taken over as abandoned
+# belongs to someone else now.
 zgz_unlock() {
+	[ "$(cat "$ZGZ_RUN/lock/pid" 2>/dev/null)" = "$$" ] || return 0
 	rm -rf "$ZGZ_RUN/lock" 2>/dev/null || true
+	return 0
+}
+
+# What the tunnel is running now, as one fingerprint: the outbound and, for an
+# account carried by a helper - L2TP, PPTP, SSTP, IKEv2, OpenVPN, WARP - the
+# account itself, which two such nodes can differ in alone.
+route_key() {
+	[ -s "$ZGZ_BEST" ] || return 0
+	cat "$ZGZ_BEST" "$ZGZ_ETC/bridge.json" 2>/dev/null | sha256sum | cut -d' ' -f1
 	return 0
 }
 
@@ -1438,9 +1459,13 @@ resolve_direct() {
 	esac
 	set -- "$1" ${ZGZ_DDNS:-$(direct_dns)}
 	[ -n "${3:-}" ] || return 1
-	# busybox nslookup takes the server as its second argument; the answer
-	# section is everything after the server's own "Address" line.
-	bounded 4 nslookup "$1" "$3" 2>/dev/null | awk '
+	# busybox nslookup takes the server as its second argument, with its port
+	# after a colon; the answer section is everything after the server's own
+	# "Address" line. It speaks UDP only, so a resolver set to TCP is asked
+	# over UDP, at the same address and port.
+	_rd_s="$3"
+	case "${4:-53}" in 53|'') : ;; *[!0-9]*) : ;; *) _rd_s="$3:$4" ;; esac
+	bounded 4 nslookup "$1" "$_rd_s" 2>/dev/null | awk '
 		/^Name:/ { named = 1; next }
 		named && /^Address/ {
 			for (i = 2; i <= NF; i++)

@@ -209,6 +209,21 @@ cmd_sample() {
 	_ldu="$(num "$(get_state last_direct_up)")"
 	_ldd="$(num "$(get_state last_direct_down)")"
 
+	# Another counter than at the last look - a core restarted, respawned,
+	# replaced - began counting from nothing, so all it reports is new. A
+	# counter going backwards says the same, but not when the new one has
+	# already passed the old one's last reading. Under sing-box the counting
+	# is zgz-sbstats', which can outlive a core that respawns.
+	if [ "$(active_engine)" = "singbox" ]; then
+		_core="$(pgrep -f "zgz-sbstats" 2>/dev/null | head -1)" || _core=""
+	else
+		_core="$(pgrep -f "run -c(onfig)? $ZGZ_CONFIG_JSON" 2>/dev/null | head -1)" || _core=""
+	fi
+	_lcore="$(get_state core)"
+	if [ -n "$_lcore" ] && [ -n "$_core" ] && [ "$_core" != "$_lcore" ]; then
+		_lpu=0; _lpd=0; _ldu=0; _ldd=0
+	fi
+
 	_dpu="$(delta "$_cpu" "$_lpu")"
 	_dpd="$(delta "$_cpd" "$_lpd")"
 	_ddu="$(delta "$_cdu" "$_ldu")"
@@ -263,6 +278,7 @@ day_proxy_down=$_apd
 day_direct_up=$_adu
 day_direct_down=$_add
 last_flush=$_lastflush
+core=$_core
 EOF
 
 	if [ $((_now - _lastflush)) -ge "$FLUSH_EVERY" ]; then
@@ -279,8 +295,9 @@ cmd_json() {
 
 	# Only count what is in memory towards today if it *is* today's.
 	_day="$(get_state day)"
-	_lpu=0; _lpd=0; _ldu=0; _ldd=0
+	_lpu=0; _lpd=0; _ldu=0; _ldd=0; _have=0
 	if [ "$_day" = "$_today" ]; then
+		_have=1
 		_lpu="$(num "$(get_state day_proxy_up)")"
 		_lpd="$(num "$(get_state day_proxy_down)")"
 		_ldu="$(num "$(get_state day_direct_up)")"
@@ -289,7 +306,7 @@ cmd_json() {
 
 	awk -F'\t' \
 		-v today="$_today" -v month="$_month" \
-		-v lpu="$_lpu" -v lpd="$_lpd" -v ldu="$_ldu" -v ldd="$_ldd" '
+		-v lpu="$_lpu" -v lpd="$_lpd" -v ldu="$_ldu" -v ldd="$_ldd" -v have="$_have" '
 		# A date turned into a plain day number, so that "the last seven days"
 		# is subtraction and not string comparison across a month boundary.
 		# Neither busybox date nor busybox awk can be relied on for this:
@@ -313,8 +330,10 @@ cmd_json() {
 		END {
 			# Whatever has accumulated since the last write to disk belongs to
 			# today as much as what is already stored, or the page would show
-			# a figure that only moves once an hour.
-			pu[today] = lpu; pd[today] = lpd; du[today] = ldu; dd[today] = ldd
+			# a figure that only moves once an hour. Only once there is such a
+			# figure: after a reboot, before the first sample, what is stored
+			# is all there is, not nothing.
+			if (have) { pu[today] = lpu; pd[today] = lpd; du[today] = ldu; dd[today] = ldd }
 			days[today] = 1
 
 			n = 0
@@ -353,7 +372,15 @@ cmd_json() {
 }
 
 cmd_reset() {
-	rm -f "$DB" "$STATE"
+	rm -f "$DB"
+	# The core's counters keep counting from where they were. Forgetting
+	# where that was too would count everything since it started all over
+	# again at the next sample - so the last readings stay, and only the
+	# totals go.
+	if [ -s "$STATE" ]; then
+		grep -E '^(last_(proxy|direct)_(up|down)|core)=' "$STATE" > "$STATE.new" 2>/dev/null || true
+		mv -f "$STATE.new" "$STATE"
+	fi
 	log "traffic history cleared"
 	return 0
 }

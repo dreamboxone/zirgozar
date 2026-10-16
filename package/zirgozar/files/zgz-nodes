@@ -94,9 +94,9 @@ proxy_ready() {
 }
 
 sub_curl() {
-	_sc_u="$1"; _sc_o="$2"; _sc_c="$3"; _sc_m="$4"; _sc_r="$5"
+	_sc_u="$1"; _sc_o="$2"; _sc_c="$3"; _sc_m="$4"; _sc_r="$5"; _sc_w="${6:-}"
 	set --
-	case "$6" in
+	case "$_sc_w" in
 		proxy)
 			set -- -x "socks5h://127.0.0.1:$(cfg node_socks_port '')"
 			;;
@@ -350,6 +350,15 @@ fetch_one() {
 				sub_failed "nothing that looks like a server link"
 				return 0
 			fi
+		fi
+		# An address in it is not enough: a login or error page has one too.
+		# Something in it has to read as a server before what is kept is
+		# replaced - judged before the keyword filter, which may rightly
+		# leave nothing.
+		if ! LC_ALL=C awk -v LIMIT=1 -f "$PARSE" < "$_tmp" 2>/dev/null | grep -q .; then
+			rm -f "$_tmp"
+			sub_failed "nothing that looks like a server link"
+			return 0
 		fi
 		# The keyword filter, on the names, leaving the links as they came.
 		if [ "${SUB_FMODE:-0}" != "0" ]; then
@@ -802,9 +811,10 @@ cmd_build() {
 		}' "$ZGZ_RUN/merge.tsv" > "$ZGZ_CANDIDATES.new" 2>/dev/null || true
 	rm -f "$ZGZ_RUN/merge.tsv"
 	# Tags are positions in this list, not permanent node identities. A
-	# changed list can assign a rejected tag to a different, working node.
+	# changed list can assign a rejected tag to a different, working node,
+	# and a measured one's place - and time - to a node never measured.
 	if ! cmp -s "$ZGZ_CANDIDATES.new" "$ZGZ_CANDIDATES"; then
-		rm -f "$ZGZ_RUN/rejected"
+		rm -f "$ZGZ_RUN/rejected" "$ZGZ_RANKED"
 	fi
 
 	if [ ! -s "$ZGZ_CANDIDATES.new" ]; then
