@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.7.24-r11';
+var BUILD = '5.7.24-r12';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -351,13 +351,96 @@ function versionText(v) {
 	return m ? _('Version %s, revision %s').format(m[1], m[2]) : _('Version %s, revision %s').format(v, '1');
 }
 
-function prefersDark() {
+function themeMode() {
 	var saved = null;
 	try { saved = localStorage.getItem('zirgozar-theme'); } catch (e) {}
-	if (saved) return saved === 'dark';
-	/* Otherwise follow the LuCI theme: a dark page background means dark. */
-	var m = getComputedStyle(document.body).backgroundColor.match(/\d+/g);
-	return m ? (0.299 * m[0] + 0.587 * m[1] + 0.114 * m[2]) < 128 : false;
+	return saved === 'dark' || saved === 'light' ? saved : 'auto';
+}
+
+/* Sample native LuCI widgets outside our styled subtree. This also supports
+   themes that predate CSS custom properties. Never change the host theme. */
+function followTheme(root) {
+	var attached = false;
+	function sync() {
+		if (!root.isConnected) {
+			if (attached) {
+				secondTimer.remove(sync);
+				if (!document.querySelector('.mk')) {
+					['pwp-active', 'pwp-follow', 'pwp-dark', 'pwp-fa'].forEach(function(name) { document.body.classList.remove(name); });
+				}
+			}
+			return;
+		}
+		attached = true;
+		var automatic = themeMode() === 'auto';
+		root.classList.toggle('mk-follow', automatic);
+		document.body.classList.toggle('pwp-follow', automatic);
+		if (!automatic) return;
+		var probe = E('div', { 'class': 'cbi-section', 'style': 'position:absolute;visibility:hidden;pointer-events:none' });
+		var button = E('button', { 'class': 'cbi-button cbi-button-apply', 'type': 'button' });
+		var input = E('input', { 'type': 'text', 'class': 'cbi-input-text', 'tabindex': '-1' });
+		probe.appendChild(button);
+		probe.appendChild(input);
+		(root.parentElement || document.body).appendChild(probe);
+		function opaque(color) {
+			return color && color !== 'transparent' && !/rgba\([^)]*,\s*0\s*\)/.test(color);
+		}
+		var host = root.parentElement, background;
+		while (host && !opaque(background = getComputedStyle(host).backgroundColor)) host = host.parentElement;
+		background = opaque(background) ? background : 'rgb(255, 255, 255)';
+		var style = getComputedStyle(probe), panel = style.backgroundColor;
+		var control = getComputedStyle(input), action = getComputedStyle(button);
+		var text = style.color, accent = action.backgroundColor;
+		/* Some themes use tonal buttons for Apply. Resolve their primary and
+		   surface tokens separately so selected tabs retain enough contrast. */
+		var swatch = E('span', { 'style': 'background:var(--brand,var(--primary-color-high,var(--primary,' + accent + ')));color:var(--on-brand,var(--on-primary-color,var(--on-primary,' + action.color + ')))' });
+		probe.appendChild(swatch);
+		var primary = getComputedStyle(swatch);
+		var surface = E('span', { 'style': 'background:var(--material3-card-background,' + panel + ');color:var(--on-surface,' + text + ')' });
+		probe.appendChild(surface);
+		var surfaceStyle = getComputedStyle(surface);
+		panel = surfaceStyle.backgroundColor;
+		text = surfaceStyle.color;
+		accent = primary.backgroundColor;
+		var values = { bg: background, panel: opaque(panel) ? panel : background,
+			text: text, line: style.borderTopColor, soft: opaque(panel) ? panel : background,
+			accent: opaque(accent) ? accent : '#5e72e4', 'on-accent': primary.color,
+			'card-radius': style.borderRadius, 'card-padding': parseFloat(style.padding) > 0 ? style.padding : '20px',
+			'card-shadow': style.boxShadow, 'button-radius': action.borderRadius,
+			'button-padding': action.padding, 'button-size': action.fontSize,
+			'button-weight': action.fontWeight, 'control-radius': control.borderRadius,
+			'control-bg': opaque(control.backgroundColor) ? control.backgroundColor : background,
+			'control-line': control.borderTopColor, 'font': style.fontFamily,
+			'font-size': style.fontSize };
+		Object.keys(values).forEach(function(key) {
+			var name = '--zgz-' + key;
+			if (root.style.getPropertyValue(name) !== values[key]) {
+				root.style.setProperty(name, values[key]);
+				document.body.style.setProperty(name, values[key]);
+			}
+		});
+		probe.remove();
+		var rgb = values.panel.match(/^rgba?\(([^)]+)\)/);
+		rgb = rgb ? rgb[1].match(/[\d.]+/g) : null;
+		if (!rgb) {
+			/* Tailwind themes can return lab()/oklch(). Convert through the
+			   browser's colour engine before measuring sRGB luminance. */
+			var canvas = document.createElement('canvas');
+			canvas.width = canvas.height = 1;
+			var context = canvas.getContext('2d', { willReadFrequently: true });
+			if (context) {
+				context.fillStyle = values.panel;
+				context.fillRect(0, 0, 1, 1);
+				rgb = context.getImageData(0, 0, 1, 1).data;
+			}
+		}
+		var dark = rgb ? (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) < 128 : false;
+		root.classList.toggle('mk-dark', dark);
+		document.body.classList.toggle('pwp-dark', dark);
+		if (root.zgzPaintTheme) root.zgzPaintTheme();
+	}
+	secondTimer.add(sync);
+	return sync;
 }
 
 function uptimeText(seconds) {
@@ -412,22 +495,30 @@ function uptimeTicker(node, read, clock, scheduler) {
 function hero(root, version) {
 	var fa = i18n.get() === 'fa';
 
-	function themeBtn(dark, text, ico) {
+	function themeBtn(mode, text, ico) {
 		return E('button', { 'type': 'button', 'class': 'mk-btn glass', 'click': function() {
+			var dark = mode === 'dark';
+			try { localStorage.setItem('zirgozar-theme', mode); } catch (e) {}
+			root.classList.toggle('mk-follow', mode === 'auto');
+			document.body.classList.toggle('pwp-follow', mode === 'auto');
 			root.classList.toggle('mk-dark', dark);
 			/* The edit window is drawn outside the page and takes its
 			   colours from here. */
 			document.body.classList.toggle('pwp-dark', dark);
 			paint();
-			try { localStorage.setItem('zirgozar-theme', dark ? 'dark' : 'light'); } catch (e) {}
+			if (root.zgzSyncTheme) root.zgzSyncTheme();
 		} }, [ icon(ico), E('span', {}, text) ]);
 	}
-	var light = themeBtn(false, _('Light'), 'sun'), dark = themeBtn(true, _('Dark'), 'moon');
+	var auto = themeBtn('auto', _('Follow LuCI theme'), 'sun');
+	var light = themeBtn('light', _('Light'), 'sun'), dark = themeBtn('dark', _('Dark'), 'moon');
 	function paint() {
-		var d = root.classList.contains('mk-dark');
-		light.classList.toggle('mk-seg-on', !d); light.setAttribute('aria-pressed', String(!d));
-		dark.classList.toggle('mk-seg-on', d); dark.setAttribute('aria-pressed', String(d));
+		[auto, light, dark].forEach(function(button, index) {
+			var selected = themeMode() === ['auto', 'light', 'dark'][index];
+			button.classList.toggle('mk-seg-on', selected);
+			button.setAttribute('aria-pressed', String(selected));
+		});
 	}
+	root.zgzPaintTheme = paint;
 	paint();
 
 	/* The other language's own name, in its own script. */
@@ -448,7 +539,10 @@ function hero(root, version) {
 		freshen(st.version, st.ui);
 	}).catch(function() {});
 
-	var heroLogo = logoImg('logo-light.png', 60);
+	var heroLogo = E('span', { 'class': 'zgz-hero-logo' }, [
+		logoImg('logo-light.png', 60, 'zgz-logo-inverse'),
+		logoImg('logo.png', 60, 'zgz-logo-normal')
+	]);
 
 	return E('div', { 'class': 'mk-hero' }, [
 		E('div', { 'class': 'mk-brand' }, [ E('div', {}, [
@@ -456,7 +550,7 @@ function hero(root, version) {
 			E('p', {}, _('Complete tunnel management on your router'))
 		]) ]),
 		E('div', { 'class': 'mk-row mk-hero-controls' }, [
-			E('div', { 'class': 'mk-seg', 'role': 'group', 'aria-label': _('Display mode') }, [ light, dark ]),
+			E('div', { 'class': 'mk-seg', 'role': 'group', 'aria-label': _('Display mode') }, [ auto, light, dark ]),
 			E('div', { 'class': 'mk-language-column' }, [ lang,
 				E('div', { 'class': 'mk-uptime' }, [ E('span', {}, _('Router uptime')), uptime ])
 			])
@@ -530,16 +624,19 @@ function page(children, opts) {
 		'error': show
 	}));
 	window.setTimeout(show, 1500);
-	var dark = prefersDark();
+	var dark = themeMode() === 'dark';
 	if (dark) root.classList.add('mk-dark');
 	/* For what LuCI draws outside the page: the edit window and the Save bar
 	   take the page's language, typeface and colours from these. */
 	document.body.classList.toggle('pwp-dark', dark);
 	document.body.classList.toggle('pwp-fa', fa);
+	document.body.classList.add('pwp-active');
 	root.appendChild(hero(root, opts.version));
 	root.appendChild(tabs());
 	root.appendChild(i18n.page(children));
 	root.appendChild(footer());
+	root.zgzSyncTheme = followTheme(root);
+	window.setTimeout(root.zgzSyncTheme, 0);
 	return root;
 }
 

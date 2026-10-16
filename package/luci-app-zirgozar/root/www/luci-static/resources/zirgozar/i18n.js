@@ -645,6 +645,7 @@ var FA = {
 
 	/* ------------------------------------------ the frame, banner, footer */
 	'Light': 'روشن',
+	'Follow LuCI theme': 'پیروی از تم LuCI',
 	'Dark': 'تیره',
 	'Display mode': 'حالت نمایش',
 	'Status': 'وضعیت',

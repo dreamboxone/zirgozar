@@ -194,8 +194,8 @@
 .mk-stat .mk-ico{color:#ef4444}
 
 /* Dialogs: LuCI's .modal box gets Makhzan colors; LuCI's own <h4> title is replaced by .mk-dialog-head */
-#modal_overlay > .modal.mk-dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:22px;padding:22px 24px 14px;max-width:660px;box-shadow:0 30px 70px -25px #000c}
-#modal_overlay > .modal.mk-dialog > h4{display:none}
+#modal_overlay:where(body.pwp-active *) > .modal.mk-dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:22px;padding:22px 24px 14px;max-width:660px;box-shadow:0 30px 70px -25px #000c}
+#modal_overlay:where(body.pwp-active *) > .modal.mk-dialog > h4{display:none}
 .mk.mk-modal{background:transparent;padding:0;border-radius:0;max-width:none;color:var(--text)}
 .mk-dialog-head{--accent:#6366f1;display:flex;align-items:center;gap:12px;margin:0 0 8px;padding-bottom:12px;border-bottom:1px solid var(--line)}
 .mk-dialog-head h3{margin:0;font-size:20px;font-weight:800}
@@ -317,16 +317,16 @@
 
 /* The window a row opens in to be edited sits outside the page, so it gets
    the page's colours here: light, or dark when the page is. */
-#modal_overlay>.modal{--bg:#f4f6fb;--panel:#fff;--text:#1b2540;--muted:#66728c;--line:#e3e8f2;--soft:#f6f8fd;--shadow:0 10px 30px -12px #1b2a5c26;
+#modal_overlay:where(body.pwp-active *)>.modal{--bg:#f4f6fb;--panel:#fff;--text:#1b2540;--muted:#66728c;--line:#e3e8f2;--soft:#f6f8fd;--shadow:0 10px 30px -12px #1b2a5c26;
 	background:var(--panel)!important;color:var(--text);border-radius:22px!important;padding:22px 24px 14px!important;box-shadow:0 30px 70px -25px #000c!important;border:1px solid var(--line)}
-body.pwp-dark #modal_overlay>.modal{--bg:#0d1526;--panel:#16213a;--text:#e8eeff;--muted:#9fb0d0;--line:#2a3a5c;--soft:#1b2846;--shadow:0 10px 30px -12px #000a}
-#modal_overlay>.modal>h4{font-weight:800;font-size:19px;color:var(--text)}
+body.pwp-dark #modal_overlay:where(body.pwp-active *)>.modal{--bg:#0d1526;--panel:#16213a;--text:#e8eeff;--muted:#9fb0d0;--line:#2a3a5c;--soft:#1b2846;--shadow:0 10px 30px -12px #000a}
+#modal_overlay:where(body.pwp-active *)>.modal>h4{font-weight:800;font-size:19px;color:var(--text)}
 /* Persian: the same typeface and direction as the page, in the window and in
    the Save bar under the page, both of which LuCI draws outside it. */
-body.pwp-fa #modal_overlay>.modal,body.pwp-fa #modal_overlay>.modal *,body.pwp-fa .cbi-page-actions,body.pwp-fa .cbi-page-actions *,
+body.pwp-fa #modal_overlay:where(body.pwp-active *)>.modal,body.pwp-fa #modal_overlay:where(body.pwp-active *)>.modal *,body.pwp-fa .cbi-page-actions:where(body.pwp-active *),body.pwp-fa .cbi-page-actions:where(body.pwp-active *) *,
 body.pwp-fa .alert-message,body.pwp-fa .alert-message *{font-family:Vazirmatn,Tahoma,sans-serif!important}
-body.pwp-fa #modal_overlay>.modal{direction:rtl;text-align:right}
-body.pwp-fa #modal_overlay>.modal textarea,body.pwp-fa #modal_overlay>.modal input:not([type=checkbox]){direction:ltr;text-align:left}
+body.pwp-fa #modal_overlay:where(body.pwp-active *)>.modal{direction:rtl;text-align:right}
+body.pwp-fa #modal_overlay:where(body.pwp-active *)>.modal textarea,body.pwp-fa #modal_overlay:where(body.pwp-active *)>.modal input:not([type=checkbox]){direction:ltr;text-align:left}
 
 /* ------------------------------------------------ LuCI's form, Makhzan's look
    The same rules for the page and for the edit window. */
@@ -340,95 +340,95 @@ body.pwp-fa #modal_overlay>.modal textarea,body.pwp-fa #modal_overlay>.modal inp
    of that card rather than a second one. */
 .mk .cbi-section .cbi-section{box-shadow:none;background:var(--soft)!important;margin:10px 0 0!important}
 .mk .cbi-section .cbi-section::before{display:none}
-:is(.mk,#modal_overlay>.modal) .cbi-section>h3,:is(.mk,#modal_overlay>.modal) .cbi-section>legend{display:flex;align-items:center;gap:12px;font-size:18px;font-weight:800;margin:0 0 14px!important;padding:0!important;border:0!important;background:none!important;color:var(--text)!important}
-:is(.mk,#modal_overlay>.modal) .cbi-section-descr{color:var(--muted);margin:0 0 12px;line-height:1.8}
-:is(.mk,#modal_overlay>.modal) .cbi-section-node{background:transparent!important;border:0!important;padding:0!important}
-:is(.mk,#modal_overlay>.modal) .cbi-value{display:flex;flex-wrap:wrap;align-items:flex-start;gap:4px 18px;padding:12px 0!important;margin:0!important;border:0!important;border-bottom:1px solid var(--line)!important;background:transparent!important}
-:is(.mk,#modal_overlay>.modal) .cbi-value:last-child{border-bottom:0!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-section>h3,:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-section>legend{display:flex;align-items:center;gap:12px;font-size:18px;font-weight:800;margin:0 0 14px!important;padding:0!important;border:0!important;background:none!important;color:var(--text)!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-section-descr{color:var(--muted);margin:0 0 12px;line-height:1.8}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-section-node{background:transparent!important;border:0!important;padding:0!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value{display:flex;flex-wrap:wrap;align-items:flex-start;gap:4px 18px;padding:12px 0!important;margin:0!important;border:0!important;border-bottom:1px solid var(--line)!important;background:transparent!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value:last-child{border-bottom:0!important}
 /* An option whose condition is not met: LuCI hides it with a class, and the
    flex above would otherwise win and show it anyway. */
-:is(.mk,#modal_overlay>.modal) .cbi-value.hidden,:is(.mk,#modal_overlay>.modal) .cbi-value[hidden],.mk .hidden{display:none!important}
-:is(.mk,#modal_overlay>.modal) .cbi-value-title{flex:0 0 220px;max-width:100%;font-weight:700;color:var(--text)!important;padding-top:10px!important;text-align:start!important;width:auto!important;float:none!important}
-:is(.mk,#modal_overlay>.modal) .cbi-value-field{flex:1 1 280px;min-width:0;margin:0!important;padding:0!important;width:auto!important;float:none!important}
-:is(.mk,#modal_overlay>.modal) .cbi-value-description{color:var(--muted)!important;font-size:12.5px;line-height:1.8;margin-top:6px;padding:0!important;background:none!important}
-:is(.mk,#modal_overlay>.modal) .cbi-value-description::before{display:none!important}
-:is(.mk,#modal_overlay>.modal) .cbi-value-field input:not([type=checkbox]),:is(.mk,#modal_overlay>.modal) .cbi-value-field select,:is(.mk,#modal_overlay>.modal) .cbi-value-field textarea{width:100%;max-width:520px}
-:is(.mk,#modal_overlay>.modal) input:not([type=checkbox]),:is(.mk,#modal_overlay>.modal) select,:is(.mk,#modal_overlay>.modal) textarea{background:var(--panel);color:var(--text);border:1.5px solid var(--line);border-radius:12px;min-height:44px;padding:10px 12px;margin:6px 0;max-width:100%}
-:is(.mk,#modal_overlay>.modal) textarea{min-height:0}
-:is(.mk,#modal_overlay>.modal) input:not([type=checkbox]):focus,:is(.mk,#modal_overlay>.modal) select:focus,:is(.mk,#modal_overlay>.modal) textarea:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 4px #6366f126}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value.hidden,:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value[hidden],.mk .hidden{display:none!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-title{flex:0 0 220px;max-width:100%;font-weight:700;color:var(--text)!important;padding-top:10px!important;text-align:start!important;width:auto!important;float:none!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-field{flex:1 1 280px;min-width:0;margin:0!important;padding:0!important;width:auto!important;float:none!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-description{color:var(--muted)!important;font-size:12.5px;line-height:1.8;margin-top:6px;padding:0!important;background:none!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-description::before{display:none!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-field input:not([type=checkbox]),:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-field select,:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-field textarea{width:100%;max-width:520px}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) input:not([type=checkbox]),:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) select,:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) textarea{background:var(--panel);color:var(--text);border:1.5px solid var(--line);border-radius:12px;min-height:44px;padding:10px 12px;margin:6px 0;max-width:100%}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) textarea{min-height:0}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) input:not([type=checkbox]):focus,:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) select:focus,:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) textarea:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 4px #6366f126}
 
 /* The widgets LuCI builds out of divs: a dropdown that also takes a typed
    value, and a list. The dropdown's entries in the page's own colours - one
    grey on another was hard to read - with the chosen one in Makhzan's blue. */
-:is(.mk,#modal_overlay>.modal) .cbi-dropdown{background:var(--panel)!important;color:var(--text);border:1.5px solid var(--line)!important;border-radius:12px!important;min-height:44px;margin:6px 0;max-width:520px;width:100%}
-:is(.mk,#modal_overlay>.modal) .cbi-dropdown[open]{border-color:#6366f1!important;box-shadow:0 0 0 4px #6366f126}
-:is(.mk,#modal_overlay>.modal) .cbi-dropdown>ul.dropdown{background:var(--panel)!important;border:1.5px solid #c7d2fe!important;border-radius:12px!important;box-shadow:0 18px 40px -18px #1e1b4b80!important;padding:4px!important;overflow:auto}
-:is(.mk,#modal_overlay>.modal) .cbi-dropdown>ul>li{color:var(--text)!important;opacity:1!important;min-height:38px;padding:8px 12px!important;border-radius:9px;border:0!important;font-weight:600}
-:is(.mk,#modal_overlay>.modal) .cbi-dropdown[open]>ul.dropdown>li:hover,:is(.mk,#modal_overlay>.modal) .cbi-dropdown[open]>ul.dropdown>li.focus{background:#eef2ff!important;color:#3730a3!important}
-:is(.mk,#modal_overlay>.modal) .cbi-dropdown[open]>ul.dropdown>li[selected]{background:linear-gradient(135deg,#3b82f6,#6366f1)!important;color:#fff!important}
-:is(.mk,#modal_overlay>.modal) .cbi-dropdown[open]>ul.dropdown>li[placeholder]{color:var(--muted)!important;font-weight:400}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-dropdown{background:var(--panel)!important;color:var(--text);border:1.5px solid var(--line)!important;border-radius:12px!important;min-height:44px;margin:6px 0;max-width:520px;width:100%}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-dropdown[open]{border-color:#6366f1!important;box-shadow:0 0 0 4px #6366f126}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-dropdown>ul.dropdown{background:var(--panel)!important;border:1.5px solid #c7d2fe!important;border-radius:12px!important;box-shadow:0 18px 40px -18px #1e1b4b80!important;padding:4px!important;overflow:auto}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-dropdown>ul>li{color:var(--text)!important;opacity:1!important;min-height:38px;padding:8px 12px!important;border-radius:9px;border:0!important;font-weight:600}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-dropdown[open]>ul.dropdown>li:hover,:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-dropdown[open]>ul.dropdown>li.focus{background:#eef2ff!important;color:#3730a3!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-dropdown[open]>ul.dropdown>li[selected]{background:linear-gradient(135deg,#3b82f6,#6366f1)!important;color:#fff!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-dropdown[open]>ul.dropdown>li[placeholder]{color:var(--muted)!important;font-weight:400}
 .mk-dark .cbi-dropdown[open]>ul.dropdown>li:hover,.mk-dark .cbi-dropdown[open]>ul.dropdown>li.focus{background:#1e3a8a55!important;color:#c7d2fe!important}
 /* Addresses, names and ports: data, drawn left to right in either language.
    The delete mark sits on the right of each entry, where a right-to-left
    entry starts - which is what cut the names off. */
-:is(.mk,#modal_overlay>.modal) .cbi-dynlist{max-width:520px;direction:ltr;text-align:left}
-:is(.mk,#modal_overlay>.modal) .cbi-dynlist>.item{background:var(--soft)!important;color:var(--text);border:1px solid var(--line)!important;border-radius:10px!important;padding:7px 34px 7px 10px!important;margin:4px 0;overflow:visible!important;white-space:normal;word-break:break-all}
-:is(.mk,#modal_overlay>.modal) .cbi-dynlist>.item::after{border-radius:0 10px 10px 0}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-dynlist{max-width:520px;direction:ltr;text-align:left}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-dynlist>.item{background:var(--soft)!important;color:var(--text);border:1px solid var(--line)!important;border-radius:10px!important;padding:7px 34px 7px 10px!important;margin:4px 0;overflow:visible!important;white-space:normal;word-break:break-all}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-dynlist>.item::after{border-radius:0 10px 10px 0}
 /* The delete mark on each entry: the LuCI theme paints it black, which on a
    light page is a row of black blocks. Light red here; the dark page keeps a
    dark one. */
-:is(.mk,#modal_overlay>.modal) .cbi-dynlist>.item::after{background:#fee2e2!important;color:#dc2626!important;border-left:1px solid #fecaca!important;text-shadow:none!important}
-:is(.mk-dark,body.pwp-dark #modal_overlay>.modal) .cbi-dynlist>.item::after{background:#3a1d26!important;color:#f87171!important;border-left-color:#5b2733!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-dynlist>.item::after{background:#fee2e2!important;color:#dc2626!important;border-left:1px solid #fecaca!important;text-shadow:none!important}
+:is(.mk-dark,body.pwp-dark #modal_overlay:where(body.pwp-active *)>.modal) .cbi-dynlist>.item::after{background:#3a1d26!important;color:#f87171!important;border-left-color:#5b2733!important}
 /* The box to type a new entry in and its + beside it, one height: the button
    was stretched to the box plus the box's margins. Both are given the same
    fixed height, borders included. */
-:is(.mk,#modal_overlay>.modal) .cbi-dynlist>.add-item{display:flex!important;align-items:center!important;gap:8px;margin:6px 0;height:auto!important}
-:is(.mk,#modal_overlay>.modal) .cbi-dynlist>.add-item>input{margin:0!important;flex:1 1 auto;min-width:0;box-sizing:border-box!important;height:44px!important;min-height:44px!important}
-:is(.mk,#modal_overlay>.modal) .cbi-dynlist>.add-item>.cbi-dropdown{margin:0!important;flex:1 1 auto;min-width:0}
-:is(.mk,#modal_overlay>.modal) .cbi-dynlist>.add-item>:is(.cbi-button,.btn,button){flex:none;margin:0!important;width:44px!important;height:44px!important;min-height:44px!important;max-height:44px!important;padding:0!important;justify-content:center;align-items:center;font-size:18px;line-height:1;box-sizing:border-box!important;align-self:center!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-dynlist>.add-item{display:flex!important;align-items:center!important;gap:8px;margin:6px 0;height:auto!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-dynlist>.add-item>input{margin:0!important;flex:1 1 auto;min-width:0;box-sizing:border-box!important;height:44px!important;min-height:44px!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-dynlist>.add-item>.cbi-dropdown{margin:0!important;flex:1 1 auto;min-width:0}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-dynlist>.add-item>:is(.cbi-button,.btn,button){flex:none;margin:0!important;width:44px!important;height:44px!important;min-height:44px!important;max-height:44px!important;padding:0!important;justify-content:center;align-items:center;font-size:18px;line-height:1;box-sizing:border-box!important;align-self:center!important}
 
 /* Every checkbox a switch, the way Makhzan draws them. The LuCI theme puts
    its own box (::before) and checkmark (::after) on every checkbox; both are
    replaced. */
-:is(.mk,#modal_overlay>.modal) input[type=checkbox]{appearance:none;-webkit-appearance:none;border:0;width:46px!important;height:26px!important;border-radius:26px;background:#cbd5e1;position:relative;cursor:pointer;flex:none;margin:9px 0;transition:background .15s;vertical-align:middle}
-:is(.mk,#modal_overlay>.modal) input[type=checkbox]::before{content:none!important;display:none!important}
-:is(.mk,#modal_overlay>.modal) input[type=checkbox]::after,:is(.mk,#modal_overlay>.modal) input[type=checkbox]:checked::after{content:""!important;position:absolute;top:3px!important;left:3px!important;width:20px!important;height:20px!important;border-radius:50%;
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) input[type=checkbox]{appearance:none;-webkit-appearance:none;border:0;width:46px!important;height:26px!important;border-radius:26px;background:#cbd5e1;position:relative;cursor:pointer;flex:none;margin:9px 0;transition:background .15s;vertical-align:middle}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) input[type=checkbox]::before{content:none!important;display:none!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) input[type=checkbox]::after,:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) input[type=checkbox]:checked::after{content:""!important;position:absolute;top:3px!important;left:3px!important;width:20px!important;height:20px!important;border-radius:50%;
 	background:#fff!important;-webkit-mask:none!important;mask:none!important;box-shadow:0 2px 4px #0003;transition:transform .15s;opacity:1}
-:is(.mk,#modal_overlay>.modal) input[type=checkbox]:checked{background:linear-gradient(135deg,#10b981,#059669)}
-:is(.mk,#modal_overlay>.modal) input[type=checkbox]:checked::after{transform:translateX(20px)}
-:is(.mk,#modal_overlay>.modal) input[type=checkbox]:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) input[type=checkbox]:checked{background:linear-gradient(135deg,#10b981,#059669)}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) input[type=checkbox]:checked::after{transform:translateX(20px)}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) input[type=checkbox]:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
 /* Off only: in a window, this outweighs the green of :checked above, and a
    switch turned on there stayed the colour of one turned off. */
-.mk-dark input[type=checkbox]:not(:checked),body.pwp-dark #modal_overlay>.modal input[type=checkbox]:not(:checked){background:#3a4a6b}
-:is(.mk,#modal_overlay>.modal) .cbi-checkbox>label{display:none}
+.mk-dark input[type=checkbox]:not(:checked),body.pwp-dark #modal_overlay:where(body.pwp-active *)>.modal input[type=checkbox]:not(:checked){background:#3a4a6b}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-checkbox>label{display:none}
 /* Except the tick box that selects a row for the buttons above the table:
    a switch there reads as turning the node on or off. A box. */
 /* Under the same :is() as the switch, which carries an id's weight, so that
    these win over it. */
-:is(.mk,#modal_overlay>.modal) input[type=checkbox].pwp-sel,:is(.mk,#modal_overlay>.modal) input[type=checkbox].zgz-tick{width:20px!important;height:20px!important;border-radius:6px!important;border:2px solid #94a3b8!important;background:transparent!important;margin:0!important}
-:is(.mk,#modal_overlay>.modal) input[type=checkbox].pwp-sel::after,:is(.mk,#modal_overlay>.modal) input[type=checkbox].pwp-sel:checked::after,:is(.mk,#modal_overlay>.modal) input[type=checkbox].zgz-tick::after,:is(.mk,#modal_overlay>.modal) input[type=checkbox].zgz-tick:checked::after{top:1px!important;left:5px!important;width:6px!important;height:11px!important;border-radius:0!important;
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) input[type=checkbox].pwp-sel,:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) input[type=checkbox].zgz-tick{width:20px!important;height:20px!important;border-radius:6px!important;border:2px solid #94a3b8!important;background:transparent!important;margin:0!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) input[type=checkbox].pwp-sel::after,:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) input[type=checkbox].pwp-sel:checked::after,:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) input[type=checkbox].zgz-tick::after,:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) input[type=checkbox].zgz-tick:checked::after{top:1px!important;left:5px!important;width:6px!important;height:11px!important;border-radius:0!important;
 	background:transparent!important;border:solid #fff;border-width:0 2.5px 2.5px 0;box-shadow:none!important;transform:rotate(45deg)!important;opacity:0}
-:is(.mk,#modal_overlay>.modal) input[type=checkbox].pwp-sel:checked,:is(.mk,#modal_overlay>.modal) input[type=checkbox].zgz-tick:checked{background:linear-gradient(135deg,#10b981,#059669)!important;border-color:#059669!important}
-:is(.mk,#modal_overlay>.modal) input[type=checkbox].pwp-sel:checked::after,:is(.mk,#modal_overlay>.modal) input[type=checkbox].zgz-tick:checked::after{opacity:1}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) input[type=checkbox].pwp-sel:checked,:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) input[type=checkbox].zgz-tick:checked{background:linear-gradient(135deg,#10b981,#059669)!important;border-color:#059669!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) input[type=checkbox].pwp-sel:checked::after,:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) input[type=checkbox].zgz-tick:checked::after{opacity:1}
 
 /* Buttons: LuCI's, in Makhzan's colours */
-:is(.mk,#modal_overlay>.modal,.cbi-page-actions) :is(.cbi-button,.btn){
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal,.cbi-page-actions:where(body.pwp-active *)) :is(.cbi-button,.btn){
 	display:inline-flex!important;align-items:center;gap:6px;border:0!important;border-radius:12px!important;padding:9px 15px!important;cursor:pointer;font-weight:700;font-size:13.5px;line-height:1.2;
 	color:#fff!important;background:linear-gradient(135deg,#3b82f6,#6366f1)!important;box-shadow:0 6px 14px -8px #0f172a80!important;transition:transform .12s,filter .12s;text-shadow:none!important;height:auto!important;min-height:38px}
-:is(.mk,#modal_overlay>.modal,.cbi-page-actions) :is(.cbi-button,.btn):hover{transform:translateY(-1px);filter:brightness(1.06)}
-:is(.mk,#modal_overlay>.modal,.cbi-page-actions) :is(.cbi-button-save,.cbi-button-positive,.cbi-button-add,.cbi-button-apply){background:linear-gradient(135deg,#10b981,#059669)!important}
-:is(.mk,#modal_overlay>.modal,.cbi-page-actions) :is(.cbi-button-remove,.cbi-button-negative,.cbi-button-reset){background:linear-gradient(135deg,#f43f5e,#dc2626)!important}
-:is(.mk,#modal_overlay>.modal,.cbi-page-actions) :is(.cbi-button-neutral,.cbi-button-edit){background:#e8f0ff!important;color:#2458d6!important;box-shadow:none!important;border:1px solid #cddcff!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal,.cbi-page-actions:where(body.pwp-active *)) :is(.cbi-button,.btn):hover{transform:translateY(-1px);filter:brightness(1.06)}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal,.cbi-page-actions:where(body.pwp-active *)) :is(.cbi-button-save,.cbi-button-positive,.cbi-button-add,.cbi-button-apply){background:linear-gradient(135deg,#10b981,#059669)!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal,.cbi-page-actions:where(body.pwp-active *)) :is(.cbi-button-remove,.cbi-button-negative,.cbi-button-reset){background:linear-gradient(135deg,#f43f5e,#dc2626)!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal,.cbi-page-actions:where(body.pwp-active *)) :is(.cbi-button-neutral,.cbi-button-edit){background:#e8f0ff!important;color:#2458d6!important;box-shadow:none!important;border:1px solid #cddcff!important}
 .mk-dark :is(.cbi-button-neutral,.cbi-button-edit){background:#1e3a8a55!important;color:#93b4ff!important;border-color:#2c4c9c!important}
 .mk .cbi-section-table .cbi-button{padding:6px 11px!important;min-height:32px;font-size:12px}
 /* Close and Save under a dialog, apart. LuCI separates them with a space,
    which an inline-flex button does not keep. */
-#modal_overlay>.modal :is(.button-row,.right){display:flex!important;gap:10px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
-#modal_overlay>.modal :is(.cbi-button,.btn)+:is(.cbi-button,.btn){margin-inline-start:10px}
-#modal_overlay>.modal :is(.button-row,.right)>:is(.cbi-button,.btn)+:is(.cbi-button,.btn){margin-inline-start:0}
+#modal_overlay:where(body.pwp-active *)>.modal :is(.button-row,.right){display:flex!important;gap:10px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+#modal_overlay:where(body.pwp-active *)>.modal :is(.cbi-button,.btn)+:is(.cbi-button,.btn){margin-inline-start:10px}
+#modal_overlay:where(body.pwp-active *)>.modal :is(.button-row,.right)>:is(.cbi-button,.btn)+:is(.cbi-button,.btn){margin-inline-start:0}
 
 /* The bar with Save and Apply, under the page */
-.cbi-page-actions{background:transparent!important;border:0!important;max-width:1240px;margin:14px auto 18px!important;padding:0 24px!important;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.cbi-page-actions:where(body.pwp-active *){background:transparent!important;border:0!important;max-width:1240px;margin:14px auto 18px!important;padding:0 24px!important;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
 
 /* Tables of rows: the subscriptions, the nodes, the rules. Every cell in a
    row on one line, and every heading over its own column - LuCI puts the
@@ -441,6 +441,10 @@ body.pwp-fa #modal_overlay>.modal textarea,body.pwp-fa #modal_overlay>.modal inp
 .mk .cbi-section-table .th,.mk table.table .th{color:var(--muted);font-weight:700;border-bottom:1px solid var(--line)!important;background:transparent!important;padding-top:10px!important}
 .mk .cbi-section-table .td,.mk table.table .td{border-top:1px solid var(--line)!important;background:transparent!important;color:var(--text)}
 .mk .cbi-section-table .td>*{margin-top:0!important;margin-bottom:0!important}
+.mk :is(.cbi-section-table,table.table) .tr.cbi-section-table-row{background:var(--panel)!important;color:var(--text)}
+.mk .cbi-section-node>[data-tab]{background:var(--panel)!important;color:var(--text)}
+.mk .cbi-value-description{opacity:1}
+:is(.mk,body.pwp-active #modal_overlay>.modal) :is(input,textarea)::placeholder{color:var(--muted);opacity:1}
 .mk .cbi-section-table .tr:hover .td{background:var(--soft)!important}
 /* The heading row and an empty table's one line are not rows to point at:
    the LuCI theme darkens them on hover like any other. */
@@ -450,17 +454,17 @@ body.pwp-fa #modal_overlay>.modal textarea,body.pwp-fa #modal_overlay>.modal inp
 .mk .cbi-section-create{margin-top:12px}
 
 /* The tabs inside a page - the settings' Main, DNS, Xray - as Makhzan's tab bar */
-:is(.mk,#modal_overlay>.modal) .cbi-tabmenu{display:flex!important;gap:6px;flex-wrap:wrap;background:var(--panel)!important;border:1px solid var(--line)!important;border-radius:18px;padding:6px!important;margin:0 0 20px!important;box-shadow:var(--shadow);list-style:none}
-:is(.mk,#modal_overlay>.modal) .cbi-tabmenu>li{height:auto!important;max-width:none!important;border:0!important;background:transparent!important;margin:0!important;padding:0!important;border-radius:13px}
-:is(.mk,#modal_overlay>.modal) .cbi-tabmenu>li>a{display:inline-flex;align-items:center;color:var(--muted)!important;font-weight:700;font-size:14px;padding:10px 14px!important;border-radius:13px!important;text-decoration:none!important;line-height:1.2!important}
-:is(.mk,#modal_overlay>.modal) .cbi-tabmenu>li:not(.cbi-tab):hover>a{background:var(--soft);color:var(--text)!important}
-:is(.mk,#modal_overlay>.modal) .cbi-tabmenu>li.cbi-tab{background:linear-gradient(135deg,#3b82f6,#6366f1)!important;box-shadow:0 6px 14px -8px #4f46e5}
-:is(.mk,#modal_overlay>.modal) .cbi-tabmenu>li.cbi-tab>a{color:#fff!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-tabmenu{display:flex!important;gap:6px;flex-wrap:wrap;background:var(--panel)!important;border:1px solid var(--line)!important;border-radius:18px;padding:6px!important;margin:0 0 20px!important;box-shadow:var(--shadow);list-style:none}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-tabmenu>li{height:auto!important;max-width:none!important;border:0!important;background:transparent!important;margin:0!important;padding:0!important;border-radius:13px}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-tabmenu>li>a{display:inline-flex;align-items:center;color:var(--muted)!important;font-weight:700;font-size:14px;padding:10px 14px!important;border-radius:13px!important;text-decoration:none!important;line-height:1.2!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-tabmenu>li:not(.cbi-tab):hover>a{background:var(--soft);color:var(--text)!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-tabmenu>li.cbi-tab{background:linear-gradient(135deg,#3b82f6,#6366f1)!important;box-shadow:0 6px 14px -8px #4f46e5}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-tabmenu>li.cbi-tab>a{color:#fff!important}
 
 @media(max-width:700px){
-	:is(.mk,#modal_overlay>.modal) .cbi-value-title{flex:1 1 100%;padding-top:0!important}
+	:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-title{flex:1 1 100%;padding-top:0!important}
 	.mk .cbi-section{padding:16px!important}
-	.cbi-page-actions{padding:0 12px!important}
+	.cbi-page-actions:where(body.pwp-active *){padding:0 12px!important}
 }
 
 /* Messages beside what they are about, never at the top of the page. */
@@ -519,15 +523,138 @@ body.pwp-fa #modal_overlay>.modal textarea,body.pwp-fa #modal_overlay>.modal inp
 
 /* Scroll bars in the page's own colours. Left to the browser they follow the
    system's dark mode, and a light page had black bars in its lists and boxes. */
-.mk,#modal_overlay>.modal{color-scheme:light;scrollbar-color:#c3cde4 var(--soft)}
-.mk-dark,body.pwp-dark #modal_overlay>.modal{color-scheme:dark;scrollbar-color:#3a4d77 var(--soft)}
-:is(.mk,#modal_overlay>.modal) ::-webkit-scrollbar{width:10px;height:10px}
-:is(.mk,#modal_overlay>.modal) ::-webkit-scrollbar-track{background:var(--soft);border-radius:10px}
-:is(.mk,#modal_overlay>.modal) ::-webkit-scrollbar-thumb{background:#c3cde4;border-radius:10px;border:2px solid var(--soft)}
-:is(.mk-dark,body.pwp-dark #modal_overlay>.modal) ::-webkit-scrollbar-thumb{background:#3a4d77}
+.mk,#modal_overlay:where(body.pwp-active *)>.modal{color-scheme:light;scrollbar-color:#c3cde4 var(--soft)}
+.mk-dark,body.pwp-dark #modal_overlay:where(body.pwp-active *)>.modal{color-scheme:dark;scrollbar-color:#3a4d77 var(--soft)}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) ::-webkit-scrollbar{width:10px;height:10px}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) ::-webkit-scrollbar-track{background:var(--soft);border-radius:10px}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) ::-webkit-scrollbar-thumb{background:#c3cde4;border-radius:10px;border:2px solid var(--soft)}
+:is(.mk-dark,body.pwp-dark #modal_overlay:where(body.pwp-active *)>.modal) ::-webkit-scrollbar-thumb{background:#3a4d77}
 
 /* Add under the shunt rules: a button its own size, its word in the middle,
    and a message under the box rather than beside it. LuCI's theme stretches
    whatever sits directly in a create row. */
 .mk .zgz-shunt-add{display:block!important}
 .mk .zgz-shunt-add .cbi-button-add{flex:0 0 auto!important;width:auto!important;min-width:110px;justify-content:center!important;text-align:center}
+
+/* Native LuCI colours are sampled outside this subtree, including on themes
+   without custom properties. Keep these rules scoped to the application. */
+.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal{
+	--bg:var(--zgz-bg);--panel:var(--zgz-panel);--text:var(--zgz-text);
+	--muted:color-mix(in srgb,var(--zgz-text) 68%,var(--zgz-panel));
+	--line:color-mix(in srgb,var(--zgz-text) 18%,var(--zgz-panel));
+	--soft:color-mix(in srgb,var(--zgz-text) 4%,var(--zgz-panel));
+	--shadow:0 2px 8px #00000012;
+}
+.mk.mk-follow{padding:16px;border-radius:6px}
+.mk-follow :is(.mk-card,.mk-metric){border-radius:6px;box-shadow:var(--shadow)}
+.mk-follow .mk-card::before{display:none}
+.mk-follow .mk-hero{background:var(--zgz-accent);border-radius:6px;padding:20px 24px;box-shadow:var(--shadow)}
+.mk-follow .mk-hero::after{display:none}
+.mk-follow .mk-btn.primary{background:var(--zgz-accent)}
+.mk-follow .mk-seg{flex-wrap:wrap}
+.mk-follow :is(input:not([type=checkbox]),select,textarea):focus{border-color:var(--zgz-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--zgz-accent) 20%,transparent)}
+.mk-follow :is(.mk-btn,input:not([type=checkbox]),select,textarea){border-radius:5px}
+@media(max-width:600px){
+	.mk.mk-follow{padding:8px}
+	.mk-follow .mk-hero{padding:16px}
+	.mk .mk-hero-controls,.mk .mk-seg{max-width:100%;min-width:0}
+	.mk .mk-seg{flex-wrap:wrap}
+	.mk .mk-seg .mk-btn.glass{padding:9px;min-height:40px;white-space:normal}
+}
+
+/* Follow the host's component geometry as well as its palette. Sampled
+   values come from native LuCI controls, not a second theme stylesheet. */
+.zgz-logo-normal{display:none}
+.mk-follow:not(.mk-dark) .zgz-logo-normal{display:block}
+.mk-follow:not(.mk-dark) .zgz-logo-inverse{display:none}
+.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal{
+	--shadow:var(--zgz-card-shadow,none);
+	--zgz-radius:var(--material3-card-radius,var(--zgz-card-radius,6px));
+	--zgz-field-radius:var(--material3-control-radius,var(--zgz-control-radius,5px));
+	--zgz-action-radius:var(--material3-button-radius,var(--zgz-button-radius,5px));
+	--zgz-success:var(--success-color-high,var(--success,#16845b));
+	--zgz-error:var(--error-color-high,var(--danger,var(--error,#c43b42)));
+	--zgz-warning:var(--warn-color-high,var(--warning,#a46712));
+	font-family:var(--zgz-font,inherit);font-size:var(--zgz-font-size,14px);
+}
+.mk.mk-follow{background:transparent;padding:20px 0 0;border-radius:0}
+.mk-follow .mk-hero{background:transparent;color:var(--text);border:0;border-radius:0;box-shadow:none;padding:12px 0 20px;margin-bottom:0}
+.mk-follow .mk-hero h2{color:var(--text);font-weight:500;font-size:24px;background:transparent!important;padding:0!important;box-shadow:none!important;border:0!important;border-radius:0;margin:0!important}
+.mk-follow .mk-hero p{color:var(--muted);font-size:13px}
+.mk-follow .mk-version{color:var(--muted);background:var(--soft);border-color:var(--line);font-weight:500}
+.mk-follow :is(.mk-card,.mk-metric,.mk-user,.mk-empty,.mk-folder,.mk-conf,.mk-log){border-radius:var(--zgz-radius);box-shadow:var(--shadow)}
+.mk-follow :is(.mk-card,.mk-metric){padding:var(--zgz-card-padding,20px);background:var(--panel);border-color:var(--line)}
+.mk.mk-follow .cbi-section{border-radius:var(--zgz-radius)!important;padding:var(--zgz-card-padding,20px)!important;box-shadow:var(--shadow)}
+.mk-follow :is(.mk-card,.cbi-section,.mk-plan>div)::before,.mk-follow .mk-metric::after{display:none}
+.mk-follow :is(.mk-card-title,.mk-metric-title,.mk-field span){font-weight:500}
+.mk-follow .mk-metric-ico,.mk-follow .mk-badge-ico{background:var(--soft);color:var(--zgz-accent);box-shadow:none;border-radius:var(--zgz-field-radius)}
+.mk-follow .mk-big{font-weight:500;color:var(--text)}
+.mk-follow .mk-avatar{background:var(--zgz-accent);color:var(--zgz-on-accent)}
+.mk-follow .mk-btn,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .mk-btn{
+	border-radius:var(--zgz-action-radius);padding:var(--zgz-button-padding,9px 16px);
+	font-size:var(--zgz-button-size,14px);font-weight:var(--zgz-button-weight,500);
+	box-shadow:none;text-transform:none;min-height:36px;justify-content:center;
+}
+.mk-follow .mk-btn:hover:not(:disabled){transform:none;box-shadow:none;filter:brightness(.95)}
+.mk-follow .mk-btn.primary,.mk-follow .mk-btn.glass,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .mk-btn.primary{background:var(--zgz-accent);color:var(--zgz-on-accent,#fff);border:1px solid transparent;backdrop-filter:none}
+.mk-follow .mk-btn.success{background:var(--success-surface,var(--zgz-success));color:var(--on-success-color,var(--success,#fff))}
+.mk-follow .mk-btn.danger{background:var(--danger-surface,var(--zgz-error));color:var(--on-error-color,var(--danger,#fff))}
+.mk-follow .mk-btn.warn{background:var(--warning-surface,var(--zgz-warning));color:var(--on-warn-color,var(--warning,#fff))}
+.mk-follow .mk-btn:is(.soft-blue,.soft-violet){background:color-mix(in srgb,var(--zgz-accent) 12%,var(--panel));color:var(--zgz-accent);border-color:transparent}
+.mk-follow .mk-btn.soft-green{background:color-mix(in srgb,var(--zgz-success) 12%,var(--panel));color:var(--zgz-success);border-color:transparent}
+.mk-follow .mk-btn.soft-red{background:color-mix(in srgb,var(--zgz-error) 12%,var(--panel));color:var(--zgz-error);border-color:transparent}
+.mk-follow .mk-btn.soft-amber{background:color-mix(in srgb,var(--zgz-warning) 12%,var(--panel));color:var(--zgz-warning);border-color:transparent}
+.mk-follow .mk-seg{background:var(--soft);border:1px solid var(--line);border-radius:var(--zgz-action-radius);backdrop-filter:none}
+.mk-follow .mk-seg .mk-btn.glass{color:var(--muted);background:transparent;border-radius:var(--zgz-action-radius)}
+.mk-follow .mk-seg .mk-btn.glass.mk-seg-on{background:var(--zgz-accent);color:var(--zgz-on-accent,#fff);box-shadow:none}
+.mk-follow .mk-tabs{position:static;background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:none;padding:0;gap:4px}
+.mk.mk-follow .mk-tab{border-radius:var(--zgz-field-radius) var(--zgz-field-radius) 0 0;font-weight:500;padding:12px;box-shadow:none}
+.mk.mk-follow .mk-tab.mk-tab-on{background:var(--soft);color:var(--zgz-accent);box-shadow:inset 0 -3px var(--zgz-accent)}
+:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) :is(input:not([type=checkbox]),select,textarea,.cbi-dropdown){border-radius:var(--zgz-field-radius)!important;background:var(--zgz-control-bg)!important;border-color:var(--zgz-control-line)!important;color:var(--text);box-shadow:none}
+:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) :is(input,select,textarea):focus{outline:2px solid var(--zgz-accent);outline-offset:1px;box-shadow:none}
+.mk.mk-follow :is(.cbi-button,.cbi-button-neutral,.cbi-button-edit){border-radius:var(--zgz-action-radius)!important;box-shadow:none!important;background:var(--zgz-accent)!important;color:var(--zgz-on-accent,#fff)!important;font-weight:var(--zgz-button-weight,500)!important;transform:none!important}
+.mk.mk-follow :is(.cbi-button-apply,.cbi-button-save,.cbi-button-add,.cbi-button-edit){background:var(--zgz-accent)!important;color:var(--zgz-on-accent,#fff)!important;border-color:transparent!important}
+.mk.mk-follow :is(.cbi-button-remove,.cbi-button-reset){background:var(--zgz-error)!important;color:var(--on-error-color,#fff)!important;border-color:transparent!important}
+.mk.mk-follow :is(.cbi-section-table,table.table){border-radius:var(--zgz-radius);border-color:var(--line)}
+.mk-follow :is(.mk-link,.mk-select,.mk-connect code){color:var(--zgz-accent);border-color:var(--line)}
+.mk-follow .mk-chip.info{background:var(--soft);color:var(--zgz-accent);border-color:var(--line)}
+.mk-follow .mk-on,.mk-follow .pwp-note.ok{color:var(--zgz-success)}
+.mk-follow .mk-bad,.mk-follow .mk-msg{color:var(--zgz-error)}
+.mk-follow .mk-wait{color:var(--zgz-warning)}
+.mk-follow input[type=checkbox]:checked{background:var(--zgz-accent)!important}
+body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal{border-radius:var(--zgz-radius)!important;box-shadow:var(--shadow);background:var(--panel);color:var(--text);max-width:min(900px,calc(100vw - 24px))}
+body.pwp-follow #modal_overlay:where(body.pwp-active *) .mk{--bg:var(--zgz-bg);--panel:var(--zgz-panel);--text:var(--zgz-text);--soft:color-mix(in srgb,var(--zgz-text) 4%,var(--zgz-panel));--line:color-mix(in srgb,var(--zgz-text) 18%,var(--zgz-panel));background:transparent;color:var(--text)}
+body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .mk-btn{box-shadow:none;transform:none}
+body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .mk-btn.success{background:var(--success-surface,var(--zgz-success));color:var(--on-success-color,var(--success,#fff))}
+body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .mk-btn.danger{background:var(--danger-surface,var(--zgz-error));color:var(--on-error-color,var(--danger,#fff))}
+body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .mk-btn.warn{background:var(--warning-surface,var(--zgz-warning));color:var(--on-warn-color,var(--warning,#fff))}
+body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .mk-btn:is(.soft-blue,.soft-violet,.glass){background:var(--soft);color:var(--zgz-accent);border-color:var(--line)}
+body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{background:var(--zgz-accent)!important;color:var(--zgz-on-accent)!important;border-radius:var(--zgz-action-radius)!important;box-shadow:none!important}
+:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) .cbi-tabmenu{background:transparent!important;border:0!important;border-bottom:1px solid var(--line)!important;border-radius:0;padding:0!important;box-shadow:none}
+:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) .cbi-tabmenu>li.cbi-tab{background:var(--soft)!important;box-shadow:inset 0 -3px var(--zgz-accent)}
+:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) .cbi-tabmenu>li>a{border-radius:var(--zgz-field-radius) var(--zgz-field-radius) 0 0!important;font-weight:500}
+:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) .cbi-tabmenu>li.cbi-tab>a{color:var(--zgz-accent)!important}
+:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) .cbi-dropdown>ul.dropdown{border-color:var(--line)!important;border-radius:var(--zgz-field-radius)!important;box-shadow:var(--shadow)!important}
+:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) .cbi-dropdown[open]>ul.dropdown>li[selected]{background:var(--zgz-accent)!important;color:var(--zgz-on-accent)!important}
+:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) .cbi-dropdown[open]>ul.dropdown>li:is(:hover,.focus){background:var(--soft)!important;color:var(--text)!important}
+:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) .cbi-value{flex-direction:row!important}
+:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-description{opacity:1}
+:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal,body.pwp-follow .cbi-page-actions) :is(.cbi-button,.btn){
+	background:var(--zgz-accent)!important;color:var(--zgz-on-accent)!important;
+	border-color:transparent!important;border-radius:var(--zgz-button-radius,6px)!important;
+	box-shadow:none!important;transform:none!important;font-weight:var(--zgz-button-weight,500)!important;
+}
+:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal,body.pwp-follow .cbi-page-actions) :is(.cbi-button-neutral,.cbi-button-default){background:var(--zgz-control-bg)!important;color:var(--zgz-text)!important;border-color:var(--zgz-control-line)!important}
+:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal,body.pwp-follow .cbi-page-actions) :is(.cbi-button-remove,.cbi-button-negative,.cbi-button-reset){background:var(--danger-surface,var(--error-color-low,#ffe8e6))!important;color:var(--danger,var(--error-color-high,#a82b35))!important}
+@media(max-width:700px){
+	.mk.mk-follow .mk-hero{padding:8px 0 16px;gap:12px}
+	.mk.mk-follow :is(.mk-card,.cbi-section){padding:16px!important}
+	.mk-follow .mk-metric{padding:14px}
+	.mk-follow .mk-tabs{overflow-x:auto;flex-wrap:nowrap}
+	.mk.mk-follow .mk-tab{flex:0 0 auto;min-height:44px}
+	.mk-follow .mk-hero-controls{gap:12px}
+	.mk-follow .mk-btn{min-height:40px}
+	:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-title,
+	:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-field{flex:1 1 100%;width:100%!important}
+	body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal{padding:16px!important;width:calc(100vw - 24px);max-height:calc(100dvh - 24px);overflow:auto}
+}

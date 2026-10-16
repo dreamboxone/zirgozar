@@ -45,6 +45,60 @@ assert.equal(render({ keylist: ['node-a'], default: ['node-a'] }, undefined)
 	.children[0].children[0].attrs.checked, '');
 
 console.log('Config checkbox rendering passed: missing, empty, populated and default choices');
+
+// A missing or stale preference follows LuCI; explicit choices remain intact.
+const modeSource = source.match(/function themeMode\(\) \{[\s\S]*?\n\}/)[0];
+for (const [saved, expected] of [[null, 'auto'], ['auto', 'auto'], ['old', 'auto'], ['dark', 'dark'], ['light', 'light']]) {
+	const mode = new Function('localStorage', modeSource + '; return themeMode();');
+	assert.equal(mode({ getItem: () => saved }), expected);
+}
+assert.equal(new Function('localStorage', modeSource + '; return themeMode();')({
+	getItem: () => { throw new Error('Storage unavailable'); }
+}), 'auto');
+console.log('Theme preferences passed: follow by default, explicit modes and unavailable storage');
+const followSource = source.match(/function followTheme\(root\) \{[\s\S]*?\n\}/)[0];
+function themedElement() {
+	const classes = new Set(), properties = new Map();
+	return { isConnected: true, parentElement: null,
+		classList: { toggle: (name, on) => on ? classes.add(name) : classes.delete(name), contains: name => classes.has(name), remove: name => classes.delete(name) },
+		style: { getPropertyValue: name => properties.get(name), setProperty: (name, value) => properties.set(name, value) },
+		appendChild() {}, remove() {} };
+}
+let hostDark = false, preference = 'auto', removedThemeTimer = false;
+let modernColor = null, modernPixels = [255, 255, 255, 255];
+const themeBody = themedElement(), themeRoot = themedElement();
+themeRoot.parentElement = themeBody;
+const synchronize = new Function('E', 'document', 'getComputedStyle', 'themeMode', 'secondTimer',
+	followSource + '; return followTheme;')(
+	() => themedElement(), { body: themeBody, querySelector: () => null,
+		createElement: () => ({ getContext: () => ({ fillRect() {}, getImageData: () => ({ data: modernPixels }) }) }) },
+	() => ({ backgroundColor: modernColor || (hostDark ? 'rgb(24, 24, 24)' : 'rgb(255, 255, 255)'),
+		color: hostDark ? 'rgb(240, 240, 240)' : 'rgb(30, 30, 30)', borderTopColor: 'rgb(90, 90, 90)',
+		borderRadius: '16px', padding: '0px', boxShadow: 'none', fontSize: '14px', fontWeight: '400', fontFamily: 'sans-serif' }),
+	() => preference, { add() {}, remove() { removedThemeTimer = true; } })(themeRoot);
+synchronize();
+assert.ok(themeRoot.classList.contains('mk-follow'));
+assert.ok(!themeRoot.classList.contains('mk-dark'));
+assert.equal(themeRoot.style.getPropertyValue('--zgz-card-radius'), '16px');
+assert.equal(themeRoot.style.getPropertyValue('--zgz-card-padding'), '20px');
+assert.equal(themeRoot.style.getPropertyValue('--zgz-button-radius'), '16px');
+assert.equal(themeRoot.style.getPropertyValue('--zgz-control-radius'), '16px');
+assert.equal(themeBody.style.getPropertyValue('--zgz-font'), 'sans-serif');
+hostDark = true; synchronize();
+assert.ok(themeRoot.classList.contains('mk-dark'));
+assert.ok(themeBody.classList.contains('pwp-dark'));
+assert.equal(themeBody.style.getPropertyValue('--zgz-panel'), 'rgb(24, 24, 24)');
+modernColor = 'lab(100% 0 0)'; synchronize();
+assert.ok(!themeRoot.classList.contains('mk-dark'));
+modernColor = 'lab(8% 0 -7)'; modernPixels = [24, 24, 24, 255]; synchronize();
+assert.ok(themeRoot.classList.contains('mk-dark'));
+preference = 'light'; synchronize();
+assert.ok(!themeRoot.classList.contains('mk-follow'));
+assert.ok(!themeBody.classList.contains('pwp-follow'));
+themeRoot.isConnected = false; synchronize();
+assert.ok(removedThemeTimer);
+assert.ok(!themeBody.classList.contains('pwp-dark'));
+console.log('Theme synchronization passed: host changes, modal colours, manual opt-out and navigation cleanup');
 assert.equal(ui.uptimeText(0), '00:00:00');
 assert.equal(ui.uptimeText(90061.9), '1 day 01:01:01');
 assert.equal(ui.uptimeText(null), '-');
