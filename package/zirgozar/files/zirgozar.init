@@ -457,7 +457,7 @@ service_started() {
 		return 1
 	fi
 
-	"$DNS" up >/dev/null 2>&1 || true
+	"$DNS" up >/dev/null 2>&1 || log "dnsmasq would not take the tunnel's name server - the health check tries again"
 
 	# What was put in place, so that a save can tell whether it changes any
 	# of it - see reload_service.

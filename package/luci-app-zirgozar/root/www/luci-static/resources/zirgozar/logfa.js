@@ -45,6 +45,7 @@ var T = [
 	[ '{} did not connect within two minutes', '{1} در دو دقیقه وصل نشد' ],
 	[ '{}: cleared what an earlier connection left behind', '{1}: باقی‌مانده اتصال قبلی پاک شد' ],
 	[ 'IKEv2: the connection was lost', 'IKEv2: اتصال قطع شد' ],
+	[ "dnsmasq would not take the tunnel's name server - the health check tries again", 'dnsmasq سرور DNS تونل را نپذیرفت - بررسی سلامت دوباره تلاش می‌کند' ],
 	[ 'the bridge never started listening on {}', 'پل هیچ‌وقت روی {1} شروع به گوش دادن نکرد' ],
 	[ 'the core is still starting - waiting for it', 'هسته هنوز در حال راه‌اندازی است - منتظر آن' ],
 	[ '{} never started listening on {} - leaving the network untouched', '{1} هیچ‌وقت روی {2} شروع به گوش دادن نکرد - شبکه دست‌نخورده ماند' ],

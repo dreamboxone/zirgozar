@@ -97,8 +97,11 @@ if tunnel_running; then
 	if ! "${ZGZ_LIB:-/usr/libexec}/zgz-rules" status 2>/dev/null | grep -q '^active:[ \t]*yes'; then
 		log "the tunnel is running but its rules are gone - putting them back"
 		"${ZGZ_LIB:-/usr/libexec}/zgz-rules" up >/dev/null 2>&1 || true
-		"${ZGZ_LIB:-/usr/libexec}/zgz-dns" up >/dev/null 2>&1 || true
 	fi
+	# The same for name lookups: a dnsmasq that would not restart with the
+	# tunnel's server, or a table of the guard's that a firewall reload took
+	# with it, is put right here. When all is in place this restarts nothing.
+	ZGZ_DNS_QUIET=1 "${ZGZ_LIB:-/usr/libexec}/zgz-dns" up >/dev/null 2>&1 || true
 	# And a tunnel that is running with its rules in place can still be
 	# carrying nothing at all. A node that completes a TCP handshake and
 	# then passes no traffic satisfies both of the checks above for ever,
