@@ -1081,9 +1081,11 @@ download_checked() {
 		rm -f "$_dl_part"
 	done
 	rm -f "$ZGZ_RUN/download"
+	# Said in a sentence of its own, without the address, so that it can be
+	# said in the reader's language; the address is in the log.
 	if [ "$_dl_ok" != "1" ]; then
 		rm -f "$_dl_part"
-		say_message "Download failed: $_url"
+		say_message "The download failed: the server did not answer, or the connection broke half way."
 		warn "download failed: $_url"
 		return 1
 	fi
@@ -1091,7 +1093,7 @@ download_checked() {
 	_dl_got="$(wc -c < "$_dl_part" 2>/dev/null || echo 0)"
 	if [ "$_dl_got" -lt 1024 ]; then
 		rm -f "$_dl_part"
-		say_message "Download looks truncated ($(human_size "$_dl_got")): $_url"
+		say_message "The download came back cut short."
 		warn "download truncated: $_url"
 		return 1
 	fi

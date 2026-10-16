@@ -42,6 +42,12 @@ set -e
 
 . "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
 
+# What an update of the routing data has to say is said beside the routing
+# data, on Rule Manage - not on the Status card, where a scheduled update that
+# could not reach its server once left "Download failed" over a working
+# tunnel, and where clearing it took away what the card was saying.
+ZGZ_MESSAGE="$ZGZ_RUN/geo-message"
+
 GEOIP_DEFAULT="https://raw.githubusercontent.com/Chocolate4U/Iran-v2ray-rules/release/geoip.dat"
 GEOSITE_DEFAULT="https://raw.githubusercontent.com/Chocolate4U/Iran-v2ray-rules/release/geosite.dat"
 
@@ -298,7 +304,8 @@ cmd_status() {
 	one_status geoip
 	printf ','
 	one_status geosite
-	printf ',"usable":%s}\n' "$(geo_dir >/dev/null 2>&1 && echo true || echo false)"
+	printf ',"usable":%s,"message":"%s"}\n' "$(geo_dir >/dev/null 2>&1 && echo true || echo false)" \
+		"$(json_escape "$(head -1 "$ZGZ_MESSAGE" 2>/dev/null)")"
 	return 0
 }
 

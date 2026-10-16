@@ -69,7 +69,9 @@ cleanup() {
 		ip link set dev "$DEV" down 2>/dev/null || true
 	fi
 	[ "${PAUSED:-0}" != 1 ] || "$ZGZ_LIB/zgz-rules" local resume >/dev/null 2>&1 || true
-	rm -rf "$STATE"
+	# Only what this run made its own: a second start turned away because
+	# the first is still running took the first one's state with it.
+	[ "${OWNED:-0}" != 1 ] || rm -rf "$STATE"
 	[ -z "${TEST_IN:-}" ] || rm -f "$TEST_IN"
 	[ "${TEST_LOCK:-0}" != 1 ] || rmdir "$ZGZ_RUN/.l2tp-test-lock" 2>/dev/null || true
 }
@@ -95,7 +97,10 @@ connect() {
 	# power cut, a kill or a crash, with no chance to clean up - is cleared:
 	# otherwise every later try stopped here for good. A connection another
 	# live run holds is still never touched.
-	if [ -f "$STATE/pid" ] || [ -n "$(ip -4 route show table "$TABLE" 2>/dev/null)" ]; then
+	# A state with no owner written in it yet may be a run that has just
+	# taken it: given a moment before it is called a leftover.
+	[ ! -d "$STATE" ] || [ -f "$STATE/pid" ] || sleep 2
+	if [ -d "$STATE" ] || [ -n "$(ip -4 route show table "$TABLE" 2>/dev/null)" ]; then
 		alive && fail 'The IKEv2 routing table is already in use.'
 		[ ! -S /var/run/charon.vici ] || ikev2config stop "$NODE" "$DEV" >/dev/null 2>&1 || true
 		ip -4 rule del pref "$TABLE" oif "$DEV" lookup "$TABLE" 2>/dev/null || true
@@ -107,7 +112,10 @@ connect() {
 		log "IKEv2: cleared what an earlier connection left behind"
 	fi
 	umask 077
-	mkdir -p "$STATE"
+	# Taken in one step: of two runs starting together, one makes the
+	# directory and the other is turned away, rather than both going on.
+	mkdir "$STATE" 2>/dev/null || fail 'The IKEv2 routing table is already in use.'
+	OWNED=1
 	echo $$ > "$STATE/pid"
 	ROUTES=1
 	# A dead tunnel must fail closed, rather than fall back to the WAN.

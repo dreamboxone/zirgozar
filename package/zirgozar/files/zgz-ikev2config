@@ -44,8 +44,15 @@ if (node.ca) {
 } else if (psk == '') {
 	let bundle = readfile('/etc/ssl/certs/ca-certificates.crt');
 	if (!bundle) fail('IKEv2 needs the router\'s certificate list. Install dependencies under Router requirements.');
-	for (let pem in match(bundle, /-----BEGIN CERTIFICATE-----[^-]+-----END CERTIFICATE-----/g))
-		push(cacerts, pem[0] + '\n');
+	// Cut at each END line rather than matched with one pattern: whether a
+	// pattern's class runs across the PEM's line breaks differs between
+	// builds of ucode - OpenWrt's does, a newer one does not unless told,
+	// and OpenWrt's own then refuses the flag that would tell it.
+	let end = '-----END CERTIFICATE-----';
+	for (let part in split(bundle, end)) {
+		let at = index(part, '-----BEGIN CERTIFICATE-----');
+		if (at >= 0) push(cacerts, substr(part, at) + end + '\n');
+	}
 	if (!length(cacerts)) fail('IKEv2 needs the router\'s certificate list. Install dependencies under Router requirements.');
 }
 if (mode == 'check') exit(0);
@@ -143,11 +150,6 @@ connection[name] = {
 		'aes256gcm16-aes128gcm16-prfsha384-prfsha256-curve25519-ecp384-ecp256-modp2048',
 		'aes256-aes128-sha384-sha256-sha1-ecp384-ecp256-modp2048-modp1536-modp1024'
 	],
-	// No certificate requests: with every public authority trusted they
-	// named a hundred and more, made the first message after the handshake
-	// several kilobytes, and a connection that drops fragments never
-	// carried it. The server's certificate is still checked against them.
-	send_certreq: 'no',
 	vips: [ '0.0.0.0' ], fragmentation: 'yes', mobike: 'no', encap: 'no',
 	dpd_delay: '20s', reauth_time: '0', keyingtries: '1', unique: 'never',
 	local, remote,

@@ -104,7 +104,8 @@ read_counters() {
 				gsub(/[^0-9]/, "", s)
 				v = s + 0
 			}
-			if (n != "") printf "%s\t%d\n", n, v
+			# %d saturates at 2 GiB on 32-bit awk builds.
+			if (n != "") printf "%s\t%.0f\n", n, v
 		}'
 	return 0
 }
@@ -359,13 +360,13 @@ cmd_json() {
 				if (substr(d, 1, 7) == month) { mpu += pu[d]; mpd += pd[d]; mdu += du[d]; mdd += dd[d] }
 				if (i >= start)
 					series = series (series == "" ? "" : ",") \
-						sprintf("{\"d\":\"%s\",\"up\":%d,\"down\":%d,\"dup\":%d,\"ddown\":%d}",
+						sprintf("{\"d\":\"%s\",\"up\":%.0f,\"down\":%.0f,\"dup\":%.0f,\"ddown\":%.0f}",
 							d, pu[d], pd[d], du[d], dd[d])
 			}
 			printf "{"
-			printf "\"today\":{\"up\":%d,\"down\":%d,\"direct_up\":%d,\"direct_down\":%d},", tpu, tpd, tdu, tdd
-			printf "\"week\":{\"up\":%d,\"down\":%d,\"direct_up\":%d,\"direct_down\":%d},", wpu, wpd, wdu, wdd
-			printf "\"month\":{\"up\":%d,\"down\":%d,\"direct_up\":%d,\"direct_down\":%d},", mpu, mpd, mdu, mdd
+			printf "\"today\":{\"up\":%.0f,\"down\":%.0f,\"direct_up\":%.0f,\"direct_down\":%.0f},", tpu, tpd, tdu, tdd
+			printf "\"week\":{\"up\":%.0f,\"down\":%.0f,\"direct_up\":%.0f,\"direct_down\":%.0f},", wpu, wpd, wdu, wdd
+			printf "\"month\":{\"up\":%.0f,\"down\":%.0f,\"direct_up\":%.0f,\"direct_down\":%.0f},", mpu, mpd, mdu, mdd
 			printf "\"days\":[%s]}", series
 		}' "$DB" 2>/dev/null
 	return 0

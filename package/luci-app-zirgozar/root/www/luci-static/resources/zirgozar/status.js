@@ -362,9 +362,13 @@ function renderState(st) {
 		}
 	}
 
-	var busy = (st.status == 'selecting' || st.status == 'starting' || !!st.job);
+	/* The card is about the tunnel. A job of another page - routing data
+	   downloading, a core or this program installing, the servers being
+	   checked or the subscriptions read - is shown on that page, not here;
+	   it only holds back Choose the fastest, which would run into it. */
+	var busy = (st.status == 'selecting' || st.status == 'starting');
 	var reselect = byId('pwp-reselect');
-	if (reselect) reselect.disabled = busy;
+	if (reselect) reselect.disabled = busy || !!st.job;
 
 	/* Two passes, and they measure different things, so one bar that silently
 	   changes meaning half way through would be a lie told twice. */
@@ -373,10 +377,7 @@ function renderState(st) {
 	var bad = (st.status == 'failed') && !!st.enabled;
 	var pct = 0, label = '';
 
-	if (st.job) {
-		pct = 100;
-		label = st.job + '…';
-	} else if (st.phase == 'prefilter' && st.total > 0) {
+	if (st.phase == 'prefilter' && st.total > 0) {
 		pct = Math.min(100, Math.round((st.done || 0) * 100 / st.total));
 		label = _('Checking which of %d nodes answer at all — %d so far').format(st.total, st.alive || 0);
 	} else if (st.phase == 'urltest') {
@@ -398,7 +399,6 @@ function renderState(st) {
 	if (fill) {
 		fill.style.width = pct + '%';
 		fill.style.background = bad ? '#ef4444' : (ok ? '#10b981' : '#3b82f6');
-		if (st.job) fill.style.background = '#8b5cf6';
 	}
 	setNode('pwp-pct', label);
 }

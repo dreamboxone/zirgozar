@@ -231,4 +231,38 @@ else
 fi
 rig_set stats_flush_minutes 5
 
+echo "== counters and reports above the 32-bit integer limit"
+cat > "$RIG_ANSWER" <<'JSON'
+{ "stat": [
+    { "name": "outbound>>>proxy>>>traffic>>>uplink", "value": 3000000001 },
+    { "name": "outbound>>>proxy>>>traffic>>>downlink", "value": "5000000002" },
+    { "name": "outbound>>>direct>>>traffic>>>uplink", "value": 4000000003 },
+    { "name": "outbound>>>direct>>>traffic>>>downlink", "value": "6000000004" }
+] }
+JSON
+rm -f "$RIG/run/stats.state" "$DB"
+sh "$STATS" sample
+for pair in proxy_up:3000000001 proxy_down:5000000002 direct_up:4000000003 direct_down:6000000004; do
+	check "$(sed -n "s/^day_${pair%%:*}=//p" "$RIG/run/stats.state")" "${pair#*:}" \
+		"${pair%%:*} is sampled without clipping at 2 GiB"
+done
+printf '%s\t9000000001\t11000000002\t13000000003\t15000000004\n' "$YESTERDAY" >> "$DB"
+J="$(sh "$STATS" json)"
+TODAY_TOTAL='"up":3000000001,"down":5000000002,"direct_up":4000000003,"direct_down":6000000004'
+WEEK_TOTAL='"up":12000000002,"down":16000000004,"direct_up":17000000006,"direct_down":21000000008'
+case "$YESTERDAY" in "$MONTH"-*) MONTH_TOTAL="$WEEK_TOTAL" ;; *) MONTH_TOTAL="$TODAY_TOTAL" ;; esac
+for scope in today week month; do
+	case "$scope" in today) want="$TODAY_TOTAL" ;; week) want="$WEEK_TOTAL" ;; month) want="$MONTH_TOTAL" ;; esac
+	if printf '%s' "$J" | grep -Fq "\"$scope\":{$want}"; then
+		ok "$scope reports all four large totals exactly"
+	else
+		bad "$scope reports all four large totals exactly: $J"
+	fi
+done
+if printf '%s' "$J" | grep -Fq "{\"d\":\"$YESTERDAY\",\"up\":9000000001,\"down\":11000000002,\"dup\":13000000003,\"ddown\":15000000004}"; then
+	ok "daily history reports large stored totals without clipping"
+else
+	bad "daily history reports large stored totals without clipping: $J"
+fi
+
 rig_report

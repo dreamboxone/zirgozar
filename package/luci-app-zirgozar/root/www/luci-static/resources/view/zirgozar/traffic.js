@@ -124,6 +124,10 @@ function renderGeo(g) {
 	});
 	box.appendChild(E('div', { 'style': 'font-size:12px;color:var(--muted);padding-top:4px' },
 		_('Free space') + ': ' + pui.bytes(g.free) + (g.dir ? '  ·  ' + g.dir : '')));
+	/* How the last update went, when it did not: said here, beside the
+	   files, rather than on the Status card. */
+	if (g.message)
+		box.appendChild(E('div', { 'class': 'pwp-note error', 'style': 'display:block;margin-top:6px' }, _(g.message)));
 }
 
 /* Once per page load, however many times the page is saved. The rebind list

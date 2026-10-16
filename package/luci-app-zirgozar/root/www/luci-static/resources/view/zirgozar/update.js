@@ -368,12 +368,17 @@ function render(d, early) {
 		var room = /^error room (\d+) (\d+)$/.exec(res);
 		say('app', room ? noRoom(room[1], room[2]) : _(res.slice(6)), 'error');
 	}
+	/* The release on GitHub is the one installed: the update stopped there. */
+	if (res.trim() == 'same' && res != lastSelf)
+		say('app', _('This is already the latest version. Nothing was downloaded.'), 'info');
 	lastSelf = res;
 
 	var cres = early ? lastCore : String(d.core_result || '');
 	if (cres && cres != lastCore) {
 		var lack = /^(\S+) room (\d+) (\d+)$/.exec(cres);
+		var fail = /^(\S+) error (.+)$/.exec(cres);
 		if (lack) say('core:' + lack[1], noRoom(lack[2], lack[3]), 'error');
+		else if (fail) say('core:' + fail[1], _(fail[2]), 'error');
 	}
 	lastCore = cres;
 	if (!d.job && app0.version && firstVersion && app0.version != firstVersion) {

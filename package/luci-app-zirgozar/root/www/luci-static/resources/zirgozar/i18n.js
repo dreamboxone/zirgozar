@@ -754,6 +754,9 @@ var FA = {
 	'The latest release has no package for this router.': 'آخرین انتشار پکیجی برای این روتر ندارد.',
 	'The latest release is incomplete.': 'آخرین انتشار ناقص است.',
 	'Download failed.': 'دانلود ناموفق بود.',
+	'The download failed: the server did not answer, or the connection broke half way.': 'دانلود ناموفق بود: سرور جواب نداد، یا اتصال وسط کار قطع شد.',
+	'The download came back cut short.': 'فایل دانلودشده ناقص بود.',
+	'This is already the latest version. Nothing was downloaded.': 'همین نسخه آخرین نسخه است. چیزی دانلود نشد.',
 	'A downloaded file does not match the release\'s checksum - nothing was installed.':
 		'فایل دانلودشده با چک‌سام انتشار جور نیست - چیزی نصب نشد.',
 	'The package manager refused the new version. The Log page has the details.':

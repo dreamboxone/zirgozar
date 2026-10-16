@@ -1140,6 +1140,20 @@ $_b/$_n"
 	fi
 	[ -n "$_urls" ] || { self_fail "GitHub could not be reached."; return 1; }
 
+	# The release is the one already here: nothing is downloaded and nothing
+	# installed. A page left open from before the last update still offered
+	# the button, and pressing it fetched forty megabytes to put back what
+	# was there - over a connection that could break half way and leave a
+	# failure where there was nothing to fail.
+	_have="$(cat "$ZGZ_VERSION_FILE" 2>/dev/null)"
+	_new="$(printf '%s\n' "$_urls" | sed -n 's#.*/releases/download/v\{0,1\}\([^/]*\)/.*#\1#p' | head -1)"
+	case "$_new" in ''|*-r[0-9]*) : ;; *) _new="$_new-r1" ;; esac
+	if [ -n "$_have" ] && [ "$_have" = "$_new" ]; then
+		printf 'same\n' > "$SELF_RESULT"
+		log "update: $_have is already the latest release - nothing to do"
+		return 0
+	fi
+
 	if [ "$_pm" = "apk" ]; then
 		_main="$(printf '%s\n' "$_urls" | grep "/zirgozar-[^/]*\.$_arch\.apk\$" | head -1)"
 		_luci="$(printf '%s\n' "$_urls" | grep '/luci-app-zirgozar-[^/]*\.apk$' | head -1)"
@@ -1265,12 +1279,17 @@ cmd_remove() {
 case "${1:-list}" in
 	list) cmd_list_cached ;;
 	install)
+		# What an install has to say is said on App Update, under what was
+		# being installed - not on the Status card, which is for the tunnel
+		# and was left saying "Download failed" over a working connection.
+		# Nor does an install take away what the card was saying.
+		ZGZ_MESSAGE="$ZGZ_RUN/install-message"
 		clear_message
 		rm -f "$ZGZ_RUN/cores.list"
 		ZGZ_ROOM_QUIET=1
 		# How a core's install went, for the page to say under that core:
-		# "<core> room <needed> <free>" when it was short of room. Nothing
-		# when it went through or failed for another reason.
+		# "<core> room <needed> <free>" when it was short of room, "<core>
+		# error <message>" when it failed for another reason it gave.
 		rm -f "$CORE_RESULT" "$ZGZ_RUN/no-room"
 		_rc=0
 		case "${2:-}" in
@@ -1296,11 +1315,13 @@ case "${1:-list}" in
 		esac
 		if [ "$_rc" != 0 ] && [ -s "$ZGZ_RUN/no-room" ]; then
 			printf '%s room %s\n' "$2" "$(cat "$ZGZ_RUN/no-room")" > "$CORE_RESULT"
+		elif [ "$_rc" != 0 ] && [ -s "$ZGZ_MESSAGE" ]; then
+			printf '%s error %s\n' "$2" "$(head -1 "$ZGZ_MESSAGE")" > "$CORE_RESULT"
 		fi
 		exit "$_rc"
 		;;
 	# What is installed has changed: the kept list is no longer true.
-	remove) clear_message; rm -f "$ZGZ_RUN/cores.list"; cmd_remove "${2:-}" ;;
+	remove) ZGZ_MESSAGE="$ZGZ_RUN/install-message"; clear_message; rm -f "$ZGZ_RUN/cores.list"; cmd_remove "${2:-}" ;;
 	latest) cmd_latest "${2:-}" ;;
 	*) echo "usage: $0 list|install <core>|remove <core>|latest [force]" >&2; exit 1 ;;
 esac
