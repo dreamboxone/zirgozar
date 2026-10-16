@@ -319,7 +319,8 @@ install_singbox() {
 	_url="https://github.com/$_repo/releases/download/$_tag/$_name.tar.gz"
 	_size="$(remote_size "$_url")"
 	# The program is about three times the size of the archive it comes in.
-	need_room $((_size * 3)) "$(dirname "$_target")" || return 1
+	# The archive and the program side by side for a moment, both on flash.
+	need_room $((_size * 4)) "$(dirname "$_target")" || return 1
 
 	# Straight from the download into the file on flash: the archive is never
 	# stored and nothing is unpacked in memory. It was both - twenty-seven
@@ -332,8 +333,12 @@ install_singbox() {
 	_n=0
 	while [ "$_n" -lt 3 ]; do
 		_n=$((_n + 1))
-		curl -fsSL --connect-timeout 20 --max-time 900 "$_url" 2>/dev/null |
-			tar -xzO -f - "$_name/sing-box" > "$_bin" 2>/dev/null || true
+		# The archive is written on flash beside where the program goes,
+		# never in memory, so that how far it has got can be shown.
+		printf '%s %s\n' "$_size" "$_target.tgz" > "$ZGZ_RUN/download" 2>/dev/null || true
+		curl -fsSL --connect-timeout 20 --max-time 900 -o "$_target.tgz" "$_url" 2>/dev/null &&
+			tar -xzO -f "$_target.tgz" "$_name/sing-box" > "$_bin" 2>/dev/null || true
+		rm -f "$_target.tgz" "$ZGZ_RUN/download"
 		# Over a megabyte is not enough to go on: a download cut off half
 		# way - the tunnel it went through restarting, say - leaves a file
 		# that starts like the program and stops short of it, and dies the
@@ -352,8 +357,10 @@ install_singbox() {
 		warn "$_kind download from $_url failed after $_n tries"
 		return 1
 	fi
-	install_binary "$_bin" "$_target" "$_kind"
-	return $?
+	install_binary "$_bin" "$_target" "$_kind" || return $?
+	# Chosen here, so a new release of this program leaves it in place.
+	[ "$_target" = /usr/libexec/zirgozar/sing-box ] && core_version "$_target" > "$ZGZ_ETC/sing-box-chosen" 2>/dev/null
+	return 0
 }
 
 # ----------------------------------------------------------------- geoview
@@ -1041,7 +1048,7 @@ cmd_list_cached() {
 	_cset="$(grep "option core_" /etc/config/zirgozar 2>/dev/null)"
 	_cpaths="$(printf '%s\n' "$_cset" | sed -n "s/.*option core_[a-z_]* '\(\/[^']*\)'.*/\1/p")"
 	_key="$( { printf '%s\n' "$_cset"
-		ls -lLi "$ZGZ_OWN_DIR" "$DIR" "$DIR/aether" /usr/bin/xray /usr/local/bin/xray /usr/sbin/openvpn \
+		ls -lLi "$ZGZ_OWN_DIR" "$DIR" "$DIR/aether" /usr/bin/xray /usr/local/bin/xray /usr/sbin/openvpn /usr/sbin/haproxy \
 			$_cpaths "$LATEST_CACHE" "$XRAY_VERSIONS" "$ZGZ_VERSION_FILE" 2>/dev/null; } | md5sum)"
 	_key="${_key%% *}"
 	if [ -n "$_key" ] && [ "$(head -1 "$_lc" 2>/dev/null)" = "$_key" ]; then
@@ -1259,6 +1266,7 @@ case "${1:-list}" in
 	list) cmd_list_cached ;;
 	install)
 		clear_message
+		rm -f "$ZGZ_RUN/cores.list"
 		ZGZ_ROOM_QUIET=1
 		# How a core's install went, for the page to say under that core:
 		# "<core> room <needed> <free>" when it was short of room. Nothing
@@ -1291,7 +1299,8 @@ case "${1:-list}" in
 		fi
 		exit "$_rc"
 		;;
-	remove) clear_message; cmd_remove "${2:-}" ;;
+	# What is installed has changed: the kept list is no longer true.
+	remove) clear_message; rm -f "$ZGZ_RUN/cores.list"; cmd_remove "${2:-}" ;;
 	latest) cmd_latest "${2:-}" ;;
 	*) echo "usage: $0 list|install <core>|remove <core>|latest [force]" >&2; exit 1 ;;
 esac

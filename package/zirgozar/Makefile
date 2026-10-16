@@ -5,8 +5,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zirgozar
-PKG_VERSION:=5.7.23
-PKG_RELEASE:=8
+PKG_VERSION:=5.7.24
+PKG_RELEASE:=1
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
 PKG_LICENSE:=AGPL-3.0-or-later
@@ -45,6 +45,7 @@ endef
 define Package/zirgozar/install
 	$(INSTALL_DIR) $(1)/usr/libexec/zirgozar
 	$(INSTALL_BIN) ./files/../../../prebuilt/$(ARCH_PACKAGES)/xray $(1)/usr/libexec/zirgozar/xray
+	$(INSTALL_BIN) ./files/../../../prebuilt/$(ARCH_PACKAGES)/sing-box $(1)/usr/libexec/zirgozar/sing-box
 
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_DATA) ./files/zirgozar.config $(1)/etc/config/zirgozar
@@ -87,6 +88,16 @@ if [ -x "$$D/xray" ]; then
 		[ -f /etc/zirgozar/xray-chosen ] || echo "$$have" > /etc/zirgozar/xray-chosen
 	fi
 fi
+# sing-box the same way. One that came before this program shipped its own
+# was the reader's, installed on App Update, and is kept too.
+if [ -x "$$D/sing-box" ]; then
+	have="$$("$$D/sing-box" version 2>/dev/null | awk 'NR == 1 { print $$3 }')"
+	shipped="$$(cat /etc/zirgozar/sing-box-version 2>/dev/null)"
+	if [ -f /etc/zirgozar/sing-box-chosen ] || [ -z "$$shipped" ] || { [ -n "$$have" ] && [ "$$have" != "$${shipped#v}" ]; }; then
+		mv -f "$$D/sing-box" "$$D/sing-box.keep"
+		[ -f /etc/zirgozar/sing-box-chosen ] || echo "$$have" > /etc/zirgozar/sing-box-chosen
+	fi
+fi
 exit 0
 endef
 
@@ -102,6 +113,9 @@ rm -f /var/run/zirgozar/message
 # The reader's own Xray, set aside before the new files came in, goes back.
 if [ -f /usr/libexec/zirgozar/xray.keep ]; then
 	mv -f /usr/libexec/zirgozar/xray.keep /usr/libexec/zirgozar/xray
+fi
+if [ -f /usr/libexec/zirgozar/sing-box.keep ]; then
+	mv -f /usr/libexec/zirgozar/sing-box.keep /usr/libexec/zirgozar/sing-box
 fi
 # The version file is not a setting, but it lives in /etc, and a package
 # manager keeps a changed file there and puts the new one beside it.

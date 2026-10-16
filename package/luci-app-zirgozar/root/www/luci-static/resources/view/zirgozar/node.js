@@ -1678,6 +1678,7 @@ return view.extend({
 			var save = m.save;
 			m.save = function() {
 				var self = this, args = arguments;
+				var needs = '';
 				return m.parse().then(function() {
 					var l = String(uci.get('zirgozar', sid, 'link') || '').trim();
 					return l ? callAction('node_dup', sid + ';' + l) : {};
@@ -1687,9 +1688,12 @@ return view.extend({
 						ui.addNotification(null, E('p', {}, msg), 'danger');
 						return Promise.reject(new Error(msg));
 					}
+					needs = (d && d.needs) || '';
 					return save.apply(self, args);
 				}).then(function(r) {
 					window.history.replaceState(null, '', back);
+					if (needs)
+						ui.addNotification(null, E('p', {}, _('This config needs %s, which is not installed. Install it on the App Update page.').format(needs.split(',').join(', '))), 'warning');
 					return r;
 				});
 			};

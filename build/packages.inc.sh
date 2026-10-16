@@ -7,8 +7,8 @@
 # packages.inc.sh - what goes into a package, shared by the .apk and .ipk
 # builders so the two formats can never drift apart.
 
-VERSION=5.7.23
-RELEASE=8
+VERSION=5.7.24
+RELEASE=1
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -61,6 +61,9 @@ stage_zgz() {
 	install -d "$i/usr/libexec/zirgozar" "$i/etc/config" "$i/etc/init.d" \
 	           "$i/usr/libexec/rpcd" "$i/etc/zirgozar" "$i/etc/zirgozar/geo"
 	install -m 0755 "$core"            "$i/usr/libexec/zirgozar/xray"
+	# sing-box ships beside it: the rest of the helpers are installed only
+	# when the reader asks for them, on App Update.
+	[ -f "$(dirname "$core")/sing-box" ] && install -m 0755 "$(dirname "$core")/sing-box" "$i/usr/libexec/zirgozar/sing-box"
 	install -m 0644 "$f/zirgozar.config"   "$i/etc/config/zirgozar"
 	install -m 0644 "$f/zirgozar_server.config" "$i/etc/config/zirgozar_server"
 	# An untouched copy, for Restore defaults in Basic Settings: the one in
@@ -87,6 +90,8 @@ stage_zgz() {
 
 	ver="$(dirname "$core")/xray-version.txt"
 	[ -s "$ver" ] && install -m 0644 "$ver" "$i/etc/zirgozar/xray-version"
+	ver="$(dirname "$core")/sing-box-version.txt"
+	[ -s "$ver" ] && install -m 0644 "$ver" "$i/etc/zirgozar/sing-box-version"
 
 	printf '%s\n' /etc/config/zirgozar /etc/config/zirgozar_server > "$work/zirgozar.conffiles"
 
@@ -144,6 +149,9 @@ rm -f /var/run/zirgozar/message
 # The reader's own Xray, set aside before the new files came in, goes back.
 if [ -f /usr/libexec/zirgozar/xray.keep ]; then
 	mv -f /usr/libexec/zirgozar/xray.keep /usr/libexec/zirgozar/xray
+fi
+if [ -f /usr/libexec/zirgozar/sing-box.keep ]; then
+	mv -f /usr/libexec/zirgozar/sing-box.keep /usr/libexec/zirgozar/sing-box
 fi
 # The rebind exceptions that ship on the Traffic Rules page. A configuration
 # kept from an older version has no such list; it gets one once, and a list
@@ -215,6 +223,16 @@ if [ -x "$D/xray" ]; then
 	if [ -f /etc/zirgozar/xray-chosen ] || { [ -n "$have" ] && [ -n "$shipped" ] && [ "$have" != "${shipped#v}" ]; }; then
 		mv -f "$D/xray" "$D/xray.keep"
 		[ -f /etc/zirgozar/xray-chosen ] || echo "$have" > /etc/zirgozar/xray-chosen
+	fi
+fi
+# sing-box the same way. One that came before this program shipped its own
+# was the reader's, installed on App Update, and is kept too.
+if [ -x "$D/sing-box" ]; then
+	have="$("$D/sing-box" version 2>/dev/null | awk 'NR == 1 { print $3 }')"
+	shipped="$(cat /etc/zirgozar/sing-box-version 2>/dev/null)"
+	if [ -f /etc/zirgozar/sing-box-chosen ] || [ -z "$shipped" ] || { [ -n "$have" ] && [ "$have" != "${shipped#v}" ]; }; then
+		mv -f "$D/sing-box" "$D/sing-box.keep"
+		[ -f /etc/zirgozar/sing-box-chosen ] || echo "$have" > /etc/zirgozar/sing-box-chosen
 	fi
 fi
 exit 0

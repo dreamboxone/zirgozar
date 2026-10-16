@@ -268,6 +268,13 @@ function addViaLinks() {
 							pui.note(b, _('None of those could be read as a node.'), 'error');
 							return;
 						}
+						/* A core the new configs need and this router lacks is said
+						   now, while the reader is here, not when the tunnel fails. */
+						if (r.needs) {
+							pui.note(b, _('This config needs %s, which is not installed. Install it on the App Update page.').format(r.needs.split(',').join(', ')), 'warn');
+							window.setTimeout(function() { ui.hideModal(); location.reload(); }, 6000);
+							return;
+						}
 						if (r.skipped) {
 							pui.note(b, _('%d added; %d were already in the list.').format(r.added, r.skipped), 'ok');
 							window.setTimeout(function() { ui.hideModal(); location.reload(); }, 2000);

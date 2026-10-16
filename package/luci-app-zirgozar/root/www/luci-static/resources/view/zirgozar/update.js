@@ -69,10 +69,17 @@ function verState(node) {
    kept here and drawn again under its row each time. */
 var notes = {};
 
+/* How far the running download has got, for the row it belongs to. */
+var progressKey = '', progressPct = -1;
+
 function noteFor(key) {
 	var n = key && notes[key];
+	var going = key && key == progressKey && progressPct >= 0;
+	/* A download keeps its note while it runs, however long it takes. */
+	if (n && going && n.until) n.until = Date.now() + 15000;
 	if (!n || (n.until && Date.now() > n.until)) return '';
-	return E('div', { 'class': 'pwp-note ' + n.kind, 'style': 'margin:0' }, n.text);
+	return E('div', { 'class': 'pwp-note ' + n.kind, 'style': 'margin:0' },
+		going && n.kind == 'info' ? n.text + ' ' + progressPct + '%' : n.text);
 }
 
 function say(key, text, kind) {
@@ -379,6 +386,10 @@ function render(d, early) {
 	/* While a check runs, what was known before it is not shown as an
 	   answer, and the page asks again sooner than its usual ten seconds. */
 	var busy = checking(d);
+	if (!early) {
+		progressKey = jobKey(d.job);
+		progressPct = (d.job && d.progress >= 0) ? +d.progress : -1;
+	}
 	/* The job is the router's word now; the press no longer stands for it. */
 	if (!early && d.job && d.job != CHECK_JOB) actAsked = 0;
 	if (!early && (busy || (d.deps || {}).pending || working(d)) && !quickRefresh)

@@ -751,6 +751,34 @@ find_geoview() {
 	return 1
 }
 
+# The programs, among those App Update installs, that the links on stdin need
+# and this router does not have - one name a line, each once. What is in no
+# list here needs nothing beyond the engine.
+missing_cores() {
+	LC_ALL=C awk -v LIMIT=1000 -f "$ZGZ_LIB/zgz-parse" 2>/dev/null | cut -f3,6 | while IFS="$(printf '\t')" read -r _mc_p _mc_j; do
+		case "$_mc_p" in
+			hysteria2|hysteria|tuic|anytls|snell|ssh|ssplugin|openconnect|tailscale)
+				[ -x "$(singbox_path)" ] || [ -x "$(singbox_lx_path)" ] || find_singbox >/dev/null 2>&1 || echo sing-box ;;
+			naive|amneziawg)
+				[ -x "$(singbox_lx_path)" ] || echo sing-box-lx ;;
+			ssr|mieru|shadowquic|trusttunnel)
+				[ -x "$(mihomo_path)" ] || echo Mihomo ;;
+			ssrust)
+				[ -x "$(sslocal_path)" ] || echo shadowsocks-rust ;;
+			warp)
+				case "$_mc_j" in
+					*'"mode":"masque"'*|*'"noize":"'[!o]*) [ -x "$(vwarp_path)" ] || echo Vwarp ;;
+					*) [ -x "$(warpplus_path)" ] || [ -x "$(vwarp_path)" ] || echo warp-plus ;;
+				esac ;;
+			aether)
+				[ -x "$(aether_path)" ] || echo Aether ;;
+			openvpn)
+				command -v openvpn >/dev/null 2>&1 || [ -x /usr/sbin/openvpn ] || echo OpenVPN ;;
+		esac
+	done | awk '!seen[$0]++'
+	return 0
+}
+
 find_singbox() {
 	_fs="$(singbox_path)"
 	[ -x "$_fs" ] && "$_fs" version >/dev/null 2>&1 && { echo "$_fs"; return 0; }

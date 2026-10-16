@@ -48,11 +48,33 @@ cleanup() {
 	rm -rf "$STATE"
 	[ "${TEST_LOCK:-0}" != 1 ] || rmdir "$ZGZ_RUN/.l2tp-test-lock" 2>/dev/null || true
 }
+# Is an xl2tpd of this very connection still running?
+alive() {
+	for _p in /proc/[0-9]*/cmdline; do
+		[ -r "$_p" ] || continue
+		tr '\000' ' ' < "$_p" 2>/dev/null | grep -Fq "$STATE/xl2tpd.conf" && return 0
+	done
+	return 1
+}
 connect() {
 	check
-	# Do not overwrite a table or interface owned by another program.
-	[ ! -d "/sys/class/net/$DEV" ] || fail 'The L2TP device is already in use.'
-	[ -z "$(ip -4 route show table "$TABLE" 2>/dev/null)" ] || fail 'The L2TP routing table is already in use.'
+	# What an earlier connection left behind when it was cut off - by a
+	# power cut, a kill or a crash, with no chance to clean up - is cleared:
+	# otherwise every later try stopped here for good. A table or device
+	# another live connection holds is still never touched.
+	if [ -d "/sys/class/net/$DEV" ] || [ -n "$(ip -4 route show table "$TABLE" 2>/dev/null)" ]; then
+		alive && fail 'The L2TP routing table is already in use.'
+		_ppp="$(cat "/var/run/ppp-$DEV.pid" 2>/dev/null)" || _ppp=''
+		case "$_ppp" in ''|*[!0-9]*) : ;; *) kill "$_ppp" 2>/dev/null || true ;; esac
+		ip -4 rule del pref "$TABLE" oif "$DEV" lookup "$TABLE" 2>/dev/null || true
+		ip -4 route flush table "$TABLE" 2>/dev/null || true
+		ip -6 rule del pref "$TABLE" oif "$DEV" lookup "$TABLE" 2>/dev/null || true
+		ip -6 route flush table "$TABLE" 2>/dev/null || true
+		_n=0
+		while [ -d "/sys/class/net/$DEV" ] && [ "$_n" -lt 5 ]; do sleep 1; _n=$((_n+1)); done
+		[ ! -d "/sys/class/net/$DEV" ] || fail 'The L2TP device is already in use.'
+		log "L2TP: cleared what an earlier connection left behind"
+	fi
 	ROUTES=1
 	# A dead PPP link must fail closed, rather than fall back to the WAN.
 	ip -4 route add unreachable default metric 32767 table "$TABLE"

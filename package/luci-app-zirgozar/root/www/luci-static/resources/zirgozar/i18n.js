@@ -1050,6 +1050,7 @@ var FA = {
 	'Target port': 'پورت مقصد',
 	'The router’s address in the tunnel; the client gets the next one.': 'آدرس روتر داخل تونل؛ کلاینت آدرس بعدی را می‌گیرد.',
 	'Router key': 'کلید روتر',
+	'This config needs %s, which is not installed. Install it on the App Update page.': 'این کانفیگ به %s نیاز دارد که نصب نیست. آن را از صفحه «به‌روزرسانی» نصب کنید.',
 	'Port range': 'بازه پورت',
 	'Such as 2090-2099, in place of the port. Empty for one port.': 'مثلاً 2090-2099، به‌جای پورت. خالی یعنی یک پورت.',
 	'Multiplexing': 'مالتی‌پلکس',

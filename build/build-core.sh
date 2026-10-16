@@ -4,7 +4,7 @@
 # Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
 # Part of Zirgozar - https://github.com/dreamboxone/zirgozar
 #
-# build-core.sh - fetch the Xray core for an OpenWrt target.
+# build-core.sh - fetch the Xray and sing-box cores for an OpenWrt target.
 #
 #   ./build/build-core.sh              # default: armv7 / ipq40xx
 #   ./build/build-core.sh aarch64
@@ -20,6 +20,7 @@ set -e
 
 TARGET="${1:-armv7}"
 XRAY_VERSION="${XRAY_VERSION:-v26.9.9}"
+SINGBOX_VERSION="${SINGBOX_VERSION:-v1.14.3}"
 BASE="https://github.com/XTLS/Xray-core/releases/download/$XRAY_VERSION"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -87,6 +88,32 @@ unzip -o -q "$WORK/xray.zip" "$BIN" -d "$WORK" 2>/dev/null || {
 
 install -m 0755 "$WORK/$BIN" "$OUT"
 printf '%s\n' "$XRAY_VERSION" > "$ROOT/prebuilt/$OUTDIR/xray-version.txt"
+
+# sing-box ships beside Xray. The static builds: the plain ones for 64-bit
+# and x86 are linked against glibc, which an OpenWrt router does not have,
+# and on MIPS the soft-float ones, for the same reason as Xray's.
+case "$TARGET" in
+	aarch64_*)                       SB=arm64-musl ;;
+	arm_arm926ej-s|arm_xscale)       SB=armv5 ;;
+	arm_arm1176jzf-s_vfp)            SB=armv6 ;;
+	arm_cortex-a*)                   SB=armv7 ;;
+	mips64el_*)                      SB=mips64le-softfloat ;;
+	mips64_*)                        SB=mips64-softfloat ;;
+	mipsel_*)                        SB=mipsle-softfloat ;;
+	mips_*)                          SB=mips-softfloat ;;
+	x86_64)                          SB=amd64-musl ;;
+	i386_pentium4)                   SB=386-musl ;;
+	riscv64_*)                       SB=riscv64-musl ;;
+	loongarch64_*)                   SB=loong64-musl ;;
+esac
+SBV="${SINGBOX_VERSION#v}"
+SBNAME="sing-box-$SBV-linux-$SB"
+echo ">>> sing-box    : $SINGBOX_VERSION ($SB)"
+curl -fsSL --retry 3 -o "$WORK/sing-box.tar.gz" \
+	"https://github.com/SagerNet/sing-box/releases/download/$SINGBOX_VERSION/$SBNAME.tar.gz"
+tar -xzf "$WORK/sing-box.tar.gz" -C "$WORK" "$SBNAME/sing-box"
+install -m 0755 "$WORK/$SBNAME/sing-box" "$ROOT/prebuilt/$OUTDIR/sing-box"
+printf '%s\n' "$SINGBOX_VERSION" > "$ROOT/prebuilt/$OUTDIR/sing-box-version.txt"
 
 echo ">>> done: $OUT"
 ls -l "$OUT"

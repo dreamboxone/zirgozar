@@ -131,6 +131,11 @@ case "$(pl SSH)" in 'ssh {"type":"ssh","server":"sh.example.com","port":22,"user
 case "$(pl SS-OBFS)" in *'"plugin":"obfs-local","plugin_opts":"obfs=http;obfs-host=bing.com"'*) ok "a shadowsocks link with obfs is read" ;; *) bad "a shadowsocks link with obfs is read: $(pl SS-OBFS)" ;; esac
 case "$(pl SS-STLS)" in *'"plugin":"shadow-tls","plugin_opts":"host=bing.com;password=p2;version=3"'*) ok "a shadowsocks link with ShadowTLS is read" ;; *) bad "a shadowsocks link with ShadowTLS is read: $(pl SS-STLS)" ;; esac
 check "$(pl SS-KCPTUN)" "" "a shadowsocks plugin that is not shipped is refused"
+MC="$(printf '%s
+' 'hysteria2://pw@h.example:443#a' 'mierus://u:p@m.example?port=1&protocol=TCP' 'sq://u:p@q.example:443?sni=q#q' 'vless://11111111-2222-3333-4444-555555555555@v.example:443?security=tls#v' |
+	sh -c '. "$ZGZ_LIB/zgz-common.sh"; missing_cores' | tr '
+' ' ')"
+check "$MC" "sing-box Mihomo " "the programs new configs need and the router lacks are named, each once"
 case "$(pl 'MIERU TCP')" in 'mieru {"type":"mieru","server":"mi.example.com","port":2999,"transport":"TCP","username":"bob","password":"pw","multiplexing":"MULTIPLEXING_HIGH"}') ok "a mieru link is read, a node for each port" ;; *) bad "a mieru link is read: $(pl 'MIERU TCP')" ;; esac
 case "$(pl 'MIERU UDP')" in *'"port":3000,"port_range":"3000-3010","transport":"UDP"'*) ok "and a range of ports is kept" ;; *) bad "a mieru port range is kept: $(pl 'MIERU UDP')" ;; esac
 case "$(pl SQUIC)" in 'shadowquic {"type":"shadowquic","server":"sq.example.com","port":10443,"username":"u","password":"p","sni":"sq.example.com","udp_over_stream":false,"zero_rtt":true,"alpn":"h3"}') ok "a ShadowQUIC link is read" ;; *) bad "a ShadowQUIC link is read: $(pl SQUIC)" ;; esac
