@@ -331,7 +331,7 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && github.ref == 'refs/heads/master' && startsWith(github.event.head_commit.message, 'انتشار '))
     steps:
       - name: Check out the repository
         uses: actions/checkout@v7
@@ -365,7 +365,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
+          version=$(sed -n 's/^VERSION=//p' build/packages.inc.sh)
+          revision=$(sed -n 's/^RELEASE=//p' build/packages.inc.sh)
+          expected="v${version}-r${revision}"
+          case "$GITHUB_REF" in
+            refs/tags/v*) tag="$GITHUB_REF_NAME" ;;
+            refs/heads/master) tag="$expected" ;;
+            *) exit 1 ;;
+          esac
+          test "$tag" = "$expected"
 
           cat > notes.md <<'NOTES'
           Pick the pair that matches your router. OpenWrt changed package
@@ -391,9 +399,10 @@ jobs:
 
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" release/* --clobber
-            gh release edit   "$tag" --title "Zirgozar $tag" --notes-file notes.md
+            gh release edit   "$tag" --title "زیرگذر $tag" --notes-file notes.md
           else
             gh release create "$tag" release/* \
-              --title "Zirgozar $tag" \
+              --target "$GITHUB_SHA" \
+              --title "زیرگذر $tag" \
               --notes-file notes.md
           fi

@@ -457,7 +457,12 @@ service_started() {
 		return 1
 	fi
 
-	"$DNS" up >/dev/null 2>&1 || log "dnsmasq would not take the tunnel's name server - the health check tries again"
+	if ! "$DNS" up >/dev/null 2>&1; then
+		# Keep the core, routing and any existing DNS guard in place. Taking
+		# them down or restoring ISP DNS here would reopen the failed path.
+		say_status failed
+		return 1
+	fi
 
 	# What was put in place, so that a save can tell whether it changes any
 	# of it - see reload_service.
@@ -631,7 +636,7 @@ reload_service() {
 		"$RULES" dump > "$ZGZ_RUN/rules.applied" 2>/dev/null || true
 	fi
 	if [ "$_dns" = "changed" ]; then
-		"$DNS" up >/dev/null 2>&1 || true
+		"$DNS" up >/dev/null 2>&1 || { say_status failed; return 1; }
 		dns_signature > "$ZGZ_RUN/dns.applied"
 	fi
 	if [ "$_rules$_dns" = "samesame" ]; then
