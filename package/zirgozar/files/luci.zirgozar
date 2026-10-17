@@ -572,7 +572,7 @@ method_system() {
 		[ "$_pct" -le 100 ] || _pct=100
 	fi
 
-	printf '{"geo":%s,"cores":%s,"deps":%s,"interfaces":%s,"job":"%s","progress":%s,"self":"%s","core_result":"%s"}\n' \
+	printf '{"geo":%s,"cores":%s,"deps":%s,"interfaces":%s,"job":"%s","progress":%s,"self":"%s","core_result":"%s","deps_result":"%s"}\n' \
 		"$("$GEO" status 2>/dev/null || echo '{}')" \
 		"$("$CORES" list 2>/dev/null || echo '{}')" \
 		"${_deps:-{\}}" \
@@ -580,7 +580,8 @@ method_system() {
 		"$(cat "$JOB" 2>/dev/null)" \
 		"$_pct" \
 		"$(json_escape "$(cat "$ZGZ_RUN/self-update" 2>/dev/null)")" \
-		"$(json_escape "$(cat "$ZGZ_RUN/core-result" 2>/dev/null)")"
+		"$(json_escape "$(cat "$ZGZ_RUN/core-result" 2>/dev/null)")" \
+		"$(json_escape "$(cat "$ZGZ_RUN/deps-result" 2>/dev/null)")"
 }
 
 # -------------------------------------------------------------------- action
@@ -853,7 +854,12 @@ method_action() {
 			;;
 		deps_install)
 			# What was missing is about to change; the next look asks again.
-			rm -f "$ZGZ_RUN/deps.json"
+			if [ -s "$JOB" ]; then
+				fail "Another install is still running. Try again when it is done."
+				return
+			fi
+			rm -f "$ZGZ_RUN/deps.json" "$ZGZ_RUN/deps-result"
+			echo 'Installing dependencies' > "$JOB"
 			run_job "Installing dependencies" "$DEPS install; rm -f '$ZGZ_RUN/deps.json'"
 			;;
 		stats_reset)

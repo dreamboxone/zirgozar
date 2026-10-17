@@ -181,7 +181,22 @@ cmd_check() {
 	return 0
 }
 
+install_done() {
+	_rc=$?
+	trap - EXIT
+	if [ "$_rc" = 0 ]; then
+		echo ok > "$ZGZ_RUN/deps-result.new"
+	else
+		printf 'error %s\n' "$(cat "$ZGZ_MESSAGE" 2>/dev/null || true)" > "$ZGZ_RUN/deps-result.new"
+	fi
+	mv -f "$ZGZ_RUN/deps-result.new" "$ZGZ_RUN/deps-result"
+	rm -f "$ZGZ_RUN/deps.json"
+}
+
 cmd_install() {
+	trap install_done EXIT
+	: > "$ZGZ_RUN/deps-install.log"
+	rm -f "$ZGZ_RUN/deps-result"
 	clear_message
 	_m="$(pkg_manager)"
 	[ "$_m" != "none" ] || {
@@ -206,13 +221,13 @@ cmd_install() {
 			# Several of these are kernel modules - TPROXY, MPPE, L2TP -
 			# and a list without its kmods source can install none of them.
 			ensure_kmods_feed || true
-			if ! bounded 180 apk update >/dev/null 2>&1; then
+			if ! bounded 180 apk update >>"$ZGZ_RUN/deps-install.log" 2>&1; then
 				say_message "Could not download the package index. The router needs a working internet connection before dependencies can be installed."
 				return 1
 			fi
 			;;
 		opkg)
-			if ! bounded 180 opkg update >/dev/null 2>&1; then
+			if ! bounded 180 opkg update >>"$ZGZ_RUN/deps-install.log" 2>&1; then
 				say_message "Could not download the package index. The router needs a working internet connection before dependencies can be installed."
 				return 1
 			fi
@@ -233,8 +248,8 @@ cmd_install() {
 			cp -p /etc/ppp/chap-secrets "$ZGZ_RUN/chap-secrets.keep" 2>/dev/null || true
 		fi
 		case "$_m" in
-			apk)  bounded 180 apk add $_force "$_p" >/dev/null 2>&1 || _failed="$_failed $_p" ;;
-			opkg) bounded 180 opkg install $_force "$_p" >/dev/null 2>&1 || _failed="$_failed $_p" ;;
+			apk)  bounded 180 apk add $_force "$_p" >>"$ZGZ_RUN/deps-install.log" 2>&1 || _failed="$_failed $_p" ;;
+			opkg) bounded 180 opkg install $_force "$_p" >>"$ZGZ_RUN/deps-install.log" 2>&1 || _failed="$_failed $_p" ;;
 		esac
 		if [ -n "$_force" ] && [ -f "$ZGZ_RUN/chap-secrets.keep" ]; then
 			cp -p "$ZGZ_RUN/chap-secrets.keep" /etc/ppp/chap-secrets 2>/dev/null || true

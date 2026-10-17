@@ -130,7 +130,7 @@ function working(d) {
 /* The row a running job belongs to. */
 function jobKey(j) {
 	var m = /^Installing (.+)$/.exec(j || '');
-	if (m) return 'core:' + m[1];
+	if (m) return m[1] == 'dependencies' ? 'deps' : 'core:' + m[1];
 	if (j == 'Updating Zirgozar') return 'app';
 	return '';
 }
@@ -159,6 +159,7 @@ function actBtn(text, tone, key, fn, ico, d) {
 function act(key, name, arg, note) {
 	actAsked = Date.now();
 	actKey = key;
+	if (key == 'deps') lastDeps = '';
 	holdButtons(key);
 	return callAction(name, arg || '').then(function(r) {
 		if (r && r.error) { actAsked = 0; say(key, _(r.error), 'error'); }
@@ -216,6 +217,8 @@ function checkBtn(tone, key, busy) {
 var firstVersion = '';
 var lastSelf = '';
 var lastCore = '';
+var lastDeps = '';
+
 
 /* An install the router stopped because the flash or memory it was going to
    land on was too full - said under its own row, so the reader knows why
@@ -241,7 +244,7 @@ function no()  { return chip(_('no'), 'error'); }
    what it answers is a list of things to install. */
 var depsOpen = null;
 
-function renderDeps(deps) {
+function renderDeps(deps, state) {
 	deps = deps || {};
 	var can = deps.can || {};
 	var box = document.getElementById('zgz-deps');
@@ -266,7 +269,7 @@ function renderDeps(deps) {
 		E('span', { 'style': 'flex:1' }),
 		pui.btn(open ? _('Hide details') : _('Details'), 'soft-blue mk-small', function() {
 			depsOpen = !open;
-			renderDeps(deps);
+			renderDeps(deps, state);
 		}, open ? 'chevron-up' : 'chevron-down')
 	]));
 	if (!open) return;
@@ -298,9 +301,9 @@ function renderDeps(deps) {
 			    E('code', {}, missing.join(' ')) ]
 			: [ yes(), E('span', { 'style': 'color:var(--muted)' }, _('everything needed is installed')) ],
 		missing.length
-			? [ pui.btn(_('Install them'), 'primary mk-small', function() {
+			? [ actBtn(_('Install them'), 'primary mk-small', 'deps', function() {
 					return act('deps', 'deps_install', '', _('Installing. This needs a working connection and may take a minute.'));
-				}, 'download') ]
+				}, 'download', state) ]
 			: [], 'deps'));
 }
 
@@ -386,7 +389,17 @@ function render(d, early) {
 		window.setTimeout(function() { location.reload(); }, 1500);
 	}
 
-	renderDeps(d.deps);
+	var dr = early ? lastDeps : String(d.deps_result || '');
+	if (dr && dr != lastDeps) {
+		if (dr == 'ok') say('deps', _('Installed.'), 'ok');
+		else if (dr.indexOf('error') == 0) say('deps', _('Dependency installation failed. Details: %s').format(_(dr.slice(6).trim()) || _('See the installation log.')), 'error');
+	}
+	lastDeps = dr;
+	renderDeps(d.deps, d);
+	/* Keep the result visible even when no packages remain missing. */
+	var db = document.getElementById('zgz-deps');
+	if (db && !db.querySelector('[data-note="deps"]') && noteFor('deps'))
+		db.appendChild(E('div', { 'data-note': 'deps' }, noteFor('deps')));
 
 	/* While a check runs, what was known before it is not shown as an
 	   answer, and the page asks again sooner than its usual ten seconds. */

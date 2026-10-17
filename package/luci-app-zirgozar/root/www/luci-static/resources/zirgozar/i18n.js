@@ -516,6 +516,8 @@ var FA = {
 	'Packages': 'پکیج‌ها',
 	'%d missing': '%d مورد کم است',
 	'everything needed is installed': 'هرچه لازم بود نصب است',
+	'Dependency installation failed. Details: %s': 'نصب پیش‌نیازها ناموفق بود. جزئیات: %s',
+	'See the installation log.': 'گزارش نصب را در /var/run/zirgozar/deps-install.log بررسی کنید.',
 	'Install them': 'نصبشان کن',
 	'Installing. This needs a working connection and may take a minute.':
 		'در حال نصب. به یک اتصال سالم نیاز دارد و ممکن است یک دقیقه طول بکشد.',
