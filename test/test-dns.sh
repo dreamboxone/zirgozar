@@ -14,6 +14,7 @@ iptables() {
  case "$DNS_TEST:$*" in ipt-install-fail:*) return 1 ;; ipt-verify-fail:*' -C '*) return 1 ;; esac
  return 0
 }
+ip6tables() { printf 'IPv6 ' >> "$ZGZ_RUN/iptables.calls"; iptables "$@"; }
 lan_devices() { echo br-lan; }
 nft() {
  case "$*" in
@@ -159,4 +160,22 @@ if [ -n "${RIG_DNSMASQ:-}" ] || command -v dnsmasq >/dev/null 2>&1; then
   case "$?" in 0) ok 'live isolated resolver checks' ;; 77) echo '  skip - live sockets are unavailable in this runtime' ;; *) bad 'live isolated resolver checks failed' ;; esac
  fi
 else echo '  skip - live resolver checks require dnsmasq'; fi
+# Regenerate the strict guard, then exercise its real output and forward hooks.
+rig_set encrypted_dns_policy strict
+reset_dns
+run_dns success || bad 'strict guard failed to install'
+grep -q 'th dport { 443, 853 }' "$RIG/run/guard.nft" && ok 'strict guard covers HTTPS and TLS DNS' || bad 'strict ports missing'
+if command -v nft >/dev/null 2>&1 && command -v unshare >/dev/null 2>&1; then
+ python3 "$RIG_SRC/test/test-dns-firewall.py" "$RIG/run/guard.nft"
+ case "$?" in 0) ok 'live encrypted DNS firewall checks' ;; 77) echo '  skip - network namespace unavailable here' ;; *) bad 'live encrypted DNS firewall checks failed' ;; esac
+fi
+reset_dns
+if run_dns ipt-success; then
+ grep -q 'IPv6 .*ZGZ_EDNSOUT_N .*--dport 443 -j DROP' "$RIG/run/iptables.calls" && ok 'legacy IPv6 output is protected' || bad 'IPv6 output guard missing'
+ grep -q 'IPv6 .*ZGZ_EDNSFWD_N .*--dport 853 -j DROP' "$RIG/run/iptables.calls" && ok 'legacy IPv6 forwarding is protected' || bad 'IPv6 forwarding guard missing'
+else bad 'legacy strict guard failed'; fi
+rig_set encrypted_dns_policy rules
+reset_dns
+run_dns success || bad 'traffic-rule policy failed'
+if grep -q 'chain encrypted_' "$RIG/run/guard.nft"; then bad 'disabled encrypted guard persisted'; else ok 'traffic-rule policy removes encrypted guard'; fi
 rig_report

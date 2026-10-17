@@ -173,8 +173,11 @@ start_service() {
 		fi
 	fi
 	if [ "$ENGINE" = "xray" ]; then
-		if ! core_config xray > "$ZGZ_CONFIG_JSON"; then
-			log "could not write $ZGZ_CONFIG_JSON"
+		if ! core_config xray > "$ZGZ_CONFIG_JSON" 2>"$ZGZ_RUN/config-build.err"; then
+			_config_error="$(tail -1 "$ZGZ_RUN/config-build.err")"
+			log "could not write $ZGZ_CONFIG_JSON: $_config_error"
+			say_message "${_config_error:-تولید پیکربندی تونل ناموفق بود.}"
+			say_status failed
 			return 1
 		fi
 	fi
@@ -523,7 +526,7 @@ service_stopped() {
 
 # What the DNS step depends on. Kept beside the ruleset for the same reason.
 dns_signature() {
-	echo "$(cfg dns_mode dnsmasq) $(cfg dns_port 1053) $(cfg dnsmasq_port 1054)"
+	echo "$(cfg dns_mode dnsmasq) $(cfg dns_port 1053) $(cfg dnsmasq_port 1054) $(cfg encrypted_dns_policy proxy)"
 }
 
 # A save. Every save on every page lands here, and restarting the tunnel for
@@ -581,10 +584,11 @@ reload_service() {
 	# refuses one it cannot tell the format of.
 	_next="${ZGZ_CONFIG_JSON%.json}.next.json"
 	_eng="$(active_engine)"
-	if ! core_config "$_eng" > "$_next" 2>/dev/null; then
+	if ! core_config "$_eng" > "$_next" 2>"$ZGZ_RUN/config-build.err"; then
 		rm -f "$_next"
-		restart
-		return
+		say_message "$(tail -1 "$ZGZ_RUN/config-build.err")"
+		say_status failed
+		return 1
 	fi
 	# Access Control has just been read again, and the Kill switch setting may
 	# be what this save changed.

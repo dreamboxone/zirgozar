@@ -17,6 +17,7 @@
 'use strict';
 'require view';
 'require form';
+'require validation';
 'require uci';
 'require zirgozar.i18n as i18n';
 'require zirgozar.ui as pui';
@@ -654,6 +655,9 @@ return view.extend({
 			_('TCP is the default because a great many free nodes carry no UDP at all, and a lookup sent as UDP through one of them is simply lost.'));
 		o.value('tcp', 'TCP');
 		o.value('doh', 'DoH');
+		o.value('tls', 'DoT');
+		o.value('quic', 'DoQ (sing-box)');
+		o.value('http3', 'DoH3 (sing-box)');
 		o.value('udp', 'UDP');
 		o.default = 'tcp';
 
@@ -673,7 +677,7 @@ return view.extend({
 		o.depends('remote_dns_protocol', 'udp');
 
 		o = s.taboption('dns', form.Value, 'remote_dns_doh', _('Remote DNS DoH'),
-			_('An address, such as the one a DNS service gives you. When it has a name, the server’s IP is looked up for it outside the tunnel; it can also be written after a comma.'));
+			_('Use an HTTPS URL. A hostname requires one literal bootstrap IP after a comma; no direct DNS lookup is performed.'));
 		o.default = 'https://8.8.8.8/dns-query';
 		o.value('https://1.1.1.1/dns-query', 'CloudFlare');
 		o.value('https://1.1.1.2/dns-query', 'CloudFlare-Security');
@@ -686,16 +690,47 @@ return view.extend({
 		o.value('https://doh.libredns.gr/dns-query,116.202.176.26', 'LibreDNS');
 		savedDns(o, 'remote_dns_doh_custom', []);
 		o.depends('remote_dns_protocol', 'doh');
+		o.depends('remote_dns_protocol', 'http3');
 		o.validate = function(section_id, value) {
-			if (!value) return true;
-			var parts = value.split(',');
-			if (!/^https:\/\/[^\s,]+$/.test(parts[0]))
-				return _('DoH request address') + ' ' + _('Format must be:') + ' URL,IP';
-			for (var k = 1; k < parts.length; k++)
-				if (!/^[0-9.:a-fA-F\/]+$/.test(parts[k]))
-					return _('DoH request address') + ' ' + _('Format must be:') + ' URL,IP';
+			if (!value) return _('A DoH endpoint is required.');
+			var parts = value.split(','), url;
+			try { url = new URL(parts[0]); } catch (e) { return _('Invalid HTTPS endpoint.'); }
+			if (url.protocol !== 'https:' || url.username || url.password || url.hash || /\s/.test(value) || parts.length > 2)
+				return _('Invalid HTTPS endpoint.');
+			var host = url.hostname.replace(/^\[|\]$/g, '');
+			var isIP = function(v) { return !!(validation.parseIPv4(v) || validation.parseIPv6(v)); };
+			if (parts.length === 2 && !isIP(parts[1])) return _('Enter one literal bootstrap IP.');
+			if (!isIP(host) && !isIP(parts[1] || '')) return _('A hostname requires a bootstrap IP after a comma.');
 			return true;
 		};
+
+		o = s.taboption('dns', form.Value, 'remote_dns_tls', _('DoT server IP'));
+		o.datatype = 'ipaddr(1)';
+		o.default = '1.1.1.1';
+		o.rmempty = false;
+		o.depends('remote_dns_protocol', 'tls');
+		o.depends('remote_dns_protocol', 'quic');
+		o = s.taboption('dns', form.Value, 'remote_dns_tls_port', _('DoT server port'));
+		o.datatype = 'port';
+		o.default = '853';
+		o.rmempty = false;
+		o.depends('remote_dns_protocol', 'tls');
+		o.depends('remote_dns_protocol', 'quic');
+		o = s.taboption('dns', form.Value, 'remote_dns_tls_server_name', _('DoT certificate name'),
+			_('The certificate must match this name. TLS verification is always enabled; the selected DNS outbound is respected.'));
+		o.datatype = 'hostname';
+		o.default = 'cloudflare-dns.com';
+		o.rmempty = false;
+		o.depends('remote_dns_protocol', 'tls');
+		o.depends('remote_dns_protocol', 'quic');
+
+		o = s.taboption('dns', form.ListValue, 'encrypted_dns_policy', _('Client encrypted DNS policy'),
+			_('Known services sends port 853 and common DoH endpoints through the tunnel. Strict mode sends all TCP/UDP 443 and 853 through the tunnel, including Iranian HTTPS sites, and blocks uncaptured connections. Unknown DoH endpoints are covered only in strict mode; custom ports are not covered. Devices excluded from interception can lose connectivity. Enable both client and router proxying for usable HTTPS in strict mode.'));
+		o.value('proxy', _('Tunnel known services'));
+		o.value('strict', _('Strict: tunnel all 443 and 853'));
+		o.value('rules', _('Follow traffic rules'));
+		o.default = 'proxy';
+
 
 		o = s.taboption('dns', form.Value, 'remote_dns_client_ip', _('Remote DNS EDNS Client Subnet'),
 			_('Tells the DNS server where the client is, so that a CDN can answer with an edge near it. It cannot be a private address, and the server has to support EDNS Client Subnet (RFC 7871).'));

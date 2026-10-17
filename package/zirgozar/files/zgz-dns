@@ -67,6 +67,8 @@ GUARD_CHAIN=ZGZ_DNSOUT
 ROUTER_CHAIN=ZGZ_DNSROUTER
 LAN_CHAIN=ZGZ_DNSLAN
 FWD_CHAIN=ZGZ_DNSFWD
+ENCRYPTED_OUT=ZGZ_EDNSOUT
+ENCRYPTED_FWD=ZGZ_EDNSFWD
 BYPASS=0xff
 
 # An address on the router's own network: reached straight out of one of its
@@ -120,6 +122,61 @@ dnsmasq_uids() {
 	printf '%s\n' $_du_ids | sort -un | tr '\n' ' '
 }
 
+# The forwarding guard only sees connections which escaped interception.
+# The output guard covers every router UID; only marked core sockets and
+# local interfaces are exempt. An established connection is checked too.
+encrypted_ipt_clean() {
+ _ec_tool="$1"; _ec_chain="$2"; _ec_parent="$3"
+ "$_ec_tool" -w 2 -S "$_ec_parent" 2>/dev/null | grep -- "-j $_ec_chain\$" | sed 's/^-A /-D /' |
+  while read -r _ec_rule; do
+   "$_ec_tool" -w 2 $_ec_rule >/dev/null 2>&1 || true
+  done
+ "$_ec_tool" -w 2 -F "$_ec_chain" >/dev/null 2>&1 || true
+ "$_ec_tool" -w 2 -X "$_ec_chain" >/dev/null 2>&1 || true
+}
+
+encrypted_ipt_up() {
+ for _eg_tool in iptables ip6tables; do
+  if [ "$_eg_tool" = ip6tables ] && ! grep -q . /proc/net/if_inet6 2>/dev/null; then continue; fi
+  command -v "$_eg_tool" >/dev/null 2>&1 || {
+   warn "محافظ DNS رمزگذاری‌شده به $_eg_tool نیاز دارد."; return 1
+  }
+  for _eg_parent in OUTPUT FORWARD; do
+   _eg_chain="$ENCRYPTED_OUT"
+   [ "$_eg_parent" != FORWARD ] || _eg_chain="$ENCRYPTED_FWD"
+   "$_eg_tool" -w 2 -N "${_eg_chain}_N" >/dev/null 2>&1 || "$_eg_tool" -w 2 -F "${_eg_chain}_N" >/dev/null 2>&1 || return 1
+   "$_eg_tool" -w 2 -A "${_eg_chain}_N" -o lo -j RETURN >/dev/null 2>&1 || return 1
+   for _eg_dev in $_g_elan; do
+    "$_eg_tool" -w 2 -A "${_eg_chain}_N" -o "$_eg_dev" -j RETURN >/dev/null 2>&1 || return 1
+   done
+   if [ "$_eg_parent" = OUTPUT ]; then
+    "$_eg_tool" -w 2 -A "${_eg_chain}_N" -m mark --mark "$BYPASS/0xff" -j RETURN >/dev/null 2>&1 || return 1
+   fi
+   for _eg_port in $_g_eports; do
+    for _eg_proto in tcp udp; do
+     "$_eg_tool" -w 2 -A "${_eg_chain}_N" -p "$_eg_proto" --dport "$_eg_port" -j DROP >/dev/null 2>&1 || return 1
+    done
+   done
+   if [ "$_eg_parent" = OUTPUT ]; then
+    "$_eg_tool" -w 2 -I OUTPUT -j "${_eg_chain}_N" >/dev/null 2>&1 || return 1
+   else
+    for _eg_dev in $_g_elan; do
+     "$_eg_tool" -w 2 -I FORWARD -i "$_eg_dev" -j "${_eg_chain}_N" >/dev/null 2>&1 || return 1
+    done
+   fi
+   encrypted_ipt_clean "$_eg_tool" "$_eg_chain" "$_eg_parent"
+   "$_eg_tool" -w 2 -E "${_eg_chain}_N" "$_eg_chain" >/dev/null 2>&1 || return 1
+   if [ "$_eg_parent" = OUTPUT ]; then
+    "$_eg_tool" -w 2 -C OUTPUT -j "$_eg_chain" >/dev/null 2>&1 || return 1
+   else
+    for _eg_dev in $_g_elan; do
+     "$_eg_tool" -w 2 -C FORWARD -i "$_eg_dev" -j "$_eg_chain" >/dev/null 2>&1 || return 1
+    done
+   fi
+  done
+ done
+}
+
 guard_up() {
 	_g_to="${1:-53}"
 	_g_output="${2:-1}"
@@ -131,7 +188,14 @@ guard_up() {
 	fi
 	_g_lan=""
 	[ "$(cfg_bool dns_hijack 1)" = "1" ] && _g_lan="$(lan_devices)"
-	_g_ports="53"; _g_ex=""
+	_g_ports="53 853"; _g_ex=""
+ _g_eports=""; _g_elan="$(lan_devices)"
+ case "$(cfg encrypted_dns_policy proxy)" in
+  proxy) _g_eports=853 ;;
+  strict) _g_eports="443 853" ;;
+  rules) ;;
+  *) warn 'سیاست DNS رمزگذاری‌شده معتبر نیست.'; return 1 ;;
+ esac
 	for _g_s in $(uci -q get 'dhcp.@dnsmasq[0].server' 2>/dev/null); do
 		case "$_g_s" in
 			*/*)
@@ -145,13 +209,15 @@ guard_up() {
 		esac
 	done
 	_g_ports="$(echo $_g_ports | tr ' ' '\n' | sort -un | tr '\n' ' ')"
-	if [ "$_g_output" != "1" ] && [ -z "$_g_lan" ]; then
+	if [ "$_g_output" != "1" ] && [ -z "$_g_lan" ] && [ -z "$_g_eports" ]; then
 		guard_down
 		return 0
 	fi
 	case "$(firewall_backend)" in
 		nft)
 			_g_nports="$(echo $_g_ports | sed 's/ /, /g')"
+			_g_neports="$(echo $_g_eports | sed 's/ /, /g')"
+			_g_nelan="$(echo $_g_elan | awk '{ for (i = 1; i <= NF; i++) printf "%s\"%s\"", (i > 1 ? ", " : ""), $i }')"
 			_g_nex="$(echo $_g_ex | sed 's/ /, /g')"
 			_g_nlan="$(echo $_g_lan | awk '{ for (i = 1; i <= NF; i++) printf "%s\"%s\"", (i > 1 ? ", " : ""), $i }')"
 			# Declared, deleted and written again in one transaction, so it
@@ -195,8 +261,24 @@ guard_up() {
 					printf '\t\tip6 daddr ::1 return\n'
 					printf '\t\tmeta l4proto { tcp, udp } th dport { %s } counter drop\n\t}\n' "$_g_nports"
 				fi
+				if [ -n "$_g_eports" ]; then
+				 printf '\tchain encrypted_out {\n\t\ttype filter hook output priority filter; policy accept;\n'
+				 printf '\t\tmeta mark & 0xff == %s return\n' "$BYPASS"
+				 printf '\t\toifname "lo" return\n'
+				 [ -z "$_g_nelan" ] || printf '\t\toifname { %s } return\n' "$_g_nelan"
+				 printf '\t\tmeta l4proto { tcp, udp } th dport { %s } counter drop\n\t}\n' "$_g_neports"
+				 if [ -n "$_g_nelan" ]; then
+				  printf '\tchain encrypted_fwd {\n\t\ttype filter hook forward priority filter; policy accept;\n'
+				  printf '\t\tiifname != { %s } return\n\t\toifname { %s } return\n' "$_g_nelan" "$_g_nelan"
+				  printf '\t\tmeta l4proto { tcp, udp } th dport { %s } counter drop\n\t}\n' "$_g_neports"
+				 fi
+				fi
 				printf '}\n'
 			} | nft -f - 2>"$ZGZ_RUN/dns-guard.err" || return 1
+			if [ -n "$_g_eports" ]; then
+			 nft list chain inet "$GUARD_TABLE" encrypted_out >/dev/null 2>&1 || return 1
+			 if [ -n "$_g_nelan" ]; then nft list chain inet "$GUARD_TABLE" encrypted_fwd >/dev/null 2>&1 || return 1; fi
+			fi
 			if [ "$_g_output" = "1" ]; then
 				nft list chain inet "$GUARD_TABLE" dnsmasq_out >/dev/null 2>&1 || return 1
 				nft list chain inet "$GUARD_TABLE" dns_router >/dev/null 2>&1 || return 1
@@ -207,6 +289,17 @@ guard_up() {
 			fi
 			;;
 		ipt)
+			if [ -n "$_g_eports" ]; then
+    encrypted_ipt_up || return 1
+   else
+    for _ed_tool in iptables ip6tables; do
+     command -v "$_ed_tool" >/dev/null 2>&1 || continue
+     for _ed_suffix in '' _N; do
+      encrypted_ipt_clean "$_ed_tool" "$ENCRYPTED_OUT$_ed_suffix" OUTPUT
+      encrypted_ipt_clean "$_ed_tool" "$ENCRYPTED_FWD$_ed_suffix" FORWARD
+     done
+    done
+   fi
 			if [ -n "$_g_lan" ]; then
 				iptables -w 2 -t nat -N "${LAN_CHAIN}_N" >/dev/null 2>&1 || iptables -w 2 -t nat -F "${LAN_CHAIN}_N" >/dev/null 2>&1 || return 1
 				iptables -w 2 -t nat -A "${LAN_CHAIN}_N" -m mark --mark "$BYPASS/0xff" -j RETURN >/dev/null 2>&1 || return 1
@@ -273,6 +366,13 @@ guard_up() {
 }
 
 guard_down() {
+ for _ed_tool in iptables ip6tables; do
+  command -v "$_ed_tool" >/dev/null 2>&1 || continue
+  for _ed_suffix in '' _N; do
+   encrypted_ipt_clean "$_ed_tool" "$ENCRYPTED_OUT$_ed_suffix" OUTPUT
+   encrypted_ipt_clean "$_ed_tool" "$ENCRYPTED_FWD$_ed_suffix" FORWARD
+  done
+ done
 	if command -v nft >/dev/null 2>&1; then
 		nft delete table inet "$GUARD_TABLE" >/dev/null 2>&1 || true
 	fi

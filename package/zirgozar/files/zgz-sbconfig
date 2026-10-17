@@ -569,6 +569,12 @@ function conv_outbound(o) {
 	let s = o.settings ?? {};
 	let r = null;
 
+	if (proto == 'freedom' && match(tag, /^dns-tls/) && ss.security == 'tls') {
+		// This wrapper is implemented by the native TLS DNS transport below.
+		// It must never become a direct outbound carrying plain DNS on 853.
+		out_tags[tag] = true;
+		return;
+	}
 	if (proto == 'freedom') {
 		r = { type: 'direct', tag };
 	} else if (proto == 'dns' || proto == 'blackhole') {
@@ -1032,28 +1038,35 @@ function dns_server(sv) {
 		warn('FakeDNS is built differently in sing-box and is not carried over');
 		return null;
 	}
-	if ((m = match(a, /^tcp:\/\/([^:\/]+)(:([0-9]+))?$/))) {
-		o = { type: 'tcp', server: m[1] };
-		if (m[3])
-			o.server_port = int(m[3]);
-	} else if ((m = match(a, /^https:\/\/([^:\/]+)(:([0-9]+))?(\/.*)?$/))) {
-		o = { type: 'https', server: m[1] };
-		if (m[3])
-			o.server_port = int(m[3]);
-		if (m[4])
-			o.path = m[4];
-	} else if ((m = match(a, /^(tls|quic):\/\/([^:\/]+)(:([0-9]+))?$/))) {
-		o = { type: m[1], server: m[2] };
+	if ((m = match(a, /^(tcp|https|h3|tls|quic):\/\/(\[[0-9a-fA-F:]+\]|[^:\/]+)(:([0-9]+))?(\/.*)?$/))) {
+		o = { type: m[1], server: replace(m[2], /^\[|\]$/g, '') };
 		if (m[4])
 			o.server_port = int(m[4]);
+		if (m[5])
+			o.path = m[5];
 	} else {
 		o = { type: 'udp', server: a };
 		if (sv.port && sv.port != 53)
 			o.server_port = sv.port;
 	}
-	// A measuring configuration's one resolver has no tag of its own.
 	o.tag = sv.tag ?? (args.mode == 'test' ? 'dns-test' : null);
 	let via = dns_via[sv.tag];
+	let wrapped = filter(X.outbounds ?? [], (x) => x.tag == via && match(x.tag, /^dns-tls/) && x.streamSettings?.security == 'tls')[0];
+	if (wrapped) {
+		o.type = 'tls';
+		o.tls = { enabled: true, server_name: wrapped.streamSettings.tlsSettings.serverName,
+		          insecure: false, min_version: '1.2', alpn: [ 'dot' ] };
+		via = target(wrapped.streamSettings.sockopt?.dialerProxy ?? 'direct');
+	}
+	// Preserve the DoH certificate/HTTP name while dialing the supplied IP.
+	// A resolver hostname must not be resolved through the direct DNS again.
+	if (o.type == 'https' || o.type == 'h3' || o.type == 'quic') {
+		let bootstrap = X.dns?.hosts?.[o.server];
+		if (bootstrap) {
+			o.tls = { enabled: true, server_name: o.server, insecure: false };
+			o.server = type(bootstrap) == 'array' ? bootstrap[0] : bootstrap;
+		}
+	}
 	if (via && via != 'direct' && via != 'block')
 		o.detour = via;
 	return o;
@@ -1133,6 +1146,9 @@ if (have_direct_dns) {
 	if (QS[X.dns?.queryStrategy])
 		route.default_domain_resolver.strategy = QS[X.dns.queryStrategy];
 }
+
+if (!route.default_domain_resolver && dns_final)
+	route.default_domain_resolver = { server: dns_final };
 
 let cfg = {
 	log: level ? { level, timestamp: true } : { disabled: true },

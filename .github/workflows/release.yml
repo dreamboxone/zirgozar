@@ -23,7 +23,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: true
 
 env:
@@ -57,7 +57,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Install firewall and DNS test tools
-        run: sudo apt-get update -qq && sudo apt-get install -y nftables dnsmasq-base
+        run: sudo apt-get update -qq && sudo apt-get install -y nftables dnsmasq-base cmake pkg-config libjson-c-dev
 
       - name: Check empty config choices
         run: node test/test-ui.js
@@ -70,6 +70,27 @@ jobs:
           set -euo pipefail
           sh ./build/build-core.sh x86_64
           ./prebuilt/x86_64/xray version
+
+      - name: Prepare native DNS translation checks
+        run: |
+          set -euo pipefail
+          tools="$PWD/.test-tools"
+          mkdir -p "$tools"
+          git clone --quiet https://github.com/jow-/ucode.git "$tools/ucode-src"
+          git -C "$tools/ucode-src" checkout --quiet 20eb2ca94a87ffdcc1515aa9b3a974d349addc6a
+          cmake -S "$tools/ucode-src" -B "$tools/ucode-build" \
+            -DCMAKE_INSTALL_PREFIX="$tools/ucode" -DCMAKE_INSTALL_LIBDIR=lib \
+            -DCMAKE_INSTALL_RPATH="$tools/ucode/lib" \
+            -DUBUS_SUPPORT=OFF -DUCI_SUPPORT=OFF -DNL80211_SUPPORT=OFF \
+            -DRTNL_SUPPORT=OFF -DRESOLV_SUPPORT=OFF -DULOOP_SUPPORT=OFF \
+            -DSOCKET_SUPPORT=OFF -DLOG_SUPPORT=OFF -DZLIB_SUPPORT=OFF
+          cmake --build "$tools/ucode-build" --parallel 2
+          cmake --install "$tools/ucode-build"
+          echo "$tools/ucode/bin" >> "$GITHUB_PATH"
+          curl -fsSL --retry 3 -o "$tools/sing-box.tar.gz" \
+            https://github.com/SagerNet/sing-box/releases/download/v1.14.3/sing-box-1.14.3-linux-amd64.tar.gz
+          tar -xzf "$tools/sing-box.tar.gz" -C "$tools" --strip-components=1 sing-box-1.14.3-linux-amd64/sing-box
+          "$tools/sing-box" version
 
       - name: Fetch the routing data the split needs
         run: |
@@ -89,6 +110,7 @@ jobs:
           # and the transparent-proxy probe genuinely loads a throwaway table.
           sudo -E env \
             RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
+            RIG_SINGBOX="$PWD/.test-tools/sing-box" \
             ZGZ_GEO_DIR="$PWD/geo" \
             PATH="$PATH" \
             timeout -k 5 180 sh test/run.sh

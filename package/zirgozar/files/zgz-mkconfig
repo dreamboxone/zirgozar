@@ -193,11 +193,30 @@ fi
 # First, so that nothing further down - a private range, the Iran split - can
 # send a resolver's traffic somewhere the tab did not ask for.
 add_rule '{"type":"field","inboundTag":["dns-direct"],"outboundTag":"direct"}'
-if [ "$(cfg remote_dns_detour remote)" = "direct" ]; then
+if [ "$(cfg remote_dns_protocol tcp)" = "tls" ]; then
+	add_rule '{"type":"field","inboundTag":["dns-remote"],"outboundTag":"dns-tls"}'
+elif [ "$(cfg remote_dns_detour remote)" = "direct" ]; then
 	add_rule '{"type":"field","inboundTag":["dns-remote"],"outboundTag":"direct"}'
 else
 	add_rule '{"type":"field","inboundTag":["dns-remote"],"outboundTag":"proxy"}'
 fi
+
+# These rules precede address splits and client overrides. Encrypted DNS
+# cannot be redirected to a plain DNS listener: carry the encrypted connection.
+encrypted_dns_policy="$(cfg encrypted_dns_policy proxy)"
+case "$encrypted_dns_policy" in
+ rules) ;;
+ proxy|strict)
+  add_rule '{"type":"field","inboundTag":["tproxy-in","redir-in","poison-in","poison-redir"],"network":"tcp,udp","port":"853","outboundTag":"proxy"}'
+  if [ "$encrypted_dns_policy" = strict ]; then
+   add_rule '{"type":"field","inboundTag":["tproxy-in","redir-in","poison-in","poison-redir"],"network":"tcp,udp","port":"443","outboundTag":"proxy"}'
+  else
+   add_rule '{"type":"field","inboundTag":["tproxy-in","redir-in","poison-in","poison-redir"],"network":"tcp,udp","port":"443","domain":["domain:dns.google","domain:cloudflare-dns.com","domain:one.one.one.one","domain:dns.quad9.net","domain:dns.adguard.com","domain:dns.adguard-dns.com","domain:doh.libredns.gr","domain:dns.nextdns.io","domain:dns0.eu","domain:doh.opendns.com","domain:dns.alidns.com","domain:doh.pub","domain:dns.sb"],"outboundTag":"proxy"}'
+   add_rule '{"type":"field","inboundTag":["tproxy-in","redir-in","poison-in","poison-redir"],"network":"tcp,udp","port":"443","ip":["1.1.1.1","1.0.0.1","1.1.1.2","1.0.0.2","1.1.1.3","1.0.0.3","8.8.8.8","8.8.4.4","9.9.9.9","149.112.112.112","94.140.14.14","94.140.15.15","208.67.222.222","208.67.220.220","2606:4700:4700::1111","2606:4700:4700::1001","2001:4860:4860::8888","2001:4860:4860::8844","2620:fe::fe","2620:fe::9"],"outboundTag":"proxy"}'
+  fi
+  ;;
+ *) echo 'سیاست DNS رمزگذاری‌شده معتبر نیست.' >&2; exit 1 ;;
+esac
 
 # `[ test ] && command` as a whole statement is a trap under set -e: when the
 # test is false the statement returns non-zero and takes the script with it.
@@ -1045,6 +1064,21 @@ $shunt_outbounds" | awk 'NF { printf "%s%s,\n", "    ", $0 }')"
 set -- $(direct_dns)
 dd_proto="$1"; dd_addr="$2"; dd_port="$3"
 direct_qs="$(cfg direct_dns_query_strategy UseIP)"
+# Accept literal IPv4/IPv6 only, with no zone, prefix or hostname.
+dns_ip_literal() {
+ LC_ALL=C awk -v ip="$1" 'BEGIN {
+  if (ip ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) {
+   n=split(ip,a,"."); for(i=1;i<=n;i++) if(length(a[i])>3 || a[i]+0>255) exit 1; exit 0
+  }
+  if (ip !~ /:/ || ip ~ /[^0-9a-fA-F:]/ || ip ~ /:::/) exit 1
+  s=ip; compressed=gsub(/::/,"X",s); if(compressed>1) exit 1
+  if (!compressed && (ip ~ /^:/ || ip ~ /:$/)) exit 1
+  n=split(ip,a,":"); count=0
+  for(i=1;i<=n;i++) if(a[i]!="") { if(length(a[i])>4) exit 1; count++ }
+  if(compressed) exit !(count<8); exit !(count==8)
+ }'
+}
+dns_tls_out=""
 remote_proto="$(cfg remote_dns_protocol tcp)"
 remote_dns="$(cfg remote_dns 8.8.8.8)"
 remote_doh="$(cfg remote_dns_doh 'https://8.8.8.8/dns-query')"
@@ -1075,44 +1109,65 @@ case "$remote_proto" in
 	udp)
 		remote_server="\"address\":\"$remote_ip\",\"port\":$remote_port"
 		;;
-	doh)
-		# "url" or "url,bootstrap-ip". The bootstrap goes into hosts, so that
-		# the DoH server's own name is never itself a lookup.
+	doh|http3)
+		if [ "$remote_proto" = http3 ] && [ "${ZGZ_FOR_SINGBOX:-0}" != 1 ]; then
+		 echo 'DoH3 به هستهٔ sing-box نیاز دارد.' >&2; exit 1
+		fi
+		# No network lookup is permitted while constructing the DoH endpoint.
 		_url="${remote_doh%%,*}"
 		_boot=""
 		case "$remote_doh" in *,*) _boot="${remote_doh#*,}" ;; esac
-		_dohhost="$(printf '%s' "$_url" | sed -n 's|^https://\([^/:]*\).*|\1|p')"
-		# A name with no address after it: Xray cannot reach it at all - it
-		# has only the server itself to ask where the server is, says "tries
-		# to resolve itself" and gives up, and every name it was to look up
-		# goes unanswered or is answered by something else. So the address is
-		# looked up here, outside the tunnel, and kept for when that fails.
-		if [ -z "$_boot" ] && [ -n "$_dohhost" ]; then
-			case "$_dohhost" in
-				*[!0-9.]*)
-					_bootf="$ZGZ_RUN/doh-boot.$(printf '%s' "$_dohhost" | tr -c 'A-Za-z0-9.-' '_')"
-					_boot="$(resolve_direct "$_dohhost" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)" || _boot=""
-					if [ -n "$_boot" ]; then
-						printf '%s\n' "$_boot" > "$_bootf" 2>/dev/null || true
-					else
-						_boot="$(cat "$_bootf" 2>/dev/null)" || _boot=""
-					fi
-					;;
-			esac
+		case "$_url" in https://*) ;; *) echo 'نشانی DoH باید با https:// شروع شود.' >&2; exit 1 ;; esac
+		_authority="${_url#https://}"; _authority="${_authority%%/*}"
+		case "$_authority" in ''|*@*|*' '*|*'"'*|*'\\'*) echo 'نشانی سرور DoH معتبر نیست.' >&2; exit 1 ;; esac
+		case "$_authority" in
+		 \[*\]*) _dohhost="${_authority#\[}"; _dohhost="${_dohhost%%\]*}" ;;
+		 *) _dohhost="${_authority%%:*}" ;;
+		esac
+		if ! dns_ip_literal "$_dohhost"; then
+		 if ! dns_ip_literal "$_boot"; then
+		  echo 'برای DoH با نام دامنه، IP سرور را بعد از ویرگول وارد کنید؛ DNS مستقیم استفاده نمی‌شود.' >&2
+		  exit 1
+		 fi
+		 add_host "$_dohhost" "$_boot"
+		elif [ -n "$_boot" ] && ! dns_ip_literal "$_boot"; then
+		 echo 'IP اولیهٔ DoH معتبر نیست.' >&2; exit 1
 		fi
-		if [ -n "$_boot" ] && [ -n "$_dohhost" ]; then
-			case "$_dohhost" in
-				*[!0-9.]*) add_host "$_dohhost" "$_boot" ;;
-			esac
-		fi
+		[ "$remote_proto" != http3 ] || _url="h3://${_url#https://}"
 		remote_server="\"address\":\"$(json_escape "$_url")\""
 		case "$_dohhost" in
 			*.*.*.*) case "$_dohhost" in *[!0-9.]*) : ;; *) remote_ip="$_dohhost" ;; esac ;;
 		esac
 		;;
-	*)
+	tls|quic)
+		if [ "$remote_proto" = quic ] && [ "${ZGZ_FOR_SINGBOX:-0}" != 1 ]; then
+		 echo 'DoQ به هستهٔ sing-box نیاز دارد.' >&2; exit 1
+		fi
+		remote_ip="$(cfg remote_dns_tls 1.1.1.1)"
+		remote_port="$(cfg remote_dns_tls_port 853)"
+		_tls_name="$(cfg remote_dns_tls_server_name cloudflare-dns.com)"
+		dns_ip_literal "$remote_ip" || { echo 'سرور DoT باید IP معتبر داشته باشد.' >&2; exit 1; }
+		case "$remote_port" in ''|*[!0-9]*) echo 'پورت DoT معتبر نیست.' >&2; exit 1 ;; esac
+		[ "$remote_port" -ge 1 ] && [ "$remote_port" -le 65535 ] || { echo 'پورت DoT معتبر نیست.' >&2; exit 1; }
+		case "$_tls_name" in ''|*[!A-Za-z0-9.:-]*) echo 'نام گواهی DoT معتبر نیست.' >&2; exit 1 ;; esac
+		_tls_dialer=proxy
+		[ "$(cfg remote_dns_detour remote)" != direct ] || _tls_dialer=direct
+		_tls_address="$remote_ip"
+		case "$remote_ip" in *:*) _tls_address="[$remote_ip]" ;; esac
+		if [ "$remote_proto" = quic ]; then
+		 remote_server="\"address\":\"quic://$_tls_address:$remote_port\""
+		 # The hosts entry supplies the certificate name without a DNS lookup.
+		 add_host "$_tls_name" "$remote_ip"
+		 remote_server="\"address\":\"quic://$_tls_name:$remote_port\""
+		else
+		remote_server="\"address\":\"tcp://$_tls_address:$remote_port\""
+		dns_tls_out="{\"tag\":\"dns-tls\",\"protocol\":\"freedom\",\"settings\":{},\"streamSettings\":{\"network\":\"tcp\",\"security\":\"tls\",\"tlsSettings\":{\"serverName\":\"$_tls_name\",\"allowInsecure\":false,\"minVersion\":\"1.2\",\"alpn\":[\"dot\"]},\"sockopt\":{\"mark\":${ZGZ_OUT_MARK},\"dialerProxy\":\"$_tls_dialer\"}}},"
+		fi
+		;;
+	tcp)
 		remote_server="\"address\":\"tcp://$remote_ip:$remote_port\""
 		;;
+	*) echo 'پروتکل DNS بالادستی پشتیبانی نمی‌شود.' >&2; exit 1 ;;
 esac
 [ -n "$remote_ecs" ] && remote_server="$remote_server,\"clientIp\":\"$(json_escape "$remote_ecs")\""
 remote_server="{\"tag\":\"dns-remote\",$remote_server,\"queryStrategy\":\"$remote_qs\"}"
@@ -1230,7 +1285,13 @@ if bridge_is_aether; then
 	_ab_server="$(printf '%s\n' "$remote_server" | sed 's/"tag":"dns-remote"/"tag":"dns-aether-bootstrap"/' |
 		awk -v names="$_ab_names" '{ sub(/}$/, ",\"domains\":[" names "],\"skipFallback\":true,\"finalQuery\":true}"); print }')"
 	dns_servers="${dns_servers:+$dns_servers,}$_ab_server"
-	rules="{\"type\":\"field\",\"inboundTag\":[\"dns-aether-bootstrap\"],\"outboundTag\":\"$_aether_out\"}${rules:+,$rules}"
+	_ab_via="$_aether_out"
+	if [ "$remote_proto" = tls ]; then
+	 _ab_via=dns-tls-aether
+	 _ab_tls="$(printf '%s' "$dns_tls_out" | sed 's/"tag":"dns-tls"/"tag":"dns-tls-aether"/' | sed "s/\"dialerProxy\":\"$_tls_dialer\"/\"dialerProxy\":\"$_aether_out\"/")"
+	 dns_tls_out="$dns_tls_out$_ab_tls"
+	fi
+	rules="{\"type\":\"field\",\"inboundTag\":[\"dns-aether-bootstrap\"],\"outboundTag\":\"$_ab_via\"}${rules:+,$rules}"
 fi
 if [ -n "$direct_names" ]; then
 	dns_servers="${dns_servers:+$dns_servers,}{\"tag\":\"dns-direct\",$direct_server,\"domains\":[$direct_names],\"skipFallback\":true,\"finalQuery\":true,\"queryStrategy\":\"$direct_qs\"}"
@@ -1307,6 +1368,7 @@ ${socks_outbounds}
 ${shunt_outbounds}
 ${chain_outs}
     $_aether_entry
+    $dns_tls_out
     { "tag": "direct", "protocol": "freedom", "settings": { "domainStrategy": "UseIP" }, "streamSettings": { "sockopt": { "mark": ${ZGZ_OUT_MARK} } } },
     { "tag": "dns-out", "protocol": "dns", "streamSettings": { "sockopt": { "mark": ${ZGZ_OUT_MARK} } } },
     { "tag": "block", "protocol": "blackhole" }
