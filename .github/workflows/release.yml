@@ -50,7 +50,7 @@ jobs:
             --jq '.workflow_runs[] | select(.path == ".github/workflows/release.yml") | .id' |
             while read -r run; do
               if [ "$run" -lt "$GITHUB_RUN_ID" ]; then
-                gh run cancel "$run" --repo "$GITHUB_REPOSITORY" || true
+                gh api --method POST "repos/$GITHUB_REPOSITORY/actions/runs/$run/force-cancel" || true
               fi
             done
       - name: Check out the repository
@@ -91,7 +91,7 @@ jobs:
             RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
             ZGZ_GEO_DIR="$PWD/geo" \
             PATH="$PATH" \
-            timeout 180 sh test/run.sh
+            timeout -k 5 180 sh test/run.sh
 
       # Separate from the suites above because it depends on somebody else's
       # server list being up this morning, which is not a reason to fail a
