@@ -21,6 +21,13 @@ cat > "$RIG/lib/zgz-rules" <<'EOF'
 #!/bin/sh
 echo 'active: yes'
 EOF
+# Health tests exercise repair decisions. The DNS service has its own real
+# daemon and namespace tests; never install router guards on the test host.
+cat > "$RIG/lib/zgz-dns" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$1" >> "$ZGZ_RUN/dns.calls"
+EOF
+chmod +x "$RIG/lib/zgz-dns"
 cp "$RIG/lib/zgz-connect" "$RIG/connect-real"
 cat > "$RIG/lib/zgz-connect" <<'EOF'
 #!/bin/sh
@@ -38,6 +45,7 @@ echo 200 > "$RIG/run/live.delay"
 health() { sh "$RIG/lib/zgz-refresh" health >/dev/null 2>&1; }
 health
 check "$(cat "$RIG/run/health.baseline")" 200 'first healthy request establishes a baseline'
+check "$(cat "$RIG/run/dns.calls")" up 'health asks the DNS service to repair its guard'
 if [ ! -e "$RIG/run/nodes.calls" ]; then ok 'health checks do not fetch subscriptions'; else bad 'health checks do not fetch subscriptions'; fi
 echo 2000 > "$RIG/run/live.delay"
 health
