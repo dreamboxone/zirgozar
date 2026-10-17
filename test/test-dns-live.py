@@ -16,6 +16,14 @@ run = pathlib.Path(os.environ['ZGZ_RUN'])
 binary = sys.argv[1]
 
 
+def deadline(signum, frame):
+    raise TimeoutError('live DNS checks exceeded 45 seconds')
+
+
+signal.signal(signal.SIGALRM, deadline)
+signal.alarm(45)
+
+
 def question(name):
     labels = b''.join(bytes([len(x)]) + x.encode('ascii') for x in name.split('.'))
     return struct.pack('!HHHHHH', secrets.randbelow(65536), 0x100, 1, 0, 0, 0) + labels + b'\0\0\1\0\1'
@@ -101,7 +109,7 @@ def query(port, name, proto='udp', address='127.0.0.1'):
 
 
 def helper(command):
-    return subprocess.run(['sh', str(root / 'lib/zgz-dns-local'), command], env=os.environ, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return subprocess.run(['sh', str(root / 'lib/zgz-dns-local'), command], env=os.environ, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
 
 
 core = Upstream()
@@ -149,7 +157,7 @@ try:
         assert query(port, 'laptop.lan', proto) == (0, '192.168.2.30')
     print('  live - UDP/TCP public names use only the tunnel; static and DHCP names resolve')
     # Exercise socket ownership validation used before declaring startup ready.
-    check = subprocess.run(['sh', '-c', '. "$RIG/dns-functions"; private_ready "$1"', 'dns-check', str(port)], env=os.environ, capture_output=True, text=True)
+    check = subprocess.run(['sh', '-c', '. "$RIG/dns-functions"; private_ready "$1"', 'dns-check', str(port)], env=os.environ, capture_output=True, text=True, timeout=5)
     if check.returncode:
         # Some container runtimes expose a host /proc with namespace-local PIDs.
         # Do not turn that environment into a false claim of socket validation.
@@ -193,7 +201,7 @@ finally:
             process.wait(timeout=3)
         except subprocess.TimeoutExpired:
             process.kill()
-            process.wait()
+            process.wait(timeout=3)
     core.close()
     old.close()
     uci.write_text(original_uci)

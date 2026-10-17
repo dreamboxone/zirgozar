@@ -22,6 +22,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   OPENWRT_RELEASE: '25.12.5'
   SDK_TARGET: 'ipq40xx/generic'      # only the host apk tool is taken from it
@@ -32,7 +36,23 @@ jobs:
   # syntax error in it is worse than no package at all.
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      actions: write
     steps:
+      - name: Stop superseded builds on master
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs?branch=master&event=push&status=in_progress&per_page=100" \
+            --jq '.workflow_runs[] | select(.path == ".github/workflows/release.yml") | .id' |
+            while read -r run; do
+              if [ "$run" -lt "$GITHUB_RUN_ID" ]; then
+                gh run cancel "$run" --repo "$GITHUB_REPOSITORY" || true
+              fi
+            done
       - name: Check out the repository
         uses: actions/checkout@v7
 
@@ -71,7 +91,7 @@ jobs:
             RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
             ZGZ_GEO_DIR="$PWD/geo" \
             PATH="$PATH" \
-            sh test/run.sh
+            timeout 180 sh test/run.sh
 
       # Separate from the suites above because it depends on somebody else's
       # server list being up this morning, which is not a reason to fail a
