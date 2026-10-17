@@ -52,7 +52,7 @@ def packets(chain):
 
 before = packets('encrypted_out')
 for family, target in ((socket.AF_INET, '198.51.100.2'), (socket.AF_INET6, '2001:db8:2::2')):
-    for port in (443, 853):
+    for port in (853, 5353):
         for kind in (socket.SOCK_DGRAM, socket.SOCK_STREAM):
             previous = packets('encrypted_out')
             with socket.socket(family, kind) as client:
@@ -69,7 +69,7 @@ for family, target in ((socket.AF_INET, '198.51.100.2'), (socket.AF_INET6, '2001
                     pass
             assert packets('encrypted_out') > previous, f'{family}/{kind}/{port} did not hit the drop rule'
 assert packets('encrypted_out') - before >= 8
-print('  live - output blocks IPv4/IPv6 TCP/UDP 443 and 853 for unmarked processes')
+print('  live - output blocks IPv4/IPv6 TCP/UDP 853 and 5353 for unmarked processes')
 marked_before = packets('encrypted_out')
 for family, target in ((socket.AF_INET, '198.51.100.2'), (socket.AF_INET6, '2001:db8:2::2')):
     with socket.socket(family, socket.SOCK_DGRAM) as client:
@@ -93,7 +93,7 @@ frame = mac('br-lan') + mac('client-test')
 with socket.socket(socket.AF_PACKET, socket.SOCK_RAW) as raw:
     raw.bind(('client-test', 0))
     before_forward = packets('encrypted_fwd')
-    for port in (443, 853):
+    for port in (853, 5353):
         udp = struct.pack('!HHHH', 53000, port, 9, 0) + b'x'
         src, dst = socket.inet_aton('192.168.55.2'), socket.inet_aton('198.51.100.2')
         header = struct.pack('!BBHHHBBH4s4s', 0x45, 0, 29, port, 0, 64, 17, 0, src, dst)
@@ -106,4 +106,4 @@ with socket.socket(socket.AF_PACKET, socket.SOCK_RAW) as raw:
         raw.send(frame + b'\x86\xdd' + header6 + udp6)
     time.sleep(0.2)
     assert packets('encrypted_fwd') - before_forward == 4, 'forwarded IPv4/IPv6 DNS escaped the guard'
-print('  live - forwarding blocks uncaptured IPv4/IPv6 443 and 853 packets')
+print('  live - forwarding blocks uncaptured IPv4/IPv6 853 and 5353 packets')

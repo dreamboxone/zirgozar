@@ -7,7 +7,7 @@
 <h3 align="center">فیلترشکن سراسری برای روتر OpenWrt</h3>
 
 <p align="center">
-  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.25-r2"></a>
+  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.25-r3"></a>
   <a href="https://github.com/dreamboxone/zirgozar/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/dreamboxone/zirgozar/total?style=for-the-badge&color=0ea5e9"></a>
   <img alt="OpenWrt" src="https://img.shields.io/badge/OpenWrt-23.05%20%7C%2024.10%20%7C%2025.12-00B5E2?style=for-the-badge&logo=openwrt&logoColor=white">
   <img alt="Xray" src="https://img.shields.io/badge/core-Xray-7c3aed?style=for-the-badge">
@@ -94,7 +94,7 @@
 
 به روتر SSH بزنید و دستور زیر را اجرا کنید. این دستور فایل‌های نسخه **5.7.24**
 را برای معماری روتر دانلود می‌کند و با مدیر بسته موجود نصب یا ارتقا می‌دهد.
-ابتدا باید این نسخه در [صفحه ریلیز](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.25-r2) منتشر شده باشد.
+ابتدا باید این نسخه در [صفحه ریلیز](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.25-r3) منتشر شده باشد.
 
 <div dir="ltr">
 
@@ -102,8 +102,8 @@
 (
   set -eu
   . /etc/openwrt_release
-  version='5.7.25-r2'
-  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.25-r2'
+  version='5.7.25-r3'
+  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.25-r3'
   install_dir="/tmp/zirgozar-install-$version"
   mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
@@ -137,11 +137,11 @@
 ```sh
 # OpenWrt 25.12 and later
 apk update
-apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.25-r2.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.25-r2.apk
+apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.25-r3.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.25-r3.apk
 
 # OpenWrt 24.10 / 23.05
 opkg update
-opkg install /tmp/zirgozar_5.7.25-r2_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.25-r2_all.ipk
+opkg install /tmp/zirgozar_5.7.25-r3_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.25-r3_all.ipk
 ```
 
 </div>
@@ -308,7 +308,7 @@ Geo، کنترل دسترسی، گزارش‌ها**.
 | **DNS راه دور** | `remote_dns` | 8.8.8.8 | آدرس DNS برای TCP یا UDP. کلادفلر، گوگل، Quad9 و OpenDNS پیشنهاد می‌شوند . پیش‌فرض گوگل است نه کلادفلر: کانفیگ‌هایی که روی Cloudflare Workers ساخته شده‌اند (مثل فهرست patterniha) به 1.1.1.1 نمی‌رسند و از داخل آن‌ها هیچ نامی پیدا نمی‌شد. روتری که از قبل روی 1.1.1.1 پیش‌فرض بود یک بار به 8.8.8.8 منتقل می‌شود |
 | **DoH برای DNS راه دور** | `remote_dns_doh` | `https://8.8.8.8/dns-query` | برای DoH: یک آدرس، مثل آدرسی که سرویس DNS (مثلاً NextDNS یا uBlockDNS) می‌دهد. اگر آدرس نام دارد، یک IP اولیهٔ معتبر بعد از ویرگول الزامی است؛ بدون آن پیکربندی با خطا متوقف می‌شود و DNS مستقیم برای پیدا کردن سرور استفاده نمی‌شود |
 | **سرور DoT / DoQ** | `remote_dns_tls`، `remote_dns_tls_port`، `remote_dns_tls_server_name` | 1.1.1.1، 853، cloudflare-dns.com | IP، پورت و نام گواهی؛ بررسی TLS همیشه فعال است. DoT در هر دو هسته و DoQ در sing-box پشتیبانی می‌شود |
-| **سیاست DNS رمزگذاری‌شدهٔ دستگاه‌ها** | `encrypted_dns_policy` | proxy | `proxy`: پورت ۸۵۳ و مقصدهای شناخته‌شدهٔ DoH از تونل؛ `strict`: همهٔ TCP/UDP پورت‌های ۴۴۳ و ۸۵۳ از تونل و اتصال‌های رهگیری‌نشده مسدود؛ `rules`: پیروی از قواعد قبلی. حالت سخت‌گیرانه HTTPS ایرانی را هم از تونل می‌فرستد؛ پورت‌های سفارشی را پوشش نمی‌دهد و می‌تواند ارتباط دستگاه‌های مستثناشده را قطع کند |
+| **سیاست DNS رمزگذاری‌شدهٔ دستگاه‌ها** | `encrypted_dns_policy` | proxy | `proxy`: پورت ۸۵۳ و DoH شناخته‌شده از تونل؛ `strict`: حفاظت از ۵۳۵۳ و پورت‌های افزوده در `dns_guard_ports`، بستن مسیر خارج از رهگیری و حفظ انتخاب تفکیک ایران برای سایت‌های عادی؛ `rules`: پیروی از قواعد ترافیک. با قطع اضطراری روشن، محافظ سخت‌گیرانه هنگام توقف سرویس باقی می‌ماند. DoH ناشناخته و پورت‌های ثبت‌نشده تضمین نمی‌شوند |
 | **EDNS Client Subnet برای DNS راه دور** | `remote_dns_client_ip` | — | به سرور DNS می‌گوید دستگاه کجاست، تا CDN نزدیک‌ترین سرورش را جواب بدهد. آدرس خصوصی نمی‌شود، و سرور باید RFC 7871 را پشتیبانی کند |
 | **مسیر DNS راه دور** | `remote_dns_detour` | از تونل | DNS راه دور از تونل پرسیده شود یا مستقیم |
 | **FakeDNS** | `remote_fakedns` | خاموش | با آدرس ساختگی جواب می‌دهد و پیدا کردن آدرس واقعی را به آن سر تونل می‌سپارد، که برای هر سایت تازه یک درخواست صرفه‌جویی می‌کند. فقط با «مستقیم داخل تونل»: وقتی dnsmasq جلوی کار است، جواب درخواست‌های خود روتر هم ساختگی می‌شد |

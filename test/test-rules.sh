@@ -391,4 +391,20 @@ else
 fi
 rig_clear
 
+rig_set encrypted_dns_policy strict
+rig_set dns_guard_ports 1853
+ks_check 'strict DNS protection exists before the tunnel starts'
+ks_has 'th dport { 53, 853, 1853, 5353 } counter drop' 'Kill switch protects DNS ports without a running resolver'
+_dns_line=$(grep -n 'th dport { 53,' "$WORK/ks.nft" | cut -d: -f1)
+_private_line=$(grep -n 'ip daddr @reserved return' "$WORK/ks.nft" | cut -d: -f1)
+if [ "$_dns_line" -lt "$_private_line" ]; then ok 'private upstream DNS cannot bypass the boot guard'; else bad 'private upstream bypasses boot DNS protection'; fi
+sh "$RIG/lib/zgz-rules" ks dump-ipt > "$WORK/strict-ks.ipt"
+if grep -q -- '--dport 5353 -j DROP' "$WORK/strict-ks.ipt"; then ok 'legacy Kill switch protects custom DNS ports'; else bad 'legacy boot DNS protection missing'; fi
+rig_set dns_guard_ports '53 1853 05353'
+ks_check 'duplicate DNS ports load without overlapping sets'
+rig_set dns_guard_ports 443
+if sh "$RIG/lib/zgz-rules" ks dump > "$WORK/invalid-ks.nft" 2>/dev/null; then bad 'invalid Kill switch DNS ports accepted'; else ok 'invalid Kill switch DNS ports rejected'; fi
+if [ -s "$WORK/invalid-ks.nft" ]; then bad 'invalid DNS ports emitted a partial ruleset'; else ok 'invalid DNS ports emit no partial ruleset'; fi
+rig_clear
+
 rig_report

@@ -526,7 +526,7 @@ service_stopped() {
 
 # What the DNS step depends on. Kept beside the ruleset for the same reason.
 dns_signature() {
-	echo "$(cfg dns_mode dnsmasq) $(cfg dns_port 1053) $(cfg dnsmasq_port 1054) $(cfg encrypted_dns_policy proxy)"
+	echo "$(cfg dns_mode dnsmasq) $(cfg dns_port 1053) $(cfg dnsmasq_port 1054) $(cfg encrypted_dns_policy proxy) $(cfg dns_guard_ports '')"
 }
 
 # A save. Every save on every page lands here, and restarting the tunnel for

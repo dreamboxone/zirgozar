@@ -725,11 +725,19 @@ return view.extend({
 		o.depends('remote_dns_protocol', 'quic');
 
 		o = s.taboption('dns', form.ListValue, 'encrypted_dns_policy', _('Client encrypted DNS policy'),
-			_('Known services sends port 853 and common DoH endpoints through the tunnel. Strict mode sends all TCP/UDP 443 and 853 through the tunnel, including Iranian HTTPS sites, and blocks uncaptured connections. Unknown DoH endpoints are covered only in strict mode; custom ports are not covered. Devices excluded from interception can lose connectivity. Enable both client and router proxying for usable HTTPS in strict mode.'));
+			_('Known services tunnels port 853 and known DoH destinations. Strict mode also tunnels TCP/UDP 5353 and additional protected DNS ports, while the Iran traffic split still controls ordinary websites. LAN and local mDNS remain available. With the Kill switch enabled, DNS protection stays active when the tunnel stops. Unknown DoH destinations and unlisted custom ports are not guaranteed.'));
 		o.value('proxy', _('Tunnel known services'));
-		o.value('strict', _('Strict: tunnel all 443 and 853'));
+		o.value('strict', _('Strict DNS protection (preserve Iran split)'));
 		o.value('rules', _('Follow traffic rules'));
 		o.default = 'proxy';
+		o = s.taboption('dns', form.DynamicList, 'dns_guard_ports', _('Additional protected DNS ports'),
+			_('Strict mode always protects 853 and 5353. Add other DNS ports here. Port 443 follows website routing and cannot be added. Other services on these ports will also use the tunnel.'));
+		o.datatype = 'port';
+		o.depends('encrypted_dns_policy', 'strict');
+		o.validate = function(section_id, value) {
+			return (Array.isArray(value) ? value : [value]).some(function(p) { return Number(p) === 443; })
+				? _('Port 443 follows website routing and cannot be a protected DNS port.') : true;
+		};
 
 
 		o = s.taboption('dns', form.Value, 'remote_dns_client_ip', _('Remote DNS EDNS Client Subnet'),

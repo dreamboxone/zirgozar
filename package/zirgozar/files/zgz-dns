@@ -192,7 +192,7 @@ guard_up() {
  _g_eports=""; _g_elan="$(lan_devices)"
  case "$(cfg encrypted_dns_policy proxy)" in
   proxy) _g_eports=853 ;;
-  strict) _g_eports="443 853" ;;
+  strict) _g_eports="$(strict_dns_ports)" || return 1 ;;
   rules) ;;
   *) warn 'سیاست DNS رمزگذاری‌شده معتبر نیست.'; return 1 ;;
  esac
@@ -557,7 +557,12 @@ cmd_up() {
 cmd_down() {
 	private_stop || return 1
 	legacy_cleanup || return 1
-	guard_down
+	if ks_on && [ "$(cfg encrypted_dns_policy proxy)" = strict ]; then
+		# No resolver fallback while the persistent Kill switch is enabled.
+		guard_up "$(cfg dns_port 1053)" 1 || return 1
+	else
+		guard_down
+	fi
 	rm -f "$ZGZ_RUN/resolver.conf" "$ZGZ_RUN/resolver.conf.new" "$ZGZ_RUN/resolver.pid" "$ZGZ_RUN/dns.failed" "$ZGZ_RUN/dns.loaded"
 	return 0
 }

@@ -232,6 +232,18 @@ cfg_bool() {
 	return 0
 }
 
+# Strict DNS ports are handled before geographical and per-device routing.
+# HTTPS is deliberately excluded: the Iran split still controls ordinary sites.
+strict_dns_ports() {
+	local ports p
+	ports="853 5353 $(cfg dns_guard_ports '')"
+	for p in $ports; do
+		case "$p" in ''|*[!0-9]*) return 1 ;; esac
+		[ "$p" -ge 1 ] && [ "$p" -le 65535 ] && [ "$p" -ne 443 ] || return 1
+	done
+	printf '%s\n' $ports | awk '{ print $0 + 0 }' | sort -un | tr '\n' ' '
+}
+
 zgz_version() {
 	cat "$ZGZ_VERSION_FILE" 2>/dev/null || echo unknown
 	return 0

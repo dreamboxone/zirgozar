@@ -164,16 +164,29 @@ else echo '  skip - live resolver checks require dnsmasq'; fi
 rig_set encrypted_dns_policy strict
 reset_dns
 run_dns success || bad 'strict guard failed to install'
-grep -q 'th dport { 443, 853 }' "$RIG/run/guard.nft" && ok 'strict guard covers HTTPS and TLS DNS' || bad 'strict ports missing'
+grep -q 'th dport { 853, 5353 }' "$RIG/run/guard.nft" && ok 'strict guard covers TLS DNS and alternative DNS' || bad 'strict ports missing'
 if command -v nft >/dev/null 2>&1 && command -v unshare >/dev/null 2>&1; then
  python3 "$RIG_SRC/test/test-dns-firewall.py" "$RIG/run/guard.nft"
  case "$?" in 0) ok 'live encrypted DNS firewall checks' ;; 77) echo '  skip - network namespace unavailable here' ;; *) bad 'live encrypted DNS firewall checks failed' ;; esac
 fi
 reset_dns
 if run_dns ipt-success; then
- grep -q 'IPv6 .*ZGZ_EDNSOUT_N .*--dport 443 -j DROP' "$RIG/run/iptables.calls" && ok 'legacy IPv6 output is protected' || bad 'IPv6 output guard missing'
+ grep -q 'IPv6 .*ZGZ_EDNSOUT_N .*--dport 5353 -j DROP' "$RIG/run/iptables.calls" && ok 'legacy IPv6 output is protected' || bad 'IPv6 output guard missing'
  grep -q 'IPv6 .*ZGZ_EDNSFWD_N .*--dport 853 -j DROP' "$RIG/run/iptables.calls" && ok 'legacy IPv6 forwarding is protected' || bad 'IPv6 forwarding guard missing'
 else bad 'legacy strict guard failed'; fi
+rig_set kill_switch 1
+reset_dns
+run_dns down || bad 'protected stop failed'
+grep -q 'th dport { 853, 5353 }' "$RIG/run/guard.nft" && ok 'strict guard survives stop with Kill switch' || bad 'strict guard disappeared on stop'
+grep -q 'redirect to :1053' "$RIG/run/guard.nft" && ok 'stopped resolver cannot fall back to the system DNS' || bad 'stopped resolver fallback is possible'
+rig_set kill_switch 0
+rig_set dns_guard_ports '1853 8853'
+reset_dns
+run_dns success || bad 'additional DNS ports failed'
+grep -q 'th dport { 853, 1853, 5353, 8853 }' "$RIG/run/guard.nft" && ok 'additional DNS ports reach the firewall' || bad 'additional ports missing'
+rig_set dns_guard_ports '443'
+if run_dns success; then bad 'HTTPS accepted as a protected DNS port'; else ok 'HTTPS cannot override Iran website routing'; fi
+rig_set dns_guard_ports ''
 rig_set encrypted_dns_policy rules
 reset_dns
 run_dns success || bad 'traffic-rule policy failed'

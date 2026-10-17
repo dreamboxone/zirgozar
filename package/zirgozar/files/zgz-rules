@@ -1128,6 +1128,13 @@ ks_ir_refresh() {
 }
 
 ks_nft_ruleset() {
+	_ks_dns=""
+	if [ "$(cfg encrypted_dns_policy proxy)" = strict ]; then
+		_ks_ports="$(strict_dns_ports)" || return 1
+		_ks_ports="$(printf '%s\n' 53 $_ks_ports | sort -un | awk '{ printf "%s%s", (NR > 1 ? ", " : ""), $0 }')"
+		_ks_dns="		meta l4proto { tcp, udp } th dport { $_ks_ports } counter drop
+"
+	fi
 	_devs="$1"
 	_iflist=""
 	for _d in $_devs; do
@@ -1283,6 +1290,7 @@ $_sets$_aclchains	chain forward {
 		# A reply belongs to a connection that came in from outside - a port
 		# forward - and is not this device going anywhere.
 		ct direction reply return
+$_ks_dns		# Local traffic has already returned by its LAN output interface.
 		ip daddr @reserved return
 		ip6 daddr @reserved6 return
 $_v6$_pass$_acljumps$_glob	}
@@ -1293,7 +1301,8 @@ NFT
 
 ks_nft_up() {
 	# One transaction: the table is replaced, never absent in between.
-	{ printf 'add table inet %s\ndelete table inet %s\n' "$KS_TABLE" "$KS_TABLE"; ks_nft_ruleset "$1"; } | nft -f -
+	_ks_rules="$(ks_nft_ruleset "$1")" || return 1
+	{ printf 'add table inet %s\ndelete table inet %s\n' "$KS_TABLE" "$KS_TABLE"; printf '%s\n' "$_ks_rules"; } | nft -f -
 	return $?
 }
 
@@ -1306,10 +1315,18 @@ ks_nft_down() {
 # can be looked at without a router and compared with what is.
 ks_ipt_rules() {
 	_devs="$1"
+	_ks_ports=""
+	if [ "$(cfg encrypted_dns_policy proxy)" = strict ]; then
+		_ks_ports="$(strict_dns_ports)" || return 1
+		_ks_ports="53 $_ks_ports"
+	fi
 	echo "-N ZGZ_KS"
 	echo "-A ZGZ_KS -m conntrack --ctdir REPLY -j RETURN"
 	for _d in $_devs; do
 		echo "-A ZGZ_KS -o $_d -j RETURN"
+	done
+	for _ks_p in $_ks_ports; do
+		for _ks_proto in tcp udp; do echo "-A ZGZ_KS -p $_ks_proto --dport $_ks_p -j DROP"; done
 	done
 	for _c in $RESERVED_V4 $(direct_ips); do
 		echo "-A ZGZ_KS -d $_c -j RETURN"
@@ -1406,7 +1423,10 @@ ks_ipt_down() {
 
 ks_ipt_up() {
 	_devs="$1"
-	_rules="$(ks_ipt_rules "$_devs")"
+	_rules="$(ks_ipt_rules "$_devs")" || return 1
+	if [ "$(cfg encrypted_dns_policy proxy)" = strict ] && grep -q . /proc/net/if_inet6 2>/dev/null; then
+		command -v ip6tables >/dev/null 2>&1 || return 1
+	fi
 	_sig="$(printf '%s\n%s\n' "$_devs" "$_rules" | md5sum | cut -c1-32)"
 	# Taking it down to put it up again leaves a moment with nothing in the
 	# way, so what is already there and right is left alone.
@@ -1444,16 +1464,22 @@ ks_ipt_up() {
 		ipt_must -t filter -I FORWARD 1 -i "$_d" -j ZGZ_KS || { ks_ipt_down; return 1; }
 	done
 
-	if [ "$ipv6_mode" != "off" ] && command -v ip6tables >/dev/null 2>&1; then
+	if { [ "$ipv6_mode" != "off" ] || [ "$(cfg encrypted_dns_policy proxy)" = strict ]; } && command -v ip6tables >/dev/null 2>&1; then
 		ipt6 -t filter -N ZGZ_KS6
 		ipt6 -t filter -A ZGZ_KS6 -m conntrack --ctdir REPLY -j RETURN
 		for _d in $_devs; do
 			ipt6 -t filter -A ZGZ_KS6 -o "$_d" -j RETURN
 		done
+		if [ "$(cfg encrypted_dns_policy proxy)" = strict ]; then
+			_ks_ports="$(strict_dns_ports)" || return 1
+			for _ks_p in 53 $_ks_ports; do
+				for _ks_proto in tcp udp; do ipt6 -t filter -A ZGZ_KS6 -p "$_ks_proto" --dport "$_ks_p" -j DROP; done
+			done
+		fi
 		ipt6 -t filter -A ZGZ_KS6 -d ::1/128 -j RETURN
 		ipt6 -t filter -A ZGZ_KS6 -d fc00::/7 -j RETURN
 		ipt6 -t filter -A ZGZ_KS6 -d fe80::/10 -j RETURN
-		ipt6 -t filter -A ZGZ_KS6 -j DROP
+		if [ "$ipv6_mode" = off ]; then ipt6 -t filter -A ZGZ_KS6 -j RETURN; else ipt6 -t filter -A ZGZ_KS6 -j DROP; fi
 		for _d in $_devs; do
 			ipt6 -t filter -I FORWARD 1 -i "$_d" -j ZGZ_KS6
 		done

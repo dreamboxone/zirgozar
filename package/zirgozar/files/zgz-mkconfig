@@ -209,11 +209,12 @@ case "$encrypted_dns_policy" in
  proxy|strict)
   add_rule '{"type":"field","inboundTag":["tproxy-in","redir-in","poison-in","poison-redir"],"network":"tcp,udp","port":"853","outboundTag":"proxy"}'
   if [ "$encrypted_dns_policy" = strict ]; then
-   add_rule '{"type":"field","inboundTag":["tproxy-in","redir-in","poison-in","poison-redir"],"network":"tcp,udp","port":"443","outboundTag":"proxy"}'
-  else
+   _dns_ports="$(strict_dns_ports)" || { echo 'Invalid protected DNS ports (443 is reserved for normal HTTPS routing).' >&2; exit 1; }
+   _dns_ports="$(echo "$_dns_ports" | awk '{$1=$1; gsub(/ /,","); print}')"
+   add_rule "{\"type\":\"field\",\"network\":\"tcp,udp\",\"port\":\"$_dns_ports\",\"outboundTag\":\"proxy\"}"
+  fi
    add_rule '{"type":"field","inboundTag":["tproxy-in","redir-in","poison-in","poison-redir"],"network":"tcp,udp","port":"443","domain":["domain:dns.google","domain:cloudflare-dns.com","domain:one.one.one.one","domain:dns.quad9.net","domain:dns.adguard.com","domain:dns.adguard-dns.com","domain:doh.libredns.gr","domain:dns.nextdns.io","domain:dns0.eu","domain:doh.opendns.com","domain:dns.alidns.com","domain:doh.pub","domain:dns.sb"],"outboundTag":"proxy"}'
    add_rule '{"type":"field","inboundTag":["tproxy-in","redir-in","poison-in","poison-redir"],"network":"tcp,udp","port":"443","ip":["1.1.1.1","1.0.0.1","1.1.1.2","1.0.0.2","1.1.1.3","1.0.0.3","8.8.8.8","8.8.4.4","9.9.9.9","149.112.112.112","94.140.14.14","94.140.15.15","208.67.222.222","208.67.220.220","2606:4700:4700::1111","2606:4700:4700::1001","2001:4860:4860::8888","2001:4860:4860::8844","2620:fe::fe","2620:fe::9"],"outboundTag":"proxy"}'
-  fi
   ;;
  *) echo 'سیاست DNS رمزگذاری‌شده معتبر نیست.' >&2; exit 1 ;;
 esac

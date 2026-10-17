@@ -158,6 +158,7 @@ def exercise(name, server_name, server_port, expected):
         remote = next(s for s in c['dns']['servers'] if s.get('tag') == 'dns-remote')
         remote['server'], remote['server_port'] = '127.0.0.1', server_port
         remote['tls']['server_name'] = server_name
+        remote['tls']['certificate_path'] = str(cert)
         c['dns'] = {'servers': [remote, {'type': 'udp', 'tag': 'plain', 'server': '127.0.0.1', 'server_port': plain.getsockname()[1]}], 'final': 'dns-remote', 'strategy': 'ipv4_only', 'timeout': '600ms'}
         c['route']['default_domain_resolver'] = {'server': 'dns-remote'}
     else:
@@ -173,6 +174,7 @@ def exercise(name, server_name, server_port, expected):
             o.get('streamSettings', {}).get('sockopt', {}).pop('mark', None)
             if o['tag'] == 'dns-tls':
                 o['streamSettings']['tlsSettings']['serverName'] = server_name
+                o['streamSettings']['tlsSettings']['certificates'] = [{'certificateFile': str(cert), 'usage': 'verify'}]
         remote = next(s for s in c['dns']['servers'] if isinstance(s, dict) and s.get('tag') == 'dns-remote')
         remote['address'] = f'tcp://127.0.0.1:{server_port}'
         remote['queryStrategy'] = 'UseIPv4'
@@ -185,7 +187,15 @@ def exercise(name, server_name, server_port, expected):
     with open(root / f'{name}.log', 'w') as log:
         process = subprocess.Popen([sys.argv[1], 'run', '-c' if native else '-config', str(conf)], env=env, stdout=log, stderr=log)
         try:
-            time.sleep(0.25)
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                if process.poll() is not None:
+                    break
+                if any(any(line.split()[1].rsplit(':',1)[-1] == f'{port:04X}' for line in pathlib.Path(table).read_text().splitlines()[1:]) for table in ('/proc/net/udp','/proc/net/udp6')):
+                    break
+                time.sleep(0.05)
+            else:
+                raise AssertionError('DNS listener did not become ready')
             if process.poll() is not None:
                 log.flush()
                 reason = (root / f'{name}.log').read_text()

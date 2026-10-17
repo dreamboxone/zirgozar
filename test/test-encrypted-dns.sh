@@ -56,12 +56,40 @@ make_config
 python3 - "$RIG/work/config.json" <<'PY'
 import json,sys
 r=json.load(open(sys.argv[1]))['routing']['rules']
-i=next(i for i,x in enumerate(r) if x.get('port')=='443' and x.get('outboundTag')=='proxy')
+i=next(i for i,x in enumerate(r) if x.get('port')=='853,5353' and x.get('outboundTag')=='proxy')
 assert 'domain' not in r[i] and 'ip' not in r[i]
 assert r[i]['network']=='tcp,udp'
+assert not any(x.get('port')=='443' and 'domain' not in x and 'ip' not in x for x in r)
 assert i<next((i for i,x in enumerate(r) if 'geosite:ir' in x.get('domain',[])),len(r))
 PY
-[ "$?" = 0 ] && ok 'strict policy precedes splits and covers TCP/UDP 443' || bad 'strict routing is incomplete'
+[ "$?" = 0 ] && ok 'strict DNS precedes splits without overriding website HTTPS' || bad 'strict routing is incomplete'
+mkdir -p "$RIG/etc/geo"
+echo fixture > "$RIG/etc/geo/geoip.dat"
+echo fixture > "$RIG/etc/geo/geosite.dat"
+for split in 0 1; do
+ rig_set route_ir "$split"
+ make_config
+ python3 - "$RIG/work/config.json" "$split" <<'PY'
+import json,sys
+rules=json.load(open(sys.argv[1]))['routing']['rules']
+iran=[r for r in rules if 'geosite:ir' in r.get('domain',[]) and r.get('outboundTag')=='direct']
+assert bool(iran)==(sys.argv[2]=='1')
+assert any(r.get('port')=='853,5353' and r.get('outboundTag')=='proxy' for r in rules)
+assert not any(r.get('port')=='443' and 'domain' not in r and 'ip' not in r for r in rules)
+PY
+ [ "$?" = 0 ] && ok "Iran HTTPS follows route_ir=$split while DNS stays protected" || bad 'Iran switch was overridden'
+done
+rig_set route_ir 0
+rm -f "$RIG/etc/geo/geoip.dat" "$RIG/etc/geo/geosite.dat"
+for ports in '1853 8853' '443' '65536' 'bad'; do
+ rig_set dns_guard_ports "$ports"
+ if make_config; then
+  [ "$ports" = '1853 8853' ] && grep -q '853,1853,5353,8853' "$RIG/work/config.json" && ok 'custom DNS ports are routed' || bad 'invalid custom ports accepted'
+ else
+  [ "$ports" != '1853 8853' ] && ok "invalid custom ports rejected: $ports" || bad 'valid custom ports rejected'
+ fi
+done
+rig_set dns_guard_ports ''
 if command -v ucode >/dev/null 2>&1; then
  rig_set remote_dns_detour remote
  for protocol in tls doh quic http3; do

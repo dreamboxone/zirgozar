@@ -8,7 +8,7 @@
 # builders so the two formats can never drift apart.
 
 VERSION=5.7.25
-RELEASE=2
+RELEASE=3
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
