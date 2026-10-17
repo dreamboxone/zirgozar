@@ -7,8 +7,8 @@
 # packages.inc.sh - what goes into a package, shared by the .apk and .ipk
 # builders so the two formats can never drift apart.
 
-VERSION=5.7.24
-RELEASE=13
+VERSION=5.7.25
+RELEASE=2
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -30,7 +30,7 @@ MAINTAINER="routekernel <https://t.me/routekernel1>"
 # another program pulled it in - needs nothing, and this finds it. Depending on it
 # would drag a second copy onto routers that do not need one, and refusing to
 # install alongside it would be worse still.
-ZGZ_DEPS="jshn libubox curl ca-bundle nftables kmod-nft-tproxy kmod-nft-socket ip-full unzip ucode ucode-mod-fs"
+ZGZ_DEPS="dnsmasq jshn libubox curl ca-bundle nftables kmod-nft-tproxy kmod-nft-socket ip-full unzip ucode ucode-mod-fs"
 LUCI_DEPS="zirgozar luci-base"
 
 ZGZ_DESC="Transparent proxy client for OpenWrt built on Xray, for Iran. Reads its server list every quarter of an hour, sifts a hundred servers with one handshake each and then measures only the ones that answered, ten at a time, until it finds one fast enough. Optional Iran routing split, per-day traffic accounting, and both nftables and iptables."
@@ -46,7 +46,7 @@ LUCI_DESC="Web interface for Zirgozar: connect, servers and subscriptions, traff
 CRON_LIST='*/15 * * * * /usr/libexec/zgz-refresh >/dev/null 2>&1'
 CRON_STATS='*/5 * * * * /usr/libexec/zgz-stats sample >/dev/null 2>&1'
 
-ZGZ_SCRIPTS="zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-stats zgz-test zgz-geo zgz-cores zgz-deps zgz-bridge zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-l2tp zgz-l2tpconfig zgz-pppvpn zgz-ikev2 zgz-ikev2config zgz-lb"
+ZGZ_SCRIPTS="zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-dns-local zgz-stats zgz-test zgz-geo zgz-cores zgz-deps zgz-bridge zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-l2tp zgz-l2tpconfig zgz-pppvpn zgz-ikev2 zgz-ikev2config zgz-lb"
 
 # stage_zgz <staging-root> <source-root> <xray-binary>
 stage_zgz() {
@@ -71,6 +71,7 @@ stage_zgz() {
 	install -d "$i/usr/share/zirgozar"
 	install -m 0644 "$f/zirgozar.config"   "$i/usr/share/zirgozar/zirgozar.config"
 	install -m 0755 "$f/zirgozar.init"     "$i/etc/init.d/zirgozar"
+	install -m 0755 "$f/zirgozar-dns.init" "$i/etc/init.d/zirgozar-dns"
 	install -m 0755 "$f/zirgozar-server.init" "$i/etc/init.d/zirgozar-server"
 	install -m 0755 "$f/zirgozar-killswitch.init" "$i/etc/init.d/zirgozar-killswitch"
 	install -d "$i/etc/hotplug.d/firewall"
@@ -254,6 +255,7 @@ bounded 15 /etc/init.d/zirgozar-killswitch disable >/dev/null 2>&1 || true
 bounded 20 /etc/init.d/zirgozar-server stop >/dev/null 2>&1 || true
 bounded 15 /etc/init.d/zirgozar-server disable >/dev/null 2>&1 || true
 bounded 20 /etc/init.d/zirgozar stop >/dev/null 2>&1 || true
+bounded 20 /etc/init.d/zirgozar-dns stop >/dev/null 2>&1 || true
 bounded 15 /etc/init.d/zirgozar disable >/dev/null 2>&1 || true
 sed -i '\|/usr/libexec/zgz-|d' /etc/crontabs/root 2>/dev/null
 bounded 15 /etc/init.d/cron reload >/dev/null 2>&1 || true

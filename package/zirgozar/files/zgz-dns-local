@@ -1,0 +1,154 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+# Local DNS records for Zirgozar's resolver. Never import upstream settings.
+set -e
+. "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
+
+# Follow includes only to extract local records. An allow-list is deliberate:
+# no server, resolv-file, DHCP, RA, TFTP, DBus or executable directive is copied.
+local_records() {
+	local file="$1" depth="${2:-0}" line key value dir filter item
+	[ "$depth" -le 8 ] || return 1
+	[ -r "$file" ] || return 0
+	while IFS= read -r line || [ -n "$line" ]; do
+		line="$(printf '%s\n' "$line" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+		case "$line" in ''|\#*) continue ;; esac
+		key="${line%%=*}"; value="${line#*=}"
+		case "$key" in
+			conf-file) local_records "$value" "$((depth + 1))" || return 1 ;;
+			conf-dir)
+				dir="${value%%,*}"; filter=""
+				[ "$dir" = "$value" ] || filter="${value#*,}"
+				for item in "$dir"/*; do
+					[ -f "$item" ] || continue
+					case "$item" in *~|*/\#*\#) continue ;; esac
+					# OpenWrt normally has no suffix filter. Honour its
+					# inclusion/exclusion lists when a user supplies one.
+					if [ -n "$filter" ]; then
+						local oldifs="$IFS" suffix take=1
+						IFS=,
+						for suffix in $filter; do
+							case "$suffix" in
+								\**) take=0; case "$item" in *"${suffix#\*}") take=1; break ;; esac ;;
+								*) case "$item" in *"$suffix") take=0; break ;; esac ;;
+							esac
+						done
+						IFS="$oldifs"
+						[ "$take" = 1 ] || continue
+					fi
+					local_records "$item" "$((depth + 1))" || return 1
+				done
+				;;
+			dhcp-leasefile) printf '# leasefile=%s\n' "$value" ;;
+			server|local)
+				# Only an authoritative local zone with NO upstream.
+				case "$value" in /*/) printf 'local=%s\n' "$value" ;; esac
+				;;
+			address|host-record|cname|interface-name|dynamic-host|ptr-record|txt-record|srv-host|mx-host|naptr-record|dns-rr|domain|addn-hosts|hostsdir|rebind-domain-ok|trust-anchor|dnssec)
+				printf '%s\n' "$line" ;;
+			no-hosts|expand-hosts|localise-queries|domain-needed|bogus-priv|stop-dns-rebind|rebind-localhost-ok|dnssec-check-unsigned)
+				printf '%s\n' "$line" ;;
+		esac
+	done < "$file"
+}
+
+system_configs() {
+	local file
+	for file in "${ZGZ_DNS_CONFIG_DIR:-/var/etc}"/dnsmasq.conf.*; do
+		[ -f "$file" ] && printf '%s\n' "$file"
+	done
+	return 0
+}
+
+cmd_config() {
+	local port core dev file records
+	port="$(cfg dnsmasq_port 1054)"; core="$(cfg dns_port 1053)"
+	case "$port:$core" in *[!0-9:]*|:*|*:) return 1 ;; esac
+	[ "$port" -gt 1023 ] && [ "$port" -le 65535 ] &&
+		[ "$core" -gt 1023 ] && [ "$core" -le 65535 ] && [ "$port" != "$core" ] || return 1
+	printf 'port=%s\npid-file=%s/resolver.pid\n' "$port" "$ZGZ_RUN"
+	printf 'no-resolv\nno-poll\nbind-dynamic\ninterface=lo\ncache-size=150\n'
+	for dev in $(lan_devices); do printf 'interface=%s\n' "$dev"; done
+	printf 'server=127.0.0.1#%s\naddn-hosts=%s/resolver.hosts\n' "$core" "$ZGZ_RUN"
+	records="$ZGZ_RUN/resolver.records.new"
+	: > "$records"
+	for file in $(system_configs); do local_records "$file" >> "$records" || { rm -f "$records"; return 1; }; done
+	sort -u "$records"
+	rm -f "$records"
+	# A system without a generated dnsmasq configuration still normally uses
+	# this lease database. It is read, never opened as a DHCP lease writer.
+	printf '# leasefile=/tmp/dhcp.leases\n'
+}
+
+hosts_refresh() {
+	local conf="${1:-$ZGZ_RUN/resolver.conf}" file now domain tmp="$ZGZ_RUN/resolver.hosts.$$"
+	[ -r "$conf" ] || return 1
+	now="$(date +%s)"
+	domain="$(sed -n 's/^domain=\([^,]*\)$/\1/p' "$conf" | head -1)"
+	: > "$tmp.new"
+	while IFS= read -r file; do
+		[ -r "$file" ] || continue
+		awk -v now="$now" -v domain="$domain" '
+			NF >= 4 && $1 ~ /^[0-9]+$/ && ($1 == 0 || $1 > now) &&
+			$3 ~ /^[0-9a-fA-F:.]+$/ && $4 ~ /^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$/ {
+				if (domain != "" && index($4,".") == 0) print $3, $4, $4 "." domain
+				else print $3, $4
+			}' "$file" >> "$tmp.new" || return 1
+	done <<EOF
+$(sed -n 's/^# leasefile=//p' "$conf" | sort -u)
+EOF
+	sort -u "$tmp.new" > "$tmp.sorted" || return 1
+	rm -f "$tmp.new"
+	HOSTS_CHANGED=0
+	if ! cmp -s "$tmp.sorted" "$ZGZ_RUN/resolver.hosts"; then
+		chmod 644 "$tmp.sorted"
+		mv -f "$tmp.sorted" "$ZGZ_RUN/resolver.hosts" || return 1
+		HOSTS_CHANGED=1
+	else
+		rm -f "$tmp.sorted"
+	fi
+}
+
+# addn-hosts and /etc/hosts are re-read on HUP; detect their content changes
+# without clearing the resolver cache every few seconds when nothing changed.
+hosts_signature() {
+	local path file
+	{
+		[ ! -r /etc/hosts ] || md5sum /etc/hosts
+		while IFS= read -r path; do
+			if [ -d "$path" ]; then
+				for file in "$path"/*; do [ ! -f "$file" ] || md5sum "$file"; done
+			elif [ -r "$path" ]; then md5sum "$path"; fi
+		done <<EOF
+$(sed -n -e 's/^addn-hosts=//p' -e 's/^hostsdir=//p' "$ZGZ_RUN/resolver.conf")
+EOF
+	} | md5sum | cut -d' ' -f1
+}
+
+cmd_watch() {
+	local previous="" current pid
+	while [ -r "$ZGZ_RUN/resolver.conf" ]; do
+		if hosts_refresh; then
+			current="$(hosts_signature)"
+			if [ "$current" != "$previous" ] || [ "$HOSTS_CHANGED" = 1 ]; then
+				pid="$(cat "$ZGZ_RUN/resolver.pid" 2>/dev/null)" || pid=""
+				case "$pid" in ''|*[!0-9]*) : ;;
+					*) if [ "$(cat "/proc/$pid/comm" 2>/dev/null)" = dnsmasq ]; then
+						kill -HUP "$pid" 2>/dev/null && previous="$current" || true
+					fi ;;
+				esac
+			fi
+		else
+			warn "could not update local DNS records"
+		fi
+		sleep 5
+	done
+}
+
+case "${1:-}" in
+	config) cmd_config ;;
+	hosts) hosts_refresh "${2:-$ZGZ_RUN/resolver.conf}" ;;
+	watch) cmd_watch ;;
+	*) echo 'usage: zgz-dns-local config|hosts|watch' >&2; exit 1 ;;
+esac

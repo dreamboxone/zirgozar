@@ -414,8 +414,8 @@ var FA = {
 
 	'Network': 'شبکه',
 	'Name lookups': 'روش پیدا کردن دامنه‌ها',
-	'“Through dnsmasq” keeps local machine names and DHCP names working and moves only the outside lookups into the tunnel. “Straight into the tunnel” resolves outside names and loses the ones on your own network.':
-		'تعیین می‌کند درخواست‌های DNS دستگاه‌ها چطور به فیلترشکن برسند. «از راه dnsmasq»: نام دستگاه‌های داخل شبکه (مثل پرینتر) کار می‌کند و فقط سایت‌های اینترنتی از فیلترشکن پرسیده می‌شوند. «مستقیم داخل تونل»: همه درخواست‌ها به فیلترشکن می‌روند و نام دستگاه‌های داخل شبکه دیگر پیدا نمی‌شود.',
+	'Keeps local device and DHCP names working. Internet lookups use the tunnel DNS without inheriting the router’s upstream servers. DHCP name changes may take up to five seconds to appear. “Straight into the tunnel” omits local names.':
+		'نام دستگاه‌ها و DHCP حفظ می‌شود و دامنه‌های اینترنتی از DNS تونل پاسخ می‌گیرند؛ DNSهای بالادستی قبلی روتر به این مسیر منتقل نمی‌شوند. نمایش تغییر نام دستگاه‌های DHCP ممکن است تا پنج ثانیه زمان ببرد. حالت «مستقیم داخل تونل» نام‌های محلی را پشتیبانی نمی‌کند.',
 	'Through dnsmasq (recommended)': 'از راه dnsmasq (پیشنهادی)',
 	'Straight into the tunnel': 'مستقیم داخل تونل',
 	'Leave alone': 'دست نزن',

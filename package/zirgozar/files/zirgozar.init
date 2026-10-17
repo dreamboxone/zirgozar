@@ -340,9 +340,8 @@ wait_for_port() {
 	return 1
 }
 
-# A start that did not bring the tunnel up. dnsmasq, kept pointed at the
-# tunnel across a restart, would otherwise send every lookup into one that
-# is not there - a network with no names rather than one without the tunnel.
+# A start that did not bring the tunnel up. The isolated DNS guard otherwise
+# keeps lookups pointed at a listener whose tunnel is not there.
 # Under the Kill switch the devices have no way out anyway, and it stays.
 start_failed() {
 	ks_on || "$DNS" down >/dev/null 2>&1 || true
@@ -524,7 +523,7 @@ service_stopped() {
 
 # What the DNS step depends on. Kept beside the ruleset for the same reason.
 dns_signature() {
-	echo "$(cfg dns_mode dnsmasq) $(cfg dns_port 1053)"
+	echo "$(cfg dns_mode dnsmasq) $(cfg dns_port 1053) $(cfg dnsmasq_port 1054)"
 }
 
 # A save. Every save on every page lands here, and restarting the tunnel for

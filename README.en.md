@@ -5,7 +5,7 @@
 <h3 align="center">A router-wide tunnel for OpenWrt</h3>
 
 <p align="center">
-  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.24-r13"></a>
+  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.25-r2"></a>
   <a href="https://github.com/dreamboxone/zirgozar/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/dreamboxone/zirgozar/total?style=for-the-badge&color=0ea5e9"></a>
   <img alt="OpenWrt" src="https://img.shields.io/badge/OpenWrt-23.05%20%7C%2024.10%20%7C%2025.12-00B5E2?style=for-the-badge&logo=openwrt&logoColor=white">
   <img alt="Xray" src="https://img.shields.io/badge/core-Xray-7c3aed?style=for-the-badge">
@@ -94,14 +94,14 @@ install the main file first, then the `luci-app-…` one. After the second, pres
 
 SSH into the router and run the command below to download and install or upgrade
 version **5.7.24** for its architecture. The version must first be published on
-the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.24-r13).
+the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.25-r2).
 
 ```sh
 (
   set -eu
   . /etc/openwrt_release
-  version='5.7.24-r13'
-  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.24-r13'
+  version='5.7.25-r2'
+  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.25-r2'
   install_dir="/tmp/zirgozar-install-$version"
   mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
@@ -131,11 +131,11 @@ These examples use `arm_cortex-a7_neon-vfpv4`; replace it with your router's arc
 ```sh
 # OpenWrt 25.12 and later
 apk update
-apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.24-r13.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.24-r13.apk
+apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.25-r2.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.25-r2.apk
 
 # OpenWrt 24.10 / 23.05
 opkg update
-opkg install /tmp/zirgozar_5.7.24-r13_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.24-r13_all.ipk
+opkg install /tmp/zirgozar_5.7.25-r2_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.25-r2_all.ipk
 ```
 
 > [!IMPORTANT]
@@ -296,7 +296,7 @@ a **Remote DNS** for everything that goes through the tunnel.
 
 | Option | In the file | Default | What it does |
 |---|---|---|---|
-| **Name lookups** | `dns_mode` | Through dnsmasq | *Through dnsmasq* keeps local device names and DHCP names working and moves only the outside lookups into the tunnel. *Straight into the tunnel* resolves outside names and loses the ones on your own network. *Leave alone* does not touch DNS at all |
+| **Name lookups** | `dns_mode` | Through dnsmasq | *Through dnsmasq* runs an isolated resolver whose only upstream is the tunnel DNS. Local records and DHCP names are imported without importing system upstream servers; lease changes appear within five seconds. *Straight into the tunnel* resolves outside names and loses the ones on your own network. *Leave alone* does not touch DNS at all |
 | **Direct DNS Protocol** | `direct_dns_protocol` | Auto | Direct DNS answers for everything that goes straight out, and for the names of the configs themselves — which can never be looked up through the tunnel they are the way into. Auto uses the router's own upstream, then the ISP's |
 | **Direct DNS** | `direct_dns` | — | With UDP or TCP above: the resolver, `1.2.3.4` or `1.2.3.4:53`. Iranian public resolvers are offered; picking one means it sees every name that goes straight out |
 | **Direct Query Strategy** | `direct_dns_query_strategy` | UseIPv4 | Which address families to ask the direct resolver for |
@@ -838,7 +838,7 @@ happens again.
 | These would not install: … | The package names differ on this OpenWrt build | Install by hand |
 | This kernel cannot do transparent proxying with nftables/iptables | The tproxy module is missing | Install them, on App Update |
 | This router has neither nftables nor iptables | There is no firewall to redirect traffic with | The router image is incomplete |
-| Could not find the directory dnsmasq reads its extra configuration from | Names are resolved straight into the tunnel and local device names stop resolving | Usually nothing |
+| Isolated DNS startup or protection failed | DNS is not declared ready; existing protection remains in place | Inspect Runtime Logs, check port conflicts and restart the connection |
 | No node on the list answered at all | The list is stale, or your connection is blocking all of them | Read the subscriptions again, or add a config of your own |
 | … answered a handshake, but none could complete a request | The configs are there, the traffic is not getting through | Choose again, or another list |
 | Nothing in the list could be read as a node | The subscription's format was not recognised | Check the subscription |

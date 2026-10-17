@@ -136,28 +136,13 @@ local_exclusions() {
 	return 0
 }
 
-# Where a hijacked name lookup should land.
-#
-# dnsmasq, when there is one. It is already answering for this network, it
-# knows the DHCP names and whatever is in /etc/hosts, and zgz-dns has pointed
-# its upstream at the tunnel - so sending queries to it keeps local names
-# working and still gets every outside lookup answered through the tunnel.
-# Redirecting straight to Xray instead would resolve the outside world
-# perfectly and lose every name on the user's own network, which reads as
-# "the router broke my printer".
+# The DNS target is stable before and during a resolver restart. A missing
+# private listener fails closed rather than falling back to the system DNS.
 dns_target() {
 	case "$(cfg dns_mode dnsmasq)" in
-		direct) echo "$dns_port"; return 0 ;;
+		direct) echo "$dns_port" ;;
+		*) cfg dnsmasq_port 1054 ;;
 	esac
-	# The same question zgz-dns asks before pointing dnsmasq at the tunnel: a
-	# dnsmasq with nowhere to put that is left alone, and the lookups then
-	# have to go to the tunnel itself, as the page says they do.
-	if pgrep -x dnsmasq >/dev/null 2>&1 && [ -n "$("$ZGZ_LIB/zgz-dns" where 2>/dev/null)" ]; then
-		echo 53
-	else
-		echo "$dns_port"
-	fi
-	return 0
 }
 
 # The addresses on the Traffic Rules page that never go into the tunnel.

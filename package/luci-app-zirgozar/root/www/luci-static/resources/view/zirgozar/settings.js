@@ -624,7 +624,7 @@ return view.extend({
 
 		/* ----------------------------------------------------------- DNS */
 		o = s.taboption('dns', form.ListValue, 'dns_mode', _('Name lookups'),
-			_('“Through dnsmasq” keeps local machine names and DHCP names working and moves only the outside lookups into the tunnel. “Straight into the tunnel” resolves outside names and loses the ones on your own network.'));
+			_('Keeps local device and DHCP names working. Internet lookups use the tunnel DNS without inheriting the router’s upstream servers. DHCP name changes may take up to five seconds to appear. “Straight into the tunnel” omits local names.'));
 		o.value('dnsmasq', _('Through dnsmasq (recommended)'));
 		o.value('direct', _('Straight into the tunnel'));
 		o.value('off', _('Leave alone'));

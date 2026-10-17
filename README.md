@@ -7,7 +7,7 @@
 <h3 align="center">فیلترشکن سراسری برای روتر OpenWrt</h3>
 
 <p align="center">
-  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.24-r13"></a>
+  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.25-r2"></a>
   <a href="https://github.com/dreamboxone/zirgozar/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/dreamboxone/zirgozar/total?style=for-the-badge&color=0ea5e9"></a>
   <img alt="OpenWrt" src="https://img.shields.io/badge/OpenWrt-23.05%20%7C%2024.10%20%7C%2025.12-00B5E2?style=for-the-badge&logo=openwrt&logoColor=white">
   <img alt="Xray" src="https://img.shields.io/badge/core-Xray-7c3aed?style=for-the-badge">
@@ -94,7 +94,7 @@
 
 به روتر SSH بزنید و دستور زیر را اجرا کنید. این دستور فایل‌های نسخه **5.7.24**
 را برای معماری روتر دانلود می‌کند و با مدیر بسته موجود نصب یا ارتقا می‌دهد.
-ابتدا باید این نسخه در [صفحه ریلیز](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.24-r13) منتشر شده باشد.
+ابتدا باید این نسخه در [صفحه ریلیز](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.25-r2) منتشر شده باشد.
 
 <div dir="ltr">
 
@@ -102,8 +102,8 @@
 (
   set -eu
   . /etc/openwrt_release
-  version='5.7.24-r13'
-  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.24-r13'
+  version='5.7.25-r2'
+  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.25-r2'
   install_dir="/tmp/zirgozar-install-$version"
   mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
@@ -137,11 +137,11 @@
 ```sh
 # OpenWrt 25.12 and later
 apk update
-apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.24-r13.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.24-r13.apk
+apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.25-r2.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.25-r2.apk
 
 # OpenWrt 24.10 / 23.05
 opkg update
-opkg install /tmp/zirgozar_5.7.24-r13_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.24-r13_all.ipk
+opkg install /tmp/zirgozar_5.7.25-r2_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.25-r2_all.ipk
 ```
 
 </div>
@@ -300,7 +300,7 @@ Geo، کنترل دسترسی، گزارش‌ها**.
 
 | گزینه | در فایل | پیش‌فرض | کار آن |
 |---|---|---|---|
-| **روش پیدا کردن دامنه‌ها** | `dns_mode` | از راه dnsmasq | *از راه dnsmasq* نام دستگاه‌های داخل شبکه و نام‌های DHCP را سر جایش نگه می‌دارد و فقط جست‌وجوی نام‌های بیرونی را به تونل می‌برد. *مستقیم داخل تونل* نام‌های بیرونی را پیدا می‌کند ولی نام‌های شبکه خودتان از دست می‌رود. *دست نزن* اصلا به DNS دست نمی‌زند |
+| **روش پیدا کردن دامنه‌ها** | `dns_mode` | از راه dnsmasq | یک resolver اختصاصی با DNS تونل اجرا می‌شود؛ DNSهای بالادستی قبلی روتر وارد آن نمی‌شوند. نام‌های محلی و DHCP حفظ می‌شوند و تغییر نام‌های DHCP تا پنج ثانیه بعد دیده می‌شود. حالت مستقیم نام‌های محلی را پشتیبانی نمی‌کند؛ حالت خاموش DNS را تغییر نمی‌دهد |
 | **پروتکل DNS مستقیم** | `direct_dns_protocol` | خودکار | DNS مستقیم به هر چیزی که بدون تونل بیرون می‌رود جواب می‌دهد، و به نام خود کانفیگ‌ها — که هیچ‌وقت نمی‌شود از داخل همان تونلی پیدایشان کرد که راه ورود به آن هستند. خودکار از DNS بالادستی خود روتر استفاده می‌کند، و اگر نبود از DNS اینترنت‌دهنده |
 | **DNS مستقیم** | `direct_dns` | — | با UDP یا TCP در بالا: آدرس DNS، به شکل `1.2.3.4` یا `1.2.3.4:53`. DNSهای عمومی ایرانی پیشنهاد می‌شوند؛ انتخاب یکی یعنی آن DNS همه نام‌هایی را که مستقیم می‌روند می‌بیند |
 | **روش درخواست DNS مستقیم** | `direct_dns_query_strategy` | UseIPv4 | از DNS مستقیم آدرس کدام نسخه IP خواسته شود |

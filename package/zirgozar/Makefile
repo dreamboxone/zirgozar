@@ -5,8 +5,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zirgozar
-PKG_VERSION:=5.7.24
-PKG_RELEASE:=13
+PKG_VERSION:=5.7.25
+PKG_RELEASE:=2
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
 PKG_LICENSE:=AGPL-3.0-or-later
@@ -16,14 +16,14 @@ include $(INCLUDE_DIR)/package.mk
 # Kept in step with build/packages.inc.sh, which is what the release builds
 # use. A helper that reaches one of them and not the other is a helper that
 # is missing on exactly half of the installations.
-ZGZ_SCRIPTS:=zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-stats zgz-test zgz-geo zgz-cores zgz-deps zgz-bridge zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-l2tp zgz-l2tpconfig zgz-pppvpn zgz-ikev2 zgz-ikev2config zgz-lb
+ZGZ_SCRIPTS:=zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-dns-local zgz-stats zgz-test zgz-geo zgz-cores zgz-deps zgz-bridge zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-l2tp zgz-l2tpconfig zgz-pppvpn zgz-ikev2 zgz-ikev2config zgz-lb
 
 define Package/zirgozar
   SECTION:=net
   CATEGORY:=Network
   TITLE:=Transparent proxy client built on Xray
   URL:=https://github.com/dreamboxone/zirgozar
-  DEPENDS:=+jshn +libubox +curl +ca-bundle +nftables +kmod-nft-tproxy +kmod-nft-socket +ip-full +unzip +ucode +ucode-mod-fs
+  DEPENDS:=+dnsmasq +jshn +libubox +curl +ca-bundle +nftables +kmod-nft-tproxy +kmod-nft-socket +ip-full +unzip +ucode +ucode-mod-fs
 endef
 
 define Package/zirgozar/description
@@ -55,6 +55,7 @@ define Package/zirgozar/install
 
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/zirgozar.init $(1)/etc/init.d/zirgozar
+	$(INSTALL_BIN) ./files/zirgozar-dns.init $(1)/etc/init.d/zirgozar-dns
 	$(INSTALL_BIN) ./files/zirgozar-server.init $(1)/etc/init.d/zirgozar-server
 	$(INSTALL_BIN) ./files/zirgozar-killswitch.init $(1)/etc/init.d/zirgozar-killswitch
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/firewall

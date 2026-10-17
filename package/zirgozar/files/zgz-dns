@@ -4,30 +4,9 @@
 # Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
 # Part of Zirgozar - https://github.com/dreamboxone/zirgozar
 #
-# zgz-dns - point the router's resolver at the tunnel while it is up.
-#
-#   zgz-dns up     send dnsmasq's upstream queries into the tunnel
-#   zgz-dns down   put it back
-#   zgz-dns where  print the directory dnsmasq reads drop-ins from
-#
-# Why this exists at all.
-#
-# A client asks the router for an address, the router asks whatever resolver
-# it was given, and where that resolver answers with whatever it has been
-# told to answer, a perfectly good tunnelled connection is then made to an
-# address that was already wrong before it left. That is why, with a tunnel
-# up and working, some sites open and others do not.
-#
-# The obvious fix is to redirect every port 53 packet straight into Xray. It
-# works, and it also throws away dnsmasq - so the router stops knowing the
-# names of the machines on its own network, DHCP names stop resolving, and
-# the user's printer disappears. Which reads, quite reasonably, as "this
-# thing broke my network".
-#
-# So instead dnsmasq keeps answering, and only its upstream is moved into the
-# tunnel. Local names keep working, everything else is resolved through the
-# tunnel, and one small file in a directory dnsmasq already watches is the
-# whole change. Nothing is written to flash.
+# An isolated DNS resolver for tunnel traffic. The system resolver keeps DHCP
+# and its own configuration. Only local DNS records are imported into the new
+# instance; its sole upstream is the tunnel's DNS listener.
 
 set -e
 
@@ -85,6 +64,7 @@ reload_dnsmasq() {
 #   socket mark keeps its intentional bootstrap and split DNS working.
 GUARD_TABLE=zirgozar_dns
 GUARD_CHAIN=ZGZ_DNSOUT
+ROUTER_CHAIN=ZGZ_DNSROUTER
 LAN_CHAIN=ZGZ_DNSLAN
 FWD_CHAIN=ZGZ_DNSFWD
 BYPASS=0xff
@@ -198,6 +178,13 @@ guard_up() {
 					printf '\t\tmeta l4proto { tcp, udp } th dport 53 counter drop\n\t}\n'
 				fi
 				if [ "$_g_output" = "1" ]; then
+					# Queries addressed to a DNS service on this router also
+					# use the isolated resolver. Explicit marked core DNS
+					# and direct bootstrap helpers are left alone.
+					printf '\tchain dns_router {\n\t\ttype nat hook output priority dstnat; policy accept;\n'
+					printf '\t\tct direction reply return\n'
+					printf '\t\tmeta mark & 0xff == %s return\n' "$BYPASS"
+					printf '\t\toifname "lo" meta l4proto { tcp, udp } th dport 53 counter redirect to :%s\n\t}\n' "$_g_to"
 					printf '\tchain dnsmasq_out {\n\t\ttype filter hook output priority filter; policy accept;\n'
 					printf '\t\tmeta mark & 0xff == %s return\n' "$BYPASS"
 					if [ -n "$_g_uids" ]; then
@@ -212,6 +199,7 @@ guard_up() {
 			} | nft -f - 2>"$ZGZ_RUN/dns-guard.err" || return 1
 			if [ "$_g_output" = "1" ]; then
 				nft list chain inet "$GUARD_TABLE" dnsmasq_out >/dev/null 2>&1 || return 1
+				nft list chain inet "$GUARD_TABLE" dns_router >/dev/null 2>&1 || return 1
 			fi
 			if [ -n "$_g_lan" ]; then
 				nft list chain inet "$GUARD_TABLE" dns_lan >/dev/null 2>&1 || return 1
@@ -245,22 +233,29 @@ guard_up() {
 					iptables -w 2 -C FORWARD -i "$_d" -j "$FWD_CHAIN" >/dev/null 2>&1 || return 1
 				done
 			fi
+			iptables -w 2 -t nat -N "${ROUTER_CHAIN}_N" >/dev/null 2>&1 || iptables -w 2 -t nat -F "${ROUTER_CHAIN}_N" >/dev/null 2>&1 || return 1
+			iptables -w 2 -t nat -A "${ROUTER_CHAIN}_N" -m mark --mark "$BYPASS/0xff" -j RETURN >/dev/null 2>&1 || return 1
+			iptables -w 2 -t nat -A "${ROUTER_CHAIN}_N" -o lo -p udp --dport 53 -j REDIRECT --to-ports "$_g_to" >/dev/null 2>&1 || return 1
+			iptables -w 2 -t nat -A "${ROUTER_CHAIN}_N" -o lo -p tcp --dport 53 -j REDIRECT --to-ports "$_g_to" >/dev/null 2>&1 || return 1
+			iptables -w 2 -t nat -I OUTPUT -j "${ROUTER_CHAIN}_N" >/dev/null 2>&1 || return 1
+			ipt_swap nat "$ROUTER_CHAIN" OUTPUT
+			iptables -w 2 -t nat -C OUTPUT -j "$ROUTER_CHAIN" >/dev/null 2>&1 || return 1
 			# The core mark is the only external DNS exception.
 			if [ "$_g_output" = "1" ]; then
 				iptables -w 2 -N "${GUARD_CHAIN}_N" >/dev/null 2>&1 || iptables -w 2 -F "${GUARD_CHAIN}_N" >/dev/null 2>&1 || return 1
 				if iptables -w 2 -A "${GUARD_CHAIN}_N" -m mark --mark "$BYPASS/0xff" -j RETURN >/dev/null 2>&1; then
-					if [ -n "$_g_uids" ]; then
-						set -- $_g_uids
-						[ "$#" = 1 ] || return 1
-						iptables -w 2 -A "${GUARD_CHAIN}_N" -m owner ! --uid-owner "$1" -j RETURN >/dev/null 2>&1 || return 1
-					fi
+
 					iptables -w 2 -A "${GUARD_CHAIN}_N" -d 127.0.0.0/8 -j RETURN >/dev/null 2>&1 || return 1
 					for _g_a in $_g_ex; do
 						iptables -w 2 -A "${GUARD_CHAIN}_N" -d "$_g_a" -j RETURN >/dev/null 2>&1 || return 1
 					done
-					for _g_p in $_g_ports; do
-						iptables -w 2 -A "${GUARD_CHAIN}_N" -p udp --dport "$_g_p" -j DROP >/dev/null 2>&1 || return 1
-						iptables -w 2 -A "${GUARD_CHAIN}_N" -p tcp --dport "$_g_p" -j DROP >/dev/null 2>&1 || return 1
+					for _g_u in ${_g_uids:-all}; do
+						set --
+						[ "$_g_u" = all ] || set -- -m owner --uid-owner "$_g_u"
+						for _g_p in $_g_ports; do
+							iptables -w 2 -A "${GUARD_CHAIN}_N" "$@" -p udp --dport "$_g_p" -j DROP >/dev/null 2>&1 || return 1
+							iptables -w 2 -A "${GUARD_CHAIN}_N" "$@" -p tcp --dport "$_g_p" -j DROP >/dev/null 2>&1 || return 1
+						done
 					done
 					iptables -w 2 -I OUTPUT -j "${GUARD_CHAIN}_N" >/dev/null 2>&1 || return 1
 					ipt_swap filter "$GUARD_CHAIN" OUTPUT
@@ -282,6 +277,15 @@ guard_down() {
 		nft delete table inet "$GUARD_TABLE" >/dev/null 2>&1 || true
 	fi
 	if command -v iptables >/dev/null 2>&1; then
+		for _gc in "$ROUTER_CHAIN" "${ROUTER_CHAIN}_N"; do
+			iptables -w 2 -t nat -S OUTPUT 2>/dev/null | grep -- "-j $_gc\$" | sed 's/^-A /-D /' |
+				while read -r _r; do
+					# shellcheck disable=SC2086
+					iptables -w 2 -t nat $_r >/dev/null 2>&1 || true
+				done
+			iptables -w 2 -t nat -F "$_gc" >/dev/null 2>&1 || true
+			iptables -w 2 -t nat -X "$_gc" >/dev/null 2>&1 || true
+		 done
 		for _gc in "$GUARD_CHAIN" "${GUARD_CHAIN}_N"; do
 			iptables -w 2 -S OUTPUT 2>/dev/null | grep -- "-j $_gc\$" | sed 's/^-A /-D /' |
 				while read -r _r; do
@@ -313,166 +317,180 @@ guard_down() {
 	return 0
 }
 
-# Which dnsmasq read the drop-in: the processes running when it was last
-# restarted with it in place. A drop-in on disk is not one dnsmasq has read -
-# a restart that failed left the old one running without it - so only these
-# very processes still running let a restart be skipped.
-LOADED="$ZGZ_RUN/dns.loaded"
-
-# What is said at a start, and not again every few minutes from the health
-# check, which calls this too.
-note() {
-	[ "${ZGZ_DNS_QUIET:-0}" = "1" ] || log "$@"
-}
-
-# The daemon itself, as procd started it: not every process by that name,
-# since dnsmasq forks one for each DNS-over-TCP connection, and those coming
-# and going looked like a new dnsmasq that had to be restarted again.
+# Only daemon PIDs, not temporary TCP workers. The isolated resolver is a
+# separate procd service and must be included in the second protection layer.
 dnsmasq_pids() {
-	_dp="$(ubus call service list '{"name":"dnsmasq"}' 2>/dev/null |
-		jsonfilter -e '@.dnsmasq.instances[*].pid' 2>/dev/null | sort -n | tr '\n' ' ')"
-	[ -n "$_dp" ] || _dp="$(pgrep -o -x dnsmasq 2>/dev/null)"
+	_dp="$(ubus call service list 2>/dev/null |
+		jsonfilter -e '@.dnsmasq.instances[*].pid' -e '@["zirgozar-dns"].instances.resolver.pid' 2>/dev/null | sort -un | tr '\n' ' ')"
+	[ -n "$_dp" ] || _dp="$( { pgrep -o -x dnsmasq 2>/dev/null; private_pid 2>/dev/null; } | sort -un | tr '\n' ' ')"
 	echo "$_dp"
 }
 
+private_pid() {
+	_pp="$(cat "$ZGZ_RUN/resolver.pid" 2>/dev/null)" || return 1
+	case "$_pp" in ''|*[!0-9]*) return 1 ;; esac
+	[ "$(cat "/proc/$_pp/comm" 2>/dev/null)" = dnsmasq ] || return 1
+	# Never signal a reused PID belonging to another dnsmasq instance.
+	tr '\000' '\n' < "/proc/$_pp/cmdline" | grep -Fx -- "--conf-file=$ZGZ_RUN/resolver.conf" >/dev/null || return 1
+	echo "$_pp"
+}
+
+private_ready() {
+	local pid fd inode ids="" hex file
+	pid="$(private_pid)" || return 1
+	hex="$(printf '%04X' "$1")"
+	for fd in /proc/"$pid"/fd/*; do
+		inode="$(readlink "$fd" 2>/dev/null)" || continue
+		case "$inode" in socket:*) inode="${inode#socket:[}"; inode="${inode%]}"; ids="$ids $inode" ;; esac
+	done
+	[ -n "$ids" ] || return 1
+	set --
+	for file in /proc/net/tcp /proc/net/tcp6 /proc/net/udp /proc/net/udp6; do
+		[ ! -r "$file" ] || set -- "$@" "$file"
+	done
+	awk -v ids="$ids" -v port=":$hex" '
+		BEGIN { n=split(ids,a," "); for(i=1;i<=n;i++) owned[a[i]]=1 }
+		owned[$10] && toupper(substr($2,length($2)-4)) == port {
+			if (FILENAME ~ /tcp/ && $4 == "0A") tcp=1
+			if (FILENAME ~ /udp/ && $4 == "07") udp=1
+		}
+		END { exit !(tcp && udp) }
+	' "$@"
+}
+
+private_stop() {
+	rm -f "$ZGZ_RUN/resolver.enabled"
+	bounded 20 /etc/init.d/zirgozar-dns stop >/dev/null 2>&1
+}
+
+private_up() {
+	local target="$1" changed=0 n=0
+	: > "$ZGZ_RUN/resolver-check.err"
+	command -v dnsmasq >/dev/null 2>&1 || { echo "dnsmasq is not installed" > "$ZGZ_RUN/resolver-check.err"; return 1; }
+	"$ZGZ_LIB/zgz-dns-local" config > "$ZGZ_RUN/resolver.conf.new" 2>>"$ZGZ_RUN/resolver-check.err" || return 1
+	"$ZGZ_LIB/zgz-dns-local" hosts "$ZGZ_RUN/resolver.conf.new" 2>>"$ZGZ_RUN/resolver-check.err" || return 1
+	dnsmasq --test --conf-file="$ZGZ_RUN/resolver.conf.new" > "$ZGZ_RUN/resolver-check.err" 2>&1 || return 1
+	if ! cmp -s "$ZGZ_RUN/resolver.conf.new" "$ZGZ_RUN/resolver.conf"; then
+		mv -f "$ZGZ_RUN/resolver.conf.new" "$ZGZ_RUN/resolver.conf" || return 1
+		changed=1
+	else
+		rm -f "$ZGZ_RUN/resolver.conf.new"
+	fi
+	if [ "$changed" = 0 ] && private_ready "$target"; then return 0; fi
+	touch "$ZGZ_RUN/resolver.enabled"
+	bounded 30 /etc/init.d/zirgozar-dns restart >/dev/null 2>&1 || return 1
+	while [ "$n" -lt 10 ]; do
+		private_ready "$target" && return 0
+		n=$((n + 1)); sleep 1
+	done
+	return 1
+}
+
+# Upgrade from the old shared-resolver implementation. UCI is never changed.
+# Normal starts of this version do not restart the DHCP service.
+legacy_cleanup() {
+	local dir changed=0
+	dir="$(dnsmasq_confdir)" || dir=""
+	if [ -n "$dir" ] && [ -f "$dir/$DROPIN" ] &&
+	   grep -q '^# Written by Zirgozar' "$dir/$DROPIN"; then
+		rm -f "$dir/$DROPIN" || return 1
+		changed=1
+	fi
+	if [ "$changed" = 1 ] || [ -f "$ZGZ_RUN/dns.main-stopped" ] || { [ -f "$ZGZ_RUN/dns.failed" ] && [ ! -f "$ZGZ_RUN/resolver.layout" ]; }; then
+		reload_dnsmasq || return 1
+		rm -f "$ZGZ_RUN/dns.main-stopped" "$ZGZ_RUN/dns.loaded"
+	fi
+	touch "$ZGZ_RUN/resolver.layout"
+}
+
+DNS_GUARD_VERIFIED=0
 dns_failed() {
-	rm -f "$LOADED"
 	touch "$ZGZ_RUN/dns.failed"
 	warn "DNS protection failed: $*"
-	if [ -s "$ZGZ_RUN/dns-guard.err" ]; then
-		warn "$(head -20 "$ZGZ_RUN/dns-guard.err")"
-	fi
+	for _df in "$ZGZ_RUN/dns-guard.err" "$ZGZ_RUN/resolver-check.err"; do
+		[ ! -s "$_df" ] || warn "$(head -20 "$_df")"
+	done
+	private_stop || true
 	say_status failed
-	say_message "محافظ DNS فعال نشد. برای جلوگیری از درخواست مستقیم DNS، سرویس dnsmasq متوقف شد. گزارش اجرا را بررسی و اتصال را دوباره راه‌اندازی کنید."
-	bounded 30 /etc/init.d/dnsmasq stop >/dev/null 2>&1 || true
-	if dnsmasq_running; then
-		warn "dnsmasq is still running after stop failed; DNS protection is not guaranteed"
-		say_message "خطای محافظ DNS: توقف dnsmasq نیز تأیید نشد. جلوگیری از نشت تضمین نمی‌شود؛ اتصال را متوقف و گزارش اجرا را بررسی کنید."
+	say_message "راه‌اندازی DNS اختصاصی ناموفق بود. محافظ موجود حفظ شده است؛ گزارش اجرا را بررسی و اتصال را دوباره راه‌اندازی کنید."
+	if [ "$DNS_GUARD_VERIFIED" != 1 ]; then
+		# A broken firewall cannot enforce a redirect. Do not leave the
+		# original resolver free to answer through its old upstreams.
+		touch "$ZGZ_RUN/dns.main-stopped"
+		bounded 30 /etc/init.d/dnsmasq stop >/dev/null 2>&1 || true
+		say_message "محافظ DNS تأیید نشد؛ سرویس اصلی dnsmasq برای جلوگیری از درخواست مستقیم متوقف شد. DNS و DHCP ممکن است تا رفع خطا در دسترس نباشند."
+		if dnsmasq_running; then
+			warn "the system resolver is still running; DNS protection is not guaranteed"
+			say_message "محافظ DNS و توقف سرویس اصلی تأیید نشدند. جلوگیری از نشت تضمین نمی‌شود؛ اتصال را متوقف و گزارش اجرا را بررسی کنید."
+		fi
 	fi
 	return 1
 }
 
 cmd_up() {
-	_mode="$(cfg dns_mode dnsmasq)"
-	_port="$(cfg dns_port 1053)"
-
-	case "$_mode" in
-		off)
-			# A drop-in left by a mode before this one, which a restart now
-			# keeps in place, is taken out first.
-			cmd_down
-			note "dns_mode is off - leaving name resolution alone"
-			return 0
-			;;
+	local mode target
+	mode="$(cfg dns_mode dnsmasq)"
+	case "$mode" in
+		off) cmd_down; return $? ;;
+		dnsmasq) target="$(cfg dnsmasq_port 1054)" ;;
+		direct) target="$(cfg dns_port 1053)" ;;
+		*) dns_failed "unknown DNS mode"; return 1 ;;
 	esac
-
-	# Where the devices' lookups go: to dnsmasq, or, straight into the tunnel,
-	# to the core's own DNS port. dnsmasq itself is pointed at the tunnel in
-	# both. Taken off it in this mode, as it once was, it went back to the
-	# ISP's servers - for the router's own lookups, and for any device's
-	# lookup on a connection made before the change, which still reaches it.
-	_to=53
-	[ "$_mode" = "direct" ] && _to="$_port"
-
-	if ! dnsmasq_running && [ ! -f "$ZGZ_RUN/dns.failed" ]; then
-		guard_up "$_port" 1 || { dns_failed "firewall installation or verification failed"; return 1; }
-		note "no dnsmasq on this router - name lookups will be redirected straight to the tunnel"
-		return 0
+	case "$target" in ''|*[!0-9]*) dns_failed "invalid DNS port"; return 1 ;; esac
+	[ "$target" -gt 1023 ] && [ "$target" -le 65535 ] || { dns_failed "invalid DNS port"; return 1; }
+	guard_up "$target" 1 || { dns_failed "firewall installation or verification failed"; return 1; }
+	DNS_GUARD_VERIFIED=1
+	legacy_cleanup || { dns_failed "could not migrate the system resolver"; return 1; }
+	if [ "$mode" = dnsmasq ]; then
+		private_up "$target" || { dns_failed "isolated resolver did not accept its configuration or open both DNS sockets"; return 1; }
+	else
+		private_stop || { dns_failed "could not stop the isolated resolver"; return 1; }
 	fi
-
-	_dir="$(dnsmasq_confdir)" || _dir=""
-	if [ -z "$_dir" ]; then
-		guard_up "$_port" 1 || { dns_failed "firewall installation or verification failed"; return 1; }
-		if [ "${ZGZ_DNS_QUIET:-0}" != "1" ]; then
-			say_message "Could not find the directory dnsmasq reads its extra configuration from, so name lookups are being redirected straight into the tunnel instead. Local machine names will not resolve while connected."
-			warn "no dnsmasq conf-dir found"
-		fi
-		return 0
+	if [ -n "$(dnsmasq_pids)" ]; then
+		guard_up "$target" uids || { dns_failed "resolver identity or output guard verification failed"; return 1; }
 	fi
-
-	# In place before dnsmasq is pointed at the tunnel, so there is no moment
-	# in which it is and its other servers are still open to it.
-	guard_up "$_to" 1 || { dns_failed "firewall installation or verification failed"; return 1; }
-
-	# no-resolv so the addresses the ISP handed out are not consulted as well:
-	# dnsmasq would ask every upstream at once and take the first answer, and
-	# the first answer would routinely be the one this exists to avoid.
-	cat > "$_dir/.$DROPIN.new" <<EOF || { dns_failed "could not write DNS configuration"; return 1; }
-# Written by Zirgozar while the tunnel is up. Removed when it goes down.
-no-resolv
-server=127.0.0.1#$_port
-EOF
-	# Already there, as a restart of the tunnel leaves it, and read by the
-	# dnsmasq now running: it is not restarted for nothing, and for a moment
-	# with the ISP's servers.
-	if cmp -s "$_dir/.$DROPIN.new" "$_dir/$DROPIN" && dnsmasq_running &&
-	   [ "$(cat "$LOADED" 2>/dev/null)" = "$(dnsmasq_pids)" ]; then
-		rm -f "$_dir/.$DROPIN.new"
-		guard_up "$_to" uids || { dns_failed "resolver identity or output guard verification failed"; return 1; }
-		return 0
-	fi
-	mv -f "$_dir/.$DROPIN.new" "$_dir/$DROPIN" || { dns_failed "could not install DNS configuration"; return 1; }
-
-	if ! reload_dnsmasq; then
-		# Not read, so the next call - the next start, save or health check
-		# - tries again rather than taking the file for done.
-		dns_failed "dnsmasq restart failed"
-		return 1
-	fi
-	# Its processes come up one after another, in a jail of its own, so they
-	# are written down once they have stopped changing.
-	_n=0; _p=""
-	while [ "$_n" -lt 8 ]; do
-		sleep 1
-		_q="$(dnsmasq_pids)"
-		[ -n "$_q" ] && [ "$_q" = "$_p" ] && break
-		_p="$_q"; _n=$((_n + 1))
-	done
-	if ! dnsmasq_running; then
-		dns_failed "dnsmasq did not remain running after restart"
-		return 1
-	fi
-	guard_up "$_to" uids || { dns_failed "resolver identity or output guard verification failed"; return 1; }
-	dnsmasq_pids > "$LOADED"
-	rm -f "$ZGZ_RUN/dns.failed"
-	log "name lookups now go through the tunnel (via $_dir/$DROPIN)"
+	rm -f "$ZGZ_RUN/dns.failed" "$ZGZ_RUN/dns.loaded"
+	[ "${ZGZ_DNS_QUIET:-0}" = 1 ] || log "DNS is isolated from the system upstream settings (port $target)"
 	return 0
-}
-
-# dnsmasq taken off the tunnel, if it was on it.
-dropin_down() {
-	_dir="$(dnsmasq_confdir)" || _dir=""
-	_dd_changed=0
-	if [ -n "$_dir" ] && [ -f "$_dir/$DROPIN" ]; then
-		rm -f "$_dir/$DROPIN"
-		_dd_changed=1
-	fi
-	# The first guard can fail before a drop-in ever existed. An explicit
-	# stop must still bring the resolver stopped by dns_failed back up.
-	if [ -f "$ZGZ_RUN/dns.failed" ] || { [ "$_dd_changed" = 1 ] && dnsmasq_running; }; then
-		reload_dnsmasq || true
-		log "name lookups are back to normal"
-	fi
-	rm -f "$LOADED" "$ZGZ_RUN/dns.failed"
 }
 
 cmd_down() {
-	dropin_down
-	# Only once dnsmasq has let go of the tunnel, and whatever else happened:
-	# a guard with nothing to guard would still keep dnsmasq off the servers
-	# it is now meant to ask.
+	private_stop || return 1
+	legacy_cleanup || return 1
 	guard_down
+	rm -f "$ZGZ_RUN/resolver.conf" "$ZGZ_RUN/resolver.conf.new" "$ZGZ_RUN/resolver.pid" "$ZGZ_RUN/dns.failed" "$ZGZ_RUN/dns.loaded"
 	return 0
 }
 
-cmd_where() {
-	dnsmasq_confdir
-	return 0
+# Health checks and a settings save may arrive together. Only the owner may
+# release this lock; a failed waiter must never remove another operation's lock.
+dns_lock() {
+	local n=0 owner
+	while ! mkdir "$ZGZ_RUN/dns.lock" 2>/dev/null; do
+		owner="$(cat "$ZGZ_RUN/dns.lock/pid" 2>/dev/null)" || owner=""
+		case "$owner" in ''|*[!0-9]*) : ;; *)
+			if ! kill -0 "$owner" 2>/dev/null; then
+				rm -f "$ZGZ_RUN/dns.lock/pid"
+				rmdir "$ZGZ_RUN/dns.lock" 2>/dev/null || true
+			fi ;;
+		esac
+		n=$((n + 1)); [ "$n" -lt 60 ] || return 1
+		sleep 1
+	done
+	echo $$ > "$ZGZ_RUN/dns.lock/pid"
+	trap 'dns_unlock' EXIT
+	trap 'exit 1' INT TERM
+}
+
+dns_unlock() {
+	[ "$(cat "$ZGZ_RUN/dns.lock/pid" 2>/dev/null)" = "$$" ] || return 0
+	rm -f "$ZGZ_RUN/dns.lock/pid"
+	rmdir "$ZGZ_RUN/dns.lock" 2>/dev/null || true
 }
 
 case "${1:-}" in
-	up)    cmd_up ;;
-	down)  cmd_down ;;
-	where) cmd_where ;;
+	up) dns_lock; cmd_up ;;
+	down) dns_lock; cmd_down ;;
+	where) dnsmasq_confdir ;;
 	*) echo "usage: $0 up|down|where" >&2; exit 1 ;;
 esac
