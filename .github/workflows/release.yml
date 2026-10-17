@@ -103,17 +103,175 @@ jobs:
           curl -fsSL --retry 3 -o geo/geosite.dat "$base/geosite-lite.dat"
           ls -l geo/
 
-      - name: Run the test suites
+      - name: Test package
         run: |
           set -euo pipefail
-          # nft --check needs to talk to the kernel about which modules exist,
-          # and the transparent-proxy probe genuinely loads a throwaway table.
           sudo -E env \
             RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
             RIG_SINGBOX="$PWD/.test-tools/sing-box" \
             ZGZ_GEO_DIR="$PWD/geo" \
             PATH="$PATH" \
-            timeout -k 5 180 sh test/run.sh
+            timeout -k 5 90 sh test/test-package.sh
+
+      - name: Test sources
+        run: |
+          set -euo pipefail
+          sudo -E env \
+            RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
+            RIG_SINGBOX="$PWD/.test-tools/sing-box" \
+            ZGZ_GEO_DIR="$PWD/geo" \
+            PATH="$PATH" \
+            timeout -k 5 90 sh test/test-sources.sh
+
+      - name: Test schedule
+        run: |
+          set -euo pipefail
+          sudo -E env \
+            RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
+            RIG_SINGBOX="$PWD/.test-tools/sing-box" \
+            ZGZ_GEO_DIR="$PWD/geo" \
+            PATH="$PATH" \
+            timeout -k 5 90 sh test/test-schedule.sh
+
+      - name: Test backup
+        run: |
+          set -euo pipefail
+          sudo -E env \
+            RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
+            RIG_SINGBOX="$PWD/.test-tools/sing-box" \
+            ZGZ_GEO_DIR="$PWD/geo" \
+            PATH="$PATH" \
+            timeout -k 5 90 sh test/test-backup.sh
+
+      - name: Test health
+        run: |
+          set -euo pipefail
+          sudo -E env \
+            RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
+            RIG_SINGBOX="$PWD/.test-tools/sing-box" \
+            ZGZ_GEO_DIR="$PWD/geo" \
+            PATH="$PATH" \
+            timeout -k 5 90 sh test/test-health.sh
+
+      - name: Test dns
+        run: |
+          set -euo pipefail
+          sudo -E env \
+            RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
+            RIG_SINGBOX="$PWD/.test-tools/sing-box" \
+            ZGZ_GEO_DIR="$PWD/geo" \
+            PATH="$PATH" \
+            timeout -k 5 90 sh test/test-dns.sh
+
+      - name: Test versions
+        run: |
+          set -euo pipefail
+          sudo -E env \
+            RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
+            RIG_SINGBOX="$PWD/.test-tools/sing-box" \
+            ZGZ_GEO_DIR="$PWD/geo" \
+            PATH="$PATH" \
+            timeout -k 5 90 sh test/test-versions.sh
+
+      - name: Test stats
+        run: |
+          set -euo pipefail
+          sudo -E env \
+            RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
+            RIG_SINGBOX="$PWD/.test-tools/sing-box" \
+            ZGZ_GEO_DIR="$PWD/geo" \
+            PATH="$PATH" \
+            timeout -k 5 90 sh test/test-stats.sh
+
+      - name: Test rules
+        run: |
+          set -euo pipefail
+          sudo -E env \
+            RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
+            RIG_SINGBOX="$PWD/.test-tools/sing-box" \
+            ZGZ_GEO_DIR="$PWD/geo" \
+            PATH="$PATH" \
+            timeout -k 5 90 sh test/test-rules.sh
+
+      - name: Test acl
+        run: |
+          set -euo pipefail
+          sudo -E env \
+            RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
+            RIG_SINGBOX="$PWD/.test-tools/sing-box" \
+            ZGZ_GEO_DIR="$PWD/geo" \
+            PATH="$PATH" \
+            timeout -k 5 90 sh test/test-acl.sh
+
+      - name: Test config
+        run: |
+          set -euo pipefail
+          sudo -E env \
+            RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
+            RIG_SINGBOX="$PWD/.test-tools/sing-box" \
+            ZGZ_GEO_DIR="$PWD/geo" \
+            PATH="$PATH" \
+            timeout -k 5 90 sh test/test-config.sh
+
+      - name: Test encrypted-dns
+        run: |
+          set -euo pipefail
+          sudo -E env \
+            RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
+            RIG_SINGBOX="$PWD/.test-tools/sing-box" \
+            ZGZ_GEO_DIR="$PWD/geo" \
+            PATH="$PATH" \
+            timeout -k 5 90 sh test/test-encrypted-dns.sh
+
+      - name: Test config-modes
+        run: |
+          set -euo pipefail
+          sudo -E env \
+            RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
+            RIG_SINGBOX="$PWD/.test-tools/sing-box" \
+            ZGZ_GEO_DIR="$PWD/geo" \
+            PATH="$PATH" \
+            timeout -k 5 90 sh test/test-config-modes.sh
+
+      - name: Test aether
+        run: |
+          set -euo pipefail
+          sudo -E env \
+            RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
+            RIG_SINGBOX="$PWD/.test-tools/sing-box" \
+            ZGZ_GEO_DIR="$PWD/geo" \
+            PATH="$PATH" \
+            timeout -k 5 90 sh test/test-aether.sh
+
+      - name: Test l2tp
+        run: |
+          set -euo pipefail
+          sudo -E env \
+            RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
+            RIG_SINGBOX="$PWD/.test-tools/sing-box" \
+            ZGZ_GEO_DIR="$PWD/geo" \
+            PATH="$PATH" \
+            timeout -k 5 90 sh test/test-l2tp.sh
+
+      - name: Test exit-cache
+        run: |
+          set -euo pipefail
+          sudo -E env \
+            RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
+            RIG_SINGBOX="$PWD/.test-tools/sing-box" \
+            ZGZ_GEO_DIR="$PWD/geo" \
+            PATH="$PATH" \
+            timeout -k 5 90 sh test/test-exit-cache.sh
+
+      - name: Test probe
+        run: |
+          set -euo pipefail
+          sudo -E env \
+            RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
+            RIG_SINGBOX="$PWD/.test-tools/sing-box" \
+            ZGZ_GEO_DIR="$PWD/geo" \
+            PATH="$PATH" \
+            timeout -k 5 90 sh test/test-probe.sh
 
       # Separate from the suites above because it depends on somebody else's
       # server list being up this morning, which is not a reason to fail a
