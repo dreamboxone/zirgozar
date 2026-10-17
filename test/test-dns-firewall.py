@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Load the generated guard in a private network namespace and send packets."""
-import errno
 import json
 import os
 import pathlib
@@ -55,6 +54,7 @@ before = packets('encrypted_out')
 for family, target in ((socket.AF_INET, '198.51.100.2'), (socket.AF_INET6, '2001:db8:2::2')):
     for port in (443, 853):
         for kind in (socket.SOCK_DGRAM, socket.SOCK_STREAM):
+            previous = packets('encrypted_out')
             with socket.socket(family, kind) as client:
                 client.settimeout(0.5)
                 try:
@@ -62,17 +62,20 @@ for family, target in ((socket.AF_INET, '198.51.100.2'), (socket.AF_INET6, '2001
                         client.sendto(b'guard-test', (target, port))
                     else:
                         client.connect((target, port))
-                except OSError as exc:
-                    assert exc.errno in (errno.EPERM, errno.EACCES), exc
-                else:
-                    raise AssertionError(f'unmarked {family}/{kind}/{port} escaped output guard')
-assert packets('encrypted_out') - before == 8
+                except OSError:
+                    # TCP can retry a silently dropped SYN until the socket
+                    # times out. The kernel rule counter proves the drop;
+                    # a timeout alone would also occur without a firewall.
+                    pass
+            assert packets('encrypted_out') > previous, f'{family}/{kind}/{port} did not hit the drop rule'
+assert packets('encrypted_out') - before >= 8
 print('  live - output blocks IPv4/IPv6 TCP/UDP 443 and 853 for unmarked processes')
+marked_before = packets('encrypted_out')
 for family, target in ((socket.AF_INET, '198.51.100.2'), (socket.AF_INET6, '2001:db8:2::2')):
     with socket.socket(family, socket.SOCK_DGRAM) as client:
         client.setsockopt(socket.SOL_SOCKET, socket.SO_MARK, 255)
         client.sendto(b'marked-core', (target, 853))
-assert packets('encrypted_out') - before == 8
+assert packets('encrypted_out') == marked_before
 print('  live - marked tunnel sockets remain usable in both address families')
 
 
@@ -85,7 +88,7 @@ def checksum(data):
     return (~value) & 65535
 
 
-mac = lambda name: bytes.fromhex(pathlib.Path(f'/sys/class/net/{name}/address').read_text().strip().replace(':', ''))
+mac = lambda name: bytes.fromhex(json.loads(run('ip', '-j', 'link', 'show', 'dev', name))[0]['address'].replace(':', ''))
 frame = mac('br-lan') + mac('client-test')
 with socket.socket(socket.AF_PACKET, socket.SOCK_RAW) as raw:
     raw.bind(('client-test', 0))
