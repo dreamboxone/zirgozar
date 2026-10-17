@@ -1786,6 +1786,14 @@ section_links() {
 	_sl_name="$(uci -q get "zirgozar.$1.name" 2>/dev/null)" || _sl_name=""
 	# The node's own settings first; they hold for everything that follows.
 	node_extras "$1"
+	# Preserve JSON documents verbatim, including embedded Aether commands.
+	if printf '%s\n' "$_sl_link" | grep -qE '^[[:space:]]*\{'; then
+		if printf '%s\n' "$_sl_link" | grep -q '"aetherCommand"[[:space:]]*:'; then
+			printf '#!zgz-x.aether_id=%s\n' "$1"
+		fi
+		printf '%s\n' "$_sl_link"
+		return 0
+	fi
 	# A whole WireGuard .conf is one document, not a list of links: cutting it
 	# into lines and hanging the name on each of them would turn every key in
 	# it into something else. The name goes in as the comment the parser

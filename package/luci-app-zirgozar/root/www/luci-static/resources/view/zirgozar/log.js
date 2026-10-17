@@ -27,14 +27,12 @@ var callLog = rpc.declare({ object: 'luci.zirgozar', method: 'log', expect: { ''
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
 
-/* Both logs are said in Persian when the page is - see logfa.js - and each
-   line then takes the direction of what it says, so a Persian sentence reads
-   right to left and a path inside it, or a line that was left in English,
-   still reads the right way round. */
+/* Persian logs keep a fixed right edge even when a line starts with a core
+   name or a path. Embedded Latin text retains its own character order. */
 function box() {
 	if (i18n.get() === 'fa')
-		return E('pre', { 'dir': 'auto', 'class': 'mk-log mk-log-fa',
-		                  'style': 'unicode-bidi:plaintext;text-align:start' }, '');
+		return E('pre', { 'dir': 'rtl', 'class': 'mk-log mk-log-fa',
+		                  'style': 'direction:rtl;unicode-bidi:embed;text-align:right' }, '');
 	return E('pre', { 'dir': 'ltr', 'class': 'mk-log' }, '');
 }
 

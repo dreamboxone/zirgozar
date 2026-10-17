@@ -1,0 +1,20 @@
+{
+  "aetherCommand": "aether --bind 127.0.0.1:10819 --protocol masque --scan balanced --ip v4 --masque-sni www.cloudflare.com --h2 --tls-ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256 --disable-grease --peer 162.159.198.201:443 --quick-reconnect --upstream socks5://127.0.0.1:10822",
+  "remarks": "MASQUE",
+  "dns": {"servers": ["https://8.8.8.8/dns-query", {"address": "localhost", "domains": ["domain:ir", "geosite:category-ir"]}]},
+  "inbounds": [
+    {"listen": "127.0.0.1", "port": 10808, "protocol": "socks", "tag": "socks"},
+    {"listen": "127.0.0.1", "port": 10822, "protocol": "mixed", "tag": "secondary-socks"}
+  ],
+  "outbounds": [
+    {"protocol": "socks", "settings": {"address": "127.0.0.1", "port": 10819}, "tag": "proxy"},
+    {"protocol": "freedom", "tag": "direct"},
+    {"protocol": "blackhole", "tag": "block"},
+    {"protocol": "dns", "tag": "dns-out"},
+    {"protocol": "freedom", "tag": "exit-node"}
+  ],
+  "routing": {"rules": [
+    {"inboundTag": ["secondary-socks"], "outboundTag": "exit-node", "type": "field"},
+    {"domain": ["domain:ir", "geosite:category-ir"], "outboundTag": "direct", "type": "field"}
+  ]}
+}

@@ -12,7 +12,7 @@ mkdir -p "$WORK"
 cat > "$WORK/aether" <<'CORE'
 #!/bin/sh
 case "$1" in
- --help) printf '%s\n' '--gool-peer --upstream --h2 --tor-only --psiphon-only'; exit 0 ;;
+ --help) printf '%s\n' '--gool-peer --upstream --h2 --tor-only --psiphon-only --masque-sni --tls-ciphers --disable-grease'; exit 0 ;;
  --version) echo 'aether 2.3.0'; exit 0 ;;
 esac
 for arg in "$@"; do
@@ -23,6 +23,22 @@ printf '%s\n' "${AETHER_MASQUE_H2_FRAGMENT:-}" > "$ZGZ_RUN/aether-fragment"
 CORE
 chmod +x "$WORK/aether"
 rig_set core_aether "$WORK/aether"
+PROFILE="$RIG_SRC/test/fixtures/aether-command.json"
+check "$(LC_ALL=C awk -f "$ZGZ_LIB/zgz-parse" < "$PROFILE" | cut -f3)" aether 'multiline Aether JSON parses as a document'
+rig_set a1.link "$(node -e 'process.stdout.write(JSON.stringify(require(process.argv[1])))' "$PROFILE")"
+rig_set node a1
+node_records a1 1 > "$WORK/import.tsv"
+check "$(cut -f3 "$WORK/import.tsv")" aether 'whole JSON imports one Aether node, not its local SOCKS helper'
+check "$(cut -f4,5 "$WORK/import.tsv")" "$(printf '162.159.198.201\t443')" 'JSON Aether preserves the remote endpoint'
+if cut -f6- "$WORK/import.tsv" | grep -q '"id":"a1"'; then ok 'JSON Aether has its own persistent identity'; else bad 'JSON Aether lost its identity'; fi
+"$ZGZ_LIB/zgz-probe" use a1 >/dev/null 2>&1
+"$ZGZ_LIB/zgz-aether" run
+node "$RIG_SRC/test/test-aether.js" imported "$ZGZ_RUN/aether-argv" || bad 'JSON Aether command was not reproduced'
+for MUTATION in shell unknown quote upstream bind cipher; do
+ node "$RIG_SRC/test/test-aether.js" "$MUTATION" "$PROFILE" > "$WORK/invalid.json"
+ check "$(LC_ALL=C awk -f "$ZGZ_LIB/zgz-parse" < "$WORK/invalid.json")" '' "unsupported JSON Aether $MUTATION is rejected without fallback"
+done
+rm -f "$ZGZ_RUN/aether-argv"
 rig_set n1.link 'socks5://127.0.0.1:39080#entry'
 rig_set a1.link 'aether://?protocol=wg-over-masque&scan=balanced&ip=v4&transport=h2&outer=162.159.198.204%3A443#aether'
 rig_set node a1

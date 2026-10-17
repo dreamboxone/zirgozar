@@ -9,6 +9,32 @@ const fs = require('node:fs');
 const path = require('node:path');
 const resources = path.join(__dirname, '../package/luci-app-zirgozar/root/www/luci-static/resources');
 
+const logfa = new Function('baseclass', fs.readFileSync(path.join(resources, 'zirgozar/logfa.js'), 'utf8'))({ extend: value => value });
+for (const [file, pattern, prefix] of [
+	['zgz-dns', /dns_failed "([^"]+)"/g, 'DNS protection failed: '],
+	['zgz-cores', /self_fail "([^"]+)"/g, 'update: ']
+]) {
+	const script = fs.readFileSync(path.join(__dirname, '../package/zirgozar/files', file), 'utf8');
+	for (const match of script.matchAll(pattern)) {
+		const message = prefix + match[1];
+		assert.match(logfa.sentence(message), /[\u0600-\u06ff]/);
+		assert.ok(!logfa.sentence(message).includes(match[1]), message);
+	}
+}
+assert.equal(logfa.line('2026-10-17 16:00:33: DNS is isolated from the system upstream settings (port 1054)'),
+	'1405/07/25 16:00:33: DNS از تنظیمات سرورهای بالادستی سیستم جدا شده است (پورت 1054)');
+assert.equal(logfa.sentence('update: unknown diagnostic 192.0.2.1:443'), 'به‌روزرسانی: unknown diagnostic 192.0.2.1:443');
+console.log('Persian runtime logs passed: DNS protection and update failures');
+
+const logSource = fs.readFileSync(path.join(resources, 'view/zirgozar/log.js'), 'utf8');
+const logBox = new Function('rpc', 'i18n', 'E', logSource.slice(0, logSource.indexOf('\nreturn view.extend(')) + '\nreturn box;');
+for (const lang of ['fa', 'en']) {
+	const box = logBox({ declare: () => () => {} }, { tr: value => value, get: () => lang }, (tag, attrs) => ({ tag, attrs }))();
+	assert.equal(box.attrs.dir, lang === 'fa' ? 'rtl' : 'ltr');
+	if (lang === 'fa') assert.ok(box.attrs.style.includes('text-align:right'));
+}
+console.log('Runtime and node log directions passed: Persian RTL, English LTR');
+
 // A small DOM stand-in lets the shipped renderer run without a browser.
 function element(tag, attrs, children) {
 	return { tag, attrs, children: children || [],

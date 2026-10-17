@@ -2329,8 +2329,99 @@ function json_item(it, src,   c, lnk, lab) {
 	else                       from_xray(it)
 }
 
+# Read arguments as data. No shell evaluation or external command execution.
+function aether_args(cmd, args,   i, c, quote, word, active, count) {
+	for (i = 1; i <= length(cmd); i++) {
+		c = substr(cmd, i, 1)
+		if (c ~ /[\r\n]/ || c ~ /[;$`|&<>]/) return 0
+		if (c == "\\") {
+			if (++i > length(cmd)) return 0
+			word = word substr(cmd, i, 1); active = 1
+		} else if (quote != "") {
+			if (c == quote) quote = ""; else word = word c
+		} else if (c == "\"" || c == "'") { quote = c; active = 1
+		} else if (c ~ /[ \t]/) {
+			if (active) { args[++count] = word; word = ""; active = 0 }
+		} else { word = word c; active = 1 }
+	}
+	if (quote != "") return 0
+	if (active) args[++count] = word
+	return count
+}
+
+function from_aether_command(doc,   args, opts, count, i, key, val, query, endpoint, label, fp, ciphers, list, rules, inlets, m, j, tags, exit_tag, inlet, port, found, rest) {
+	count = aether_args(jstr(doc, "aetherCommand"), args)
+	if (count < 2 || args[1] !~ /(^|\/)aether$/) return
+	for (i = 2; i <= count; i++) {
+		key = args[i]
+		if (key ~ /^--(h2|h3|disable-grease|quick-reconnect)$/) {
+			if (key == "--h2" || key == "--h3") {
+				if (opts["transport"] != "") return
+				opts["transport"] = substr(key, 3)
+			} else opts[substr(key, 3)] = "1"
+			continue
+		}
+		if (key !~ /^--(bind|protocol|scan|ip|masque-sni|tls-ciphers|peer|upstream)$/ || ++i > count) return
+		if (key in opts) return
+		val = args[i]
+		if (val == "" || val ~ /["\\#&?\r\n\t]/) return
+		opts[key] = val
+	}
+	if (opts["--protocol"] != "masque") return
+	if (opts["--masque-sni"] != "" && opts["--masque-sni"] !~ /^[A-Za-z0-9.-]+$/) return
+	# Only the generated local SOCKS plumbing may be replaced automatically.
+	if (opts["--bind"] !~ /^127\.0\.0\.1:[0-9]+$/) return
+	split(opts["--bind"], inlets, ":"); port = inlets[2] + 0
+	if (port < 1 || port > 65535) return
+	m = jsplit(jraw(doc, "outbounds"), list)
+	for (i = 1; i <= m; i++) {
+		if (jstr(list[i], "protocol") == "socks" && jstr(jraw(list[i], "settings"), "address") == "127.0.0.1" && jnum(jraw(list[i], "settings"), "port") == port) found++
+	}
+	if (found != 1) return
+	if (opts["--upstream"] != "") {
+		if (opts["--upstream"] !~ /^socks5:\/\/127\.0\.0\.1:[0-9]+$/) return
+		port = substr(opts["--upstream"], 20) + 0
+		if (port < 1 || port > 65535) return
+		m = jsplit(jraw(doc, "inbounds"), inlets)
+		for (i = 1; i <= m; i++) {
+			if (jstr(inlets[i], "listen") == "127.0.0.1" && jnum(inlets[i], "port") == port && jstr(inlets[i], "protocol") ~ /^(socks|mixed)$/) inlet = jstr(inlets[i], "tag")
+		}
+		if (inlet == "") return
+		m = jsplit(jraw(jraw(doc, "routing"), "rules"), rules)
+		for (i = 1; i <= m; i++) {
+			tags = jsplit(jraw(rules[i], "inboundTag"), inlets)
+			for (j = 1; j <= tags; j++) if (junq(inlets[j]) == inlet) {
+				# A conditional or competing upstream route cannot be collapsed.
+				rest = jdrop(jdrop(jdrop(rules[i], "type"), "inboundTag"), "outboundTag")
+				gsub(/[ \t\r\n]/, "", rest)
+				if (exit_tag != "" || rest != "{}") return
+				exit_tag = jstr(rules[i], "outboundTag")
+			}
+		}
+		found = 0; m = jsplit(jraw(doc, "outbounds"), list)
+		for (i = 1; i <= m; i++) if (jstr(list[i], "tag") == exit_tag && jstr(list[i], "protocol") == "freedom") {
+			rest = jdrop(jdrop(list[i], "tag"), "protocol"); gsub(/[ \t\r\n]/, "", rest)
+			if (rest != "{}") return
+			found++
+		}
+		if (exit_tag == "" || found != 1) return
+	}
+	ciphers = opts["--tls-ciphers"]
+	if (ciphers != "") {
+		if (ciphers != "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256" || !opts["disable-grease"]) return
+		fp = "semi-python"
+	} else if (opts["disable-grease"]) return
+	endpoint = opts["--peer"]
+	query = "?protocol=" (opts["--protocol"] != "" ? opts["--protocol"] : "masque") "&scan=" (opts["--scan"] != "" ? opts["--scan"] : "balanced") "&ip=" (opts["--ip"] != "" ? opts["--ip"] : "v4") "&transport=" (opts["transport"] != "" ? opts["transport"] : "h3")
+	if (opts["--masque-sni"] != "") query = query "&sni=" opts["--masque-sni"]
+	if (fp != "") query = query "&fingerprint=" fp
+	label = jstr(doc, "remarks"); if (label == "") label = "Aether"
+	do_aether(endpoint query "#" label)
+}
+
 function json_doc(doc,   list, extra, m, k, i, src) {
 	doc = jtrim(doc)
+	if (jraw(doc, "aetherCommand") != "") { from_aether_command(doc); return }
 	m = 0
 	src = "auto"
 

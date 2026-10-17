@@ -6,7 +6,16 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const mode = process.argv[2], data = fs.readFileSync(process.argv[3], 'utf8');
-if (mode === 'config' || mode === 'direct') {
+if (['shell', 'unknown', 'quote', 'upstream', 'bind', 'cipher'].includes(mode) && data.trim().startsWith('{')) {
+	const c = JSON.parse(data);
+	if (mode === 'shell') c.aetherCommand += '; touch /tmp/aether-import-executed';
+	if (mode === 'unknown') c.aetherCommand += ' --unsupported-option test';
+	if (mode === 'quote') c.aetherCommand += ' "unfinished';
+	if (mode === 'upstream') c.outbounds.find(o => o.tag === 'exit-node').protocol = 'blackhole';
+	if (mode === 'bind') c.aetherCommand = c.aetherCommand.replace('127.0.0.1:10819', '0.0.0.0:10819');
+	if (mode === 'cipher') c.aetherCommand = c.aetherCommand.replace('ECDHE-ECDSA-AES256-GCM-SHA384:', '');
+	process.stdout.write(JSON.stringify(c));
+} else if (mode === 'config' || mode === 'direct') {
 	const c = JSON.parse(data);
 	const inlet = c.inbounds.find(i => i.tag === 'aether-via');
 	assert.equal(inlet.listen, '127.0.0.1');
@@ -30,9 +39,17 @@ if (mode === 'config' || mode === 'direct') {
 	const option = key => args[args.lastIndexOf(key) + 1];
 	assert.equal(option('--mark'), '255');
 	assert.ok(option('--config').endsWith('/aether/a1/identity.toml'));
-	assert.equal(option('--protocol'), 'gool');
-	assert.equal(option('--peer'), '162.159.198.204:443');
+	assert.equal(option('--protocol'), mode === 'imported' ? 'masque' : 'gool');
+	assert.equal(option('--peer'), mode === 'imported' ? '162.159.198.201:443' : '162.159.198.204:443');
 	assert.ok(args.includes('--h2'));
 	assert.ok(!args.includes('--gool-classic'));
+	if (mode === 'imported') {
+		assert.equal(option('--masque-sni'), 'www.cloudflare.com');
+		assert.ok(option('--tls-ciphers').startsWith('ECDHE-ECDSA-AES256-GCM-SHA384:'));
+		assert.ok(args.includes('--disable-grease'));
+		assert.ok(args.includes('--quick-reconnect'));
+		assert.equal(option('--bind'), '127.0.0.1:10808');
+		assert.ok(!args.includes('--upstream'));
+	}
 	if (mode === 'upstream') assert.equal(option('--upstream'), 'socks5://127.0.0.1:10809');
 }
