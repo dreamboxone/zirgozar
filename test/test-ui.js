@@ -3,6 +3,7 @@
  * Part of Zirgozar - https://github.com/dreamboxone/zirgozar
  */
 'use strict';
+require('./test-status-ui.js');
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

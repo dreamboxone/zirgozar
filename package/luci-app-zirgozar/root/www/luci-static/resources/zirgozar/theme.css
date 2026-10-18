@@ -658,3 +658,44 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 	:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-field{flex:1 1 100%;width:100%!important}
 	body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal{padding:16px!important;width:calc(100vw - 24px);max-height:calc(100dvh - 24px);overflow:auto}
 }
+
+/* The three site checks share two former tile columns; usage takes the third. */
+.mk-grid.pwp-status-row{grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,2fr) minmax(0,1fr)}
+.pwp-status-row .pwp-social-card{display:flex;flex-direction:column;gap:7px;justify-content:center}
+.mk .pwp-social-check{display:grid;grid-template-columns:32px minmax(0,1fr) minmax(70px,auto);gap:9px;align-items:center;min-height:43px;width:100%;padding:7px 9px;border:0;border-radius:10px;color:var(--text);background:var(--soft);background:color-mix(in srgb,var(--site-colour) 10%,var(--panel));font:inherit;text-align:start;cursor:pointer}
+.mk .pwp-social-check:hover{background:color-mix(in srgb,var(--site-colour) 17%,var(--panel))}
+.mk .pwp-social-check:disabled{cursor:wait;opacity:.7}
+.mk .pwp-social-check:focus-visible,.mk .pwp-usage-periods button:focus-visible{outline:2px solid var(--zgz-accent,#3b82f6);outline-offset:2px}
+.pwp-social-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;color:var(--site-colour);background:color-mix(in srgb,var(--site-colour) 15%,var(--panel))}
+.pwp-social-icon .mk-ico{width:18px;height:18px}
+.pwp-social-name{font-size:14px;font-weight:600;min-width:0}
+.pwp-check-value{font-size:13px;font-weight:600;text-align:end;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.pwp-status-row .pwp-usage-card{--usage-padding:16px;position:relative;overflow:hidden;padding-inline-end:46px;display:flex;flex-direction:column;gap:10px;background:var(--panel);background:linear-gradient(145deg,var(--panel),color-mix(in srgb,var(--zgz-accent,#3b82f6) 7%,var(--panel)))}
+.pwp-usage-title{display:flex;justify-content:space-between;gap:6px;font-size:12px;color:var(--muted)}
+
+.pwp-usage-body{display:flex;gap:10px;flex:1;align-items:stretch}
+.pwp-usage-values{display:flex;flex-direction:column;justify-content:space-between;gap:8px;flex:1;min-width:0}
+.pwp-usage-value{display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px}
+.pwp-usage-value>span{font-size:11px;color:var(--muted)}
+.pwp-usage-value>strong{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;text-align:end}
+.pwp-usage-up>strong{color:#169c9a}.pwp-usage-down>strong{color:var(--zgz-accent,#3b82f6)}
+.pwp-usage-periods{position:absolute;inset-block:0;inset-inline-end:0;width:31px;display:flex;flex-direction:column;gap:0;align-self:stretch;padding:0;border-radius:0;overflow:visible;background:transparent;isolation:isolate}
+.mk .pwp-usage-periods button{font:inherit;position:relative;font-size:11px;min-width:31px;min-height:32px;flex:1;padding:8px 6px;border:1px solid var(--line);border-inline-end:0;border-radius:9px 0 0 9px;background:linear-gradient(105deg,var(--soft),var(--panel));color:var(--muted);cursor:pointer;white-space:nowrap;margin:0;box-shadow:2px -2px 5px #00000010;z-index:1}
+.mk .pwp-usage-periods button:first-child{border-top:0}.mk .pwp-usage-periods button:last-child{border-bottom:0}.mk .pwp-usage-periods button+button{margin-top:-6px}.mk .pwp-usage-periods button:nth-child(2){z-index:2;background:color-mix(in srgb,var(--zgz-accent,#3b82f6) 6%,var(--panel))}.mk .pwp-usage-periods button:nth-child(3){z-index:3;background:color-mix(in srgb,var(--zgz-accent,#3b82f6) 12%,var(--panel))}
+.mk .pwp-usage-periods button[aria-selected=true]{background:var(--zgz-accent,#3b82f6);color:var(--zgz-on-accent,#fff);font-weight:700;border-color:color-mix(in srgb,var(--zgz-accent,#3b82f6) 70%,var(--line));box-shadow:3px 0 8px #00000022;margin-inline-start:-5px;z-index:5}
+
+.mk[dir=ltr] .pwp-usage-periods button{border-radius:9px 0 0 9px;box-shadow:-2px -2px 5px #00000010}.mk[dir=ltr] .pwp-usage-periods button[aria-selected=true]{box-shadow:-3px 0 8px #00000022}
+@media(max-width:900px){.mk-grid.pwp-status-row{grid-template-columns:repeat(2,minmax(0,1fr))}.pwp-status-row .pwp-social-card{grid-column:1/-1;grid-row:3}.pwp-status-row .pwp-usage-card{grid-column:2;grid-row:2}}
+@media(max-width:420px){.mk .pwp-social-check{grid-template-columns:28px minmax(0,1fr) minmax(65px,auto);padding:7px;gap:7px}.pwp-status-row .pwp-usage-card{--usage-padding:12px;padding:12px;padding-inline-end:42px}.pwp-usage-body{gap:7px}.pwp-usage-value>strong{font-size:17px}}
+@media(pointer:coarse){.mk .pwp-social-check{min-height:44px}.mk .pwp-usage-periods button{min-height:30px}}
+
+.pwp-status-row .pwp-usage-card::before{inset:-1px;border-radius:inherit;z-index:8}
+
+/* Normal left corners, reverse right corners where the tab joins its sheet. */
+.mk .pwp-usage-periods button{--tab-paper:color-mix(in srgb,var(--line) 25%,var(--panel));background:var(--tab-paper);border:0;border-radius:9px 0 0 9px;box-shadow:none;color:var(--muted)}
+.mk .pwp-usage-periods button:nth-child(2){--tab-paper:color-mix(in srgb,var(--line) 18%,var(--panel));background:var(--tab-paper)}
+.mk .pwp-usage-periods button:nth-child(3){--tab-paper:color-mix(in srgb,var(--line) 32%,var(--panel));background:var(--tab-paper)}
+.mk .pwp-usage-periods button[aria-selected=true]{--tab-paper:color-mix(in srgb,var(--zgz-accent,#3b82f6) 18%,var(--panel));background:var(--tab-paper);color:color-mix(in srgb,var(--zgz-accent,#3b82f6) 65%,var(--text));border-color:transparent;box-shadow:none;font-weight:700}
+.mk .pwp-usage-periods button::before,.mk .pwp-usage-periods button::after{content:"";position:absolute;right:0;width:9px;height:9px;pointer-events:none;transform:none}
+.mk .pwp-usage-periods button::before{top:-9px;bottom:auto;background:radial-gradient(circle at top left,transparent 8.5px,var(--tab-paper) 9px)}
+.mk .pwp-usage-periods button::after{top:auto;bottom:-9px;background:radial-gradient(circle at bottom left,transparent 8.5px,var(--tab-paper) 9px)}

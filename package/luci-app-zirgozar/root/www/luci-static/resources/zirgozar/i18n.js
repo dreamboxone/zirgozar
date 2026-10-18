@@ -41,6 +41,15 @@
 var LANG = 'en';
 
 var FA = {
+	'Usage (GB)': 'میزان مصرف (GB)',
+	'N/A': 'ندارد',
+	'Connection checks': 'بررسی اتصال',
+	'Instagram': 'اینستاگرام',
+	'Reddit': 'ردیت',
+	'Upload': 'آپلود',
+	'Total': 'مجموع',
+	'Period': 'بازه',
+	'Last 30 days': '۳۰ روز اخیر',
 	'Use an HTTPS URL. A hostname requires one literal bootstrap IP after a comma; no direct DNS lookup is performed.': 'نشانی HTTPS وارد کنید. برای نام دامنه، یک IP اولیه بعد از ویرگول الزامی است؛ درخواست DNS مستقیم ارسال نمی‌شود.',
 	'A DoH endpoint is required.': 'نشانی سرور DoH الزامی است.',
 	'Invalid HTTPS endpoint.': 'نشانی HTTPS معتبر نیست.',

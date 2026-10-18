@@ -342,7 +342,7 @@ core_log_all_marked() {
 # for a site the tunnel carries is the tunnel, once the router's own lookups
 # go through it.
 method_check() {
-	local input url code t
+	local input url code t port
 	read -r input
 	[ -n "$input" ] || input='{}'
 	json_load "$input" 2>/dev/null
@@ -351,15 +351,20 @@ method_check() {
 		https://*|http://*) : ;;
 		*) json_init; json_add_int "ms" 0; json_dump; return ;;
 	esac
-	t="$(curl -o /dev/null -I -sk --connect-timeout 3 --max-time 6 \
-		-w '%{http_code} %{time_appconnect} %{time_connect}' "$url" 2>/dev/null)" || t=""
+	port="$(cfg node_socks_port 1070)"
+	case "$port" in ''|*[!0-9]*) port=0 ;; esac
+	t=''
+	if [ "$port" -ge 1 ] && [ "$port" -le 65535 ]; then
+		t="$(curl -o /dev/null -sS -L --max-redirs 3 --proto '=http,https' --proto-redir '=http,https' --noproxy '' --socks5-hostname "127.0.0.1:$port" \
+			--connect-timeout 5 --max-time 10 -w '%{http_code} %{time_total}' "$url" 2>/dev/null)" || t=""
+	fi
 	code="${t%% *}"
 	json_init
-	if [ -n "$code" ] && [ "$code" != "000" ]; then
-		json_add_int "ms" "$(printf '%s' "$t" | awk '{ v = ($2 > 0) ? $2 : $3; m = int(v * 1000 + 0.5); if (m < 1) m = 1; print m }')"
-	else
-		json_add_int "ms" 0
-	fi
+	case "$code" in
+		2??|3??) json_add_int "ms" "$(printf '%s' "$t" | awk '{ m = int($2 * 1000 + 0.5); print (m < 1 ? 1 : m) }')" ;;
+		*) json_add_int "ms" 0 ;;
+	esac
+	case "$code" in [1-5][0-9][0-9]) json_add_int "http_code" "$code" ;; esac
 	json_dump
 }
 

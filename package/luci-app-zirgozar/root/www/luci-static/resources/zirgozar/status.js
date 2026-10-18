@@ -6,8 +6,8 @@
  * What is shown at the top of the Basic Settings page, and this
  * program's first page shows the same way: a row of tiles - the core and
  * whether it is running, and three sites to press for a connection check -
- * then what the tunnel is doing and through which node, and at the foot of
- * the page how much has gone through it.
+ * then what the tunnel is doing and through which node. Consumption stays in
+ * the compact card beside the site checks.
  *
  * There is no switch here. The main switch is the one in the form below,
  * saved and applied's is; two switches for one thing is one
@@ -32,7 +32,6 @@ var callCheck   = rpc.declare({ object: 'luci.zirgozar', method: 'check',
 var callAction  = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                 params: [ 'name', 'arg' ], expect: { '': {} } });
 
-var UP = '#f59e0b', DOWN = '#3b82f6';
 
 /* The one message the reader has already read and put away. Kept for as long
    as the page is open, which is exactly as long as it needs to be: a reload
@@ -40,6 +39,69 @@ var UP = '#f59e0b', DOWN = '#3b82f6';
 var dismissed = '';
 var stateRequest = 0;
 var refreshListeners = false;
+var usagePeriod = 'today', usageData = null;
+
+function usageTotals(data, period) {
+	if (!data) return null;
+	if (period !== 'month') return data[period] || null;
+	var days = data.days || [], end = Math.max.apply(null, days.map(function(d) { return Date.parse(d.d + 'T00:00:00Z') || 0; }));
+	if (!(end > 0)) return null;
+	return days.reduce(function(total, d) {
+		var date = Date.parse(d.d + 'T00:00:00Z');
+		if (date >= end - 29 * 86400000 && date <= end) {
+			total.up += Math.max(0, Number(d.up) || 0);
+			total.down += Math.max(0, Number(d.down) || 0);
+		}
+		return total;
+	}, { up: 0, down: 0 });
+}
+
+function renderUsage() {
+	var totals = usageTotals(usageData, usagePeriod);
+	['up', 'down', 'total'].forEach(function(key) {
+		var value = totals ? (key === 'total' ? (Number(totals.up) || 0) + (Number(totals.down) || 0) : Number(totals[key]) || 0) : null;
+		setNode('pwp-usage-' + key, value == null ? '—' : (Math.max(0, value) / 1000000000).toFixed(2));
+	});
+	['today', 'week', 'month'].forEach(function(period) {
+		var button = byId('pwp-period-' + period);
+		if (button) {
+			button.setAttribute('aria-selected', String(period === usagePeriod));
+			button.setAttribute('tabindex', period === usagePeriod ? '0' : '-1');
+		}
+	});
+	var panel = byId('pwp-usage-panel');
+	if (panel) panel.setAttribute('aria-labelledby', 'pwp-period-' + usagePeriod);
+}
+
+function usageCard() {
+	var fa = i18n.get() === 'fa';
+	return E('section', { 'class': 'mk-card pwp-usage-card', 'aria-label': _('Usage (GB)') }, [
+		E('div', { 'class': 'pwp-usage-title' }, _('Usage (GB)')),
+		E('div', { 'class': 'pwp-usage-body' }, [
+			E('div', { 'id': 'pwp-usage-panel', 'role': 'tabpanel', 'aria-labelledby': 'pwp-period-today', 'class': 'pwp-usage-values', 'aria-live': 'polite' }, ['up', 'down', 'total'].map(function(key) {
+				return E('div', { 'class': 'pwp-usage-value pwp-usage-' + key }, [ E('span', {}, _({ up: 'Upload', down: 'Download', total: 'Total' }[key])), E('strong', { 'id': 'pwp-usage-' + key, 'dir': 'ltr' }, '—') ]);
+			})),
+			E('div', { 'class': 'pwp-usage-periods', 'role': 'tablist', 'aria-orientation': 'vertical', 'aria-label': _('Period') }, ['today', 'week', 'month'].map(function(period, index) {
+				return E('button', { 'id': 'pwp-period-' + period, 'type': 'button', 'role': 'tab', 'aria-controls': 'pwp-usage-panel', 'aria-selected': String(index === 0), 'tabindex': index === 0 ? '0' : '-1', 'title': _(['Today', 'Last 7 days', 'Last 30 days'][index]), 'click': function() { usagePeriod = period; renderUsage(); }, 'keydown': function(event) {
+					var periods = ['today', 'week', 'month'], next;
+					if (event.key === 'ArrowDown') next = (index + 1) % 3;
+					else if (event.key === 'ArrowUp') next = (index + 2) % 3;
+					else if (event.key === 'Home') next = 0;
+					else if (event.key === 'End') next = 2;
+					else return;
+					event.preventDefault(); usagePeriod = periods[next]; renderUsage();
+					var target = byId('pwp-period-' + usagePeriod); if (target) target.focus();
+				} }, (fa ? ['۱ر', '۷ر', '۳۰ر'] : ['1d', '1w', '1m'])[index]);
+			}))
+		])
+	]);
+}
+
+function socialCheck(id, name, mark, colour, url) {
+	return E('button', { 'type': 'button', 'id': id, 'class': 'pwp-social-check', 'style': '--site-colour:' + colour, 'click': function() { return check(id, url); } }, [
+		E('span', { 'class': 'pwp-social-icon' }, brand(mark)), E('span', { 'class': 'pwp-social-name' }, name), E('span', { 'class': 'pwp-check-value', 'id': id + '-v' }, _('Touch Check'))
+	]);
+}
 
 /* The three sites' marks, drawn in one colour like every other icon on the
    page - white on the tile's own colour - rather than in their makers'. */
@@ -56,122 +118,6 @@ function brand(name) {
 	var s = E('span', { 'class': 'mk-ico', 'aria-hidden': 'true' });
 	s.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none">' + (BRANDS[name] || '') + '</svg>';
 	return s;
-}
-
-function svg(tag, attrs, children) {
-	var e = document.createElementNS('http://www.w3.org/2000/svg', tag);
-	for (var k in attrs) if (attrs[k] != null) e.setAttribute(k, attrs[k]);
-	(children || []).forEach(function(c) { e.appendChild(c); });
-	return e;
-}
-
-/* A size as its number and its unit, apart - so that the middle of a ring can
-   show the number large and the unit small under it. "1.40 گیگابایت" on one
-   line was wider than the ring. */
-function sizeParts(n) {
-	var t = pui.bytes(n), i = t.indexOf(' ');
-	return i < 0 ? [ t, '' ] : [ t.slice(0, i), t.slice(i + 1) ];
-}
-
-/* A ring split between what went up and what came down, with the total in the
-   middle. Drawn with stroke-dasharray on two arcs of one circle rather than
-   with paths: no arc maths, nothing to get wrong at 0% or 100%, and it scales
-   to whatever size the caller asks for. */
-function donut(title, up, down) {
-	var total = (Number(up) || 0) + (Number(down) || 0);
-	var R = 46, C = 2 * Math.PI * R;
-	var upLen = total > 0 ? (up / total) * C : 0;
-
-	var ring = [
-		svg('circle', {
-			cx: 60, cy: 60, r: R, fill: 'none',
-			stroke: 'currentColor', 'stroke-opacity': '.12', 'stroke-width': 14
-		}),
-		svg('circle', {
-			cx: 60, cy: 60, r: R, fill: 'none', stroke: DOWN, 'stroke-width': 14,
-			'stroke-dasharray': C + ' ' + C, 'stroke-dashoffset': 0,
-			transform: 'rotate(-90 60 60)'
-		}),
-		svg('circle', {
-			cx: 60, cy: 60, r: R, fill: 'none', stroke: UP, 'stroke-width': 14,
-			'stroke-dasharray': upLen + ' ' + C, 'stroke-dashoffset': 0,
-			transform: 'rotate(-90 60 60)'
-		})
-	];
-
-	/* An empty ring must read as "nothing yet" rather than as "all download". */
-	if (total === 0) ring = [ ring[0] ];
-
-	/* Transparent, and it takes an !important to say so: the LuCI theme paints
-	   a background on every svg on the page with rules that are !important
-	   themselves, and an important declaration in a style attribute is the one
-	   thing that outranks them. */
-	var g = svg('svg', { viewBox: '0 0 120 120', width: 120, height: 120,
-	                     style: 'display:block;background-color:transparent!important' }, ring);
-
-	var mid = sizeParts(total);
-
-	return E('div', { 'style': 'text-align:center;flex:1 1 140px;min-width:140px' }, [
-		E('div', { 'style': 'font-size:12px;color:var(--muted);margin-bottom:6px' }, title),
-		E('div', { 'style': 'position:relative;display:inline-block' }, [
-			g,
-			E('div', {
-				'style': 'position:absolute;inset:0;display:flex;flex-direction:column;' +
-				         'align-items:center;justify-content:center;pointer-events:none;line-height:1.15'
-			}, [
-				E('div', { 'style': 'font-size:17px;font-weight:800;direction:ltr' }, mid[0]),
-				E('div', { 'style': 'font-size:10px;font-weight:600;color:var(--muted)' }, mid[1]),
-				E('div', { 'style': 'font-size:9px;color:var(--muted);margin-top:2px' }, _('total'))
-			])
-		]),
-		E('div', { 'style': 'margin-top:6px;font-size:11px;line-height:1.6' }, [
-			E('div', {}, [
-				E('span', { 'style': 'display:inline-block;width:8px;height:8px;border-radius:50%;' +
-				                     'background:' + DOWN + ';margin-inline-end:5px' }),
-				E('span', { 'style': 'color:var(--muted)' }, _('down') + ' '),
-				E('span', { 'style': 'font-weight:700' }, pui.bytes(down))
-			]),
-			E('div', {}, [
-				E('span', { 'style': 'display:inline-block;width:8px;height:8px;border-radius:50%;' +
-				                     'background:' + UP + ';margin-inline-end:5px' }),
-				E('span', { 'style': 'color:var(--muted)' }, _('up') + ' '),
-				E('span', { 'style': 'font-weight:700' }, pui.bytes(up))
-			])
-		])
-	]);
-}
-
-/* The last fortnight, one stacked bar a day. Bars are scaled against the
-   busiest day rather than against a fixed ceiling, so a quiet fortnight is
-   still legible instead of being a row of invisible stubs. */
-function bars(days) {
-	days = (days || []).slice(-14);
-	var max = 1;
-	days.forEach(function(d) { max = Math.max(max, (d.up || 0) + (d.down || 0)); });
-
-	var cols = days.map(function(d) {
-		var t = (d.up || 0) + (d.down || 0);
-		var h = Math.max(2, Math.round((t / max) * 88));
-		var uh = t > 0 ? Math.round((d.up / t) * h) : 0;
-		return E('div', {
-			'style': 'flex:1 1 0;display:flex;flex-direction:column;justify-content:flex-end;' +
-			         'align-items:center;gap:2px;min-width:0',
-			'title': d.d + '  ↓ ' + pui.bytes(d.down) + '  ↑ ' + pui.bytes(d.up)
-		}, [
-			E('div', { 'style': 'width:100%;max-width:22px;display:flex;flex-direction:column;' +
-			                    'justify-content:flex-end;height:' + h + 'px;border-radius:4px;overflow:hidden' }, [
-				E('div', { 'style': 'height:' + uh + 'px;background:' + UP }),
-				E('div', { 'style': 'height:' + (h - uh) + 'px;background:' + DOWN })
-			]),
-			E('div', { 'style': 'font-size:9px;color:var(--muted);white-space:nowrap' }, d.d.slice(8))
-		]);
-	});
-
-	if (!cols.length)
-		return E('div', { 'style': 'color:var(--muted);font-size:12px;padding:12px 0' },
-			_('Nothing recorded yet.'));
-
-	return E('div', { 'style': 'display:flex;align-items:flex-end;gap:4px;height:110px' }, cols);
 }
 
 function badge(st) {
@@ -419,23 +365,8 @@ function updateTickers() {
 }
 
 function renderTraffic(t) {
-	t = t || {};
-	var box = byId('pwp-donuts');
-	if (box) {
-		while (box.firstChild) box.removeChild(box.firstChild);
-		[[ _('Today'), t.today ], [ _('Last 7 days'), t.week ], [ _('This month'), t.month ]]
-			.forEach(function(p) {
-				var v = p[1] || {};
-				box.appendChild(donut(p[0], v.up || 0, v.down || 0));
-			});
-	}
-	var b = byId('pwp-bars');
-	if (b) {
-		while (b.firstChild) b.removeChild(b.firstChild);
-		b.appendChild(bars(t.days));
-	}
-	var d = (t.month || {}).direct_up + (t.month || {}).direct_down;
-	setNode('pwp-direct', d > 0 ? pui.bytes(d) : '-');
+	usageData = t || {};
+	renderUsage();
 }
 
 function refreshState() {
@@ -447,19 +378,23 @@ function refreshState() {
 
 /* The connection check: press the tile, one request, timed. */
 function check(id, url) {
+	var button = byId(id);
+	if (button && button.disabled) return Promise.resolve();
+	if (button) button.disabled = true;
 	var v = byId(id + '-v');
 	if (v) {
-		v.className = 'mk-big mk-wait';
+		v.className = 'pwp-check-value mk-wait';
 		v.textContent = _('Checking…');
 	}
 	return callCheck(url).then(function(r) {
-		var ms = (r && r.ms) || 0;
+		var ms = Number(r && r.ms) || 0;
 		if (!v) return;
-		v.className = 'mk-big ' + (ms > 0 ? (ms < 1000 ? 'mk-on' : ms < 2000 ? 'mk-wait' : 'mk-bad') : 'mk-bad');
-		v.textContent = ms > 0 ? pui.ms(ms) : _('Problem detected!');
+		v.className = 'pwp-check-value ' + (ms > 0 ? (ms < 1000 ? 'mk-on' : ms < 2000 ? 'mk-wait' : 'mk-bad') : 'mk-bad');
+		v.textContent = ms > 0 ? pui.ms(ms) : _('N/A');
+		v.title = r && r.http_code ? 'HTTP ' + r.http_code : '';
 	}).catch(function() {
-		if (v) { v.className = 'mk-big mk-bad'; v.textContent = _('Problem detected!'); }
-	});
+		if (v) { v.className = 'pwp-check-value mk-bad'; v.textContent = _('N/A'); v.title = ''; }
+	}).then(function() { if (button) button.disabled = false; });
 }
 
 return baseclass.extend({
@@ -476,17 +411,18 @@ return baseclass.extend({
 
 	/* Everything for the top of the page, and the traffic for its foot. */
 	render: function(data) {
+		usagePeriod = 'today'; usageData = null;
 		var st = (data && data[0]) || null;
 		var tr = (data && data[1]) || null;
 
 		var tiles = E('div', { 'class': 'mk-grid mk-metrics pwp-status-row', 'style': 'margin-bottom:18px' }, [
 			tile('pwp-core', pui.icon('cpu'), '#3b82f6', _('Core'), '-'),
-			tile('pwp-chk-ig', brand('instagram'), '#e1306c', _('Instagram Connection'), _('Touch Check'),
-				function() { check('pwp-chk-ig', 'https://www.instagram.com'); }),
-			tile('pwp-chk-reddit', brand('reddit'), '#ff4500', _('Reddit Connection'), _('Touch Check'),
-				function() { check('pwp-chk-reddit', 'https://www.reddit.com'); }),
-			tile('pwp-chk-x', brand('x'), '#334155', _('X Connection'), _('Touch Check'),
-				function() { check('pwp-chk-x', 'https://x.com'); })
+			E('section', { 'class': 'mk-card pwp-social-card', 'aria-label': _('Connection checks') }, [
+				socialCheck('pwp-chk-ig', _('Instagram'), 'instagram', '#df458e', 'https://www.instagram.com'),
+				socialCheck('pwp-chk-reddit', _('Reddit'), 'reddit', '#ec693c', 'https://www.reddit.com'),
+				socialCheck('pwp-chk-x', 'X', 'x', '#329dc2', 'https://x.com')
+			]),
+			usageCard()
 		]);
 
 		var status = pui.card(_('Status'), 'pulse', '#10b981', E('div', {}, [
@@ -533,20 +469,6 @@ return baseclass.extend({
 		status.querySelector('.mk-card-title').appendChild(E('span', { 'id': 'pwp-state', 'style': 'font-size:13px;white-space:nowrap' }, '-'));
 		tiles.insertBefore(status, tiles.firstChild);
 
-		var traffic = pui.card(_('Traffic through the tunnel'), 'chart', '#3b82f6', E('div', {}, [
-			E('div', {
-				'id': 'pwp-donuts',
-				'style': 'display:flex;gap:14px;flex-wrap:wrap;justify-content:space-around;margin-bottom:18px'
-			}, []),
-			E('div', { 'style': 'font-size:12px;color:var(--muted);margin-bottom:6px' }, _('Last 14 days')),
-			/* Left to right whatever the language: these are days in order. */
-			E('div', { 'id': 'pwp-bars', 'dir': 'ltr' }, []),
-			E('div', { 'style': 'margin-top:12px;font-size:12px;color:var(--muted)' }, [
-				E('span', {}, _('Sent straight out this month (not tunnelled): ')),
-				E('span', { 'id': 'pwp-direct', 'style': 'font-weight:600' }, '-')
-			])
-		]));
-
 		poll.add(refreshState, 3);
 		if (!refreshListeners) {
 			refreshListeners = true;
@@ -563,7 +485,7 @@ return baseclass.extend({
 
 		/* Filled in now, in the pieces themselves. */
 		if (st) {
-			scope = [ tiles, status, traffic ];
+			scope = [ tiles, status ];
 			renderState(st);
 			renderTraffic(tr || {});
 			scope = null;
@@ -581,6 +503,6 @@ return baseclass.extend({
 			})();
 		}
 
-		return { top: [ tiles ], bottom: statsOn ? [ traffic ] : [], version: st ? st.version : null };
+		return { top: [ tiles ], bottom: [], version: st ? st.version : null };
 	}
 });
