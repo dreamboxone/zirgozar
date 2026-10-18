@@ -5,8 +5,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zirgozar
-PKG_VERSION:=5.7.25
-PKG_RELEASE:=5
+PKG_VERSION:=5.7.26
+PKG_RELEASE:=1
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
 PKG_LICENSE:=AGPL-3.0-or-later

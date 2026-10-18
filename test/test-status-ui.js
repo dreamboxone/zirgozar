@@ -21,7 +21,7 @@ function element(tag, attrs, children) {
 	return el;
 }
 let language = 'fa', requests = 0, finish;
-const api = new Function('rpc', 'i18n', 'pui', 'E', 'document', 'Node', source.slice(0, source.indexOf('\nreturn baseclass.extend(')) + '\nreturn {usageTotals, usageCard, socialCheck, check, setScope: function(nodes) {scope=nodes;}, setTraffic: function(data) {usageData=data;renderUsage();}};')(
+const api = new Function('rpc', 'i18n', 'pui', 'E', 'document', 'Node', source.slice(0, source.indexOf('\nreturn baseclass.extend(')) + '\nreturn {usageTotals, usageCard, socialCheck, check, setEnabled: function(value) {usageEnabled=value;renderUsage();}, setScope: function(nodes) {scope=nodes;}, setTraffic: function(data) {usageData=data;renderUsage();}};')(
 	{ declare: spec => spec.method === 'check' ? () => { requests++; return new Promise(resolve => { finish = resolve; }); } : () => Promise.resolve({}) },
 	{ tr: value => value, get: () => language }, { ms: value => value + ' ms' }, element, { getElementById: () => null, createTextNode: text => ({textContent:text}) }, class Node {}
 );
@@ -40,6 +40,11 @@ usage.querySelector('#pwp-period-month').attrs.click();
 assert.equal(usage.querySelector('#pwp-usage-total').textContent, '8.00');
 api.setTraffic(null); assert.equal(usage.querySelector('#pwp-usage-total').textContent, '—');
 assert.equal(usage.querySelector('#pwp-period-month').textContent, '۳۰ر');
+api.setEnabled(false);
+for (const key of ['up','down','total']) assert.equal(usage.querySelector('#pwp-usage-' + key).textContent, 'Disabled');
+assert.equal(usage.querySelector('#pwp-period-month').disabled, true);
+api.setEnabled(true);
+assert.equal(usage.querySelector('#pwp-period-month').disabled, false);
 language = 'en'; assert.equal(api.usageCard().querySelector('#pwp-period-month').textContent, '1m');
 const social = api.socialCheck('site', 'Instagram', 'instagram', '#df458e', 'https://www.instagram.com'); api.setScope([social]);
 const pending = social.attrs.click(); social.attrs.click(); assert.equal(requests, 1); assert.equal(social.disabled, true);

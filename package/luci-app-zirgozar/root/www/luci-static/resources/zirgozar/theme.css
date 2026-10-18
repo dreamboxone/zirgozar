@@ -699,3 +699,5 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 .mk .pwp-usage-periods button::before,.mk .pwp-usage-periods button::after{content:"";position:absolute;right:0;width:9px;height:9px;pointer-events:none;transform:none}
 .mk .pwp-usage-periods button::before{top:-9px;bottom:auto;background:radial-gradient(circle at top left,transparent 8.5px,var(--tab-paper) 9px)}
 .mk .pwp-usage-periods button::after{top:auto;bottom:-9px;background:radial-gradient(circle at bottom left,transparent 8.5px,var(--tab-paper) 9px)}
+
+.pwp-usage-card[data-enabled=false] .pwp-usage-value>strong{font-size:12px;color:var(--muted)}.mk .pwp-usage-periods button:disabled{cursor:default;opacity:.6}

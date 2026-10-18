@@ -39,7 +39,7 @@ var callAction  = rpc.declare({ object: 'luci.zirgozar', method: 'action',
 var dismissed = '';
 var stateRequest = 0;
 var refreshListeners = false;
-var usagePeriod = 'today', usageData = null;
+var usagePeriod = 'today', usageData = null, usageEnabled = true;
 
 function usageTotals(data, period) {
 	if (!data) return null;
@@ -57,14 +57,17 @@ function usageTotals(data, period) {
 }
 
 function renderUsage() {
-	var totals = usageTotals(usageData, usagePeriod);
+	var totals = usageEnabled ? usageTotals(usageData, usagePeriod) : null;
+	var card = byId('pwp-usage-card');
+	if (card) card.setAttribute('data-enabled', String(usageEnabled));
 	['up', 'down', 'total'].forEach(function(key) {
 		var value = totals ? (key === 'total' ? (Number(totals.up) || 0) + (Number(totals.down) || 0) : Number(totals[key]) || 0) : null;
-		setNode('pwp-usage-' + key, value == null ? '—' : (Math.max(0, value) / 1000000000).toFixed(2));
+		setNode('pwp-usage-' + key, !usageEnabled ? _('Disabled') : value == null ? '—' : (Math.max(0, value) / 1000000000).toFixed(2));
 	});
 	['today', 'week', 'month'].forEach(function(period) {
 		var button = byId('pwp-period-' + period);
 		if (button) {
+			button.disabled = !usageEnabled;
 			button.setAttribute('aria-selected', String(period === usagePeriod));
 			button.setAttribute('tabindex', period === usagePeriod ? '0' : '-1');
 		}
@@ -75,7 +78,7 @@ function renderUsage() {
 
 function usageCard() {
 	var fa = i18n.get() === 'fa';
-	return E('section', { 'class': 'mk-card pwp-usage-card', 'aria-label': _('Usage (GB)') }, [
+	return E('section', { 'id': 'pwp-usage-card', 'class': 'mk-card pwp-usage-card', 'aria-label': _('Usage (GB)') }, [
 		E('div', { 'class': 'pwp-usage-title' }, _('Usage (GB)')),
 		E('div', { 'class': 'pwp-usage-body' }, [
 			E('div', { 'id': 'pwp-usage-panel', 'role': 'tabpanel', 'aria-labelledby': 'pwp-period-today', 'class': 'pwp-usage-values', 'aria-live': 'polite' }, ['up', 'down', 'total'].map(function(key) {
@@ -262,6 +265,10 @@ function coreTile(id, word, name, version, running) {
 }
 
 function renderState(st) {
+	if (st && st.stats_enabled != null) {
+		usageEnabled = st.stats_enabled !== false;
+		renderUsage();
+	}
 	window.requestAnimationFrame(updateTickers);
 	st = st || {};
 	setNode('pwp-version', pui.versionText(st.version));
@@ -414,6 +421,7 @@ return baseclass.extend({
 		usagePeriod = 'today'; usageData = null;
 		var st = (data && data[0]) || null;
 		var tr = (data && data[1]) || null;
+		usageEnabled = st ? st.stats_enabled !== false : uci.get('zirgozar', 'config', 'stats_enabled') != '0';
 
 		var tiles = E('div', { 'class': 'mk-grid mk-metrics pwp-status-row', 'style': 'margin-bottom:18px' }, [
 			tile('pwp-core', pui.icon('cpu'), '#3b82f6', _('Core'), '-'),
@@ -478,7 +486,7 @@ return baseclass.extend({
 			});
 		}
 		/* Traffic moves in five-minute steps. */
-		var statsOn = st ? st.stats_enabled !== false : uci.get('zirgozar', 'config', 'stats_enabled') != '0';
+		var statsOn = usageEnabled;
 		if (statsOn) poll.add(function() {
 			return callTraffic().then(renderTraffic).catch(function() {});
 		}, 15);

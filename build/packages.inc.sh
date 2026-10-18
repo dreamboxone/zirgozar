@@ -7,8 +7,8 @@
 # packages.inc.sh - what goes into a package, shared by the .apk and .ipk
 # builders so the two formats can never drift apart.
 
-VERSION=5.7.25
-RELEASE=5
+VERSION=5.7.26
+RELEASE=1
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
