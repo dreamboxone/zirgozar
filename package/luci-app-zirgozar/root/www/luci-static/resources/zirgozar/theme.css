@@ -645,7 +645,8 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 	box-shadow:none!important;transform:none!important;font-weight:var(--zgz-button-weight,500)!important;
 }
 :is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal,body.pwp-follow .cbi-page-actions) :is(.cbi-button-neutral,.cbi-button-default){background:var(--zgz-control-bg)!important;color:var(--zgz-text)!important;border-color:var(--zgz-control-line)!important}
-:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal,body.pwp-follow .cbi-page-actions) :is(.cbi-button-remove,.cbi-button-negative,.cbi-button-reset){background:var(--danger-surface,var(--error-color-low,#ffe8e6))!important;color:var(--danger,var(--error-color-high,#a82b35))!important}
+/* Host themes do not consistently pair their danger surface and text tokens. */
+:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal,body.pwp-follow .cbi-page-actions) :is(.cbi-button-remove,.cbi-button-negative,.cbi-button-reset,.mk-btn.danger){background:#a82b35!important;color:#fff!important;border-color:transparent!important;text-shadow:none}
 @media(max-width:700px){
 	.mk.mk-follow .mk-hero{padding:8px 0 16px;gap:12px}
 	.mk.mk-follow :is(.mk-card,.cbi-section){padding:16px!important}
@@ -701,3 +702,24 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 .mk .pwp-usage-periods button::after{top:auto;bottom:-9px;background:radial-gradient(circle at bottom left,transparent 8.5px,var(--tab-paper) 9px)}
 
 .pwp-usage-card[data-enabled=false] .pwp-usage-value>strong{font-size:12px;color:var(--muted)}.mk .pwp-usage-periods button:disabled{cursor:default;opacity:.6}
+
+/* Reserve the tab rail even when the LuCI theme supplies card padding. */
+.mk.mk-follow .pwp-status-row .pwp-usage-card{padding-inline-end:46px!important}
+.pwp-status-row>*,.pwp-usage-body,.pwp-social-card{min-width:0}
+.pwp-usage-title,.pwp-usage-value>span{overflow-wrap:anywhere}
+@media(max-width:700px){
+	.mk .mk-tabs{max-width:100%;min-width:0}
+	.mk .mk-hero-controls{max-width:100%;flex-wrap:wrap}
+	.mk .mk-alert{overflow-wrap:anywhere;min-width:0}
+}
+@media(max-width:600px){
+	.mk-grid.pwp-status-row{grid-template-columns:minmax(0,1fr);gap:12px}
+	.pwp-status-row .pwp-status-card,.pwp-status-row .pwp-social-card,.pwp-status-row .pwp-usage-card{grid-column:1;grid-row:auto}
+	.pwp-status-row .pwp-usage-card{min-height:210px;padding-inline-end:50px}
+	.mk.mk-follow .pwp-status-row .pwp-usage-card{padding-inline-end:50px!important}
+	.pwp-usage-values{gap:16px}
+	.pwp-usage-value>strong{font-size:20px;white-space:nowrap;overflow-wrap:normal}
+	.pwp-usage-value>span{font-size:12px}
+	.pwp-usage-periods{width:36px}
+	.mk .pwp-usage-periods button{min-width:36px}
+}
