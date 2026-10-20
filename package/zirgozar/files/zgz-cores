@@ -274,7 +274,11 @@ install_xray_patterniha() {
 	_want="$(curl -fsSL --connect-timeout 15 --max-time 60 "$_url.dgst" 2>/dev/null |
 		sed -n 's/^SHA2-256=[[:space:]]*\([0-9a-fA-F]\{64\}\).*/\1/p' | head -1 | tr 'A-F' 'a-f')"
 	_got="$(sha256sum "$_zip" 2>/dev/null | awk '{ print $1 }')"
-	if [ -n "$_want" ] && [ "$_want" != "$_got" ]; then
+	if [ "${#_want}" != 64 ]; then
+		say_message "The release checksum could not be retrieved or is invalid. Nothing was installed."
+		return 1
+	fi
+	if [ "$_want" != "$_got" ]; then
 		rm -f "$_zip"
 		say_message "The Xray download does not match its published checksum - nothing was installed."
 		warn "xray-patterniha: SHA-256 $_got, the release says $_want"
@@ -422,9 +426,14 @@ install_sslocal() {
 		return 1
 	}
 	if ! command -v xz >/dev/null 2>&1; then
-		case "$(ovpn_pkg_manager)" in
-			apk)  apk update >/dev/null 2>&1 || true; apk add xz >/dev/null 2>&1 || true ;;
-			opkg) opkg update >/dev/null 2>&1 || true; opkg install xz >/dev/null 2>&1 || true ;;
+		_xpm="$(ovpn_pkg_manager)"
+		_xlog="$ZGZ_RUN/xz-install.log"
+		: > "$_xlog"
+		[ "$_xpm" != none ] || { say_message "xz is needed to unpack shadowsocks-rust and could not be installed from the router's packages."; return 1; }
+		pkg_refresh "$_xpm" "$_xlog" || return 1
+		case "$_xpm" in
+			apk) bounded 180 apk add xz >>"$_xlog" 2>&1 || { pkg_failure "$_xlog"; return 1; } ;;
+			opkg) bounded 180 opkg install xz >>"$_xlog" 2>&1 || { pkg_failure "$_xlog"; return 1; } ;;
 		esac
 		command -v xz >/dev/null 2>&1 || {
 			say_message "xz is needed to unpack shadowsocks-rust and could not be installed from the router's packages."
@@ -443,7 +452,11 @@ install_sslocal() {
 	_want="$(curl -fsSL --connect-timeout 15 --max-time 60 "$_url.sha256" 2>/dev/null |
 		awk 'NR == 1 && $1 ~ /^[0-9a-fA-F]+$/ { print tolower($1) }')"
 	_got="$(sha256sum "$_txz" 2>/dev/null | awk '{ print $1 }')"
-	if [ -n "$_want" ] && [ "$_want" != "$_got" ]; then
+	if [ "${#_want}" != 64 ]; then
+		say_message "The release checksum could not be retrieved or is invalid. Nothing was installed."
+		return 1
+	fi
+	if [ "$_want" != "$_got" ]; then
 		rm -f "$_txz"
 		say_message "The shadowsocks-rust download does not match its published checksum - nothing was installed."
 		return 1
@@ -501,13 +514,16 @@ install_warpplus() {
 	_want="$(curl -fsSL --connect-timeout 15 --max-time 60 "$_url.dgst" 2>/dev/null |
 		sed -n 's/^SHA2-256=[[:space:]]*\([0-9a-fA-F]\{64\}\).*/\1/p' | head -1 | tr 'A-F' 'a-f')"
 	_got="$(sha256sum "$_zip" 2>/dev/null | awk '{ print $1 }')"
-	if [ -n "$_want" ] && [ "$_want" != "$_got" ]; then
+	if [ "${#_want}" != 64 ]; then
+		say_message "The release checksum could not be retrieved or is invalid. Nothing was installed."
+		return 1
+	fi
+	if [ "$_want" != "$_got" ]; then
 		rm -f "$_zip"
 		say_message "The $_wk download does not match its published checksum - nothing was installed."
 		warn "$_wk: SHA-256 $_got, the release says $_want"
 		return 1
 	fi
-	[ -n "$_want" ] || log "$_wk: the checksum file could not be read - installed on the size check alone"
 
 	rm -rf "$ZGZ_RUN/xtract"
 	mkdir -p "$ZGZ_RUN/xtract"
@@ -691,51 +707,23 @@ ovpn_latest() {
 }
 
 install_openvpn() {
+	local manager file rc=0
 	_op="$(ovpn_pkg)"
 	_had="$(openvpn_path)"
-	case "$(ovpn_pkg_manager)" in
-		apk)
-			# OpenVPN needs a kernel module; see ensure_kmods_feed.
-			ensure_kmods_feed || true
-			apk update >/dev/null 2>&1 || true
-			if [ -n "$_had" ]; then apk add -u "$_op" >"$ZGZ_RUN/ovpn-install.log" 2>&1
-			else apk add "$_op" >"$ZGZ_RUN/ovpn-install.log" 2>&1; fi
-			;;
-		opkg)
-			opkg update >/dev/null 2>&1 || true
-			if [ -n "$_had" ]; then opkg upgrade "$_op" >"$ZGZ_RUN/ovpn-install.log" 2>&1
-			else opkg install "$_op" >"$ZGZ_RUN/ovpn-install.log" 2>&1; fi
-			;;
-		*)
-			say_message "This router has neither opkg nor apk, so OpenVPN cannot be installed automatically."
-			return 1
-			;;
+	manager="$(ovpn_pkg_manager)"; file="$ZGZ_RUN/ovpn-install.log"
+	: > "$file"
+	[ "$manager" != none ] || { say_message "This router has neither opkg nor apk, so OpenVPN cannot be installed automatically."; return 1; }
+	if [ "$manager" = apk ]; then ensure_kmods_feed >>"$file" 2>&1 || return 1; fi
+	pkg_refresh "$manager" "$file" || return 1
+	case "$manager" in
+		apk) if [ -n "$_had" ]; then bounded 180 apk add -u "$_op" >>"$file" 2>&1 || rc=$?
+		     else bounded 180 apk add "$_op" >>"$file" 2>&1 || rc=$?; fi ;;
+		opkg) if [ -n "$_had" ]; then bounded 180 opkg upgrade "$_op" >>"$file" 2>&1 || rc=$?
+		      else bounded 180 opkg install "$_op" >>"$file" 2>&1 || rc=$?; fi ;;
 	esac
-	if [ -z "$(openvpn_path)" ]; then
-		# OpenVPN 2.7 needs a kernel module. Kernel modules come from one
-		# package source of their own, kmods, made for this kernel only - and
-		# some third-party install scripts are known to leave that line out of
-		# the list, after which no kernel module can be installed at all. The
-		# package manager's own words for it, "required by: openvpn-…
-		# [kmod-ovpn-backports]", tell nobody any of this, so it is said
-		# here: the line missing, with the exact line to put back; or the
-		# line there and the module still not, which is the firmware.
-		if grep -q 'kmod-' "$ZGZ_RUN/ovpn-install.log" 2>/dev/null; then
-			_km="$(grep -o 'kmod-[A-Za-z0-9_-]*' "$ZGZ_RUN/ovpn-install.log" | sort -u | tr '\n' ' ')"
-			if [ "$(ovpn_pkg_manager)" = apk ] && ! grep -qs '/kmods/' /etc/apk/repositories /etc/apk/repositories.d/*.list; then
-				_kl="$(kmods_feed)"
-				say_message "OpenVPN could not be installed: the official source of kernel modules (kmods) is missing from this router's package sources, so no kernel module can be installed. The line to add is on the Runtime Logs page."
-				warn "OpenVPN: ${_km}cannot be installed - the kmods line is missing from /etc/apk/repositories.d/distfeeds.list"
-				if [ -n "$_kl" ]; then
-					warn "add this line to /etc/apk/repositories.d/distfeeds.list, then press Install again: $_kl"
-				fi
-			else
-				say_message "OpenVPN could not be installed: a kernel module it needs is not available for this router's firmware. Update the firmware to the latest official OpenWrt release."
-				warn "OpenVPN: ${_km}is not available for this firmware's kernel ($(uname -r))"
-			fi
-		else
-			say_message "OpenVPN could not be installed: $(tail -1 "$ZGZ_RUN/ovpn-install.log" 2>/dev/null | cut -c1-160)"
-		fi
+	if [ "$rc" != 0 ]; then pkg_failure "$file"; return 1; fi
+	if [ -z "$(openvpn_path)" ] || ! /usr/sbin/openvpn --version >>"$file" 2>&1; then
+		say_message "OpenVPN was installed but its executable did not pass verification. See the installation log."
 		return 1
 	fi
 	log "OpenVPN $(core_version /usr/sbin/openvpn) installed ($_op)"
@@ -749,16 +737,20 @@ haproxy_path() {
 }
 
 install_haproxy() {
-	case "$(ovpn_pkg_manager)" in
-		apk)  apk update >/dev/null 2>&1 || true; apk add haproxy >"$ZGZ_RUN/lb-install.log" 2>&1 ;;
-		opkg) opkg update >/dev/null 2>&1 || true; opkg install haproxy >"$ZGZ_RUN/lb-install.log" 2>&1 ;;
-		*) say_message "This router has neither opkg nor apk, so HAProxy cannot be installed automatically."; return 1 ;;
+	local manager file="$ZGZ_RUN/lb-install.log" rc=0
+	manager="$(ovpn_pkg_manager)"
+	: > "$file"
+	[ "$manager" != none ] || { say_message "This router has neither opkg nor apk, so HAProxy cannot be installed automatically."; return 1; }
+	pkg_refresh "$manager" "$file" || return 1
+	case "$manager" in
+		apk) bounded 180 apk add haproxy >>"$file" 2>&1 || rc=$? ;;
+		opkg) bounded 180 opkg install haproxy >>"$file" 2>&1 || rc=$? ;;
 	esac
-	if [ -z "$(haproxy_path)" ]; then
-		say_message "HAProxy could not be installed: $(tail -1 "$ZGZ_RUN/lb-install.log" 2>/dev/null | cut -c1-160)"
+	if [ "$rc" != 0 ]; then pkg_failure "$file"; return 1; fi
+	if [ -z "$(haproxy_path)" ] || ! /usr/sbin/haproxy -v >>"$file" 2>&1; then
+		say_message "HAProxy was installed but its executable did not pass verification. See the installation log."
 		return 1
 	fi
-	# Installed for this program, which runs it itself.
 	/etc/init.d/haproxy disable >/dev/null 2>&1 || true
 	/etc/init.d/haproxy stop >/dev/null 2>&1 || true
 	log "HAProxy $(core_version /usr/sbin/haproxy) installed"
@@ -1279,6 +1271,9 @@ cmd_remove() {
 case "${1:-list}" in
 	list) cmd_list_cached ;;
 	install)
+		pkg_lock || exit 1
+		trap pkg_unlock EXIT
+		trap 'exit 1' INT TERM
 		# What an install has to say is said on App Update, under what was
 		# being installed - not on the Status card, which is for the tunnel
 		# and was left saying "Download failed" over a working connection.
@@ -1321,7 +1316,7 @@ case "${1:-list}" in
 		exit "$_rc"
 		;;
 	# What is installed has changed: the kept list is no longer true.
-	remove) ZGZ_MESSAGE="$ZGZ_RUN/install-message"; clear_message; rm -f "$ZGZ_RUN/cores.list"; cmd_remove "${2:-}" ;;
+	remove) pkg_lock || exit 1; trap pkg_unlock EXIT; ZGZ_MESSAGE="$ZGZ_RUN/install-message"; clear_message; rm -f "$ZGZ_RUN/cores.list"; cmd_remove "${2:-}" ;;
 	latest) cmd_latest "${2:-}" ;;
 	*) echo "usage: $0 list|install <core>|remove <core>|latest [force]" >&2; exit 1 ;;
 esac

@@ -1,0 +1,159 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+# Part of Zirgozar - https://github.com/dreamboxone/zirgozar
+
+set -e
+
+. "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
+LED_ROOT="${ZGZ_LED_ROOT:-/sys/class/leds}"
+SAVE="$ZGZ_RUN/led-saved"
+
+# Only combine channels belonging to the same RGB indicator. Unrelated
+# single-colour power, Ethernet and storage LEDs must never be repurposed.
+detect() {
+	RED= GREEN= BLUE= GROUP= BLINK=0
+	for d in "$LED_ROOT"/*; do
+		[ -d "$d" ] || continue
+		n="${d##*/}"
+		lower="$(printf '%s' "$n" | tr 'A-Z' 'a-z')"
+		case "$lower" in
+			*:red|*_red|*-red) prefix="${lower%red}"; green_name="${prefix}green"; blue_name="${prefix}blue"; group="${prefix}rgb" ;;
+			red:*) suffix="${lower#red}"; green_name="green${suffix}"; blue_name="blue${suffix}"; group="rgb${suffix}" ;;
+			*:red:*) prefix="${lower%%:red:*}"; suffix="${lower#*:red:}"; green_name="$prefix:green:$suffix"; blue_name="$prefix:blue:$suffix"; group="$prefix:rgb:$suffix" ;;
+			*) continue ;;
+		esac
+		r="$d"; g=; b=
+		for candidate in "$LED_ROOT"/*; do
+			name="$(printf '%s' "${candidate##*/}" | tr 'A-Z' 'a-z')"
+			case "$name" in "$green_name") g="$candidate" ;; "$blue_name") b="$candidate" ;; esac
+		done
+		[ -n "$g" ] && [ -n "$b" ] || continue
+		valid=1; blink=1
+		for c in "$r" "$g" "$b"; do
+			[ -w "$c/brightness" ] && [ -w "$c/trigger" ] && [ -r "$c/max_brightness" ] || valid=0
+			grep -qw timer "$c/trigger" 2>/dev/null || blink=0
+		done
+		[ "$valid" = 1 ] || continue
+		[ "$(cat "$r/max_brightness")" -gt 1 ] && [ "$(cat "$g/max_brightness")" -gt 1 ] || continue
+		RED="$r"; GREEN="$g"; BLUE="$b"; GROUP="$group"; BLINK="$blink"
+		return 0
+	done
+	return 1
+}
+
+status() {
+	if detect; then
+		printf '{"supported":true,"blink":%s,"indicator":"%s"}\n' "$([ "$BLINK" = 1 ] && echo true || echo false)" "$(json_escape "$GROUP")"
+	else
+		printf '{"supported":false,"blink":false}\n'
+	fi
+}
+
+snapshot() {
+	[ -d "$SAVE" ] && return 0
+	mkdir -p "$SAVE.new" || return 1
+	for channel in "$RED" "$GREEN" "$BLUE"; do
+		name="${channel##*/}"
+		mkdir -p "$SAVE.new/$name" || return 1
+		cat "$channel/brightness" > "$SAVE.new/$name/brightness"
+		sed -n 's/.*\[\([^]]*\)\].*/\1/p' "$channel/trigger" > "$SAVE.new/$name/trigger"
+		for attr in delay_on delay_off; do
+			[ ! -f "$channel/$attr" ] || cat "$channel/$attr" > "$SAVE.new/$name/$attr"
+		done
+	done
+	mv "$SAVE.new" "$SAVE"
+}
+
+restore() {
+	[ -d "$SAVE" ] || return 0
+	for saved in "$SAVE"/*; do
+		[ -d "$saved" ] || continue
+		channel="$LED_ROOT/${saved##*/}"
+		[ -w "$channel/trigger" ] || continue
+		echo none > "$channel/trigger"
+		cat "$saved/brightness" > "$channel/brightness"
+		trigger="$(cat "$saved/trigger")"
+		[ -z "$trigger" ] || printf '%s\n' "$trigger" > "$channel/trigger"
+		for attr in delay_on delay_off; do
+			[ ! -f "$saved/$attr" ] || cat "$saved/$attr" > "$channel/$attr"
+		done
+	done
+	if [ "$LED_ROOT" = /sys/class/leds ] && [ -x /etc/init.d/led ]; then
+		/etc/init.d/led reload >/dev/null 2>&1 || true
+	fi
+	rm -f "$SAVE"/*/brightness "$SAVE"/*/trigger "$SAVE"/*/delay_on "$SAVE"/*/delay_off
+	rmdir "$SAVE"/* "$SAVE" 2>/dev/null || true
+}
+
+thresholds() {
+	G="$(cfg led_green_ms 200)"; Y="$(cfg led_yellow_ms 300)"
+	O="$(cfg led_orange_ms 500)"; R="$(cfg led_red_ms 1000)"
+	for v in "$G" "$Y" "$O" "$R"; do
+		case "$v" in ''|*[!0-9]*) return 1 ;; esac
+		[ "$v" -ge 1 ] && [ "$v" -le 60000 ] || return 1
+	done
+	[ "$G" -lt "$Y" ] && [ "$Y" -lt "$O" ] && [ "$O" -lt "$R" ]
+	return $?
+}
+
+colour() {
+	case "$1" in ''|*[!0-9]*) echo off; return ;; esac
+	if [ "$1" -eq 0 ] || [ "$1" -gt "$R" ]; then echo off
+	elif [ "$1" -ge "$O" ]; then echo red
+	elif [ "$1" -ge "$Y" ]; then echo orange
+	elif [ "$1" -ge "$G" ]; then echo yellow
+	else echo green; fi
+}
+
+apply_colour() {
+	for channel in "$RED" "$GREEN" "$BLUE"; do echo none > "$channel/trigger"; echo 0 > "$channel/brightness"; done
+	rmax="$(cat "$RED/max_brightness")"; gmax="$(cat "$GREEN/max_brightness")"
+	case "$1" in
+		red) rv="$rmax"; gv=0 ;;
+		orange) rv="$rmax"; gv=$((gmax / 4)) ;;
+		yellow) rv="$rmax"; gv="$gmax" ;;
+		green) rv=0; gv="$gmax" ;;
+		*) return 0 ;;
+	esac
+	# Binary channels cannot produce the two mixed shades reliably.
+	[ "$1" != orange ] || [ "$gv" -gt 0 ] || gv=1
+	printf '%s\n' "$rv" > "$RED/brightness"
+	printf '%s\n' "$gv" > "$GREEN/brightness"
+	if [ "$(cfg "led_${1}_mode" steady)" = blink ] && [ "$BLINK" = 1 ]; then
+		for channel in "$RED" "$GREEN"; do
+			[ "$(cat "$channel/brightness")" -gt 0 ] || continue
+			echo timer > "$channel/trigger"
+			echo 500 > "$channel/delay_on"; echo 500 > "$channel/delay_off"
+		done
+	fi
+}
+
+run() {
+	[ "$(cfg_bool led_enabled 0)" = 1 ] || { restore; return 0; }
+	detect && thresholds || { restore; return 1; }
+	# Orange and yellow need independently dimmable red and green channels.
+	[ "$(cat "$RED/max_brightness")" -gt 1 ] && [ "$(cat "$GREEN/max_brightness")" -gt 1 ] || return 1
+	snapshot || return 1
+	trap 'exit 0' INT TERM
+	trap restore EXIT
+	last=
+	while [ "$(cfg_bool led_enabled 0)" = 1 ]; do
+		ms=0
+		if [ "$(cat "$ZGZ_STATUS" 2>/dev/null)" = ready ] && tunnel_running; then
+			identity="$(exit_identity)" || identity=
+			ms="$("$ZGZ_LIB/zgz-test" live 2>/dev/null)" || ms=0
+			[ "$identity" = "$(exit_identity)" ] || ms=0
+		fi
+		next="$(colour "$ms")"
+		[ "$next" = "$last" ] || { apply_colour "$next"; last="$next"; }
+		sleep 15 & wait $!
+	done
+}
+
+case "${1:-status}" in
+	status) status ;;
+	run) run ;;
+	restore) restore ;;
+	*) exit 1 ;;
+esac

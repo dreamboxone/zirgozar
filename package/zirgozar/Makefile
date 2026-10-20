@@ -6,7 +6,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zirgozar
 PKG_VERSION:=5.7.28
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
 PKG_LICENSE:=AGPL-3.0-or-later
@@ -16,7 +16,7 @@ include $(INCLUDE_DIR)/package.mk
 # Kept in step with build/packages.inc.sh, which is what the release builds
 # use. A helper that reaches one of them and not the other is a helper that
 # is missing on exactly half of the installations.
-ZGZ_SCRIPTS:=zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-dns-local zgz-stats zgz-test zgz-geo zgz-cores zgz-deps zgz-bridge zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-l2tp zgz-l2tpconfig zgz-pppvpn zgz-ikev2 zgz-ikev2config zgz-lb
+ZGZ_SCRIPTS:=zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-dns-local zgz-stats zgz-led zgz-test zgz-geo zgz-cores zgz-deps zgz-bridge zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-l2tp zgz-l2tpconfig zgz-pppvpn zgz-ikev2 zgz-ikev2config zgz-lb
 
 define Package/zirgozar
   SECTION:=net
@@ -55,6 +55,7 @@ define Package/zirgozar/install
 
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/zirgozar.init $(1)/etc/init.d/zirgozar
+	$(INSTALL_BIN) ./files/zirgozar-led.init $(1)/etc/init.d/zirgozar-led
 	$(INSTALL_BIN) ./files/zirgozar-dns.init $(1)/etc/init.d/zirgozar-dns
 	$(INSTALL_BIN) ./files/zirgozar-server.init $(1)/etc/init.d/zirgozar-server
 	$(INSTALL_BIN) ./files/zirgozar-killswitch.init $(1)/etc/init.d/zirgozar-killswitch
@@ -188,6 +189,8 @@ if ! ubus list 2>/dev/null | grep -q '^luci.zirgozar$$'; then
 fi
 # Always in the boot sequence; the main switch decides whether it runs.
 /etc/init.d/zirgozar enable >/dev/null 2>&1
+/etc/init.d/zirgozar-led enable >/dev/null 2>&1
+/etc/init.d/zirgozar-led restart >/dev/null 2>&1
 /etc/init.d/zirgozar-server enable >/dev/null 2>&1
 # Ahead of the network, so that the Kill switch - when it is on - is in place
 # before the first packet; with the setting off it does nothing.
@@ -205,6 +208,8 @@ define Package/zirgozar/prerm
 # open it again.
 /usr/libexec/zgz-rules ks down >/dev/null 2>&1
 /etc/init.d/zirgozar-killswitch disable >/dev/null 2>&1
+/etc/init.d/zirgozar-led stop >/dev/null 2>&1
+/etc/init.d/zirgozar-led disable >/dev/null 2>&1
 /etc/init.d/zirgozar-server stop >/dev/null 2>&1
 /etc/init.d/zirgozar-server disable >/dev/null 2>&1
 /etc/init.d/zirgozar stop >/dev/null 2>&1

@@ -515,6 +515,10 @@ changed — so a reboot does not lose a list that is read once a week.
 
 ### 🧰 4.4 Other Settings
 
+**LED color** is off by default and leaves the indicator under OpenWrt control. Supported indicators have three matching, independently dimmable RGB channels. While enabled, a URL test through the current connection runs every 15 seconds: below 200 ms green, 200–299 ms yellow, 300–499 ms orange, 500–1000 ms red, and above 1000 ms or a failed test off. All four boundaries are editable. Each colour can be steady or blinking when supported. Disabling restores OpenWrt LED settings.
+
+Home renders without waiting for subscription processing; node choices are filled in afterwards. The traffic period is remembered in the same browser.
+
 The Other Settings, section by section.
 
 **Delay Settings**

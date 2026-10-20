@@ -466,6 +466,10 @@ method_geoview() {
 }
 
 # The nodes of every subscription, for the node choice in Basic Settings.
+method_led() {
+	"$ZGZ_LIB/zgz-led" status
+}
+
 method_subnodes() {
 	"$NODES" subnodes 2>/dev/null | awk -F'\t' 'BEGIN { printf "{\"nodes\":["; n = 0 }
 		NF >= 6 {
@@ -600,6 +604,10 @@ method_action() {
 	json_get_var name name
 	json_get_var arg arg
 
+	case "$name" in
+		core_install|core_remove|app_update|deps_install)
+			if [ -s "$JOB" ]; then fail "Another install is still running. Try again when it is done."; return; fi ;;
+	esac
 	case "$name" in
 		connect)
 			uci -q set zirgozar.config.enabled='1' && uci -q commit zirgozar
@@ -955,6 +963,7 @@ fail() {
 case "$1" in
 	list)
 		json_init
+		json_add_object "led"; json_close_object
 		json_add_object "state";   json_close_object
 		json_add_object "traffic"; json_close_object
 		json_add_object "nodes";   json_close_object
@@ -988,6 +997,7 @@ case "$1" in
 		;;
 	call)
 		case "$2" in
+			led)     method_led ;;
 			state)   method_state ;;
 			traffic) method_traffic ;;
 			nodes)   method_nodes ;;

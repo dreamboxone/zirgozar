@@ -116,6 +116,12 @@ jobs:
             PATH="$PATH" \
             timeout -k 5 90 sh test/test-package.sh
 
+      - name: Test package installation
+        run: sh test/test-package-install.sh
+
+      - name: Test LED control
+        run: sh test/test-led.sh
+
       - name: Test sources
         run: |
           set -euo pipefail

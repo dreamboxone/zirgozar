@@ -1,0 +1,26 @@
+#!/bin/sh /etc/rc.common
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+# Part of Zirgozar - https://github.com/dreamboxone/zirgozar
+
+START=99
+STOP=10
+USE_PROCD=1
+
+start_service() {
+	. /usr/libexec/zgz-common.sh
+	[ "$(cfg_bool led_enabled 0)" = 1 ] || { /usr/libexec/zgz-led restore; return 0; }
+	procd_open_instance
+	procd_set_param command /usr/libexec/zgz-led run
+	procd_set_param term_timeout 15
+	procd_set_param file /etc/config/zirgozar
+	procd_close_instance
+}
+
+service_stopped() {
+	/usr/libexec/zgz-led restore
+}
+
+service_triggers() {
+	procd_add_reload_trigger zirgozar
+}

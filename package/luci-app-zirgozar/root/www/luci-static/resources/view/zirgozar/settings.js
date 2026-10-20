@@ -200,16 +200,51 @@ function savedDns(opt, key, builtin) {
 	};
 }
 
+function fillNodeChoices(widget, keys, labels) {
+	var choices = {};
+	keys.forEach(function(key, i) { choices[key] = labels[i]; });
+	if (typeof widget.addChoices === 'function') {
+		widget.addChoices(keys, choices);
+		return;
+	}
+	var root = widget.node;
+	var select = root && (root.tagName === 'SELECT' ? root : root.querySelector('select'));
+	if (!select) return;
+	var current = select.value;
+	keys.forEach(function(key, i) {
+		if (!Array.prototype.some.call(select.options, function(option) { return option.value === key; }))
+			select.appendChild(E('option', { value: key }, labels[i]));
+	});
+	select.value = current;
+}
+
 return view.extend({
 	load: function() {
 		return Promise.all([
 			uci.load('zirgozar').catch(function() { return null; }),
-			status.load(),
-			callSubNodes().catch(function() { return {}; })
+			status.load()
 		]);
 	},
 
 	render: function(data) {
+		i18n.setLang(uci.get('zirgozar', 'config', 'lang'));
+		var st = status.render(data[1]);
+		var content = E('div', {}, _('Loading settings…'));
+		var page = pui.page(st.top.concat([ content ]), { version: st.version });
+		var self = this;
+		/* Mount the dashboard before rendering the form. Subscription data is optional. */
+		window.setTimeout(function() {
+			self.renderForm([ data[0], data[1], { nodes: [] } ], st).then(function(formEl) {
+				while (content.firstChild) content.removeChild(content.firstChild);
+				content.appendChild(formEl);
+			}).catch(function() {
+				content.textContent = _('Could not load settings. Reload this page to retry.');
+			});
+		}, 0);
+		return page;
+	},
+
+	renderForm: function(data, st) {
 		i18n.setLang(uci.get('zirgozar', 'config', 'lang'));
 
 		var m, s, o, i;
@@ -226,6 +261,7 @@ return view.extend({
 		   time, so one is kept by what it is - subscription, protocol, address,
 		   port and name - and found again in each new list. */
 		var subNodes = (data[2] && data[2].nodes) || [];
+		var subscriptionOptions = [];
 		/* Several nodes of one list can share a name and an address - one
 		   with ECH, one with a fragment, one over IPv6 - and are told apart by
 		   a fingerprint of the node, which the reference ends in and the name
@@ -235,13 +271,15 @@ return view.extend({
 			var k = n.sub + '|' + n.label;
 			seenName[k] = (seenName[k] || 0) + 1;
 		});
-		function subChoices(opt, keep) {
+		function subChoices(opt, keep, refresh) {
+			if (!refresh) subscriptionOptions.push({ opt: opt, keep: keep });
 			subNodes.forEach(function(n) {
 				var parts = [ n.protocol, n.host, n.port, n.label ];
 				if (n.fp) parts.push('#' + n.fp);
 				var name = n.label || (n.host + ':' + n.port);
 				if (n.fp && seenName[n.sub + '|' + n.label] > 1) name += ' · ' + n.fp.slice(0, 4);
-				opt.value('sub:' + n.sub + ':' + parts.join('|'), n.subname + ' › ' + name);
+				var key = 'sub:' + n.sub + ':' + parts.join('|');
+				if (opt.keylist.indexOf(key) < 0) opt.value(key, n.subname + ' › ' + name);
 			});
 			/* A choice whose node has left the list is still the choice, and is
 			   found again by the router; it keeps a name here. */
@@ -256,7 +294,6 @@ return view.extend({
 
 		/* The tiles and the status card for the top of the page, and the
 		   traffic for the Log tab. */
-		var st = status.render(data[1]);
 
 		m = new form.Map('zirgozar', _('Basic Settings'));
 
@@ -835,7 +872,24 @@ return view.extend({
 
 		return m.render().then(function(mapEl) {
 			pui.sortable(mapEl, 'zirgozar');
-			return pui.page(st.top.concat([ mapEl ]), { version: st.version });
+			/* Fill choices in place; never redraw a form the user may have edited. */
+			window.setTimeout(function() {
+				callSubNodes().then(function(result) {
+					if (!mapEl.isConnected) return;
+					subNodes = result.nodes || [];
+					seenName = {};
+					subNodes.forEach(function(n) { var k = n.sub + '|' + n.label; seenName[k] = (seenName[k] || 0) + 1; });
+					subscriptionOptions.forEach(function(binding) {
+						var opt = binding.opt;
+						subChoices(opt, binding.keep, true);
+						uci.sections('zirgozar').forEach(function(section) {
+							var widget = opt.getUIElement(section['.name']);
+							if (widget) fillNodeChoices(widget, opt.keylist, opt.vallist);
+						});
+					});
+				}).catch(function() {});
+			}, 0);
+			return mapEl;
 		});
 	}
 });

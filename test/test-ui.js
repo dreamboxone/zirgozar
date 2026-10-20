@@ -4,6 +4,7 @@
  */
 'use strict';
 require('./test-status-ui.js');
+require('./test-home-ui.js');
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

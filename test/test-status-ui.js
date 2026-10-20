@@ -21,9 +21,11 @@ function element(tag, attrs, children) {
 	return el;
 }
 let language = 'fa', requests = 0, finish;
-const api = new Function('rpc', 'i18n', 'pui', 'E', 'document', 'Node', source.slice(0, source.indexOf('\nreturn baseclass.extend(')) + '\nreturn {usageTotals, usageCard, socialCheck, check, setEnabled: function(value) {usageEnabled=value;renderUsage();}, setScope: function(nodes) {scope=nodes;}, setTraffic: function(data) {usageData=data;renderUsage();}};')(
+const storage = new Map();
+const api = new Function('rpc', 'i18n', 'pui', 'E', 'document', 'Node', 'window', source.slice(0, source.indexOf('\nreturn baseclass.extend(')) + '\nreturn {savedUsagePeriod, usageTotals, usageCard, socialCheck, check, setEnabled: function(value) {usageEnabled=value;renderUsage();}, setScope: function(nodes) {scope=nodes;}, setTraffic: function(data) {usageData=data;renderUsage();}};')(
 	{ declare: spec => spec.method === 'check' ? () => { requests++; return new Promise(resolve => { finish = resolve; }); } : () => Promise.resolve({}) },
-	{ tr: value => value, get: () => language }, { ms: value => value + ' ms' }, element, { getElementById: () => null, createTextNode: text => ({textContent:text}) }, class Node {}
+	{ tr: value => value, get: () => language }, { ms: value => value + ' ms' }, element, { getElementById: () => null, createTextNode: text => ({textContent:text}) }, class Node {},
+	{ localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) } }
 );
 const traffic = { today: { up: 1e9, down: 2e9 }, week: { up: 4e9, down: 8e9 }, month: { up: 99e9, down: 99e9 }, days: [
 	{ d: '2026-09-17', up: 900e9, down: 900e9 }, { d: '2026-09-18', up: 2e9, down: 3e9 }, { d: '2026-10-17', up: 1e9, down: 2e9 }
@@ -37,6 +39,10 @@ assert.equal(usage.querySelector('#pwp-usage-up').textContent, '4.00');
 assert.equal(usage.querySelector('#pwp-usage-down').textContent, '8.00');
 assert.equal(usage.querySelector('#pwp-usage-total').textContent, '12.00');
 usage.querySelector('#pwp-period-month').attrs.click();
+assert.equal(api.savedUsagePeriod(), 'month');
+storage.set('zirgozar.usage.period', 'invalid');
+assert.equal(api.savedUsagePeriod(), 'today');
+storage.set('zirgozar.usage.period', 'month');
 assert.equal(usage.querySelector('#pwp-usage-total').textContent, '8.00');
 api.setTraffic(null); assert.equal(usage.querySelector('#pwp-usage-total').textContent, '—');
 assert.equal(usage.querySelector('#pwp-period-month').textContent, '۳۰ر');

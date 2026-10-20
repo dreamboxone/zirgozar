@@ -1987,48 +1987,132 @@ node_records() {
 # not OpenVPN's, not PPTP's MPPE, not L2TP's - only "required by: …[kmod-…]"
 # from the package manager, which tells nobody what is wrong.
 
-# The kmods line this router's package list should have: the installed kernel
-# package "kernel-6.12.94~<hash>-r1" names the folder, "6.12.94-1-<hash>", and
-# the router's own target line - or failing that its release and target - the
-# rest. Empty when it cannot be worked out.
-kmods_feed() {
-	_kv="$(apk list -I kernel 2>/dev/null | head -1 | cut -d' ' -f1)"
-	_kv="${_kv#kernel-}"
-	case "$_kv" in *~*-r*) : ;; *) return 0 ;; esac
-	_kver="${_kv%%~*}"; _krest="${_kv#*~}"
-	_kdir="$_kver-${_krest##*-r}-${_krest%-r*}"
-	_ktp="$(grep -hs '/targets/.*/packages/packages\.adb' /etc/apk/repositories /etc/apk/repositories.d/*.list | head -1)"
-	if [ -n "$_ktp" ]; then
-		echo "${_ktp%/packages/packages.adb}/kmods/$_kdir/packages.adb"
-		return 0
-	fi
-	_krel="$(sed -n "s/^DISTRIB_RELEASE='\(.*\)'/\1/p" /etc/openwrt_release 2>/dev/null)"
-	_ktgt="$(sed -n "s/^DISTRIB_TARGET='\(.*\)'/\1/p" /etc/openwrt_release 2>/dev/null)"
-	[ -n "$_krel" ] && [ -n "$_ktgt" ] || return 0
-	case "$_krel" in
-		SNAPSHOT) echo "https://downloads.openwrt.org/snapshots/targets/$_ktgt/kmods/$_kdir/packages.adb" ;;
-		*) echo "https://downloads.openwrt.org/releases/$_krel/targets/$_ktgt/kmods/$_kdir/packages.adb" ;;
-	esac
+# Active APK repositories only: comments and disabled lines are not feeds.
+apk_repositories() {
+	local root="${ZGZ_APK_ROOT:-/etc/apk}" file
+	for file in "$root/repositories" "$root"/repositories.d/*.list; do
+		[ ! -r "$file" ] || cat "$file"
+	done | awk '!/^[[:space:]]*#/ { for (i=1; i<=NF; i++) { if ($i ~ /^#/) break; if ($i ~ /^https?:\/\//) print $i } }'
 	return 0
 }
 
-# Put the kmods line back when it is missing, before anything is installed.
-# Only that one official line is added, and only when the address answers;
-# nothing else in the list is touched. Returns 0 when the line is there
-# afterwards - already, or now - and the caller then refreshes the index.
+kernel_feed_dir() {
+	local version rest
+	version="$(apk list -I kernel 2>/dev/null | sed -n 's/^kernel-\([^ ]*\) .*/\1/p' | head -1)"
+	case "$version" in *~*-r*) : ;; *) return 1 ;; esac
+	rest="${version#*~}"
+	printf '%s-%s-%s\n' "${version%%~*}" "${rest##*-r}" "${rest%-r*}"
+}
+
+kmods_feed() {
+	local dir release target path base
+	dir="$(kernel_feed_dir)" || return 1
+	release="$(sed -n "s/^DISTRIB_RELEASE='\(.*\)'/\1/p" "${ZGZ_RELEASE_FILE:-/etc/openwrt_release}")"
+	target="$(sed -n "s/^DISTRIB_TARGET='\(.*\)'/\1/p" "${ZGZ_RELEASE_FILE:-/etc/openwrt_release}")"
+	case "$release/$target/$dir" in *[!A-Za-z0-9._~/-]*|'') return 1 ;; esac
+	[ -n "$release" ] && [ -n "$target" ] && [ -n "$dir" ] || return 1
+	case "$release" in SNAPSHOT) path="/snapshots/targets/$target" ;; *) path="/releases/$release/targets/$target" ;; esac
+	base="$(apk_repositories | awk -v end="$path/packages/packages.adb" 'length($0)>=length(end) && substr($0,length($0)-length(end)+1)==end { print substr($0,1,length($0)-length(end)); exit }')"
+	printf '%s%s/kmods/%s/packages.adb\n' "${base:-https://downloads.openwrt.org}" "$path" "$dir"
+}
+
 ensure_kmods_feed() {
+	local dir target candidate index root http code=0
 	command -v apk >/dev/null 2>&1 || return 0
-	grep -qs '/kmods/' /etc/apk/repositories /etc/apk/repositories.d/*.list && return 0
-	_kf="$(kmods_feed)"
-	[ -n "$_kf" ] || return 1
-	if ! curl -fsSI --connect-timeout 8 --max-time 20 -o /dev/null "$_kf" 2>/dev/null; then
-		warn "the kmods source is missing from the package list, and $_kf did not answer - not added"
+	dir="$(kernel_feed_dir)" || { say_message "The installed kernel identity could not be read. Package sources were left unchanged."; return 1; }
+	target="$(sed -n "s/^DISTRIB_TARGET='\(.*\)'/\1/p" "${ZGZ_RELEASE_FILE:-/etc/openwrt_release}")"
+	if apk_repositories | awk -v suffix="/targets/$target/kmods/$dir/packages.adb" 'length($0)>=length(suffix) && substr($0,length($0)-length(suffix)+1)==suffix { found=1 } END { exit !found }'; then
+		return 0
+	fi
+	candidate="$(kmods_feed)" || { say_message "The matching kernel repository could not be determined. Package sources were left unchanged."; return 1; }
+	index="$ZGZ_RUN/kmods-index.$$"
+	# GET follows redirects and verifies an actual signed index, not just HEAD.
+	http="$(curl -fsSL --connect-timeout 8 --max-time 30 --retry 1 -w '%{http_code}' -o "$index" "$candidate" 2>"$ZGZ_RUN/kmods-fetch.log")" || code=$?
+	if [ "$code" != 0 ]; then
+		rm -f "$index"
+		warn "kernel repository fetch failed (curl $code, HTTP $http): $candidate"
+		case "$code" in
+			6) say_message "The kernel repository hostname could not be resolved. Check router DNS." ;;
+			60|77) say_message "The kernel repository certificate could not be verified. Check CA certificates and the router clock." ;;
+			22) say_message "The matching kernel repository returned an HTTP error. Firmware incompatibility has not been established. See Runtime Logs." ;;
+			*) say_message "The matching kernel repository could not be downloaded. Check connectivity and Runtime Logs." ;;
+		esac
 		return 1
 	fi
-	_kl=/etc/apk/repositories.d/distfeeds.list
-	# The last line of the file may have no line ending of its own.
-	[ ! -s "$_kl" ] || [ -z "$(tail -c 1 "$_kl")" ] || echo >> "$_kl"
-	printf '%s\n' "$_kf" >> "$_kl" || return 1
-	log "the kmods source was missing from the package list - added: $_kf"
+	if ! bounded 30 apk verify "$index" >>"$ZGZ_RUN/kmods-fetch.log" 2>&1; then
+		rm -f "$index"
+		say_message "The kernel repository signature could not be verified. Package sources were left unchanged."
+		return 1
+	fi
+	rm -f "$index"
+	root="${ZGZ_APK_ROOT:-/etc/apk}"
+	mkdir -p "$root/repositories.d" || return 1
+	printf '%s\n' "$candidate" > "$root/repositories.d/zirgozar-kmods.list.new" && \
+		mv -f "$root/repositories.d/zirgozar-kmods.list.new" "$root/repositories.d/zirgozar-kmods.list" || return 1
+	log "added verified matching kernel repository: $candidate"
 	return 0
+}
+
+# One package transaction across all entry points, including direct CLI calls.
+pkg_lock() {
+	local lock="$ZGZ_RUN/package.lock" pid
+	if ! mkdir "$lock" 2>/dev/null; then
+		if mkdir "$lock.reap" 2>/dev/null; then
+			pid="$(cat "$lock/pid" 2>/dev/null)" || pid=
+			case "$pid" in '')
+				if [ -n "$(find "$lock" -maxdepth 0 -mmin +2 2>/dev/null)" ]; then rmdir "$lock" 2>/dev/null || true; fi ;;
+				*[!0-9]*) : ;; *)
+				if ! kill -0 "$pid" 2>/dev/null; then rm -f "$lock/pid"; rmdir "$lock" 2>/dev/null || true; fi ;;
+			esac
+			rmdir "$lock.reap" 2>/dev/null || true
+		fi
+		mkdir "$lock" 2>/dev/null || { echo "Another package operation is still running." >&2; return 1; }
+	fi
+	printf '%s\n' "$$" > "$lock/pid"
+	ZGZ_PACKAGE_LOCKED=1
+	return 0
+}
+
+pkg_unlock() {
+	if [ "${ZGZ_PACKAGE_LOCKED:-0}" = 1 ] && [ "$(cat "$ZGZ_RUN/package.lock/pid" 2>/dev/null)" = "$$" ]; then
+		rm -f "$ZGZ_RUN/package.lock/pid"
+		rmdir "$ZGZ_RUN/package.lock" 2>/dev/null || true
+	fi
+	return 0
+}
+
+pkg_failure() {
+	local file="$1" message
+	if grep -qiE 'no space left|not enough space|insufficient space' "$file"; then
+		message='Package installation ran out of storage. Free space and try again.'
+	elif grep -qiE 'read.only file system' "$file"; then
+		message='Router storage is read-only. Package installation cannot continue.'
+	elif grep -qiE 'certificate|SSL.*error|TLS.*error' "$file"; then
+		message='Package HTTPS verification failed. Check CA certificates and the router clock.'
+	elif grep -qiE 'resolve|DNS|name resolution' "$file"; then
+		message='Package repository DNS lookup failed. Check router DNS.'
+	elif grep -qiE 'signature|untrusted|BAD signature' "$file"; then
+		message='Package signature verification failed. Check the repository and its trusted signing keys.'
+	elif grep -qiE 'timed? out|timeout|connection|network unreachable|temporary error' "$file"; then
+		message='Package repositories could not be reached. Check connectivity and try again.'
+	elif grep -qiE '404|not found|no such package|cannot satisfy|incompatible|conflict|breaks:' "$file"; then
+		message='Required packages are unavailable or incompatible in the current repositories. See the installation log; a firmware change may not be necessary.'
+	else
+		message='The package operation failed. See the installation log for the original error.'
+	fi
+	say_message "$message"
+	warn "$message Log: $file"
+	tail -n 8 "$file" 2>/dev/null | while IFS= read -r detail; do warn "packages: $detail"; done
+	return 0
+}
+
+pkg_refresh() {
+	local manager="$1" file="$2" attempt
+	for attempt in 1 2; do
+		if bounded 180 "$manager" update >>"$file" 2>&1; then return 0; fi
+		[ "$attempt" = 1 ] && grep -qiE 'timed? out|timeout|connection|temporary error|name resolution|DNS|resolve' "$file" || break
+		sleep 1
+	done
+	pkg_failure "$file"
+	return 1
 }

@@ -8,7 +8,7 @@
 # builders so the two formats can never drift apart.
 
 VERSION=5.7.28
-RELEASE=1
+RELEASE=2
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -46,7 +46,7 @@ LUCI_DESC="Web interface for Zirgozar: connect, servers and subscriptions, traff
 CRON_LIST='*/15 * * * * /usr/libexec/zgz-refresh >/dev/null 2>&1'
 CRON_STATS='*/5 * * * * /usr/libexec/zgz-stats sample >/dev/null 2>&1'
 
-ZGZ_SCRIPTS="zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-dns-local zgz-stats zgz-test zgz-geo zgz-cores zgz-deps zgz-bridge zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-l2tp zgz-l2tpconfig zgz-pppvpn zgz-ikev2 zgz-ikev2config zgz-lb"
+ZGZ_SCRIPTS="zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-dns-local zgz-stats zgz-led zgz-test zgz-geo zgz-cores zgz-deps zgz-bridge zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-l2tp zgz-l2tpconfig zgz-pppvpn zgz-ikev2 zgz-ikev2config zgz-lb"
 
 # stage_zgz <staging-root> <source-root> <xray-binary>
 stage_zgz() {
@@ -71,6 +71,7 @@ stage_zgz() {
 	install -d "$i/usr/share/zirgozar"
 	install -m 0644 "$f/zirgozar.config"   "$i/usr/share/zirgozar/zirgozar.config"
 	install -m 0755 "$f/zirgozar.init"     "$i/etc/init.d/zirgozar"
+	install -m 0755 "$f/zirgozar-led.init" "$i/etc/init.d/zirgozar-led"
 	install -m 0755 "$f/zirgozar-dns.init" "$i/etc/init.d/zirgozar-dns"
 	install -m 0755 "$f/zirgozar-server.init" "$i/etc/init.d/zirgozar-server"
 	install -m 0755 "$f/zirgozar-killswitch.init" "$i/etc/init.d/zirgozar-killswitch"
@@ -202,6 +203,8 @@ if ! ubus list 2>/dev/null | grep -q '^luci.zirgozar\$'; then
 fi
 # Always in the boot sequence; the main switch decides whether it runs.
 bounded 15 /etc/init.d/zirgozar enable >/dev/null 2>&1 || true
+bounded 15 /etc/init.d/zirgozar-led enable >/dev/null 2>&1 || true
+bounded 15 /etc/init.d/zirgozar-led restart >/dev/null 2>&1 || true
 bounded 15 /etc/init.d/zirgozar-server enable >/dev/null 2>&1 || true
 # Ahead of the network, so that the Kill switch - when it is on - is in place
 # before the first packet; with the setting off it does nothing.
@@ -252,6 +255,8 @@ bounded() {
 # open it again.
 bounded 15 /usr/libexec/zgz-rules ks down >/dev/null 2>&1 || true
 bounded 15 /etc/init.d/zirgozar-killswitch disable >/dev/null 2>&1 || true
+bounded 20 /etc/init.d/zirgozar-led stop >/dev/null 2>&1 || true
+bounded 15 /etc/init.d/zirgozar-led disable >/dev/null 2>&1 || true
 bounded 20 /etc/init.d/zirgozar-server stop >/dev/null 2>&1 || true
 bounded 15 /etc/init.d/zirgozar-server disable >/dev/null 2>&1 || true
 bounded 20 /etc/init.d/zirgozar stop >/dev/null 2>&1 || true

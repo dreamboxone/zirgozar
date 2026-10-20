@@ -402,7 +402,7 @@ function render(d, early) {
 
 	var dr = early ? lastDeps : String(d.deps_result || '');
 	if (dr && dr != lastDeps) {
-		if (dr == 'ok') say('deps', _('Installed.'), 'ok');
+		if (dr == 'ok') say('deps', _('Package installation finished. Check the capability results above.'), 'ok');
 		else if (dr.indexOf('error') == 0) say('deps', _('Dependency installation failed. Details: %s').format(_(dr.slice(6).trim()) || _('See the installation log.')), 'error');
 	}
 	lastDeps = dr;

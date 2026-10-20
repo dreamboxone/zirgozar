@@ -39,6 +39,14 @@ var callAction  = rpc.declare({ object: 'luci.zirgozar', method: 'action',
 var dismissed = '';
 var stateRequest = 0;
 var refreshListeners = false;
+function savedUsagePeriod() {
+	try { var p = window.localStorage.getItem('zirgozar.usage.period'); return ['today', 'week', 'month'].indexOf(p) >= 0 ? p : 'today'; } catch (e) { return 'today'; }
+}
+function chooseUsagePeriod(period) {
+	usagePeriod = period;
+	try { window.localStorage.setItem('zirgozar.usage.period', period); } catch (e) {}
+	renderUsage();
+}
 var usagePeriod = 'today', usageData = null, usageEnabled = true;
 
 function usageTotals(data, period) {
@@ -81,18 +89,18 @@ function usageCard() {
 	return E('section', { 'id': 'pwp-usage-card', 'class': 'mk-card pwp-usage-card', 'aria-label': _('Usage (GB)') }, [
 		E('div', { 'class': 'pwp-usage-title' }, _('Usage (GB)')),
 		E('div', { 'class': 'pwp-usage-body' }, [
-			E('div', { 'id': 'pwp-usage-panel', 'role': 'tabpanel', 'aria-labelledby': 'pwp-period-today', 'class': 'pwp-usage-values', 'aria-live': 'polite' }, ['up', 'down', 'total'].map(function(key) {
+			E('div', { 'id': 'pwp-usage-panel', 'role': 'tabpanel', 'aria-labelledby': 'pwp-period-' + usagePeriod, 'class': 'pwp-usage-values', 'aria-live': 'polite' }, ['up', 'down', 'total'].map(function(key) {
 				return E('div', { 'class': 'pwp-usage-value pwp-usage-' + key }, [ E('span', {}, _({ up: 'Upload', down: 'Download', total: 'Total' }[key])), E('strong', { 'id': 'pwp-usage-' + key, 'dir': 'ltr' }, '—') ]);
 			})),
 			E('div', { 'class': 'pwp-usage-periods', 'role': 'tablist', 'aria-orientation': 'vertical', 'aria-label': _('Period') }, ['today', 'week', 'month'].map(function(period, index) {
-				return E('button', { 'id': 'pwp-period-' + period, 'type': 'button', 'role': 'tab', 'aria-controls': 'pwp-usage-panel', 'aria-selected': String(index === 0), 'tabindex': index === 0 ? '0' : '-1', 'title': _(['Today', 'Last 7 days', 'Last 30 days'][index]), 'click': function() { usagePeriod = period; renderUsage(); }, 'keydown': function(event) {
+				return E('button', { 'id': 'pwp-period-' + period, 'type': 'button', 'role': 'tab', 'aria-controls': 'pwp-usage-panel', 'aria-selected': String(period === usagePeriod), 'tabindex': period === usagePeriod ? '0' : '-1', 'title': _(['Today', 'Last 7 days', 'Last 30 days'][index]), 'click': function() { chooseUsagePeriod(period); }, 'keydown': function(event) {
 					var periods = ['today', 'week', 'month'], next;
 					if (event.key === 'ArrowDown') next = (index + 1) % 3;
 					else if (event.key === 'ArrowUp') next = (index + 2) % 3;
 					else if (event.key === 'Home') next = 0;
 					else if (event.key === 'End') next = 2;
 					else return;
-					event.preventDefault(); usagePeriod = periods[next]; renderUsage();
+					event.preventDefault(); chooseUsagePeriod(periods[next]);
 					var target = byId('pwp-period-' + usagePeriod); if (target) target.focus();
 				} }, (fa ? ['۱ر', '۷ر', '۳۰ر'] : ['1d', '1w', '1m'])[index]);
 			}))
@@ -418,7 +426,7 @@ return baseclass.extend({
 
 	/* Everything for the top of the page, and the traffic for its foot. */
 	render: function(data) {
-		usagePeriod = 'today'; usageData = null;
+		usagePeriod = savedUsagePeriod(); usageData = null;
 		var st = (data && data[0]) || null;
 		var tr = (data && data[1]) || null;
 		usageEnabled = st ? st.stats_enabled !== false : uci.get('zirgozar', 'config', 'stats_enabled') != '0';

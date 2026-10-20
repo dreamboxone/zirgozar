@@ -185,6 +185,7 @@ cmd_check() {
 
 install_done() {
 	_rc=$?
+	pkg_unlock
 	trap - EXIT
 	if [ "$_rc" = 0 ]; then
 		echo ok > "$ZGZ_RUN/deps-result.new"
@@ -196,7 +197,9 @@ install_done() {
 }
 
 cmd_install() {
+	pkg_lock || return 1
 	trap install_done EXIT
+	trap 'exit 1' INT TERM
 	: > "$ZGZ_RUN/deps-install.log"
 	rm -f "$ZGZ_RUN/deps-result"
 	clear_message
@@ -220,21 +223,10 @@ cmd_install() {
 	# reporting as "install failed".
 	case "$_m" in
 		apk)
-			# Several of these are kernel modules - TPROXY, MPPE, L2TP -
-			# and a list without its kmods source can install none of them.
-			ensure_kmods_feed || true
-			if ! bounded 180 apk update >>"$ZGZ_RUN/deps-install.log" 2>&1; then
-				say_message "Could not download the package index. The router needs a working internet connection before dependencies can be installed."
-				return 1
-			fi
-			;;
-		opkg)
-			if ! bounded 180 opkg update >>"$ZGZ_RUN/deps-install.log" 2>&1; then
-				say_message "Could not download the package index. The router needs a working internet connection before dependencies can be installed."
-				return 1
-			fi
+			case " $_missing " in *" kmod-"*|*" openvpn-"*) ensure_kmods_feed >>"$ZGZ_RUN/deps-install.log" 2>&1 || return 1 ;; esac
 			;;
 	esac
+	pkg_refresh "$_m" "$ZGZ_RUN/deps-install.log" || return 1
 
 	# One at a time, so that a name this OpenWrt happens not to have does not
 	# take the rest of the list down with it.
@@ -275,11 +267,16 @@ cmd_install() {
 	forget_caps
 
 	if [ -n "$_failed" ]; then
-		say_message "Installed what it could. These would not install:$_failed - they may have different names on this build of OpenWrt."
+		pkg_failure "$ZGZ_RUN/deps-install.log"
 		warn "could not install:$_failed"
 		return 1
 	fi
 
+	_remaining="$(missing | tr '\n' ' ')"
+	if [ -n "$_remaining" ]; then
+		say_message "The package manager finished but required packages are still missing. See the installation log."
+		return 1
+	fi
 	log "dependencies installed"
 	return 0
 }
