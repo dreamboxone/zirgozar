@@ -95,8 +95,7 @@ function when(t) {
 	return t ? new Date(t * 1000).toLocaleString(i18n.get() === 'fa' ? 'fa-IR' : undefined) : _('date unknown');
 }
 
-/* The version line of each file, with its Rollback button while a copy from
-   before the last update is kept. */
+/* The size and update time of each routing data file. */
 function renderGeo(g) {
 	var box = document.getElementById('pwp-geo-status');
 	if (!box) return;
@@ -109,17 +108,7 @@ function renderGeo(g) {
 			f.present
 				? E('span', { 'class': 'mk-chip ok' }, pui.bytes(f.bytes))
 				: E('span', { 'class': 'mk-chip' }, _('not downloaded')),
-			f.present ? E('span', { 'style': 'font-size:12px;color:var(--muted)' }, _('updated %s').format(when(f.updated))) : '',
-			f.backup
-				? pui.btn(_('Rollback') + ' ' + p[1], 'soft-blue mk-small', function(ev) {
-					var b = ev.currentTarget;
-					return callAction('geo_rollback', p[0]).then(function(r) {
-						if (r && r.error) pui.note(b, _(r.error), 'error');
-						else pui.note(b, _('Put back. Reconnect for it to take effect.'), 'ok');
-						return callGeo().then(renderGeo);
-					});
-				}, 'refresh')
-				: ''
+			f.present ? E('span', { 'style': 'font-size:12px;color:var(--muted)' }, _('updated %s').format(when(f.updated))) : ''
 		]));
 	});
 	box.appendChild(E('div', { 'style': 'font-size:12px;color:var(--muted);padding-top:4px' },
@@ -393,14 +382,7 @@ return view.extend({
 								else if (later) pui.note(b, _('Downloading from the addresses shown. Press Save & Apply as well, or the automatic update will go back to the saved ones.'), 'info');
 								else pui.note(b, _('Downloading. The page will show the new size when it is done.'), 'info');
 							});
-						}, 'download'),
-						pui.btn(_('Remove both'), 'danger mk-small', function(ev) {
-							var b = ev.currentTarget;
-							return callAction('geo_remove', '').then(function() {
-								pui.note(b, _('Routing data removed.'), 'ok');
-								return callGeo().then(renderGeo);
-							});
-						}, 'trash')
+						}, 'download')
 					])
 				])
 			]);

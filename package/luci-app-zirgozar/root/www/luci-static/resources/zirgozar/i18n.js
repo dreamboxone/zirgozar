@@ -517,6 +517,16 @@ var FA = {
 	'busybox ip cannot add the route this needs — install ip-full':
 		'ip بیزی‌باکس این مسیر را نمی‌تواند اضافه کند — ip-full را نصب کنید',
 	'HTTPS': 'HTTPS',
+	'The HTTPS check could not resolve the proxy hostname.': 'در بررسی HTTPS، نام دامنهٔ پروکسی پیدا نشد.',
+	'The HTTPS check could not resolve the download hostname. Check the router DNS.': 'نام دامنهٔ سرور دانلود پیدا نشد؛ DNS روتر را بررسی کنید.',
+	'The HTTPS check could not connect to the download server.': 'بررسی HTTPS نتوانست به سرور دانلود وصل شود.',
+	'The download server returned an HTTP error. Check the HTTPS probe URL.': 'سرور دانلود خطای HTTP داد؛ نشانی تست HTTPS را بررسی کنید.',
+	'The HTTPS check timed out. Check access to the download server.': 'مهلت بررسی HTTPS تمام شد؛ دسترسی به سرور دانلود را بررسی کنید.',
+	'The HTTPS TLS handshake failed.': 'برقراری ارتباط TLS در بررسی HTTPS ناموفق بود.',
+	'The HTTPS certificate could not be verified. Check CA certificates and the router clock.': 'گواهی HTTPS تأیید نشد؛ گواهی‌های ریشه و ساعت روتر را بررسی کنید.',
+	'The HTTPS CA certificate file is missing or unreadable.': 'فایل گواهی‌های ریشهٔ HTTPS وجود ندارد یا قابل خواندن نیست.',
+	'curl is unavailable. Install the missing packages.': 'دستور curl در دسترس نیست؛ بسته‌های موردنیاز را نصب کنید.',
+	'The HTTPS download check failed. This does not establish that all downloads are blocked.': 'تست دانلود HTTPS ناموفق بود؛ این نتیجه به‌تنهایی به معنی مسدود بودن همهٔ دانلودها نیست.',
 	'the router can fetch over HTTPS': 'روتر می‌تواند از HTTPS دانلود کند',
 	'certificates are missing or the connection is blocked — nothing can be downloaded':
 		'گواهی‌ها نیستند یا اتصال مسدود است — هیچ چیزی دانلود نمی‌شود',
@@ -527,7 +537,7 @@ var FA = {
 	'everything needed is installed': 'هرچه لازم بود نصب است',
 	'Dependency installation failed. Details: %s': 'نصب پیش‌نیازها ناموفق بود. جزئیات: %s',
 	'See the installation log.': 'گزارش نصب را در /var/run/zirgozar/deps-install.log بررسی کنید.',
-	'Install them': 'نصبشان کن',
+	'Install them': 'نصب',
 	'Installing. This needs a working connection and may take a minute.':
 		'در حال نصب. به یک اتصال سالم نیاز دارد و ممکن است یک دقیقه طول بکشد.',
 
@@ -546,8 +556,6 @@ var FA = {
 	'UDP is carried inside the TCP connection, for a SOCKS server that takes it that way. Only sing-box does this, so a node with it on is carried by sing-box when there is one.':
 		'UDP درون همان اتصال TCP فرستاده می‌شود، برای سرور ساکسی که UDP را این‌طور می‌پذیرد. این کار فقط از sing-box برمی‌آید، پس اگر sing-box نصب باشد، این نود با sing-box اجرا می‌شود.',
 	'Free space': 'فضای خالی',
-	'Remove both': 'حذف هر دو',
-	'Routing data removed.': 'داده مسیریابی حذف شد.',
 	'The full files are about 17 MB and 8 MB. If they will not fit, the same project publishes geoip-lite.dat (38 KB) and geosite-lite.dat (2 MB), which carry the Iranian categories and nothing else — put those addresses in the boxes above. A download that will not fit is refused rather than half written.':
 		'فایل‌های کامل حدود ۱۷ و ۸ مگابایت هستند. اگر جا نمی‌شوند، همان پروژه ‎geoip-lite.dat‎ (۳۸ کیلوبایت) و ‎geosite-lite.dat‎ (۲ مگابایت) را هم منتشر می‌کند که فقط دسته‌های ایرانی را دارند — آدرس آن‌ها را در کادرهای بالا بگذارید. دانلودی که جا نشود رد می‌شود، نه اینکه نصفه نوشته شود.',
 
@@ -1217,9 +1225,6 @@ var FA = {
 	'Rule version': 'نسخه قوانین',
 	'Manually update': 'به‌روزرسانی دستی',
 	'Tick GeoIP, Geosite or both first.': 'اول GeoIP یا Geosite یا هر دو را تیک بزنید.',
-	'Rollback': 'بازگشت به نسخه قبل',
-	'Put back. Reconnect for it to take effect.': 'نسخه قبلی برگردانده شد. برای اعمال، تونل را دوباره راه‌اندازی کنید.',
-	'That file could not be put back.': 'آن فایل برگردانده نشد.',
 	'unknown file': 'فایل ناشناخته',
 	'Not valid, please re-enter: %s': 'نادرست است، دوباره وارد کنید: %s',
 	'Names that go through a node are answered with made-up addresses, and the node looks up the real one at the far end — for streaming services that unlock by DNS, or to save a lookup. Tick it for each rule below that should use it. The router itself can open those names only with Localhost Proxy on.':

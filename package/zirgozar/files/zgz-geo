@@ -7,15 +7,7 @@
 # zgz-geo - fetch the routing data the Iran split needs.
 #
 #   zgz-geo update [geoip|geosite|all]
-#   zgz-geo rollback geoip|geosite
 #   zgz-geo status
-#   zgz-geo remove
-#
-# The Rollback: the file an update replaces is kept, in memory, until
-# the next reboot or the next update, and can be put back. In memory and not
-# on flash, because two copies of seventeen megabytes
-# on flash is exactly what a small router has not got - and only when there
-# is room in memory to spare, because running out of it is worse still.
 #
 # Both addresses are settings, shown in the web interface and editable there.
 # Pressing Update always downloads again, whether or not the file is already
@@ -52,9 +44,6 @@ GEOIP_DEFAULT="https://raw.githubusercontent.com/Chocolate4U/Iran-v2ray-rules/re
 GEOSITE_DEFAULT="https://raw.githubusercontent.com/Chocolate4U/Iran-v2ray-rules/release/geosite.dat"
 
 DIR="$(cfg geo_dir "$ZGZ_ETC/geo")"
-BAK="${ZGZ_GEO_BAK:-/tmp/zirgozar-geo-bak}"
-# What must stay free in memory after a copy is kept.
-BAK_MARGIN=33554432
 
 # ZGZ_GEOIP_URL and ZGZ_GEOSITE_URL are the addresses the settings page had
 # on screen when Update was pressed, saved or not - see geo_update in
@@ -142,58 +131,9 @@ fetch_one() {
 		fi
 	fi
 
-	keep_old "$_what"
 	mv -f "$_new" "$DIR/$_what.dat" || return 1
 	date -u +%s > "$DIR/$_what.stamp" 2>/dev/null || true
 	log "$_what updated ($(human_size "$(wc -c < "$DIR/$_what.dat")"))"
-	return 0
-}
-
-# The file about to be replaced, and when it was last replaced, kept for
-# Rollback - when memory allows.
-keep_old() {
-	[ -s "$DIR/$1.dat" ] || return 0
-	mkdir -p "$BAK" 2>/dev/null || return 0
-	_sz="$(file_size "$DIR/$1.dat")"
-	if [ "$(free_bytes "$BAK")" -lt $((_sz + BAK_MARGIN)) ]; then
-		log "$1: not enough free memory to keep the old copy for rollback"
-		rm -f "$BAK/$1.dat" "$BAK/$1.stamp"
-		return 0
-	fi
-	if cp -f "$DIR/$1.dat" "$BAK/$1.dat" 2>/dev/null; then
-		printf '%s\n' "$(stamped "$1")" > "$BAK/$1.stamp" 2>/dev/null || true
-	else
-		rm -f "$BAK/$1.dat" "$BAK/$1.stamp"
-	fi
-	return 0
-}
-
-# Put the kept copy back. It is checked with its partner first, the same as a
-# download is, and it needs the same room on flash a download would.
-cmd_rollback() {
-	case "${1:-}" in
-		geoip|geosite) : ;;
-		*) echo "usage: $0 rollback geoip|geosite" >&2; return 1 ;;
-	esac
-	_what="$1"
-	[ -s "$BAK/$_what.dat" ] || { warn "$_what: no earlier copy to go back to"; return 1; }
-	space_for "$(file_size "$BAK/$_what.dat")" "$DIR" || return 1
-	if [ "$_what" = "geoip" ]; then
-		_a="$BAK/geoip.dat"; _b="$DIR/geosite.dat"
-	else
-		_a="$DIR/geoip.dat"; _b="$BAK/geosite.dat"
-	fi
-	if [ -s "$_a" ] && [ -s "$_b" ] && ! verify_pair "$_a" "$_b"; then
-		say_message "The earlier $_what file is not readable routing data any more - kept the current one."
-		return 1
-	fi
-	cp -f "$BAK/$_what.dat" "$DIR/$_what.dat.new" || { rm -f "$DIR/$_what.dat.new"; return 1; }
-	mv -f "$DIR/$_what.dat.new" "$DIR/$_what.dat" || return 1
-	if [ -s "$BAK/$_what.stamp" ]; then
-		cp -f "$BAK/$_what.stamp" "$DIR/$_what.stamp" 2>/dev/null || true
-	fi
-	rm -f "$BAK/$_what.dat" "$BAK/$_what.stamp"
-	log "$_what: rolled back to the earlier copy - reconnect for it to take effect"
 	return 0
 }
 
@@ -286,15 +226,13 @@ one_status() {
 	_what="$1"
 	_f="$DIR/$_what.dat"
 	if [ -s "$_f" ]; then
-		printf '"%s":{"present":true,"bytes":%s,"updated":%s,"url":"%s","backup":%s}' \
+		printf '"%s":{"present":true,"bytes":%s,"updated":%s,"url":"%s"}' \
 			"$_what" "$(file_size "$_f")" \
 			"$(stamped "$_what")" \
-			"$(json_escape "$(url_for "$_what")")" \
-			"$([ -s "$BAK/$_what.dat" ] && echo true || echo false)"
+			"$(json_escape "$(url_for "$_what")")"
 	else
-		printf '"%s":{"present":false,"bytes":0,"updated":0,"url":"%s","backup":%s}' \
-			"$_what" "$(json_escape "$(url_for "$_what")")" \
-			"$([ -s "$BAK/$_what.dat" ] && echo true || echo false)"
+		printf '"%s":{"present":false,"bytes":0,"updated":0,"url":"%s"}' \
+			"$_what" "$(json_escape "$(url_for "$_what")")"
 	fi
 	return 0
 }
@@ -366,18 +304,10 @@ cmd_view() {
 	return 0
 }
 
-cmd_remove() {
-	rm -f "$DIR/geoip.dat" "$DIR/geosite.dat" "$DIR/geoip.stamp" "$DIR/geosite.stamp" "$EXTRA_ADS"
-	log "routing data removed"
-	return 0
-}
-
 case "${1:-status}" in
 	update)   cmd_update "${2:-all}" ;;
-	rollback) cmd_rollback "${2:-}" ;;
 	status)   cmd_status ;;
 	view)     cmd_view "${2:-}" "${3:-}" ;;
-	remove)   cmd_remove ;;
 	extra)    fetch_extra "${2:-}" ;;
-	*) echo "usage: $0 update [geoip|geosite|all]|rollback geoip|geosite|status|remove" >&2; exit 1 ;;
+	*) echo "usage: $0 update [geoip|geosite|all]|status|view|extra" >&2; exit 1 ;;
 esac

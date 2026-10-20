@@ -822,16 +822,6 @@ method_action() {
 			detach /bin/sh -c 'echo "Downloading routing data" > "$1"; ZGZ_GEOIP_URL="$2" ZGZ_GEOSITE_URL="$3" "$4" update "$5" >/dev/null 2>&1; rm -f "$1"' \
 				sh "$JOB" "$_gip" "$_gsite" "$GEO" "$_which"
 			;;
-		geo_remove)
-			"$GEO" remove >/dev/null 2>&1
-			;;
-		geo_rollback)
-			case "$arg" in geoip|geosite) : ;; *) fail "unknown file"; return ;; esac
-			if ! "$GEO" rollback "$arg" >/dev/null 2>&1; then
-				fail "That file could not be put back."
-				return
-			fi
-			;;
 		core_install)
 			case "$arg" in
 				xray|xray-patterniha|sing-box|sing-box-lx|geoview|warp-plus|vwarp|aether|mihomo|sslocal|haproxy|openvpn) run_job "Installing $arg" "$CORES install $arg" ;;

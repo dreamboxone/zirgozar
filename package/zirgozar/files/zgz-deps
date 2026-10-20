@@ -175,9 +175,11 @@ cmd_check() {
 	printf '],"can":{'
 	printf '"tproxy":%s,' "$(have_tproxy && echo true || echo false)"
 	printf '"policy_routing":%s,' "$(have_ip_full && echo true || echo false)"
-	printf '"https":%s,' "$(have_https && echo true || echo false)"
+	_https_rc=0
+	have_https || _https_rc=$?
+	printf '"https":%s,' "$([ "$_https_rc" = 0 ] && echo true || echo false)"
 	printf '"unzip":%s' "$(command -v unzip >/dev/null 2>&1 && echo true || echo false)"
-	printf '}}\n'
+	printf '},"https_code":%s}\n' "$_https_rc"
 	return 0
 }
 

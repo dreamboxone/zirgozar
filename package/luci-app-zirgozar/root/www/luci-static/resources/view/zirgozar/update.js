@@ -275,6 +275,17 @@ function renderDeps(deps, state) {
 	if (!open) return;
 	var dbox = E('div', { 'style': 'margin-top:8px' });
 	box.appendChild(dbox);
+	var httpsErrors = {
+		5: _('The HTTPS check could not resolve the proxy hostname.'),
+		6: _('The HTTPS check could not resolve the download hostname. Check the router DNS.'),
+		7: _('The HTTPS check could not connect to the download server.'),
+		22: _('The download server returned an HTTP error. Check the HTTPS probe URL.'),
+		28: _('The HTTPS check timed out. Check access to the download server.'),
+		35: _('The HTTPS TLS handshake failed.'),
+		60: _('The HTTPS certificate could not be verified. Check CA certificates and the router clock.'),
+		77: _('The HTTPS CA certificate file is missing or unreadable.'),
+		127: _('curl is unavailable. Install the missing packages.')
+	};
 	dbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:0 0 4px' },
 		_('These are questions put to the running system, not a list of package names. A package can be installed and the thing it provides still not work.')));
 	dbox.appendChild(row(_('Transparent proxy'),
@@ -291,7 +302,7 @@ function renderDeps(deps, state) {
 		[ can.https ? yes() : no(),
 		  E('span', { 'style': 'color:var(--muted)' },
 		    can.https ? _('the router can fetch over HTTPS')
-		              : _('certificates are missing or the connection is blocked — nothing can be downloaded')) ]));
+		              : (httpsErrors[deps.https_code] || _('The HTTPS download check failed. This does not establish that all downloads are blocked.'))) ]));
 	dbox.appendChild(row(_('Firewall in use'),
 		[ E('span', {}, deps.backend == 'nft' ? 'nftables'
 		              : deps.backend == 'ipt' ? 'iptables' : _('none found')) ]));
@@ -301,7 +312,7 @@ function renderDeps(deps, state) {
 			    E('code', {}, missing.join(' ')) ]
 			: [ yes(), E('span', { 'style': 'color:var(--muted)' }, _('everything needed is installed')) ],
 		missing.length
-			? [ actBtn(_('Install them'), 'primary mk-small', 'deps', function() {
+			? [ actBtn(_('Install'), 'primary mk-small', 'deps', function() {
 					return act('deps', 'deps_install', '', _('Installing. This needs a working connection and may take a minute.'));
 				}, 'download', state) ]
 			: [], 'deps'));
