@@ -145,6 +145,18 @@ function buildQuery(q) {
 
 /* What one link is, as the fields of this page; null when it is not one this
    page knows. Query parameters it has no field for are kept and written back. */
+function aetherExitNodes(sections, sid) {
+	return sections.filter(function(n) {
+		if (n['.name'] == sid || n.enabled == '0') return false;
+		var link = String(n.link || '').trim();
+		if (/^\[interface\]/i.test(link))
+			return !/^\s*(jc|jmin|jmax|s[1-4]|h[1-4]|i[1-5])\s*=/im.test(link);
+		return /^(vless|vmess|trojan|ss|shadowsocks|socks|socks5|http|https|wireguard|wg|warp):\/\//i.test(link);
+	}).map(function(n) {
+		return { tag: n['.name'], label: n.name || n['.name'] };
+	});
+}
+
 function parseLink(link) {
 	var s = String(link || '').trim();
 	if (/\s/.test(s)) return null;
@@ -1047,7 +1059,7 @@ return view.extend({
 				_('The selected config carries Aether: selected-node → WARP / Psiphon / Tor.'));
 			o.depends('_proto', 'aether');
 			o.value('_direct', _('Direct'));
-			nodes.filter(function(n) { return n.tag != sid; }).forEach(function(n) { o.value(n.tag, n.label); });
+			aetherExitNodes(uci.sections('zirgozar', 'node'), sid).forEach(function(n) { o.value(n.tag, n.label); });
 			o.default = '_direct';
 			o = s.option(form.TextValue, 'aether_exit_finalmask', _('Exit-node FinalMask JSON'));
 			o.depends('_proto', 'aether');

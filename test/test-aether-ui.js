@@ -11,6 +11,17 @@ const offset = source.indexOf('\nreturn view.extend(');
 assert.ok(offset > 0);
 const api = new Function('rpc', 'i18n', source.slice(0, offset) + '\nreturn { parseLink, buildLink };')(
 	{ declare: () => () => Promise.resolve({}) }, { tr: value => value });
+const exitNodes = new Function(source.slice(source.indexOf('function aetherExitNodes('), source.indexOf('\nfunction parseLink(')) + '\nreturn aetherExitNodes;')();
+assert.deepEqual(exitNodes([
+	{ '.name': 'v1', name: 'Saved VLESS', link: 'vless://id@example.com:443' },
+	{ '.name': 'wg1', link: '[Interface]\nPrivateKey = key\n[Peer]\nPublicKey = peer' },
+	{ '.name': 'awg', link: '[Interface]\nJc = 4' },
+	{ '.name': 'off', enabled: '0', link: 'trojan://pass@example.com:443' },
+	{ '.name': 'hy', link: 'hysteria2://pass@example.com:443' },
+	{ '.name': 'self', link: 'aether://?protocol=masque' }
+], 'self'), [ { tag: 'v1', label: 'Saved VLESS' }, { tag: 'wg1', label: 'wg1' } ]);
+assert.deepEqual(exitNodes([{ '.name': 'v1', link: 'vless://id@example.com:443' }], 'v1'), []);
+assert.match(source, /aetherExitNodes\(uci\.sections\('zirgozar', 'node'\), sid\)/);
 const example = 'aether://?protocol=wg-over-masque&scan=balanced&ip=v4&transport=h2&outer=162.159.198.204%3A443#aether';
 const f = api.parseLink(example);
 assert.equal(f.proto, 'aether');
