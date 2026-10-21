@@ -2309,12 +2309,18 @@ function json_guess(it) {
 	return "xray"
 }
 
-function json_item(it, src,   c, lnk, lab) {
+function json_item(it, src, depth,   c, lnk, lab) {
 	if (n >= LIMIT) return
 	c = substr(jtrim(it), 1, 1)
 	# A bare string in the list is a share link.
 	if (c == "\"") { do_line(junq(it)); return }
 	if (c != "{") return
+	# Some clients receive an array of complete profiles, not outbounds.
+	# Walk each profile using the same importer, with a bounded nesting depth.
+	if (jraw(it, "outbounds") != "" || jraw(it, "endpoints") != "") {
+		if (depth < 8) json_doc(it, depth + 1)
+		return
+	}
 
 	lnk = jstr(it, "link")
 	if (lnk == "") lnk = jstr(it, "url")
@@ -2430,7 +2436,7 @@ function from_aether_command(doc,   args, opts, count, i, key, val, query, endpo
 	do_aether(endpoint query "#" label)
 }
 
-function json_doc(doc,   list, extra, m, k, i, src) {
+function json_doc(doc, depth,   list, extra, m, k, i, src, label) {
 	doc = jtrim(doc)
 	if (jraw(doc, "aetherCommand") != "") { from_aether_command(doc); return }
 	m = 0
@@ -2448,6 +2454,12 @@ function json_doc(doc,   list, extra, m, k, i, src) {
 		# endpoints exist only in sing-box; an Xray outbound says protocol.
 		if (k > 0) src = "singbox"
 		else if (m > 0 && (jraw(list[1], "protocol") != "" || jraw(list[1], "streamSettings") != "")) src = "xray"
+		label = jstr(doc, "remarks")
+		if (label == "") label = jstr(doc, "name")
+		# Profile names carry the subscription's user-visible labels; outbound
+		# tags such as "proxy" are internal routing identifiers.
+		if (label != "") for (i = 1; i <= m; i++)
+			list[i] = jset(list[i], "tag", "\"" jesc(label) "\"")
 	} else if (jraw(doc, "nodes") != "") {
 		m = jsplit(jraw(doc, "nodes"), list)
 	} else if (jraw(doc, "links") != "") {
@@ -2464,7 +2476,7 @@ function json_doc(doc,   list, extra, m, k, i, src) {
 	for (i = 1; i <= m; i++) {
 		if (n >= LIMIT) break
 		HOST = ""; PORT = 0
-		json_item(list[i], src)
+		json_item(list[i], src, depth)
 	}
 }
 

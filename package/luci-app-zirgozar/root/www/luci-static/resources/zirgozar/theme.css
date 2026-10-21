@@ -17,7 +17,7 @@
 .mk code,.mk code *{font-family:ui-monospace,Consolas,monospace!important}
 
 .mk,.mk-dialog{--bg:#f4f6fb;--panel:#fff;--text:#1b2540;--muted:#66728c;--line:#e3e8f2;--soft:#f6f8fd;--shadow:0 10px 30px -12px #1b2a5c26}
-.mk{background:var(--bg);color:var(--text);padding:24px;border-radius:26px;max-width:none;margin:auto;font-family:"Segoe UI",Tahoma,Arial,sans-serif}
+.mk{background:var(--bg);color:var(--text);padding:24px;border-radius:26px;width:100%;min-width:0;max-width:none;box-sizing:border-box;margin:auto;font-family:"Segoe UI",Tahoma,Arial,sans-serif}
 .mk *{box-sizing:border-box}
 .mk h2,.mk h3{color:inherit;margin:0 0 14px}
 .mk p{line-height:1.9;margin:8px 0}

@@ -1269,4 +1269,58 @@ if command -v ucode >/dev/null 2>&1; then
 	else bad "sing-box rejection did not explain ECH repacking"; fi
 fi
 rig_clear
+echo "== subscriptions containing complete JSON profiles"
+if python3 - "$RIG/lib/zgz-parse" "$WORK/profile-outbounds.json" <<'PY'
+import json
+import os
+import subprocess
+import sys
+
+parser, output = sys.argv[1:]
+outbound = {
+    'tag': 'proxy', 'protocol': 'vless',
+    'settings': {'vnext': [{'address': 'profile.example', 'port': 443,
+        'users': [{'id': '11111111-2222-3333-4444-555555555555', 'encryption': 'none'}]}]},
+    'streamSettings': {'network': 'xhttp', 'security': 'tls',
+        'tlsSettings': {'serverName': 'profile.example', 'fingerprint': 'chrome'},
+        'xhttpSettings': {'path': '/custom', 'mode': 'auto',
+            'extra': {'noGRPCHeader': True, 'scMaxEachPostBytes': 1000000}}}
+}
+profile = {'remarks': 'Custom profile', 'inbounds': [{'port': 10808}],
+    'dns': {'servers': ['localhost']}, 'routing': {'rules': []},
+    'outbounds': [outbound, {'tag': 'direct', 'protocol': 'freedom'},
+        {'tag': 'block', 'protocol': 'blackhole'}]}
+
+def parse(document, *options):
+    result = subprocess.run(['awk', *options, '-f', parser],
+        input=json.dumps(document), text=True, capture_output=True,
+        env=dict(os.environ, LC_ALL='C'), check=True, timeout=10)
+    return [line.split('\t', 5) for line in result.stdout.splitlines()]
+
+second = json.loads(json.dumps(profile))
+second['remarks'] = 'Second profile'
+second['outbounds'][0]['settings']['vnext'][0]['address'] = 'second.example'
+records = parse([profile, second])
+assert len(records) == 2
+assert [r[1] for r in records] == ['Custom profile', 'Second profile']
+assert json.loads(records[0][5]) == {k: v for k, v in outbound.items() if k != 'tag'}
+assert len(parse([profile, second], '-v', 'LIMIT=1')) == 1
+assert len(parse([profile, profile])) == 1
+assert len(parse(profile)) == 1
+assert len(parse([outbound])) == 1
+assert len(parse([{'outbounds': []}, {'outbounds': [{}]}, profile])) == 1
+nested = profile
+for _ in range(12):
+    nested = {'outbounds': [nested]}
+assert parse(nested) == []
+with open(output, 'w') as f:
+    json.dump({'outbounds': [json.loads(r[5]) for r in records]}, f)
+PY
+then ok "profile arrays retain names and XHTTP settings, skip service outbounds, deduplicate and obey limits"
+else bad "complete JSON profile import"; fi
+if [ -x "$RIG/core/xray" ]; then
+	if "$RIG/core/xray" run -test -config "$WORK/profile-outbounds.json" > "$WORK/profile-outbounds.test" 2>&1; then
+		ok "Xray accepts imported custom JSON profiles"
+	else bad "Xray rejected imported profiles: $(tail -3 "$WORK/profile-outbounds.test")"; fi
+fi
 rig_report
