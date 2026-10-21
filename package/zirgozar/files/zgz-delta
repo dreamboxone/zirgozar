@@ -1,0 +1,66 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+# Reconstruct the exact published package; installation remains apk/opkg's job.
+set -eu
+
+LIB="${ZGZ_LIB:-/usr/libexec}"
+CACHE="${ZGZ_DELTA_CACHE:-/usr/libexec/zirgozar/.update-cache}"
+PLAN="$LIB/zgz-delta-plan"
+mode="${1:-}"; url="${2:-}"; dest="${3:-}"; expected="${4:-}"; sums="${5:-}"; key="${6:-}"
+case "$key" in main|luci) ;; *) exit 2 ;; esac
+case "$url" in https://github.com/dreamboxone/zirgozar/releases/download/v*/*.apk|https://github.com/dreamboxone/zirgozar/releases/download/v*/*.ipk) ;; *) exit 2 ;; esac
+name="${url##*/}"
+work="${dest}.delta"
+mkdir -p "$work"
+trap 'rm -rf "$work"' EXIT
+
+hash() { sha256sum "$1" | awk '{ print $1 }'; }
+manifest="$work/manifest.json"
+want="$(awk -v name="$name.chunks.json" '$2 == name || $2 == "*" name { print $1; exit }' "$sums")"
+[ "${#want}" = 64 ] || exit 2
+curl -fsSL --connect-timeout 10 --max-time 45 --max-filesize 524288 -o "$manifest" "$url.chunks.json" 2>/dev/null || exit 2
+[ "$(hash "$manifest")" = "$want" ] || exit 2
+size="$(ucode "$PLAN" validate "$manifest" - "$name" "$expected" 2>/dev/null)" || exit 2
+
+if [ "$mode" = seed ]; then
+	[ -f "$dest" ] && [ "$(hash "$dest")" = "$expected" ] || exit 2
+	# Optional single-generation cache. Never consume a small router's last
+	# space or persist an unlimited history of packages.
+	[ "$size" -le 67108864 ] || exit 2
+	if [ ! -d "$CACHE" ]; then mkdir -p "$CACHE" 2>/dev/null || exit 2; fi
+	rm -f "$CACHE/$key.package.new" "$CACHE/$key.json.new"
+	free="$(df -Pk "$CACHE" | awk 'END { printf "%.0f", $4 * 1024 }')"
+	[ "${free:-0}" -gt "$((size + 8388608))" ] || exit 2
+	chmod 700 "$CACHE"
+	cp "$dest" "$CACHE/$key.package.new" || { rm -f "$CACHE/$key.package.new"; exit 2; }
+	cp "$manifest" "$CACHE/$key.json.new" || { rm -f "$CACHE/$key.package.new" "$CACHE/$key.json.new"; exit 2; }
+	mv -f "$CACHE/$key.package.new" "$CACHE/$key.package"
+	mv -f "$CACHE/$key.json.new" "$CACHE/$key.json"
+	exit 0
+fi
+[ "$mode" = fetch ] && [ -s "$CACHE/$key.package" ] && [ -s "$CACHE/$key.json" ] || exit 2
+ucode "$PLAN" plan "$manifest" "$CACHE/$key.json" "$name" "$expected" > "$work/plan" 2>/dev/null || exit 2
+: > "$work/package"
+while read -r source offset length; do
+	if [ "$source" = local ]; then
+		ucode "$PLAN" copy "$CACHE/$key.package" "$work/part" "$offset" "$length" || exit 2
+	else
+		end=$((offset + length - 1))
+		code="$(curl -fsSL --connect-timeout 15 --max-time 180 --retry 1 \
+			-H 'Accept-Encoding: identity' --range "$offset-$end" --max-filesize 134217728 \
+			-w '%{http_code}' -o "$work/part" "$url" 2>/dev/null)" || exit 2
+		if [ "$code" = 200 ]; then
+			# Some mirrors ignore Range. Accept their full response only when
+			# it is the exact published package, without downloading it again.
+			[ "$(hash "$work/part")" = "$expected" ] || exit 2
+			mv -f "$work/part" "$dest"
+			exit 0
+		fi
+		[ "$code" = 206 ] || exit 2
+	fi
+	[ "$(wc -c < "$work/part")" -eq "$length" ] || exit 2
+	cat "$work/part" >> "$work/package"
+done < "$work/plan"
+[ "$(wc -c < "$work/package")" -eq "$size" ] && [ "$(hash "$work/package")" = "$expected" ] || exit 2
+mv -f "$work/package" "$dest"

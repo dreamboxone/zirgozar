@@ -5,7 +5,7 @@
 <h3 align="center">A router-wide tunnel for OpenWrt</h3>
 
 <p align="center">
-  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.29-r4"></a>
+  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.29-r5"></a>
   <a href="https://github.com/dreamboxone/zirgozar/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/dreamboxone/zirgozar/total?style=for-the-badge&color=0ea5e9"></a>
   <img alt="OpenWrt" src="https://img.shields.io/badge/OpenWrt-23.05%20%7C%2024.10%20%7C%2025.12-00B5E2?style=for-the-badge&logo=openwrt&logoColor=white">
   <img alt="Xray" src="https://img.shields.io/badge/core-Xray-7c3aed?style=for-the-badge">
@@ -94,14 +94,14 @@ install the main file first, then the `luci-app-…` one. After the second, pres
 
 SSH into the router and run the command below to download and install or upgrade
 version **5.7.29** for its architecture. The version must first be published on
-the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.29-r4).
+the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.29-r5).
 
 ```sh
 (
   set -eu
   . /etc/openwrt_release
-  version='5.7.29-r4'
-  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.29-r4'
+  version='5.7.29-r5'
+  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.29-r5'
   install_dir="/tmp/zirgozar-install-$version"
   mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
@@ -131,11 +131,11 @@ These examples use `arm_cortex-a7_neon-vfpv4`; replace it with your router's arc
 ```sh
 # OpenWrt 25.12 and later
 apk update
-apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.29-r4.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.29-r4.apk
+apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.29-r5.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.29-r5.apk
 
 # OpenWrt 24.10 / 23.05
 opkg update
-opkg install /tmp/zirgozar_5.7.29-r4_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.29-r4_all.ipk
+opkg install /tmp/zirgozar_5.7.29-r5_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.29-r5_all.ipk
 ```
 
 > [!IMPORTANT]
@@ -429,7 +429,7 @@ settings.
 
 **PPTP and SSTP.** Choose PPTP or SSTP under **Add** and enter the server (IPv4 or domain), username and password. The port can be left empty: 1723 for PPTP, 443 for SSTP. Import them as `pptp://user:password@server:1723?mppe=1#name` and `sstp://user:password@server:443#name`; URL-encode special characters in credentials. MTU defaults to 1400. **Router requirements** installs the dependencies: the PPTP plugin and MPPE for PPTP, and `sstp-client` with OpenSSL's legacy module for SSTP. Like L2TP, the client creates a device of its own (`zgzpptp` or `zgzsstp`) and the routing core sends the primary outbound through it, keeping the Iran split and routing rules. SSTP runs inside HTTPS and gets through most firewalls; the server certificate is not checked. PPTP's encryption is weak; its MPPE encryption is on by default. Both are supported as the primary tunnel only, not in a proxy chain or balancer.
 
-**IKEv2.** Choose IKEv2 under **Add** and enter the server (IPv4 or domain). **Sign-in** is a username and password (EAP, with the server proving itself by certificate) or a shared key alone (PSK). The port can be left empty: 500. The server certificate must come from a public authority such as Let's Encrypt; when the provider supplies its own CA certificate, paste it under **Certificate authority**, and when the name in the certificate is not the server address, enter it under **Server identity**. Import them as `ikev2://user:password@server:500?id=vpn.example.com#name` and `ikev2://server:500?psk=key#name`; a CA certificate comes as `ca=` in base64. MTU defaults to 1400. **Router requirements** installs the dependencies: strongSwan with EAP and OpenSSL, and the XFRM interface kernel module. The client creates a device of its own (`zgzikev2`) and the routing core sends the primary outbound through it, keeping the Iran split and routing rules. Other strongSwan connections on the router are left alone. Supported as the primary tunnel only, not in a proxy chain or balancer.
+**IKEv2.** Choose IKEv2 under **Add** and enter the server (IPv4 or domain). **Sign-in** is a username and password (EAP, with the server proving itself by certificate) or a shared key alone (PSK). The port can be left empty: 500. The server certificate must come from a public authority such as Let's Encrypt; when the provider supplies its own CA certificate, paste it under **Certificate authority**, and when the name in the certificate is not the server address, enter it under **Server identity**. Import them as `ikev2://user:password@server:500?id=vpn.example.com#name` and `ikev2://server:500?psk=key#name`; a CA certificate comes as `ca=` in base64. MTU defaults to 1400. Connecting or testing installs missing prerequisites for this protocol: strongSwan with EAP and OpenSSL, and the XFRM interface kernel module. **Router requirements** remains available. Opening a page does not run this check. For PureVPN, select username/password authentication and enter `pointtoserver.com` under **Server identity**; it is not a PSK. The client creates a device of its own (`zgzikev2`) and the routing core sends the primary outbound through it, keeping the Iran split and routing rules. Other strongSwan connections on the router are left alone. Supported as the primary tunnel only, not in a proxy chain or balancer.
 
 **AmneziaWG.** A WireGuard `.conf` that carries any of the AmneziaWG lines - `Jc`, `Jmin`, `Jmax`, `S1` to `S4`, `H1` to `H4` (a number or a range) and the decoy packets `I1` to `I5` - is an AmneziaWG node, version 2 or 3. Xray cannot speak it, and neither can the official sing-box: it is carried by [sing-box-lx](https://github.com/Leadaxe/sing-box-lx). While this config is chosen, sing-box-lx carries the whole tunnel by itself and Xray stands aside. Without sing-box-lx installed the page says so. Chosen by hand, like hysteria2 and OpenVPN.
 
@@ -592,6 +592,17 @@ If the router clock is wrong, secure connections and tunnel connections cannot
 be made.
 
 ### ⬆️ 4.5 App Update
+
+Application updates can reuse unchanged ranges of previously downloaded packages.
+Only missing ranges are transferred, then the exact release package is verified
+against `SHA256SUMS` and installed with `apk` or `opkg` as usual. The first update
+downloads the complete packages to establish a baseline. An optional cache keeps
+one package per component (at most 64 MiB each) under
+`/usr/libexec/zirgozar/.update-cache`, with at least 8 MiB of free space reserved.
+Missing cache, incompatible releases, little reusable data or failed range requests
+fall back to a complete download. Deleting this cache only disables reuse until
+the next successful download. This runs only when an update is requested; opening
+a page does not perform any additional checks or downloads.
 
 | Card | What it shows |
 |---|---|

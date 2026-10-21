@@ -38,6 +38,49 @@ conn() {
 	echo "zirgozar-$DEV"
 }
 
+ensure_dependencies() {
+	local needed=0 plugin
+	command -v swanctl >/dev/null 2>&1 && [ -x /etc/init.d/swanctl ] || needed=1
+	[ -f /usr/lib/ucode/socket.so ] || needed=1
+	if [ -z "$(jsonfilter -i "$NODE" -e '@.psk' 2>/dev/null)" ]; then
+		for plugin in eap-identity eap-mschapv2 md4; do
+			[ -f "/usr/lib/ipsec/plugins/libstrongswan-$plugin.so" ] || needed=1
+		done
+	fi
+	[ -d /sys/module/xfrm_interface ] || modprobe xfrm_interface >/dev/null 2>&1 || true
+	[ -d /sys/module/xfrm_interface ] || needed=1
+	if [ "$needed" = 1 ]; then
+		log 'IKEv2: installing the prerequisites for this connection'
+		"$ZGZ_LIB/zgz-deps" install ikev2 > "$ZGZ_RUN/ikev2-deps.log" 2>&1 ||
+			fail 'IKEv2 needs strongSwan EAP and XFRM. Dependency installation failed. Check Router requirements.'
+	fi
+}
+
+# A socket pathname can remain while procd is restarting charon. Readiness
+# means an actual VICI reply, not just a file named charon.vici.
+wait_ipsec() {
+	local attempt=0
+	while [ "$attempt" -lt 10 ]; do
+		swanctl --stats >/dev/null 2>&1 && return 0
+		sleep 1
+		attempt=$((attempt + 1))
+	done
+	return 1
+}
+
+# Keep the direct lookup first, but do not discard a working router resolver
+# when the WAN's advertised DNS server does not answer. The fallback uses
+# the router's existing resolver and is bounded even while a tunnel is down.
+resolve_ikev2() {
+	local address
+	address="$(resolve_direct "$1" | head -1)"
+	if [ -n "$address" ]; then printf '%s\n' "$address"; return 0; fi
+	bounded 4 nslookup "$1" 127.0.0.1 2>/dev/null | awk '
+		/^Name:/ { answer=1; next }
+		answer && /^Address/ { for (i=2; i<=NF; i++)
+			if ($i ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) { print $i; exit } }'
+}
+
 check() {
 	command -v swanctl >/dev/null 2>&1 && [ -x /etc/init.d/swanctl ] ||
 		fail 'IKEv2 needs strongSwan. Install dependencies under Router requirements.'
@@ -92,6 +135,7 @@ established() {
 }
 
 connect() {
+	ensure_dependencies
 	check
 	# What an earlier connection left behind when it was cut off - by a
 	# power cut, a kill or a crash, with no chance to clean up - is cleared:
@@ -128,7 +172,7 @@ connect() {
 	_mtu="$(jsonfilter -i "$NODE" -e '@.mtu' 2>/dev/null)" || _mtu=''
 	case "$_mtu" in ''|*[!0-9]*) _mtu=1400 ;; esac
 	# Looked up outside the tunnel: this account is the way into it.
-	_ip="$(resolve_direct "$_host" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
+	_ip="$(resolve_ikev2 "$_host" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
 	[ -n "$_ip" ] || fail 'The IKEv2 server has no reachable IPv4 address.'
 	# Asked before any policy is in place: left to itself, strongSwan can
 	# pick loopback as its own address on a router with TProxy.
@@ -154,10 +198,8 @@ connect() {
 	fi
 	if [ ! -S /var/run/charon.vici ]; then
 		/etc/init.d/swanctl start >/dev/null 2>&1 || true
-		_n=0
-		while [ ! -S /var/run/charon.vici ] && [ "$_n" -lt 10 ]; do sleep 1; _n=$((_n+1)); done
-		[ -S /var/run/charon.vici ] || fail 'The IPsec service did not start.'
 	fi
+	wait_ipsec || fail 'The IPsec service did not start.'
 	IKE=1
 	ikev2config load "$NODE" "$DEV" "$_ip" "$_src" > "$STATE/log" 2>&1 || {
 		tail -5 "$STATE/log" >&2
@@ -193,7 +235,7 @@ measure() {
 	_host="${_authority%%:*}"; _port="${_authority##*:}"
 	case "$_url" in http://*) _default=80 ;; https://*) _default=443 ;; *) fail 'Invalid test URL.' ;; esac
 	[ "$_port" != "$_authority" ] || _port="$_default"
-	_ip="$(resolve_direct "$_host" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
+	_ip="$(resolve_ikev2 "$_host" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
 	[ -n "$_ip" ] || { echo 0; return 1; }
 	if [ "$KIND" = tcp ]; then
 		_t="$(curl -4 -sS --noproxy '*' --interface "$DEV" --resolve "$_host:$_port:$_ip" \
@@ -207,6 +249,7 @@ measure() {
 
 case "$MODE" in
 	check) check ;;
+	prepare) ensure_dependencies; check ;;
 	run)
 		trap cleanup EXIT
 		trap 'exit 1' INT TERM
@@ -244,5 +287,5 @@ case "$MODE" in
 		fi
 		connect
 		measure ;;
-	*) echo 'usage: zgz-ikev2 check|run|test tcp|url' >&2; exit 1 ;;
+	*) echo 'usage: zgz-ikev2 check|prepare|run|test tcp|url' >&2; exit 1 ;;
 esac

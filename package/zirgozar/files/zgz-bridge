@@ -478,7 +478,7 @@ cmd_command() {
 		return 0
 	fi
 	if bridge_is_ikev2; then
-		"$ZGZ_LIB/zgz-ikev2" check || return 1
+		"$ZGZ_LIB/zgz-ikev2" prepare >/dev/null || return 1
 		echo "$ZGZ_LIB/zgz-ikev2 run"
 		return 0
 	fi

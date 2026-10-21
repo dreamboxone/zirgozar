@@ -119,6 +119,12 @@ jobs:
       - name: Test package installation
         run: sh test/test-package-install.sh
 
+      - name: Test differential package downloads
+        run: python3 test/test-delta.py
+
+      - name: Test IKEv2 bootstrap and service readiness
+        run: sh test/test-ikev2.sh
+
       - name: Test LED control
         run: sh test/test-led.sh
 
@@ -568,6 +574,7 @@ jobs:
             for f in "$dir"/*.ipk; do cp -f "$f" "release/$(basename "$f")"; done
           done
           ls -l release/
+          python3 build/package-chunks.py release
           (cd release && sha256sum * > SHA256SUMS)
 
       - name: Publish the release

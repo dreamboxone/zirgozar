@@ -86,6 +86,12 @@ link_wanted() {
 
 # What is needed, given how this router does firewalling.
 wanted() {
+	# A connection may be tested before it has been saved in UCI. Install
+	# only that protocol's prerequisites when explicitly requested by it.
+	if [ "${DEPS_PROTOCOL:-}" = ikev2 ]; then
+		printf 'ikev2://required\n' | link_wanted
+		return 0
+	fi
 	echo "curl ca-bundle ip-full"
 	case "$(firewall_backend)" in
 		nft) echo "kmod-nft-tproxy kmod-nft-socket" ;;
@@ -293,7 +299,10 @@ cmd_for() {
 
 case "${1:-check}" in
 	check)   cmd_check ;;
-	install) cmd_install ;;
+	install)
+		DEPS_PROTOCOL="${2:-}"
+		case "$DEPS_PROTOCOL" in ''|ikev2) cmd_install ;; *) exit 1 ;; esac
+		;;
 	for)     cmd_for ;;
 	*) echo "usage: $0 check|install|for" >&2; exit 1 ;;
 esac
