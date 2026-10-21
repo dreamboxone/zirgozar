@@ -1,6 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+RIG_ROOT="${RIG_ROOT:-$(mktemp -d /tmp/zgz-ikev2-test.XXXXXX)}"
 . "$(dirname "$0")/rig.sh"
 rig_setup
 
