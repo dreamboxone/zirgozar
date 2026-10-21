@@ -63,6 +63,9 @@
 .mk-btn.spinning{padding-left:revert!important}
 .mk-btn.spinning::before,.mk-btn.spinning::after{display:none!important}
 @keyframes mk-spin{to{transform:rotate(360deg)}}
+.mk-btn.mk-running .mk-ico.mk-download{animation:none}
+.mk-btn.mk-running .mk-download-arrow{animation:mk-download 1.2s ease-in-out infinite}
+@keyframes mk-download{0%,100%{transform:translateY(-2px);opacity:.65}55%{transform:translateY(2px);opacity:1}}
 .mk-btn.primary{background:linear-gradient(135deg,#3b82f6,#6366f1)}
 .mk-btn.success{background:linear-gradient(135deg,#10b981,#059669)}
 .mk-btn.warn{background:linear-gradient(135deg,#f59e0b,#ea580c)}

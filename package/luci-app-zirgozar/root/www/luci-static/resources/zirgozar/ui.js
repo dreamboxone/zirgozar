@@ -38,7 +38,7 @@ var ICONS = {
 	   where the wrench's thin diagonal broke up into a smudge. */
 	sliders:  '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
 	grid:     '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
-	download: '<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>',
+	download: '<g class="mk-download-arrow"><path d="M12 3v12M7 10l5 5 5-5"/></g><path d="M4 17v4h16v-4"/>',
 	book:     '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5M9 7h6"/>',
 	power:    '<path d="M12 3v9"/><path d="M6.4 6.4a8 8 0 1 0 11.2 0"/>',
 	cpu:      '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>',
@@ -68,7 +68,7 @@ var ICONS = {
 };
 
 function icon(name, cls) {
-	var s = E('span', { 'class': 'mk-ico ' + (cls || ''), 'aria-hidden': 'true' });
+	var s = E('span', { 'class': 'mk-ico ' + (name == 'download' ? 'mk-download ' : '') + (cls || ''), 'aria-hidden': 'true' });
 	s.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
 		'stroke-linecap="round" stroke-linejoin="round">' + (ICONS[name] || '') + '</svg>';
 	return s;
