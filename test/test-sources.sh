@@ -50,4 +50,24 @@ printf 'n0\n' > "$RIG/run/rejected"
 sections 1 0
 build_check own '' 1 'candidate list becomes empty'
 if [ ! -e "$RIG/run/rejected" ]; then ok 'empty list clears rejected tags'; else bad 'empty list clears rejected tags'; fi
+echo '== subscription choices from links and parsed JSON records'
+sections 1 1
+rm -f "$RIG/run/subs/s.tsv"
+printf '%s\n' "$subscription" > "$RIG/run/subs/s.links"
+sh "$RIG/lib/zgz-nodes" subnodes > "$RIG/choices.tsv"
+check "$(cut -f4 "$RIG/choices.tsv")" sub.example 'link subscription appears in choices'
+LC_ALL=C awk -f "$RIG/lib/zgz-parse" <<'JSON' > "$RIG/run/subs/s.tsv"
+[{"remarks":"Custom JSON","outbounds":[{"protocol":"vless","settings":{"vnext":[{"address":"json.example","port":443,"users":[{"id":"11111111-2222-3333-4444-555555555555","encryption":"none"}]}]},"streamSettings":{"network":"xhttp","security":"tls","tlsSettings":{"serverName":"json.example"},"xhttpSettings":{"path":"/custom","mode":"auto"}}}]}]
+JSON
+sh "$RIG/lib/zgz-nodes" subnodes > "$RIG/choices.tsv"
+check "$(cut -f4 "$RIG/choices.tsv")" json.example 'parsed JSON takes precedence over cached link choices'
+check "$(cut -f6 "$RIG/choices.tsv")" 'Custom JSON' 'profile name survives subscription choice'
+if awk -F'\t' 'NF == 7 && $7 ~ /^[0-9a-f]+$/ { found=1 } END { exit !found }' "$RIG/choices.tsv"; then
+	ok 'JSON choice includes the fingerprint used to resolve the selected node'
+else bad 'JSON choice fingerprint missing'; fi
+rm -f "$RIG/run/subs/s.links"
+sh "$RIG/lib/zgz-nodes" subnodes > "$RIG/choices.tsv"
+check "$(cut -f4 "$RIG/choices.tsv")" json.example 'JSON choices work without a links file'
+sections 0 1
+check "$(sh "$RIG/lib/zgz-nodes" subnodes | wc -l | tr -d ' ')" 0 'disabled JSON subscription is excluded'
 rig_report

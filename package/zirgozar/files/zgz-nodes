@@ -1167,6 +1167,10 @@ function payload(line,   p, i) {
 # The parsed list of one subscription, as records.
 sub_parsed() {
 	sub_restore "$1"
+	if [ -s "$SUBS_DIR/$1.tsv" ]; then
+		LC_ALL=C awk -F'\t' -v limit="$(cfg max_nodes 300)" 'NF >= 6 { print; if (++n >= limit) exit }' "$SUBS_DIR/$1.tsv"
+		return 0
+	fi
 	[ -s "$SUBS_DIR/$1.links" ] || return 1
 	LC_ALL=C awk -v LIMIT="$(cfg max_nodes 300)" -f "$PARSE" < "$SUBS_DIR/$1.links" 2>/dev/null
 }
@@ -1184,8 +1188,10 @@ subnodes_one() {
 	sub_restore "$1"
 	# A file of a new name for the fingerprint column, so that a list cached
 	# without it is read again rather than used as it is.
-	_sn_links="$SUBS_DIR/$1.links" _sn_cache="$SUBS_DIR/$1.subnodes3"
-	rm -f "$SUBS_DIR/$1.subnodes" "$SUBS_DIR/$1.subnodes2"
+	_sn_links="$SUBS_DIR/$1.tsv"
+	[ -s "$_sn_links" ] || _sn_links="$SUBS_DIR/$1.links"
+	_sn_cache="$SUBS_DIR/$1.subnodes4.${_sn_links##*.}"
+	rm -f "$SUBS_DIR/$1.subnodes" "$SUBS_DIR/$1.subnodes2" "$SUBS_DIR/$1.subnodes3"
 	[ -s "$_sn_links" ] || return 0
 	if [ ! -f "$_sn_cache" ] || [ "$_sn_links" -nt "$_sn_cache" ]; then
 		sub_parsed "$1" | LC_ALL=C awk -F'\t' "$FP_AWK"'
