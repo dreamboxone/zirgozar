@@ -441,7 +441,7 @@ body.pwp-fa #modal_overlay:where(body.pwp-active *)>.modal textarea,body.pwp-fa 
 .mk .cbi-section-table .th,.mk table.table .th{color:var(--muted);font-weight:700;border-bottom:1px solid var(--line)!important;background:transparent!important;padding-top:10px!important}
 .mk .cbi-section-table .td,.mk table.table .td{border-top:1px solid var(--line)!important;background:transparent!important;color:var(--text)}
 .mk .cbi-section-table .td>*{margin-top:0!important;margin-bottom:0!important}
-.mk :is(.cbi-section-table,table.table) .tr.cbi-section-table-row{background:var(--panel)!important;color:var(--text)}
+.mk :is(.cbi-section-table,table.table) .tr:not(.table-titles):not(.cbi-section-table-titles){background:var(--panel)!important;color:var(--text)}
 .mk .cbi-section-node>[data-tab]{background:var(--panel)!important;color:var(--text)}
 .mk .cbi-value-description{opacity:1}
 :is(.mk,body.pwp-active #modal_overlay>.modal) :is(input,textarea)::placeholder{color:var(--muted);opacity:1}
