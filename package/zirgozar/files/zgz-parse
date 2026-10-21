@@ -378,6 +378,17 @@ function node_extras(p,   ss, sec, t, sock, net, ws, k, v, pem, n, a, i, arr, h)
 		t = jraw(ss, "tlsSettings")
 		if (t == "") t = "{}"
 		if (NX["ech"] != "")           t = jset(t, "echConfigList", "\"" jesc(NX["ech"]) "\"")
+		if (NX["ech_repack"] == "1") {
+			v = jstr(t, "echConfigList")
+			# Keep an explicit query domain, even when replacing blocked UDP DNS.
+			k = index(v, "+")
+			v = (k && v ~ /:\/\// ? substr(v, 1, k) : "") "h2c://1.1.1.1/dns-query"
+			t = jset(t, "echConfigList", "\"" jesc(v) "\"")
+			sock = jraw(t, "echSockopt")
+			if (sock == "") sock = "{}"
+			sock = jset(sock, "dialerProxy", "\"tls-repack-dns\"")
+			t = jset(t, "echSockopt", jset(sock, "mark", "255"))
+		}
 		if (NX["tls_pin"] != "")       t = jset(t, "pinnedPeerCertSha256", "\"" jesc(NX["tls_pin"]) "\"")
 		if (NX["cert_name"] != "")     t = jset(t, "verifyPeerCertByName", "\"" jesc(NX["cert_name"]) "\"")
 		if (NX["cipher_suites"] != "") t = jset(t, "cipherSuites", "\"" jesc(NX["cipher_suites"]) "\"")

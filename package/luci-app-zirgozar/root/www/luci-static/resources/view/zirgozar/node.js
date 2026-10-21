@@ -1615,6 +1615,9 @@ return view.extend({
 			o.monospace = true;
 			o = tlsOnly(s.option(form.Value, 'ech', 'ECH',
 				_('An ECH configuration, or a domain and the DNS that publishes it, such as cloudflare-ech.com+https://1.1.1.1/dns-query.')));
+			o = tlsOnly(s.option(form.Flag, 'ech_repack', _('ECH DNS through TLS (echOutbound)'),
+				_('Fetches ECH keys with h2c through 1.1.1.1:443 using the Microsoft TLS preset. Requires Xray with echSockopt and fromMitM support. An explicit ECH query domain is preserved; otherwise SNI is used.')));
+			o.default = '0';
 			o = tlsOnly(s.option(form.Value, 'cipher_suites', _('Cipher Suites'),
 				_('Configures the list of supported cipher suites, separated by colons.')));
 			[ 'TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256',

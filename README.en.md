@@ -5,7 +5,7 @@
 <h3 align="center">A router-wide tunnel for OpenWrt</h3>
 
 <p align="center">
-  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.28-r1"></a>
+  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.29-r1"></a>
   <a href="https://github.com/dreamboxone/zirgozar/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/dreamboxone/zirgozar/total?style=for-the-badge&color=0ea5e9"></a>
   <img alt="OpenWrt" src="https://img.shields.io/badge/OpenWrt-23.05%20%7C%2024.10%20%7C%2025.12-00B5E2?style=for-the-badge&logo=openwrt&logoColor=white">
   <img alt="Xray" src="https://img.shields.io/badge/core-Xray-7c3aed?style=for-the-badge">
@@ -93,15 +93,15 @@ install the main file first, then the `luci-app-…` one. After the second, pres
 ### The other way: from a terminal
 
 SSH into the router and run the command below to download and install or upgrade
-version **5.7.24** for its architecture. The version must first be published on
-the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.28-r1).
+version **5.7.29** for its architecture. The version must first be published on
+the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.29-r1).
 
 ```sh
 (
   set -eu
   . /etc/openwrt_release
-  version='5.7.28-r1'
-  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.28-r1'
+  version='5.7.29-r1'
+  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.29-r1'
   install_dir="/tmp/zirgozar-install-$version"
   mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
@@ -131,11 +131,11 @@ These examples use `arm_cortex-a7_neon-vfpv4`; replace it with your router's arc
 ```sh
 # OpenWrt 25.12 and later
 apk update
-apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.28-r1.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.28-r1.apk
+apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.29-r1.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.29-r1.apk
 
 # OpenWrt 24.10 / 23.05
 opkg update
-opkg install /tmp/zirgozar_5.7.28-r1_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.28-r1_all.ipk
+opkg install /tmp/zirgozar_5.7.29-r1_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.29-r1_all.ipk
 ```
 
 > [!IMPORTANT]
@@ -512,6 +512,8 @@ Each subscription's edit window:
 
 What a subscription brought is kept on flash as well — written only when it
 changed — so a reboot does not lose a list that is read once a week.
+
+For an ECH node whose plain DNS key lookup is blocked, open the node editor and enable **ECH DNS through TLS (echOutbound)**. This preset queries `h2c://1.1.1.1/dns-query` through a TLS outbound to `1.1.1.1:443` with the Microsoft SNI, `fromMitM` certificate/ALPN handling and Chrome fingerprint. The ECH field can specify the query domain, for example `cloudflare-ech.com+h2c://1.1.1.1/dns-query`; otherwise the node SNI is used. The preset replaces the resolver with Cloudflare. Use a recent Xray with `echSockopt` and `fromMitM` support; sing-box cannot carry this preset. It is off by default and is included in URL tests and exported node configurations when enabled.
 
 ### 🧰 4.4 Other Settings
 

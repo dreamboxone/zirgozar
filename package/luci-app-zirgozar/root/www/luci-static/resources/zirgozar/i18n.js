@@ -1422,6 +1422,10 @@ var FA = {
 		'گواهی‌ای که زنجیره سرور به‌جای گواهی‌های معمول با آن سنجیده می‌شود.',
 	'An ECH configuration, or a domain and the DNS that publishes it, such as cloudflare-ech.com+https://1.1.1.1/dns-query.':
 		'یک پیکربندی ECH، یا یک دامنه و DNS‌ای که آن را منتشر می‌کند، مثل cloudflare-ech.com+https://1.1.1.1/dns-query.',
+	'ECH DNS through TLS (echOutbound)':
+		'دریافت کلید ECH از مسیر TLS (echOutbound)',
+	'Fetches ECH keys with h2c through 1.1.1.1:443 using the Microsoft TLS preset. Requires Xray with echSockopt and fromMitM support. An explicit ECH query domain is preserved; otherwise SNI is used.':
+		'کلید ECH را با h2c از مسیر 1.1.1.1:443 و تنظیم TLS مایکروسافت می‌گیرد. به Xray با پشتیبانی echSockopt و fromMitM نیاز دارد. دامنهٔ مشخص‌شده در فیلد ECH حفظ می‌شود؛ در غیر این صورت SNI استفاده می‌شود.',
 	'Cipher Suites': 'مجموعه رمزها (Cipher Suites)',
 	'Configures the list of supported cipher suites, separated by colons.': 'فهرست مجموعه رمزهای مجاز، جداشده با دونقطه.',
 	'Xray’s finalmask for this node, as a JSON object. The fragment and noise of the Xray tab are still added, unless this has its own.':

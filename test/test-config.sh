@@ -1205,4 +1205,68 @@ if [ -x "$RIG/core/xray" ]; then
 fi
 rig_clear
 
+echo "== ECH DNS TLS repacking"
+rig_clear
+rig_set cfgech.link "$NX"
+rig_set cfgech.ech 'cloudflare-ech.com+udp://1.1.1.1'
+rig_set cfgech.ech_repack 1
+ECHREC="$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; node_records cfgech' | head -1)"
+ECHOUT="$(printf '%s\n' "$ECHREC" | cut -f6-)"
+printf '%s\n' "$ECHOUT" > "$RIG/etc/best.json"
+sh "$RIG/lib/zgz-mkconfig" > "$WORK/ech-repack.json"
+if python3 - "$WORK/ech-repack.json" <<'PY'
+import json, sys
+c = json.load(open(sys.argv[1]))
+t = c['outbounds'][0]['streamSettings']['tlsSettings']
+assert t['echConfigList'] == 'cloudflare-ech.com+h2c://1.1.1.1/dns-query'
+assert t['echSockopt'] == {'dialerProxy': 'tls-repack-dns', 'mark': 255}
+helpers = [o for o in c['outbounds'] if o.get('tag') == 'tls-repack-dns']
+assert len(helpers) == 1
+o = helpers[0]
+assert o['protocol'] == 'direct'
+assert o['settings']['redirect'] == '1.1.1.1:443'
+assert o['streamSettings']['sockopt']['mark'] == 255
+t = o['streamSettings']['tlsSettings']
+assert t['serverName'] == 'www.microsoft.com'
+assert t['verifyPeerCertByName'] == 'fromMitM,www.microsoft.com'
+assert t['alpn'] == ['fromMitM'] and t['fingerprint'] == 'chrome'
+assert not t.get('allowInsecure')
+PY
+then ok "ECH uses h2c through exactly one verified TLS outbound with a bypass mark"
+else bad "ECH repack configuration"; fi
+if [ -x "$RIG/core/xray" ]; then
+	if "$RIG/core/xray" run -test -config "$WORK/ech-repack.json" > "$WORK/ech-repack.test" 2>&1; then
+		ok "the core accepts ECH repacking"
+	else bad "ECH repacking: $(tail -3 "$WORK/ech-repack.test")"; fi
+fi
+rig_set cfgech.ech 'cloudflare-ech.com+h2c://9.9.9.9/dns-query'
+CUSTOM="$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; node_records cfgech' | cut -f6-)"
+case "$CUSTOM" in *'cloudflare-ech.com+h2c://1.1.1.1/dns-query'*) ok "the preset uses the resolver matched by its TLS redirect" ;; *) bad "ECH resolver does not match TLS redirect" ;; esac
+CHAINS="$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; chain_outbounds '\''{"streamSettings":{"sockopt":{"dialerProxy":"chain-cfgech"}}}'\''')"
+printf '%s\n' "$CHAINS" > "$WORK/ech-chains.jsonl"
+if python3 - "$WORK/ech-chains.jsonl" <<'PY'
+import json, sys
+outbounds = [json.loads(line) for line in open(sys.argv[1]) if line.strip()]
+assert [o['tag'] for o in outbounds] == ['chain-cfgech', 'tls-repack-dns']
+assert outbounds[0]['streamSettings']['tlsSettings']['echSockopt']['dialerProxy'] == 'tls-repack-dns'
+PY
+then ok "pre-proxy nodes keep their ECH settings and helper"
+else bad "pre-proxy ECH dependency missing"; fi
+rig_set cfgech.ech ''
+NOSERVER="$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; node_records cfgech' | cut -f6-)"
+case "$NOSERVER" in *'"echConfigList":"h2c://1.1.1.1/dns-query"'*) ok "without an explicit ECH domain the core uses SNI" ;; *) bad "ECH preset without domain" ;; esac
+rig_set cfgech.ech 'cloudflare-ech.com+udp://1.1.1.1'
+rig_set cfgech.ech_repack 0
+OFF="$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; node_records cfgech' | cut -f6-)"
+case "$OFF" in *tls-repack-dns*) bad "disabled ECH repacking leaks into node" ;; *) ok "ECH repacking is opt-in" ;; esac
+NONE="$(sh -c '. "$ZGZ_LIB/zgz-common.sh"; chain_outbounds "$1"' sh "$OFF")"
+[ -z "$NONE" ] && ok "disabled nodes need no helper" || bad "unused ECH helper"
+if command -v ucode >/dev/null 2>&1; then
+	if ucode "$RIG/lib/zgz-sbconfig" mode=test < "$WORK/ech-repack.json" > "$WORK/ech-singbox.json" 2> "$WORK/ech-singbox.err"; then
+		bad "sing-box silently accepted unsupported ECH repacking"
+	elif grep -q 'ECH TLS repacking requires Xray' "$WORK/ech-singbox.err"; then
+		ok "sing-box refuses to silently drop ECH repacking"
+	else bad "sing-box rejection did not explain ECH repacking"; fi
+fi
+rig_clear
 rig_report

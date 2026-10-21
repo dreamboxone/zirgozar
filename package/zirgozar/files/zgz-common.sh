@@ -1696,9 +1696,7 @@ chain_outbound() {
 	_co_link="$(uci -q get "zirgozar.$1.link" 2>/dev/null)" || _co_link=""
 	if [ -n "$_co_link" ]; then
 		# A WARP node is read with its section, which names its account.
-		case "$_co_link" in
-			warp://*) _co_link="$(section_links "$1")" ;;
-		esac
+		_co_link="$(section_links "$1")"
 		_co="$(printf '%s\n' "$_co_link" | LC_ALL=C awk -v LIMIT=1 -f "$ZGZ_LIB/zgz-parse" 2>/dev/null | head -1)"
 	else
 		# Not a hand-added node: a subscription's own node that its landing
@@ -1723,11 +1721,18 @@ chain_outbound() {
 # Every chain-<section> the given outbounds dial through, as outbounds of
 # their own, one per line, each once.
 chain_outbounds() {
-	printf '%s\n' "$1" | grep -o '"dialerProxy":"chain-[A-Za-z0-9_]*"' | sort -u |
+	local dependencies
+	dependencies="$(printf '%s\n' "$1" | grep -o '"dialerProxy":"chain-[A-Za-z0-9_]*"' | sort -u |
 		sed 's/.*"chain-\([A-Za-z0-9_]*\)"/\1/' | while read -r _cs; do
 			[ -n "$_cs" ] || continue
 			chain_outbound "$_cs" || warn "the pre-proxy '$_cs' could not be read - it has been deleted, or Xray cannot speak it"
-		done
+		done)"
+	[ -z "$dependencies" ] || printf '%s\n' "$dependencies"
+	# ECH bootstrap must leave directly, before the tunnel exists. Both the
+	# tunnel and measuring/exported configurations collect dependencies here.
+	if printf '%s\n%s\n' "$1" "$dependencies" | grep -q '"dialerProxy":"tls-repack-dns"'; then
+		printf '%s\n' '{"tag":"tls-repack-dns","protocol":"direct","settings":{"redirect":"1.1.1.1:443"},"streamSettings":{"security":"tls","tlsSettings":{"serverName":"www.microsoft.com","verifyPeerCertByName":"fromMitM,www.microsoft.com","alpn":["fromMitM"],"fingerprint":"chrome"},"sockopt":{"mark":255}}}'
+	fi
 	return 0
 }
 
@@ -1759,7 +1764,7 @@ node_domain_strategy() {
 # as the lines zgz-parse reads them from: "#!zgz-x.<key>=<value>". A
 # certificate keeps its lines with a bar between them, a JSON object loses its
 # line breaks. Nothing at all for a node that has none.
-NODE_EXTRA_KEYS="ech tls_pin cert_name tls_pem cipher_suites user_agent finalmask tcp_fast_open tcp_mptcp domain_strategy happy_eyeballs warpplus ws_heartbeat grpc_idle grpc_health grpc_window grpc_permit kcp_mtu kcp_tti kcp_uplink kcp_downlink kcp_read kcp_write kcp_congestion sb_mux sb_mux_streams sb_mux_padding sb_brutal_up sb_brutal_down wg_system ssrust hy_portmap"
+NODE_EXTRA_KEYS="ech ech_repack tls_pin cert_name tls_pem cipher_suites user_agent finalmask tcp_fast_open tcp_mptcp domain_strategy happy_eyeballs warpplus ws_heartbeat grpc_idle grpc_health grpc_window grpc_permit kcp_mtu kcp_tti kcp_uplink kcp_downlink kcp_read kcp_write kcp_congestion sb_mux sb_mux_streams sb_mux_padding sb_brutal_up sb_brutal_down wg_system ssrust hy_portmap"
 
 node_extras() {
 	for _nk in $NODE_EXTRA_KEYS; do
