@@ -365,7 +365,7 @@ return view.extend({
 				E('div', { 'class': 'cbi-value-field' }, [
 					E('div', { 'id': 'pwp-geo-status' }, []),
 					E('div', { 'style': 'display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px' }, [
-						pui.btn(_('Manually update'), 'primary mk-small', function(ev) {
+						pui.btn(_('Update'), 'primary mk-small', function(ev) {
 							var b = ev.currentTarget;
 							var ip = ticked('geoip_update'), site = ticked('geosite_update');
 							if (!ip && !site) {
@@ -419,7 +419,7 @@ return view.extend({
 
 		/* ------------------------------------------------------ rebind */
 		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Sites with a rebind weakness'),
-			_('Some sites answer with a private address — Iranian banks and government services among them, which resolve to 10.x addresses inside the country. The router’s DNS protection against rebind attacks refuses those answers, and the site simply does not open. Every name listed here is excused from that protection, together with everything under it.'));
+			E('div', { 'class': 'cbi-value-description' }, _('Some sites answer with a private address — Iranian banks and government services among them, which resolve to 10.x addresses inside the country. The router’s DNS protection against rebind attacks refuses those answers, and the site simply does not open. Every name listed here is excused from that protection, together with everything under it.')));
 		s.anonymous = true;
 
 		o = s.option(form.DynamicList, 'rebind_domain', _('Domains'));

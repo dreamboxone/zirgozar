@@ -623,7 +623,7 @@ var FA = {
 	'Traffic Rules': 'قوانین ترافیکی',
 	'Sites with a rebind weakness': 'سایت‌های دارای ضعف امنیتی Rebind Attack',
 	'Some sites answer with a private address — Iranian banks and government services among them, which resolve to 10.x addresses inside the country. The router’s DNS protection against rebind attacks refuses those answers, and the site simply does not open. Every name listed here is excused from that protection, together with everything under it.':
-		'بعضی سایت‌های ایرانی، مثل بانک‌ها و سرویس‌های دولتی، آدرس داخلی (10.x) دارند. روتر برای امنیت این جواب‌ها را رد می‌کند و سایت باز نمی‌شود. سایت‌هایی که اینجا بنویسید، با زیردامنه‌هایشان، از این محدودیت معاف می‌شوند.',
+		'بعضی سایت‌های ایرانی، مثل بانک‌ها و سرویس‌های دولتی، آدرس داخلی (10.x.x.x) دارند. روتر برای امنیت این جواب‌ها را رد می‌کند و سایت باز نمی‌شود. سایت‌هایی که اینجا بنویسید، با زیردامنه‌هایشان، از این محدودیت معاف می‌شوند.',
 	'Domains': 'دامنه‌ها',
 	'That does not look like a domain name': 'این شبیه یک نام دامنه نیست',
 	'Direct addresses': 'IPهای مستقیم',
