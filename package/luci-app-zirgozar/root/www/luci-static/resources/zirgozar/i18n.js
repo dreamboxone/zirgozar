@@ -300,6 +300,8 @@ var FA = {
 	'SSTP did not connect. The Runtime Logs page says how far it got.': 'SSTP وصل نشد. جزئیات اتصال در برگه گزارش‌ها موجود است.',
 	'IKEv2 did not connect. The Runtime Logs page says how far it got.': 'IKEv2 وصل نشد. جزئیات اتصال در برگه گزارش‌ها موجود است.',
 	'Sign-in': 'روش ورود',
+	'Authentication method': 'روش احراز هویت',
+	'Certificate file (PEM / DER)': 'فایل گواهی (PEM / DER)',
 	'Username and password': 'نام کاربری و رمز',
 	'Shared key (PSK)': 'کلید مشترک (PSK)',
 	'Server identity': 'شناسه سرور',
@@ -1382,7 +1384,7 @@ var FA = {
 	'Node Remarks': 'نام کانفیگ',
 	'A share link, several of them one per line, a whole WireGuard .conf file or an OpenVPN .ovpn profile.':
 		'یک لینک اشتراک‌گذاری، چند لینک هر کدام در یک خط، یک فایل کامل WireGuard ‏.conf یا یک پروفایل OpenVPN ‏.ovpn.',
-	'Address (Support Domain Name)': 'آدرس (دامنه هم قبول است)',
+	'Address (Support Domain Name)': 'آی پی یا دامنه سرور',
 	'ID': 'شناسه (UUID)',
 	'Username': 'نام کاربری',
 	'Password': 'رمز عبور',

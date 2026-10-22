@@ -4,6 +4,7 @@
 RIG_ROOT="${RIG_ROOT:-$(mktemp -d /tmp/zgz-ikev2-test.XXXXXX)}"
 . "$(dirname "$0")/rig.sh"
 rig_setup
+node "$RIG_SRC/test/test-ikev2-form.js" || bad 'IKEv2 certificate import or authentication form failed'
 
 # Exercise the production helpers without starting IPsec or altering routes.
 sed '/^case "$MODE" in/,$d; s/^check() {/ikev2_check() {/' "$RIG/lib/zgz-ikev2" > "$RIG/ikev2-functions"

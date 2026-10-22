@@ -1135,9 +1135,11 @@ return view.extend({
 
 			/* IKEv2: a username and password, with the server proving itself by
 			   certificate, or a shared key alone. Carried by zgz-ikev2. */
-			o = field(form.ListValue, 'ikev2_auth', _('Sign-in'));
+			o = field(form.ListValue, 'ikev2_auth', _('Authentication method'));
 			o.value('eap', _('Username and password'));
 			o.value('psk', _('Shared key (PSK)'));
+			o.widget = 'select';
+			o.default = 'eap';
 			o.cfgvalue = function() { return f.ikev2_auth == 'psk' ? 'psk' : 'eap'; };
 			o.depends('_proto', 'ikev2');
 			o = field(form.Value, 'ikev2_psk', _('Shared key (PSK)'));
@@ -1152,6 +1154,7 @@ return view.extend({
 			o = field(form.TextValue, 'ikev2_ca', _('Certificate authority'),
 				_('Optional. The CA certificate the provider supplies, in PEM form. Left empty, the server certificate must be from a public authority, such as Let’s Encrypt.'));
 			o.rows = 5;
+			nodelink.withBrowse(o, _('Certificate file (PEM / DER)'), { certificate: true, accept: '.pem,.crt,.cer,.der,text/plain,application/x-pem-file,application/pkix-cert' });
 			o.placeholder = '-----BEGIN CERTIFICATE-----';
 			o.validate = function(section_id, value) {
 				return !value || /^\s*-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----\s*$/.test(value) ? true : _('Paste the whole certificate, from BEGIN CERTIFICATE to END CERTIFICATE.');

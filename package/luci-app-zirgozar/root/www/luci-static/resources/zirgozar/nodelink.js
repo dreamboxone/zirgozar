@@ -106,7 +106,18 @@ function nameFromLink(text) {
    uploaded anywhere, and what gets saved is the same text as if it had been
    typed - so everything downstream, the parser included, sees exactly what it
    saw before and none of it had to learn about files. */
-function withBrowse(o, hint) {
+function certificatePEM(buffer) {
+	var bytes = new Uint8Array(buffer);
+	var text = new TextDecoder().decode(bytes).trim();
+	if (/^-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----$/.test(text)) return text;
+	if (bytes[0] != 0x30) throw new Error('Invalid certificate');
+	var binary = '';
+	for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+	return '-----BEGIN CERTIFICATE-----\n' + btoa(binary).match(/.{1,64}/g).join('\n') + '\n-----END CERTIFICATE-----';
+}
+
+function withBrowse(o, hint, options) {
+	options = options || {};
 	o.renderWidget = function(section_id, option_index, cfgvalue) {
 		var self = this;
 		var box = form.TextValue.prototype.renderWidget.apply(this,
@@ -114,15 +125,18 @@ function withBrowse(o, hint) {
 
 		var picker = E('input', {
 			'type': 'file',
-			'accept': '.conf,.ovpn,.txt,.json,.yaml,.yml,text/plain',
+			'accept': options.accept || '.conf,.ovpn,.txt,.json,.yaml,.yml,text/plain',
 			'style': 'display:none',
 			'change': function(ev) {
 				var f = ev.target.files && ev.target.files[0];
 				if (!f) return;
 				var reader = new FileReader();
 				reader.onload = function() {
+					var value;
+					try { value = options.certificate ? certificatePEM(reader.result) : String(reader.result || '').trim(); }
+					catch (e) { pui.note(browse, _('That file could not be read.'), 'error'); return; }
 					var el = self.getUIElement(section_id);
-					if (el) el.setValue(String(reader.result || '').trim());
+					if (el) el.setValue(value);
 					/* setValue puts the text in without telling anyone, so the
 					   box went on counting as empty: LuCI had checked it once,
 					   when it was empty, and never again - which is why the
@@ -138,7 +152,8 @@ function withBrowse(o, hint) {
 				reader.onerror = function() {
 					pui.note(browse, _('That file could not be read.'), 'error');
 				};
-				reader.readAsText(f);
+				if (options.certificate) reader.readAsArrayBuffer(f);
+				else reader.readAsText(f);
 				/* So that choosing the same file twice in a row still fires
 				   a change. */
 				ev.target.value = '';
