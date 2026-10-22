@@ -1030,6 +1030,11 @@ If you run a modified version on a router whose web page other people use over t
 
 ## 🙏 10. Thanks
 
+Thanks to [patterniha](https://github.com/patterniha) for developing
+[their Xray-core build](https://github.com/patterniha/Xray-core) and
+[PattN](https://github.com/patterniha/PattN). Zirgozar supports this core and
+reads configuration parameters from PattN links thanks to these projects.
+
 The default config list is the **TOP 100** collection published by
 [@Raydikalx](https://t.me/raydikalx), gathered and kept current as free, public
 work. The Iranian routing data is
