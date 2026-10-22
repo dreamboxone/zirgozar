@@ -616,10 +616,10 @@ jobs:
 
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" release/* --clobber
-            gh release edit   "$tag" --title "زیرگذر $tag" --notes-file notes.md
+            gh release edit   "$tag" --title "$tag" --notes-file notes.md
           else
             gh release create "$tag" release/* \
               --target "$GITHUB_SHA" \
-              --title "زیرگذر $tag" \
+              --title "$tag" \
               --notes-file notes.md
           fi
