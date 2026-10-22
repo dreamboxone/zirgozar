@@ -7,7 +7,7 @@
 <h3 align="center">فیلترشکن سراسری برای روتر OpenWrt</h3>
 
 <p align="center">
-  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.30-r3"></a>
+  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300"></a>
   <a href="https://github.com/dreamboxone/zirgozar/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/dreamboxone/zirgozar/total?style=for-the-badge&color=0ea5e9"></a>
   <img alt="OpenWrt" src="https://img.shields.io/badge/OpenWrt-23.05%20%7C%2024.10%20%7C%2025.12-00B5E2?style=for-the-badge&logo=openwrt&logoColor=white">
   <img alt="Xray" src="https://img.shields.io/badge/core-Xray-7c3aed?style=for-the-badge">
@@ -110,15 +110,15 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 
 ### راه ساده: از خود LuCI
 
-در LuCI بروید به **System ← Software** و **Upload Package…** را بزنید. اول فایل
+در LuCI بروید به **<bdi dir="ltr">System → Software</bdi>** و **Upload Package…** را بزنید. اول فایل
 اصلی را آپلود و نصب کنید، بعد فایل `luci-app-…` را. بعد از دومی یک بار
 **Ctrl+F5** بزنید تا صفحه جدید ظاهر شود.
 
 ### نصب مستقیم از GitHub با SSH
 
-به روتر SSH بزنید و دستور زیر را اجرا کنید. این دستور فایل‌های نسخه **5.7.30-r3**
+به روتر SSH بزنید و دستور زیر را اجرا کنید. این دستور فایل‌های آخرین نسخه منتشر شده
 را برای معماری روتر دانلود می‌کند و با مدیر بسته موجود نصب یا ارتقا می‌دهد.
-ابتدا باید این نسخه در [صفحه ریلیز](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.30-r3) منتشر شده باشد.
+نسخه به صورت خودکار از [آخرین ریلیز](https://github.com/dreamboxone/zirgozar/releases/latest) خوانده می شود؛ دستور به `jsonfilter` موجود در OpenWrt نیاز دارد.
 
 <div dir="ltr">
 
@@ -126,8 +126,13 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 (
   set -eu
   . /etc/openwrt_release
-  version='5.7.30-r3'
-  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.30-r3'
+  tag="$(wget -qO- https://api.github.com/repos/dreamboxone/zirgozar/releases/latest | jsonfilter -e '@.tag_name')"
+  case "$tag" in
+    v[0-9]*) ;;
+    *) echo 'Could not determine the latest release.' >&2; exit 1 ;;
+  esac
+  version="${tag#v}"
+  base="https://github.com/dreamboxone/zirgozar/releases/download/$tag"
   install_dir="/tmp/zirgozar-install-$version"
   mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
@@ -157,10 +162,10 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 
 دو فایل هم نسخه مناسب معماری روتر را از صفحه ریلیز دانلود کنید و با WinSCP
 یا SCP به `/tmp` روتر بفرستید. فرمان نمونه زیر روی کامپیوتر اجرا می شود؛
-آدرس روتر و نام فایل ها را مطابق دستگاه خود تغییر دهید:
+آدرس روتر را مطابق دستگاه خود تغییر دهید و فرمان را در پوشه ای اجرا کنید که فقط دو فایل همان ریلیز و معماری را دارد:
 
 ```sh
-scp -O zirgozar-5.7.30-r3.arm_cortex-a7_neon-vfpv4.apk luci-app-zirgozar-5.7.30-r3.apk root@192.168.1.1:/tmp/
+scp -O zirgozar-*.apk luci-app-zirgozar-*.apk root@192.168.1.1:/tmp/
 ```
 
 برای OpenWrt قدیمی، دو فایل `.ipk` را به همین روش منتقل کنید.
@@ -170,18 +175,42 @@ scp -O zirgozar-5.7.30-r3.arm_cortex-a7_neon-vfpv4.apk luci-app-zirgozar-5.7.30-
 کافی روی `/overlay` نیاز دارد و وابستگی های گم شده از اینترنت دریافت می شوند.
 
 اگر فایل‌ها را با WinSCP در `/tmp` گذاشته‌اید، فقط نصب را انجام دهید.
-در مثال زیر معماری روتر `arm_cortex-a7_neon-vfpv4` است؛ برای روتر دیگر نام معماری را عوض کنید:
+فقط یک جفت فایل هم نسخه در `/tmp` بگذارید. دستور زیر نسخه فایل ها و معماری روتر را خودکار تشخیص می دهد:
 
 <div dir="ltr">
 
 ```sh
-# OpenWrt 25.12 and later
-apk update
-apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.30-r3.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.30-r3.apk
-
-# OpenWrt 24.10 / 23.05
-opkg update
-opkg install /tmp/zirgozar_5.7.30-r3_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.30-r3_all.ipk
+(
+  set -eu
+  . /etc/openwrt_release
+  if command -v apk >/dev/null 2>&1; then
+    set -- /tmp/luci-app-zirgozar-*.apk
+    [ "$#" -eq 1 ] && [ -f "$1" ] || {
+      echo 'Keep exactly one release pair in /tmp.' >&2; exit 1;
+    }
+    luci="$1"
+    version="${luci##*/luci-app-zirgozar-}"
+    version="${version%.apk}"
+    main="/tmp/zirgozar-$version.$DISTRIB_ARCH.apk"
+    [ -f "$main" ] || { echo "Missing package: $main" >&2; exit 1; }
+    apk update
+    apk add --allow-untrusted --upgrade "$main" "$luci"
+  elif command -v opkg >/dev/null 2>&1; then
+    set -- /tmp/luci-app-zirgozar_*_all.ipk
+    [ "$#" -eq 1 ] && [ -f "$1" ] || {
+      echo 'Keep exactly one release pair in /tmp.' >&2; exit 1;
+    }
+    luci="$1"
+    version="${luci##*/luci-app-zirgozar_}"
+    version="${version%_all.ipk}"
+    main="/tmp/zirgozar_${version}_${DISTRIB_ARCH}.ipk"
+    [ -f "$main" ] || { echo "Missing package: $main" >&2; exit 1; }
+    opkg update
+    opkg install "$main" "$luci"
+  else
+    echo 'apk or opkg was not found.' >&2; exit 1
+  fi
+)
 ```
 
 </div>
@@ -205,7 +234,7 @@ HTTPS می‌گیرد؟ — و هرچه کم باشد با یک دکمه نصب 
 
 ## 🚀 ۳. اولین اتصال
 
-۱. در LuCI بروید به **Services ← Zirgozar**. صفحه اول **تنظیمات پایه** است.
+۱. در LuCI بروید به **<bdi dir="ltr">Services → Zirgozar</bdi>**. صفحه اول **تنظیمات پایه** است.
 ۲. صفحه که باز شد، روتر همان لحظه شروع می‌کند به اندازه‌گیری کانفیگ‌ها؛ کارت
    وضعیت نشان می‌دهد تا کجا رسیده.
 ۳. در زبانه **اصلی** گزینه **کلید اصلی** را روشن کنید و **ذخیره و اعمال** را

@@ -5,7 +5,7 @@
 <h3 align="center">A router-wide tunnel for OpenWrt</h3>
 
 <p align="center">
-  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.30-r3"></a>
+  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300"></a>
   <a href="https://github.com/dreamboxone/zirgozar/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/dreamboxone/zirgozar/total?style=for-the-badge&color=0ea5e9"></a>
   <img alt="OpenWrt" src="https://img.shields.io/badge/OpenWrt-23.05%20%7C%2024.10%20%7C%2025.12-00B5E2?style=for-the-badge&logo=openwrt&logoColor=white">
   <img alt="Xray" src="https://img.shields.io/badge/core-Xray-7c3aed?style=for-the-badge">
@@ -116,15 +116,20 @@ install the main file first, then the `luci-app-…` one. After the second, pres
 ### Install directly from GitHub over SSH
 
 SSH into the router and run the command below to download and install or upgrade
-version **5.7.30-r3** for its architecture. The version must first be published on
-the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.30-r3).
+the latest published release for its architecture. The command discovers the
+release from GitHub automatically and uses OpenWrt's `jsonfilter` utility.
 
 ```sh
 (
   set -eu
   . /etc/openwrt_release
-  version='5.7.30-r3'
-  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.30-r3'
+  tag="$(wget -qO- https://api.github.com/repos/dreamboxone/zirgozar/releases/latest | jsonfilter -e '@.tag_name')"
+  case "$tag" in
+    v[0-9]*) ;;
+    *) echo 'Could not determine the latest release.' >&2; exit 1 ;;
+  esac
+  version="${tag#v}"
+  base="https://github.com/dreamboxone/zirgozar/releases/download/$tag"
   install_dir="/tmp/zirgozar-install-$version"
   mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
@@ -152,10 +157,10 @@ the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.30-
 
 Download both matching release packages for your router, then copy them to
 `/tmp` using WinSCP or SCP. Run this example on your computer, replacing the
-router address and package filenames as needed:
+router address as needed. Run it from a directory containing only the matching release pair for your architecture:
 
 ```sh
-scp -O zirgozar-5.7.30-r3.arm_cortex-a7_neon-vfpv4.apk luci-app-zirgozar-5.7.30-r3.apk root@192.168.1.1:/tmp/
+scp -O zirgozar-*.apk luci-app-zirgozar-*.apk root@192.168.1.1:/tmp/
 ```
 
 For older OpenWrt, transfer the two `.ipk` files instead. Connect to the router
@@ -165,16 +170,40 @@ Installation still needs writable storage on `/overlay`, and missing dependencie
 are downloaded from the router's package feeds.
 
 If you already copied the files to `/tmp` with WinSCP, install them directly.
-These examples use `arm_cortex-a7_neon-vfpv4`; replace it with your router's architecture:
+Keep exactly one matching release pair in `/tmp`. This command detects its version and the router architecture automatically:
 
 ```sh
-# OpenWrt 25.12 and later
-apk update
-apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.30-r3.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.30-r3.apk
-
-# OpenWrt 24.10 / 23.05
-opkg update
-opkg install /tmp/zirgozar_5.7.30-r3_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.30-r3_all.ipk
+(
+  set -eu
+  . /etc/openwrt_release
+  if command -v apk >/dev/null 2>&1; then
+    set -- /tmp/luci-app-zirgozar-*.apk
+    [ "$#" -eq 1 ] && [ -f "$1" ] || {
+      echo 'Keep exactly one release pair in /tmp.' >&2; exit 1;
+    }
+    luci="$1"
+    version="${luci##*/luci-app-zirgozar-}"
+    version="${version%.apk}"
+    main="/tmp/zirgozar-$version.$DISTRIB_ARCH.apk"
+    [ -f "$main" ] || { echo "Missing package: $main" >&2; exit 1; }
+    apk update
+    apk add --allow-untrusted --upgrade "$main" "$luci"
+  elif command -v opkg >/dev/null 2>&1; then
+    set -- /tmp/luci-app-zirgozar_*_all.ipk
+    [ "$#" -eq 1 ] && [ -f "$1" ] || {
+      echo 'Keep exactly one release pair in /tmp.' >&2; exit 1;
+    }
+    luci="$1"
+    version="${luci##*/luci-app-zirgozar_}"
+    version="${version%_all.ipk}"
+    main="/tmp/zirgozar_${version}_${DISTRIB_ARCH}.ipk"
+    [ -f "$main" ] || { echo "Missing package: $main" >&2; exit 1; }
+    opkg update
+    opkg install "$main" "$luci"
+  else
+    echo 'apk or opkg was not found.' >&2; exit 1
+  fi
+)
 ```
 
 > [!IMPORTANT]
