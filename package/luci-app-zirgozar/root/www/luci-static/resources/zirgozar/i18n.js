@@ -58,7 +58,7 @@ var FA = {
 	'DoT server IP': 'IP سرور DoT',
 	'DoT server port': 'پورت سرور DoT',
 	'DoT certificate name': 'نام گواهی سرور DoT',
-	'The certificate must match this name. TLS verification is always enabled; the selected DNS outbound is respected.': 'گواهی باید با این نام مطابقت داشته باشد. بررسی گواهی TLS همیشه فعال است و مسیر خروج انتخاب‌شدهٔ DNS رعایت می‌شود.',
+	'The certificate must match this name. TLS verification is always enabled; the selected DNS outbound is respected.': 'دامنه وارد شده باید با دامنه معتبر در گواهی سرور DoT مطابقت داشته باشد. بررسی گواهی TLS همیشه فعال است و مسیر خروج انتخاب شده برای DNS رعایت می شود.',
 	'Additional protected DNS ports': 'پورت‌های DNS افزوده برای حفاظت',
 	'Strict mode always protects 853 and 5353. Add other DNS ports here. Port 443 follows website routing and cannot be added. Other services on these ports will also use the tunnel.': 'در حالت سخت‌گیرانه، پورت‌های ۸۵۳ و ۵۳۵۳ همیشه محافظت می‌شوند. پورت‌های دیگر DNS را اینجا اضافه کنید. پورت ۴۴۳ تابع مسیریابی سایت‌هاست و نمی‌توان آن را افزود. سرویس‌های دیگر روی این پورت‌ها هم از تونل عبور می‌کنند.',
 	'Port 443 follows website routing and cannot be a protected DNS port.': 'پورت ۴۴۳ تابع مسیریابی سایت‌هاست و نمی‌توان آن را به پورت‌های DNS افزود.',
@@ -306,7 +306,7 @@ var FA = {
 	'Username and password': 'نام کاربری و رمز',
 	'Shared key (PSK)': 'کلید مشترک (PSK)',
 	'Server identity': 'شناسه سرور',
-	'Optional. The name or address in the server certificate, when it is not the server address above.': 'اختیاری. نام یا آدرسی که در گواهی سرور آمده، وقتی با آدرس سرور بالا فرق دارد.',
+	'Optional. The name or address in the server certificate, when it is not the server address above.': 'اختیاری. دامنه یا آدرس IP درج شده در گواهی سرور را وارد کنید، اگر با آدرس سرور بالا فرق دارد.',
 	'Local identity': 'شناسه این روتر',
 	'Optional. Only when the provider gives one for this router.': 'اختیاری. فقط وقتی فروشنده یکی برای این روتر داده باشد.',
 	'Certificate authority': 'گواهی مرجع (CA)',
@@ -500,7 +500,9 @@ var FA = {
 	'Router requirements': 'پیش‌نیازهای روتر',
 	'Everything is ready': 'همه چیز آماده است',
 	'Details': 'جزییات',
-	'Restore defaults': 'بازگشت به حالت پیش‌فرض',
+	'Restore defaults': 'بازگشت به حالت اولیه',
+	'Chooses how Xray matches domain names against routing rules. hybrid uses a combined matcher; linear checks the domain patterns sequentially. Keep hybrid unless you need linear for troubleshooting. This changes the matching method, not the rule order or DNS settings.':
+		'روش مقایسه نام دامنه با قوانین مسیریابی در Xray را تعیین می کند. hybrid از روش ترکیبی و linear از بررسی ترتیبی الگوهای دامنه استفاده می کند. معمولا hybrid را نگه دارید و برای عیب یابی می توانید linear را امتحان کنید. این گزینه ترتیب قوانین یا تنظیمات DNS را تغییر نمی دهد.',
 	'Tick and save to delete every config and subscription and put every setting back as it was when the program was installed. The routing data, the downloaded cores and the traffic history are kept. There is no undo.':
 		'کانفیگ‌ها و اشتراک‌ها حذف می‌شوند و تنظیمات به حالت زمان نصب برمی‌گردند. داده‌های مسیریابی، هسته‌های دانلودشده و تاریخچه مصرف حفظ می‌شوند. این کار برگشت‌پذیر نیست.',
 	'Every config, every subscription and every setting will be deleted when you save. Continue?':
@@ -545,7 +547,7 @@ var FA = {
 		'در حال نصب. به یک اتصال سالم نیاز دارد و ممکن است یک دقیقه طول بکشد.',
 
 	'Addresses (geoip.dat)': 'آدرس‌ها (geoip.dat)',
-	'Names (geosite.dat)': 'نام‌ها (geosite.dat)',
+	'Names (geosite.dat)': 'دامنه ها (geosite.dat)',
 	'updated %s': 'به‌روزرسانی: %s',
 	'date unknown': 'تاریخ نامعلوم',
 	'not downloaded': 'دانلود نشده',
@@ -576,8 +578,8 @@ var FA = {
 	'Green below (ms)': 'سبز: کمتر از (میلی‌ثانیه)',
 	'Yellow below (ms)': 'زرد: از مرز سبز تا کمتر از (میلی‌ثانیه)',
 	'Orange below (ms)': 'نارنجی: از مرز زرد تا کمتر از (میلی‌ثانیه)',
-	'Red up to (ms); above turns off': 'قرمز: از مرز نارنجی تا (میلی‌ثانیه)؛ بالاتر خاموش',
-	'LED thresholds must increase: green, yellow, orange, red.': 'مرزهای چراغ باید به‌ترتیب افزایش یابند: سبز، زرد، نارنجی، قرمز.',
+	'Red': 'قرمز',
+	'LED thresholds must increase: green, yellow, orange.': 'مرزهای چراغ باید به ترتیب افزایش یابند: سبز، زرد، نارنجی.',
 	'Light mode': 'حالت چراغ',
 	'Steady': 'ثابت',
 	'Blinking': 'چشمک‌زن',
@@ -646,7 +648,7 @@ var FA = {
 	'Certificate fingerprint': 'اثر انگشت گواهی',
 	'Optional. For a self-signed server certificate.': 'اختیاری. برای گواهی خودامضای سرور.',
 	'Auth key': 'کلید احراز هویت',
-	'Name or Tailscale IP of the exit node.': 'نام یا IP تیل‌اسکیل نود خروجی.',
+	'Name or Tailscale IP of the exit node.': 'نام دستگاه نود خروجی در شبکه Tailscale یا آدرس IP تیل اسکیل آن را وارد کنید.',
 	'Device name': 'نام دستگاه',
 	'Control server': 'سرور کنترل',
 	'Empty for Tailscale; a Headscale address otherwise.': 'خالی برای Tailscale؛ در غیر این صورت آدرس Headscale.',
@@ -758,7 +760,7 @@ var FA = {
 	'Remote DNS': 'DNS راه دور',
 	'Remote DNS DoH': 'DoH برای DNS راه دور',
 	'An address, such as the one a DNS service gives you. When it has a name, the server’s IP is looked up for it outside the tunnel; it can also be written after a comma.':
-		'آدرس DoH را وارد کنید، مثلاً همان آدرسی که سرویس DNS به شما داده. اگر آدرس نام دارد، IP سرورش خودکار و بیرون از تونل پیدا می‌شود؛ می‌توانید آن را بعد از یک کاما هم خودتان بنویسید.',
+		'آدرس DoH را وارد کنید؛ مثلا آدرسی که سرویس DNS به شما داده است. اگر آدرس شامل دامنه است، آدرس IP اولیه سرور را بعد از ویرگول وارد کنید.',
 	'DoH request address': 'آدرس درخواست DoH',
 	'Format must be:': 'قالب باید این باشد:',
 	'Remote DNS EDNS Client Subnet': 'EDNS Client Subnet برای DNS راه دور',
@@ -772,7 +774,7 @@ var FA = {
 	'Remote Query Strategy': 'روش درخواست DNS راه دور',
 	'Domain Override': 'جایگزینی دامنه',
 	'One per line: a name, a space, and the address it should resolve to.':
-		'هر خط یک نام، یک فاصله، و آدرسی که برای آن نام برگردانده شود؛ مثل: example.com 1.2.3.4',
+		'در هر خط یک دامنه، یک فاصله و آدرس IP جایگزین آن دامنه را وارد کنید؛ مثل: example.com 1.2.3.4',
 	'DNS Redirect': 'تغییر مسیر DNS',
 
 	'Preproxy': 'پیش‌پروکسی',
@@ -782,7 +784,7 @@ var FA = {
 	'Nodes added by hand on the Configs page.': 'کانفیگ‌هایی که در صفحه کانفیگ‌ها دستی اضافه شده‌اند.',
 	'Fragment': 'فرگمنت',
 	'TCP fragments, which can deceive the censorship system in some cases, such as bypassing SNI blacklists.':
-		'اولین بسته‌های اتصال تکه‌تکه فرستاده می‌شوند تا فیلترینگ نتواند نام سایت (SNI) را تشخیص دهد. برای وقتی که کانفیگ‌ها به خاطر فیلتر SNI وصل نمی‌شوند.',
+		'اولین بسته های اتصال تکه تکه فرستاده می شوند تا تشخیص دامنه در SNI برای فیلترینگ دشوارتر شود. برای زمانی که کانفیگ به دلیل فیلتر SNI وصل نمی شود.',
 	'Fragment Packets': 'بسته‌های فرگمنت',
 	'“tlshello” splits the TLS client hello. “1-3” splits at the TCP layer, the first one to three writes the client makes.':
 		'tlshello: فقط پیام شروع TLS تکه می‌شود (پیشنهادی). 1-3: یک تا سه بسته اول TCP تکه می‌شوند.',
@@ -978,7 +980,7 @@ var FA = {
 	'Xray Settings': 'تنظیمات Xray',
 	'Override the connection destination address': 'جایگزینی آدرس مقصد اتصال',
 	'Override the connection destination address with the sniffed domain. Otherwise the sniffed domain is used for routing only.':
-		'اگر روشن باشد، سرور به جای آدرسی که دستگاه داده، به نام سایت وصل می‌شود؛ حتی اگر دستگاه آدرس فیلترشده گرفته باشد سایت باز می‌شود. اگر خاموش باشد، نام سایت فقط برای مسیریابی استفاده می‌شود.',
+		'اگر روشن باشد، دامنه تشخیص داده شده از ترافیک جایگزین آدرس مقصد اتصال می شود. اگر خاموش باشد، دامنه فقط برای تطبیق قوانین مسیریابی استفاده می شود و آدرس مقصد تغییر نمی کند.',
 	'Excluded Domains': 'دامنه‌های مستثنا',
 	'If the traffic sniffing result is in this list, the destination address will not be overridden.':
 		'برای این سایت‌ها آدرس عوض نمی‌شود؛ سرویس‌هایی که با این کار خراب می‌شوند.',
@@ -1051,14 +1053,14 @@ var FA = {
 	'No shunt rules yet. Add one with the button below.':
 		'هنوز قانون شانتی وجود ندارد. با دکمه پایین یکی اضافه کنید.',
 	'AsIs: only the name is used for routing. IPIfNonMatch: when no rule matches the name, it is resolved to addresses and all the rules are tried again. IPOnDemand: whenever an address rule is met, the name is resolved at once. Auto chooses IPIfNonMatch when a rule or the Iran split has addresses in it, and AsIs otherwise.':
-		'اگر برای سایتی بر اساس نامش قانونی پیدا نشود چه کار شود. AsIs: فقط نام بررسی می‌شود (سریع‌تر). IPIfNonMatch: اگر هیچ قانونی با نام جور نشد، IP سایت پیدا می‌شود و قانون‌های IP هم بررسی می‌شوند. IPOnDemand: برای هر قانون IP، آدرس سایت فورا پیدا می‌شود. خودکار: اگر قانونی با IP دارید IPIfNonMatch، وگرنه AsIs.',
+		'روش استفاده از دامنه و آدرس IP در قوانین مسیریابی را تعیین می کند. منظور از دامنه، عبارتی مثل example.com است. AsIs: دامنه برای تطبیق قوانین به IP تبدیل نمی شود. IPIfNonMatch: اگر هیچ قانونی با دامنه مطابقت نداشت، آدرس IP دامنه پیدا می شود و قوانین دوباره بررسی می شوند. IPOnDemand: به محض رسیدن به قانونی که به IP نیاز دارد، آدرس IP دامنه پیدا می شود. خودکار: اگر قوانین یا جداسازی ایران به آدرس IP نیاز داشته باشند، IPIfNonMatch انتخاب می شود؛ در غیر این صورت AsIs.',
 	'Which traffic each rule is about. Where it goes — a node, direct, or blocked — is chosen in the Shunt Rule tab of Basic Settings. The rules steer the tunnel’s own traffic, in this order, ahead of the Iran split; a device with a node of its own on the Access Control page keeps it.':
 		'هر قانون مشخص می‌کند درباره کدام ترافیک است. اینکه آن ترافیک کجا برود (یک کانفیگ، مستقیم یا مسدود) در زبانه «قانون شانت» صفحه «تنظیمات پایه» انتخاب می‌شود. قانون‌ها به همین ترتیب و پیش از جداسازی ایران روی ترافیک تونل اعمال می‌شوند. دستگاهی که در «کنترل دسترسی» کانفیگ جداگانه دارد، همان را نگه می‌دارد.',
 	'A device’s address, a range such as 192.168.1.0/24, or geoip:private.':
 		'آدرس یک دستگاه، یک محدوده مثل 192.168.1.0/24، یا geoip:private.',
 	'Such as 443, 80,443 or 1000-2000.': 'مثل 443 یا 80,443 یا 1000-2000.',
 	'One a line. domain:example.com is that name and everything under it; full: that name only; regexp: a regular expression; keyword: or a plain word anywhere in the name; geosite: a list from the routing data. A line starting with # is a comment.':
-		'هر خط یک مورد. domain:example.com یعنی این سایت و همه زیردامنه‌هایش. full:example.com فقط خود این نام. keyword:google یا فقط google یعنی هر سایتی که این کلمه در نامش باشد. geosite:google یعنی فهرست آماده سایت‌های گوگل. regexp: یک الگوی پیشرفته. خطی که با # شروع شود نادیده گرفته می‌شود.',
+		'هر خط یک مورد. domain:example.com یعنی این دامنه و همه زیردامنه های آن. full:example.com فقط خود دامنه example.com را تطبیق می دهد. keyword:google یا فقط google یعنی هر دامنه ای که این عبارت را داشته باشد. geosite:google یعنی فهرست آماده دامنه های گوگل. regexp: برای الگوی عبارت منظم است. خطی که با # شروع شود نادیده گرفته می شود.',
 	'One a line: an address, a range such as 10.0.0.0/8, or geoip: and a country code from the routing data. A line starting with # is a comment.':
 		'هر خط یک مورد: یک IP، یک محدوده مثل 10.0.0.0/8، یا فهرست IP یک کشور یا سرویس مثل geoip:ir یا geoip:telegram. خطی که با # شروع شود نادیده گرفته می‌شود.',
 	'Rule Manage': 'مدیریت قوانین',
@@ -1219,7 +1221,7 @@ var FA = {
 	'HTTP Listen Port': 'پورت HTTP',
 	'Not the SOCKS port.': 'نباید همان پورت SOCKS باشد.',
 	'Node address DNS': 'DNS آدرس نودها',
-	'The resolver every node’s server name is looked up with, straight out - an IP address, since nothing can be looked up before the tunnel is up. Empty uses Direct DNS. Such as 1.1.1.1, tcp://8.8.8.8 or https://8.8.8.8/dns-query.': 'DNS که نام سرور همه نودها، از جمله نودهای اشتراک، مستقیم با آن پیدا می‌شود. باید آدرس IP باشد، چون پیش از بالا آمدن تونل نامی پیدا نمی‌شود. خالی یعنی DNS مستقیم. مثلاً 1.1.1.1، tcp://8.8.8.8 یا https://8.8.8.8/dns-query.',
+	'The resolver every node’s server name is looked up with, straight out - an IP address, since nothing can be looked up before the tunnel is up. Empty uses Direct DNS. Such as 1.1.1.1, tcp://8.8.8.8 or https://8.8.8.8/dns-query.': 'سرور DNS برای تبدیل دامنه سرور همه کانفیگ ها، از جمله کانفیگ های اشتراک، به آدرس IP است. درخواست ها مستقیم ارسال می شوند. آدرس این DNS باید IP باشد تا برای دسترسی به آن به تبدیل دامنه دیگری نیاز نباشد. خالی یعنی استفاده از DNS مستقیم. مثلا 1.1.1.1، tcp://8.8.8.8 یا https://8.8.8.8/dns-query.',
 	'An IP address, such as 1.1.1.1, tcp://8.8.8.8 or https://8.8.8.8/dns-query.': 'یک آدرس IP، مثلاً 1.1.1.1، tcp://8.8.8.8 یا https://8.8.8.8/dns-query.',
 	'%d added; %d were already in the list.': '%d کانفیگ اضافه شد؛ %d تا از قبل در فهرست بودند.',
 	'Enter share links, one per line. Subscription links are not supported!': 'لینک‌های کانفیگ را وارد کنید، هر خط یک لینک. لینک اشتراک پذیرفته نمی‌شود!',
@@ -1419,7 +1421,7 @@ var FA = {
 	'Once set, connects only when the server’s chain fingerprint matches.':
 		'اگر پر شود، فقط وقتی وصل می‌شود که اثر انگشت زنجیره گواهی سرور با آن یکی باشد.',
 	'TLS Certificate Name (CertName)': 'نام گواهی TLS ‏(CertName)',
-	'TLS is used to verify the leaf certificate name.': 'نام گواهی سرور با این نام سنجیده می‌شود.',
+	'TLS is used to verify the leaf certificate name.': 'دامنه یا شناسه مورد انتظار در گواهی نهایی سرور برای بررسی TLS استفاده می شود؛ منظور نام فایل گواهی نیست.',
 	'TLS Certificate (PEM)': 'گواهی TLS ‏(PEM)',
 	'A certificate the server’s chain is checked against, in place of the usual ones.':
 		'گواهی‌ای که زنجیره سرور به‌جای گواهی‌های معمول با آن سنجیده می‌شود.',
@@ -1487,7 +1489,7 @@ var FA = {
 	'Handshake server': 'سرور دست‌دادن (dest)',
 	'A real site the handshake is borrowed from, as host:port.': 'یک سایت واقعی که دست‌دادن از آن قرض گرفته می‌شود، به شکل host:port.',
 	'Server names': 'نام‌های سرور (serverNames)',
-	'The names a client may ask for. Empty is the handshake server’s.': 'نام‌هایی که کلاینت می‌تواند بخواهد. خالی یعنی نام سرور دست‌دادن.',
+	'The names a client may ask for. Empty is the handshake server’s.': 'دامنه های مجاز در SNI درخواست کلاینت. خالی یعنی دامنه سرور دست دادن.',
 	'Where the traffic of whoever connects leaves from. Hysteria2 and TUIC servers can use the first three.':
 		'ترافیک کسی که وصل می‌شود از کجا بیرون برود. سرورهای Hysteria2 و TUIC فقط سه گزینه اول را دارند.',
 	'Through the Zirgozar tunnel': 'از داخل تونل زیرگذر',

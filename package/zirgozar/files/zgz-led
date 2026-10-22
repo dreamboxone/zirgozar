@@ -88,18 +88,18 @@ restore() {
 
 thresholds() {
 	G="$(cfg led_green_ms 200)"; Y="$(cfg led_yellow_ms 300)"
-	O="$(cfg led_orange_ms 500)"; R="$(cfg led_red_ms 1000)"
-	for v in "$G" "$Y" "$O" "$R"; do
+	O="$(cfg led_orange_ms 500)"
+	for v in "$G" "$Y" "$O"; do
 		case "$v" in ''|*[!0-9]*) return 1 ;; esac
 		[ "$v" -ge 1 ] && [ "$v" -le 60000 ] || return 1
 	done
-	[ "$G" -lt "$Y" ] && [ "$Y" -lt "$O" ] && [ "$O" -lt "$R" ]
+	[ "$G" -lt "$Y" ] && [ "$Y" -lt "$O" ]
 	return $?
 }
 
 colour() {
 	case "$1" in ''|*[!0-9]*) echo off; return ;; esac
-	if [ "$1" -eq 0 ] || [ "$1" -gt "$R" ]; then echo off
+	if [ "$1" -eq 0 ]; then echo off
 	elif [ "$1" -ge "$O" ]; then echo red
 	elif [ "$1" -ge "$Y" ]; then echo orange
 	elif [ "$1" -ge "$G" ]; then echo yellow

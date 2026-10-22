@@ -33,7 +33,7 @@ done
 detect
 [ "$BLINK" = 1 ]
 thresholds
-for pair in '0 off' '199 green' '200 yellow' '299 yellow' '300 orange' '499 orange' '500 red' '1000 red' '1001 off'; do
+for pair in '0 off' '199 green' '200 yellow' '299 yellow' '300 orange' '499 orange' '500 red' '1000 red' '1001 red' '60000 red'; do
  set -- $pair
  [ "$(colour "$1")" = "$2" ]
 done

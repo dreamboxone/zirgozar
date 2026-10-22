@@ -383,18 +383,20 @@ return view.extend({
 			: _('No supported dimmable RGB indicator was detected on this router.'));
 		o.default = '0'; o.rmempty = false; o.readonly = !led.supported;
 		if (led.supported) {
-			var bounds = [ ['green', 200, _('Green below (ms)')], ['yellow', 300, _('Yellow below (ms)')], ['orange', 500, _('Orange below (ms)')], ['red', 1000, _('Red up to (ms); above turns off')] ];
+			var bounds = [ ['green', 200, _('Green below (ms)')], ['yellow', 300, _('Yellow below (ms)')], ['orange', 500, _('Orange below (ms)')], ['red', 0, _('Red')] ];
 			bounds.forEach(function(b) {
+				if (b[0] != 'red') {
 				var v = s.option(form.Value, 'led_' + b[0] + '_ms', b[2]);
 				v.default = String(b[1]); v.rmempty = false; v.datatype = 'range(1,60000)'; v.depends('led_enabled', '1');
 				v.validate = function(sid, value) {
-					var vals = bounds.map(function(x) {
+					var vals = bounds.slice(0, 3).map(function(x) {
 						var opt = m.lookupOption('led_' + x[0] + '_ms', sid);
 						return Number(opt && opt[0] ? opt[0].formvalue(sid) : x[1]);
 					});
-					return vals.every(function(n) { return Number.isInteger(n) && n >= 1 && n <= 60000; }) && vals[0] < vals[1] && vals[1] < vals[2] && vals[2] < vals[3]
-						? true : _('LED thresholds must increase: green, yellow, orange, red.');
+					return vals.every(function(n) { return Number.isInteger(n) && n >= 1 && n <= 60000; }) && vals[0] < vals[1] && vals[1] < vals[2]
+						? true : _('LED thresholds must increase: green, yellow, orange.');
 				};
+				}
 				var mode = s.option(form.ListValue, 'led_' + b[0] + '_mode', b[2] + ' — ' + _('Light mode'));
 				mode.value('steady', _('Steady')); if (led.blink) mode.value('blink', _('Blinking'));
 				mode.default = 'steady'; mode.rmempty = false; mode.depends('led_enabled', '1');

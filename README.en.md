@@ -258,6 +258,8 @@ Every option is also a line in `/etc/config/zirgozar`, an ordinary UCI
 file; the name in backticks is its name there. Anything a page does can be done
 by editing the file, and the other way round.
 
+Click the question mark beside an option to open its help. Click outside the popup or press Escape to close it.
+
 Two things hold on every page:
 
 - **Nothing is changed until you press Save & Apply** at the foot of the page.
@@ -594,7 +596,7 @@ For an ECH node whose plain DNS key lookup is blocked, open the node editor and 
 
 ### 🧰 4.4 Other Settings
 
-**LED color**, at the end of the Other Settings form, is off by default and leaves the indicator under OpenWrt control. Supported indicators have three matching, independently dimmable RGB channels. While enabled, a URL test through the current connection runs every 15 seconds: below 200 ms green, 200–299 ms yellow, 300–499 ms orange, 500–1000 ms red, and above 1000 ms or a failed test off. All four boundaries are editable. Each colour can be steady or blinking when supported. Disabling restores OpenWrt LED settings.
+**LED color**, at the end of the Other Settings form, is off by default and leaves the indicator under OpenWrt control. Supported indicators have three matching, independently dimmable RGB channels. While enabled, a URL test through the current connection runs every 15 seconds: below 200 ms green, 200–299 ms yellow, 300–499 ms orange, 500 ms and above red; a disconnected tunnel or failed test turns the indicator off. All three boundaries are editable. Each colour can be steady or blinking when supported. Disabling restores OpenWrt LED settings.
 
 Home renders without waiting for subscription processing; node choices are filled in afterwards. The traffic period is remembered in the same browser.
 

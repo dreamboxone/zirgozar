@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.7.30-r3';
+var BUILD = '5.7.30-r4';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -609,6 +609,70 @@ function footer() {
    Everything a view returns goes in here: Makhzan's root, banner, tab bar
    and footer around it. The right-to-left box for Persian is i18n's, inside
    this one. */
+function optionHelp(root) {
+	var active = null, connected = false;
+	function close() {
+		if (!active) return;
+		active.open = false;
+		active.querySelector('summary').setAttribute('aria-expanded', 'false');
+		active = null;
+	}
+	function enhance(scope) {
+		scope.querySelectorAll('.cbi-value-description').forEach(function(desc) {
+			if (desc.closest('.zgz-help') || !desc.textContent.trim()) return;
+			var row = desc.closest('.cbi-value');
+			var label = row && row.querySelector('.cbi-value-title');
+			var help = E('details', { 'class': 'zgz-help' });
+			var summary = E('summary', { 'aria-label': i18n.get() === 'fa' ? 'راهنمای گزینه' : 'Option help', 'aria-expanded': 'false' }, i18n.get() === 'fa' ? '؟' : '?');
+			help.appendChild(summary);
+			desc.classList.add('zgz-help-content');
+			if (label) label.appendChild(help);
+			else desc.parentNode.insertBefore(help, desc);
+			help.appendChild(desc);
+			summary.addEventListener('click', function(ev) {
+				ev.preventDefault(); ev.stopPropagation();
+				var opening = !help.open;
+				close();
+				if (opening) {
+					help.open = true; active = help;
+					summary.setAttribute('aria-expanded', 'true');
+					var anchor = summary.getBoundingClientRect();
+					var box = desc.getBoundingClientRect();
+					desc.style.left = Math.max(16, Math.min(i18n.get() === 'fa' ? anchor.right - box.width : anchor.left, window.innerWidth - box.width - 16)) + 'px';
+					desc.style.top = Math.max(16, anchor.bottom + 8 + box.height <= window.innerHeight - 16 ? anchor.bottom + 8 : anchor.top - box.height - 8) + 'px';
+				}
+			});
+		});
+	}
+	function outside(ev) { if (active && !active.contains(ev.target)) close(); }
+	function scroll(ev) { if (active && !active.contains(ev.target)) close(); }
+	function escape(ev) {
+		if (ev.key === 'Escape' && active) {
+			var summary = active.querySelector('summary'); close(); summary.focus();
+		}
+	}
+	var observer = new MutationObserver(function() {
+		if (root.isConnected) connected = true;
+		else if (connected) {
+			close(); observer.disconnect();
+			document.removeEventListener('click', outside);
+			document.removeEventListener('keydown', escape);
+			document.removeEventListener('scroll', scroll, true);
+			window.removeEventListener('resize', close);
+			return;
+		}
+		enhance(root);
+		var modal = document.querySelector('#modal_overlay > .modal');
+		if (modal) enhance(modal);
+	});
+	enhance(root);
+	observer.observe(document.body, { childList: true, subtree: true });
+	document.addEventListener('click', outside);
+	document.addEventListener('keydown', escape);
+	document.addEventListener('scroll', scroll, true);
+	window.addEventListener('resize', close);
+}
+
 function page(children, opts) {
 	opts = opts || {};
 	var fa = i18n.get() === 'fa';
@@ -637,6 +701,7 @@ function page(children, opts) {
 	root.appendChild(i18n.page(children));
 	root.appendChild(footer());
 	root.zgzSyncTheme = followTheme(root);
+	optionHelp(root);
 	window.setTimeout(root.zgzSyncTheme, 0);
 	return root;
 }

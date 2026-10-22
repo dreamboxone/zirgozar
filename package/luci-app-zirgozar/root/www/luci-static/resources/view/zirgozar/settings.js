@@ -517,7 +517,8 @@ return view.extend({
 		o.value('auto', _('Auto'));
 		o.default = 'IPOnDemand';
 
-		o = s.taboption('shunt', form.ListValue, 'domainMatcher', _('Domain matcher'));
+		o = s.taboption('shunt', form.ListValue, 'domainMatcher', _('Domain matcher'),
+			_('Chooses how Xray matches domain names against routing rules. hybrid uses a combined matcher; linear checks the domain patterns sequentially. Keep hybrid unless you need linear for troubleshooting. This changes the matching method, not the rule order or DNS settings.'));
 		o.value('', 'hybrid');
 		o.value('linear');
 
