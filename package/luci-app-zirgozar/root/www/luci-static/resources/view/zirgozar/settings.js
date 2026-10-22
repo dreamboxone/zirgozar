@@ -338,7 +338,7 @@ return view.extend({
 		nodeChoices(o);
 
 		o = s.taboption('main', form.Flag, 'localhost_proxy', _('Localhost Proxy'),
-			_('When selected, the router’s own traffic goes through the tunnel as well — its downloads, its clock, its package manager, and so the routing data and the cores from GitHub. While a node is being measured or a subscription read it goes direct, so the router can always repair its own tunnel. On by default.'));
+			_('On: the router also uses the tunnel.'));
 		o.default = '1';
 		o.rmempty = false;
 

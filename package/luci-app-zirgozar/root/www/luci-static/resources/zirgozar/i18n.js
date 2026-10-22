@@ -891,8 +891,8 @@ var FA = {
 		'خودکار: همه کانفیگ‌ها آزمایش می‌شوند و سریع‌ترین انتخاب می‌شود. اگر یک کانفیگ دستی انتخاب کنید، همیشه از همان استفاده می‌شود و آزمایشی انجام نمی‌شود.',
 	'Auto (fastest)': 'خودکار (سریع‌ترین)',
 	'Localhost Proxy': 'پروکسی خود روتر',
-	'When selected, the router’s own traffic goes through the tunnel as well — its downloads, its clock, its package manager, and so the routing data and the cores from GitHub. While a node is being measured or a subscription read it goes direct, so the router can always repair its own tunnel. On by default.':
-		'اگر روشن باشد، اینترنت خود روتر هم از فیلترشکن می‌رود؛ مثل دانلود هسته‌ها، فایل‌های مسیریابی و پکیج‌ها از گیت‌هاب. هنگام آزمایش کانفیگ‌ها و خواندن اشتراک، روتر موقتا مستقیم وصل می‌شود تا اگر تونل قطع شد بتواند خودش را درست کند.',
+	'On: the router also uses the tunnel.':
+		'روشن: روتر هم از فیلترشکن استفاده می کند.',
 	'Kill switch': 'کلید قطع اضطراری (Kill switch)',
 	'Off, the network works directly whenever the tunnel is not carrying it — stopped, failed, restarting, or not up yet after a reboot. On, a rule of its own, kept apart from the tunnel and never removed with it, closes the way out for the devices on your network in all of those cases: they reach the local network and nothing else, and are never sent out untunnelled without your knowing. Iranian addresses stay reachable if the Iran split is on, and so do the addresses and devices you set to go direct. Pings, which the tunnel does not carry, are blocked too. To get the direct network back, turn this off and save.':
 		'اگر خاموش باشد، هر وقت تونل ترافیک را عبور نمی‌دهد (متوقف، ناموفق، در حال راه‌اندازی دوباره، یا بعد از ری‌استارت هنوز بالا نیامده) اینترنت دستگاه‌ها مستقیم و بدون تونل کار می‌کند. اگر روشن باشد، یک قانون جدا از تونل که با تونل برداشته نمی‌شود، در همه‌ی این حالت‌ها راه بیرون رفتن دستگاه‌ها را می‌بندد: فقط به شبکه‌ی محلی دسترسی دارند و هیچ‌وقت بدون اطلاع شما مستقیم بیرون نمی‌روند. اگر «تفکیک ایران» روشن باشد مقصدهای ایرانی باز می‌مانند، و همین‌طور آدرس‌ها و دستگاه‌هایی که خودتان مستقیم گذاشته‌اید. پینگ هم که تونل حمل نمی‌کند بسته است. برای برگشتن به اینترنت مستقیم، این گزینه را خاموش و ذخیره کنید.',
