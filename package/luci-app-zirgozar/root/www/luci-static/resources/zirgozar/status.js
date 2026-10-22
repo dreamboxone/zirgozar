@@ -110,7 +110,7 @@ function usageCard() {
 
 function socialCheck(id, name, mark, colour, url) {
 	return E('button', { 'type': 'button', 'id': id, 'class': 'pwp-social-check', 'style': '--site-colour:' + colour, 'click': function() { return check(id, url); } }, [
-		E('span', { 'class': 'pwp-social-icon' }, brand(mark)), E('span', { 'class': 'pwp-social-name' }, name), E('span', { 'class': 'pwp-check-value', 'id': id + '-v' }, _('Touch Check'))
+		E('span', { 'class': 'pwp-social-icon' }, brand(mark)), E('span', { 'class': 'pwp-social-name' }, name), E('span', { 'class': 'pwp-check-value', 'id': id + '-v' }, i18n.get() === 'fa' ? _('Connection check') : _('Check'))
 	]);
 }
 
@@ -279,7 +279,10 @@ function renderState(st) {
 	}
 	window.requestAnimationFrame(updateTickers);
 	st = st || {};
-	setNode('pwp-version', pui.versionText(st.version));
+	if (st.version) {
+		var versionNode = byId('pwp-version'), versionLabel = pui.versionText(st.version);
+		if (versionNode && versionNode.textContent !== versionLabel) versionNode.textContent = versionLabel;
+	}
 	setNode('pwp-state', badge(st));
 	setNode('pwp-node', st.server || '-');
 	setNode('pwp-proto', st.protocol ? st.protocol : '-');

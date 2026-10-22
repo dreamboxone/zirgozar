@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.7.30-r2';
+var BUILD = '5.7.30-r3';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -529,13 +529,14 @@ function hero(root, version) {
 		})
 	}, [ icon('globe'), E('span', {}, fa ? 'English' : 'فارسی') ]);
 
-	var ver = E('span', { 'class': 'mk-version', 'id': 'pwp-version' }, versionText(version));
+	var ver = E('span', { 'class': 'mk-version', 'id': 'pwp-version' }, versionText(version || BUILD));
 	var uptime = E('span', { 'class': 'mk-uptime-value', 'id': 'pwp-uptime', 'dir': 'auto' }, '-');
 	var syncUptime = uptimeTicker(uptime, callState, function() { return Date.now(); }, secondTimer);
 	callState().then(function(st) {
 		if (st) syncUptime(st.uptime);
 		if (!st || !st.version) return;
-		if (!version) ver.textContent = versionText(st.version);
+		var installedVersion = versionText(st.version);
+		if (ver.textContent !== installedVersion) ver.textContent = installedVersion;
 		freshen(st.version, st.ui);
 	}).catch(function() {});
 
@@ -547,12 +548,12 @@ function hero(root, version) {
 	return E('div', { 'class': 'mk-hero' }, [
 		E('div', { 'class': 'mk-brand' }, [ E('div', {}, [
 			E('h2', { 'aria-label': 'Zirgozar' }, [ heroLogo, ver ]),
-			E('p', {}, _('Complete tunnel management on your router'))
+			E('p', {}, _('A total VPN manger for your router'))
 		]) ]),
 		E('div', { 'class': 'mk-row mk-hero-controls' }, [
 			E('div', { 'class': 'mk-seg', 'role': 'group', 'aria-label': _('Display mode') }, [ auto, light, dark ]),
 			E('div', { 'class': 'mk-language-column' }, [ lang,
-				E('div', { 'class': 'mk-uptime' }, [ E('span', {}, _('Router uptime')), uptime ])
+				E('div', { 'class': 'mk-uptime' }, [ E('span', {}, _('Uptime')), uptime ])
 			])
 		])
 	]);

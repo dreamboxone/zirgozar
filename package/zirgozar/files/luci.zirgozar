@@ -806,7 +806,12 @@ method_action() {
 			run_job "Checking which servers answer" "$PROBE sift"
 			;;
 		cores_latest)
-			run_job "Checking for new versions" "$CORES latest force"
+			case "$arg" in
+				'') run_job "Checking for new versions" "$CORES latest force" ;;
+				xray|xray-patterniha|sing-box|sing-box-lx|geoview|warp-plus|vwarp|aether|mihomo|sslocal|haproxy|openvpn|zirgozar|all-cores)
+					run_job "Checking for new versions: $arg" "$CORES latest force $arg" ;;
+				*) fail "unknown core"; return ;;
+			esac
 			;;
 		aether_clear_psiphon)
 			case "$arg" in ''|*[!A-Za-z0-9_]*) fail 'Unknown Aether node.'; return ;; esac

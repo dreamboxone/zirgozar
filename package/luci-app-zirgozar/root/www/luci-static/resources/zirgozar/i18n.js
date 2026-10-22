@@ -172,10 +172,11 @@ var FA = {
 	'%d min ago': '%d دقیقه پیش',
 	'%d h ago': '%d ساعت پیش',
 	'%d days ago': '%d روز پیش',
-	'Router uptime': 'مدت فعالیت',
+	'Uptime': 'مدت فعالیت',
 	'Backup and Restore': 'پشتیبان‌گیری و بازگردانی',
 	'Create Backup File': 'ساخت فایل پشتیبان',
 	'Restore Backup File': 'بازگردانی فایل پشتیبان',
+	'Restore': 'بازگردانی',
 	'Backup or Restore Client and Server Configurations.': 'پشتیبان‌گیری یا بازگردانی تنظیمات کلاینت و سرور.',
 	'The file holds every config, subscription, rule and setting, the shunt rules, the WARP and Aether accounts and the routing data. The cores and the traffic history are not in it.': 'این فایل همه کانفیگ‌ها، اشتراک‌ها، قوانین و تنظیمات، قوانین شانت، حساب‌های WARP و Aether و داده‌های مسیریابی را در خود دارد. هسته‌ها و تاریخچه ترافیک در آن نیستند.',
 	'Note: Restoring configurations across different versions may cause compatibility issues.': 'توجه: بازگردانی تنظیمات یک نسخه دیگر ممکن است مشکل سازگاری ایجاد کند.',
@@ -601,7 +602,7 @@ var FA = {
 	'The release checksum could not be retrieved or is invalid. Nothing was installed.': 'چک‌سام انتشار دریافت نشد یا معتبر نیست؛ چیزی نصب نشد.',
 	'Package installation finished. Check the capability results above.': 'نصب بسته‌ها تمام شد؛ نتیجهٔ بررسی قابلیت‌ها را در ردیف‌های بالا ببینید.',
 	'Install': 'نصب',
-	'Downloading %s.': 'در حال دانلود %s.',
+	'Downloading %s:': 'در حال دانلود %s:',
 	'Remove': 'حذف',
 	'%s removed.': '%s حذف شد.',
 	'Check for new versions': 'بررسی نسخه‌های جدید',
@@ -627,7 +628,7 @@ var FA = {
 	'These addresses always go straight out, never through the tunnel. One address or one range per entry.':
 		'این آدرس‌ها همیشه مستقیم می‌روند و هیچ‌وقت از تونل رد نمی‌شوند. در هر ردیف یک آدرس یا یک رنج.',
 	'Addresses': 'آدرس‌ها',
-	'Sing-Box-LX App Path': 'مسیر برنامه Sing-Box-LX',
+	'Sing-Box-LX App Path': 'مسیر Sing-Box-LX',
 	'The sing-box build that speaks xhttp. Empty means this program’s own copy in the folder above.': 'نسخه‌ای از sing-box که xhttp را می‌فهمد. خالی یعنی نسخه خود این برنامه در پوشه بالا.',
 	'Active core': 'هسته فعال',
 	'Auto measures the nodes and uses the fastest. A node chosen here - added by hand or from a subscription - is used as it is, and nothing is measured. A subscription’s node is found again each time its list is read.': 'خودکار: سریع‌ترین کانفیگ.',
@@ -721,7 +722,7 @@ var FA = {
 	'Dark': 'تیره',
 	'Display mode': 'حالت نمایش',
 	'Status': 'وضعیت',
-	'Complete tunnel management on your router': 'مدیریت کامل فیلترشکن در روتر شما',
+	'A total VPN manger for your router': 'مدیریت کامل فیلترشکن در روتر شما',
 	'Version %s, revision %s': 'نسخه %s ویرایش %s',
 	'No warranty': 'بدون ضمانت',
 	'Source code': 'کد منبع',
@@ -735,7 +736,8 @@ var FA = {
 	'Core': 'هسته',
 	'Helper core': 'هسته کمکی',
 	'Iranian site': 'سایت ایرانی',
-	'Touch Check': 'برای بررسی بزنید',
+	'Check': 'بررسی',
+	'Connection check': 'بررسی اتصال',
 	'Reddit Connection': 'اتصال ردیت',
 	'X Connection': 'اتصال ایکس',
 
@@ -813,11 +815,9 @@ var FA = {
 	/* -------------------------------------------------------- App Update */
 	'App Update': 'به‌روزرسانی',
 	'%s is available': 'نسخه %s آماده است',
-	'It is the latest version': 'آخرین نسخه است',
+	'Up to date': 'به‌روز است',
 	'Check update': 'بررسی به‌روزرسانی',
-	'Force update': 'به‌روزرسانی اجباری',
-	'The update button downloads the new version from GitHub and installs it. The settings are kept.':
-		'دکمه به‌روزرسانی نسخه جدید را از گیت‌هاب دانلود و نصب می‌کند. تنظیمات حفظ می‌شوند.',
+	'Reinstall': 'نصب مجدد',
 	'Downloading and installing the new version. This takes a minute or two; the page reloads by itself when it is done.':
 		'در حال دانلود و نصب نسخه جدید. یکی دو دقیقه طول می‌کشد؛ وقتی تمام شد صفحه خودش دوباره بارگذاری می‌شود.',
 	'Updated to %s.': 'به نسخه %s به‌روز شد.',
@@ -844,7 +844,7 @@ var FA = {
 	'The full files are about 17 MB and 8 MB. If they will not fit, the same project publishes geoip-lite.dat (38 KB) and geosite-lite.dat (2 MB), which carry the Iranian categories and nothing else — put those addresses in the boxes below. A download that will not fit is refused rather than half written.':
 		'فایل‌های کامل حدود ۱۷ و ۸ مگابایت هستند. اگر جا نمی‌شوند، همان پروژه ‎geoip-lite.dat‎ (۳۸ کیلوبایت) و ‎geosite-lite.dat‎ (۲ مگابایت) را هم منتشر می‌کند که فقط دسته‌های ایرانی را دارند — آدرس آن‌ها را در کادرهای پایین بگذارید. دانلودی که جا نشود رد می‌شود، نه اینکه نصفه نوشته شود.',
 	'App Path': 'مسیر برنامه‌ها',
-	'Folder for downloaded cores': 'پوشه هسته‌های دانلودشده',
+	'Core download folder': 'پوشه دانلود هسته‌ها',
 	'Point this at USB storage on a router short of flash. A core another package installed is used where it is and never moved.':
 		'روی روتری که حافظه‌اش کم است، این را روی حافظه USB بگذارید. هسته‌ای که پکیج دیگری نصب کرده همان‌جا که هست استفاده می‌شود و جابه‌جا نمی‌شود.',
 	'Xray App Path': 'مسیر Xray',
@@ -1067,7 +1067,7 @@ var FA = {
 	'Add': 'افزودن',
 	'Default Preproxy': 'پیش‌پراکسی پیش‌فرض',
 	'Geoview': 'موقعیت‌یاب',
-	'Geoview App Path': 'مسیر برنامه Geoview',
+	'Geoview App Path': 'مسیر Geoview',
 	'The Geoview page needs it, and so does sing-box whenever the Iran split or ad blocking is on - it is then installed by itself. Empty means this program’s own copy in the folder above.':
 		'صفحه «موقعیت‌یاب» به آن نیاز دارد، و sing-box هم وقتی تفکیک ایران یا مسدود کردن تبلیغات روشن است — آن وقت خودش نصب می‌شود. خالی یعنی نسخه خود این برنامه در پوشه بالا.',
 	'Geoview shows where a name or an address belongs, on the Geoview page. sing-box cannot read the routing data without it: when sing-box carries the tunnel with the Iran split or ad blocking on, Geoview is installed by itself if it is missing.':
@@ -1187,9 +1187,9 @@ var FA = {
 	'Obfuscation parameter': 'پارامتر مبهم‌سازی',
 	'Carry with shadowsocks-rust': 'اجرا با shadowsocks-rust',
 	'Its own client, from App Update, in place of the core.': 'با کلاینت خودش (از صفحه به‌روزرسانی)، به‌جای هسته.',
-	'Mihomo App Path': 'مسیر برنامه Mihomo',
+	'Mihomo App Path': 'مسیر Mihomo',
 	'Only SSR nodes need it.': 'فقط کانفیگ‌های SSR به آن نیاز دارند.',
-	'shadowsocks-rust App Path': 'مسیر برنامه shadowsocks-rust',
+	'shadowsocks-rust App Path': 'مسیر shadowsocks-rust',
 	'Only Shadowsocks nodes set to use it need it.': 'فقط کانفیگ‌های Shadowsocks که روی آن تنظیم شده‌اند به آن نیاز دارند.',
 	'Only with the sing-box engine: the tunnel is a network interface of the router.': 'فقط با هسته sing-box: تونل یک رابط شبکه روی روتر می‌شود.',
 	'The router’s services are restarting. Try again in a few seconds.': 'سرویس‌های روتر در حال راه‌اندازی دوباره‌اند. چند ثانیه دیگر دوباره امتحان کنید.',
@@ -1240,7 +1240,7 @@ var FA = {
 	'Are you sure set this node?': 'این کانفیگ به‌عنوان کانفیگ اصلی تنظیم شود؟',
 	'This is now the node in Basic Settings.': 'این کانفیگ الان کانفیگ «تنظیمات پایه» است.',
 	'Copy': 'کپی',
-	'Sing-Box App Path': 'مسیر برنامه Sing-Box',
+	'Sing-Box App Path': 'مسیر Sing-Box',
 	'Hysteria App Path': 'مسیر برنامه Hysteria',
 	'Empty means this program’s own copy in the folder above.': 'خالی یعنی نسخه خود این برنامه در پوشه بالا.',
 	'To run a core from memory, give a path beginning with /tmp, save and apply, then press Install beside it above. It has to be installed again after every reboot.':
@@ -1271,6 +1271,7 @@ var FA = {
 	'When the Default row goes to a node, it is reached through this node first.':
 		'اگر ردیف پیش‌فرض به یک کانفیگ می‌رود، اتصال اول از این کانفیگ رد می‌شود.',
 	'Delete the subscribed node': 'حذف کانفیگ‌ها',
+	'Delete Nodes': 'حذف نودها',
 	'Delete subscription': 'حذف اشتراک',
 	'Not enough free space on the router: %s needed, %s free. Nothing was installed.': 'فضای خالی روتر کافی نیست: %s لازم است و %s خالی است. نصب انجام نشد.',
 	'Not enough free space on the router: %s free. Nothing was installed.': 'فضای خالی روتر کافی نیست: فقط %s خالی است. نصب انجام نشد.',
@@ -1545,7 +1546,7 @@ var FA = {
 	'Carry with warp-plus': 'اجرا با warp-plus',
 	'warp-plus sends junk ahead of every WireGuard handshake, which gets it past a filter that drops WireGuard on sight. It needs warp-plus, from App Update. As a pre-proxy or a landing node, the config is still carried by Xray.':
 		'warp-plus قبل از هر هندشیک وایرگارد چند بسته بی‌معنی می‌فرستد و همین وایرگارد را از فیلتری که آن را می‌شناسد و می‌بندد رد می‌کند. warp-plus را از صفحه «به‌روزرسانی» نصب کنید. وقتی این کانفیگ «کانفیگ پیش‌پروکسی» یا «کانفیگ فرود» باشد، همچنان Xray آن را اجرا می‌کند.',
-	'warp-plus App Path': 'مسیر برنامه warp-plus',
+	'warp-plus App Path': 'مسیر warp-plus',
 	'Only WARP nodes need it. Empty means this program’s own copy in the folder above.':
 		'فقط کانفیگ‌های وارپ لازمش دارند. خالی یعنی نسخه خود این برنامه در پوشه بالا.',
 	'warp-plus is only needed for WARP nodes: Cloudflare WARP, WARP in WARP, Psiphon behind WARP, and WireGuard nodes set to be carried by it.':
@@ -1575,7 +1576,7 @@ var FA = {
 	'Junk and padding sent around the first packets, so that a filter does not recognise WireGuard or MASQUE. Heavier gets past more and connects more slowly. Anything but Off needs Vwarp. WARP over MASQUE with Off is carried by Xray itself when it speaks MASQUE - patterniha’s 26.10.8 or later - and Vwarp is then only needed to register the account.':
 		'بسته‌های بی‌معنی و پرکننده دور اولین بسته‌ها، تا فیلتر وایرگارد یا MASQUE را نشناسد. هرچه سنگین‌تر، از فیلترهای بیشتری رد می‌شود و دیرتر وصل می‌شود. هر گزینه‌ای جز «خاموش» به Vwarp نیاز دارد. WARP روی MASQUE با گزینه‌ی «خاموش» را، اگر Xray روی روتر MASQUE را بشناسد (Xray پترنیها 26.10.8 به بعد)، خود Xray اجرا می‌کند؛ آن‌وقت Vwarp فقط برای ثبت حساب لازم است.',
 	'Off': 'خاموش',
-	'Vwarp App Path': 'مسیر برنامه Vwarp',
+	'Vwarp App Path': 'مسیر Vwarp',
 	'Only WARP nodes over MASQUE or with noize need it. Empty means this program’s own copy in the folder above.':
 		'فقط کانفیگ‌های وارپ با MASQUE یا با پوشش لازمش دارند. خالی یعنی نسخه خود این برنامه در پوشه بالا.',
 	'Xray (patterniha)': 'Xray (پترنیها)',

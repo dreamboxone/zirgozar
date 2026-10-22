@@ -5,7 +5,7 @@
 <h3 align="center">A router-wide tunnel for OpenWrt</h3>
 
 <p align="center">
-  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.30-r1"></a>
+  <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300&v=5.7.30-r3"></a>
   <a href="https://github.com/dreamboxone/zirgozar/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/dreamboxone/zirgozar/total?style=for-the-badge&color=0ea5e9"></a>
   <img alt="OpenWrt" src="https://img.shields.io/badge/OpenWrt-23.05%20%7C%2024.10%20%7C%2025.12-00B5E2?style=for-the-badge&logo=openwrt&logoColor=white">
   <img alt="Xray" src="https://img.shields.io/badge/core-Xray-7c3aed?style=for-the-badge">
@@ -40,19 +40,42 @@
 
 | | Minimum | Comfortable |
 |---|---|---|
-| **Free flash** | 20 MB | 50 MB |
+| **Free storage for base install** | about 120 MiB | at least 160 MiB |
 | **RAM** | 128 MB | 256 MB or more |
 | **CPU** | any architecture Xray publishes a build for | two cores or more |
 
-**Flash.** The package itself is about **13 MB**, because it carries the Xray
-core. If the router already has `xray-core` — because another program pulled it in —
-Zirgozar uses that one and downloads nothing. The Iranian routing data is
-optional and counted separately: 25 MB for the full pair, about 2 MB for the
-`-lite` pair.
+**Storage.** The main package now includes both Xray and sing-box. On the
+`arm_cortex-a7_neon-vfpv4` reference router, the installed main package uses
+about **105 MiB**, plus less than **1 MiB** for the web interface. Budget about
+**120 MiB free for the base installation**, preferably **160 MiB or more** for
+missing dependencies and installation headroom. An existing `xray-core` package
+does not remove Zirgozar's bundled copy. Compressed download size is not installed
+size. Figures vary with architecture, core versions, filesystem and dependencies.
 
-> [!CAUTION]
-> Routers with **32 MB of flash**, which is most older models, do not have room,
-> unless you add USB storage.
+| Installation | Reference router footprint | Storage budget |
+|---|---|---|
+| Application and UI, including Xray and sing-box | about 106 MiB before extra dependencies | at least 160 MiB free before installation |
+| All listed cores and tools, plus full routing data | about 400 MiB before update cache and temporary files | at least 1 GiB usable storage |
+
+The full measurement includes Xray, patterniha's Xray, sing-box, sing-box-lx,
+Geoview, warp-plus, Vwarp, Aether and its supporting files, Mihomo,
+shadowsocks-rust, OpenVPN and HAProxy. The current update cache adds about
+38 MiB. Full routing data adds about 24 MiB; the lite pair is about 2 MiB.
+There is no fixed maximum: subscriptions, traffic history, optional protocol
+packages, caches and later releases can increase usage. Downloads and extraction
+also need temporary space. USB storage or extroot is suitable for a full install.
+
+Check actual free space and current usage:
+
+```sh
+df -h /overlay /tmp
+du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
+```
+
+> Routers with 32 or 64 MB of total flash cannot hold the current base package.
+> Even 128 MB total flash does not mean 120 MiB free: check the writable filesystem.
+> Changing only the core download folder to USB does not relocate the two cores
+> bundled in the initial package; arrange extroot or enough installation space first.
 
 **RAM.** The running core takes 40–80 MB. It works on a 128 MB router, but if
 you use a hundred-config subscription, turn **Checked at once** on the **Node
@@ -90,18 +113,18 @@ In LuCI go to **System → Software** and press **Upload Package…**. Upload an
 install the main file first, then the `luci-app-…` one. After the second, press
 **Ctrl+F5** once so the new page appears.
 
-### The other way: from a terminal
+### Install directly from GitHub over SSH
 
 SSH into the router and run the command below to download and install or upgrade
-version **5.7.30** for its architecture. The version must first be published on
-the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.30-r1).
+version **5.7.30-r3** for its architecture. The version must first be published on
+the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.30-r3).
 
 ```sh
 (
   set -eu
   . /etc/openwrt_release
-  version='5.7.30-r1'
-  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.30-r1'
+  version='5.7.30-r3'
+  base='https://github.com/dreamboxone/zirgozar/releases/download/v5.7.30-r3'
   install_dir="/tmp/zirgozar-install-$version"
   mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
@@ -125,17 +148,33 @@ the [release page](https://github.com/dreamboxone/zirgozar/releases/tag/v5.7.30-
 )
 ```
 
+### Install package files from `/tmp`
+
+Download both matching release packages for your router, then copy them to
+`/tmp` using WinSCP or SCP. Run this example on your computer, replacing the
+router address and package filenames as needed:
+
+```sh
+scp -O zirgozar-5.7.30-r3.arm_cortex-a7_neon-vfpv4.apk luci-app-zirgozar-5.7.30-r3.apk root@192.168.1.1:/tmp/
+```
+
+For older OpenWrt, transfer the two `.ipk` files instead. Connect to the router
+over SSH and run the matching package-manager commands below. `/tmp` uses RAM:
+check `df -h /tmp` before copying. These files disappear after a reboot.
+Installation still needs writable storage on `/overlay`, and missing dependencies
+are downloaded from the router's package feeds.
+
 If you already copied the files to `/tmp` with WinSCP, install them directly.
 These examples use `arm_cortex-a7_neon-vfpv4`; replace it with your router's architecture:
 
 ```sh
 # OpenWrt 25.12 and later
 apk update
-apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.30-r1.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.30-r1.apk
+apk add --allow-untrusted --upgrade /tmp/zirgozar-5.7.30-r3.arm_cortex-a7_neon-vfpv4.apk /tmp/luci-app-zirgozar-5.7.30-r3.apk
 
 # OpenWrt 24.10 / 23.05
 opkg update
-opkg install /tmp/zirgozar_5.7.30-r1_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.30-r1_all.ipk
+opkg install /tmp/zirgozar_5.7.30-r3_arm_cortex-a7_neon-vfpv4.ipk /tmp/luci-app-zirgozar_5.7.30-r3_all.ipk
 ```
 
 > [!IMPORTANT]
@@ -181,7 +220,7 @@ status card.
 
 The tabs across the top: **Basic
 Settings, Configs, Node Subscribe, Other Settings, App Update, Rule Manage,
-Geoview, Access Control, Runtime Logs**.
+Geoview, Server-Side, Access Control, Runtime Logs**.
 
 The pages' language, English or Persian, is switched with the language button
 at the top and kept in `lang`.
@@ -200,23 +239,25 @@ Two things hold on every page:
 
 ### ⚙️ 4.1 Basic Settings
 
-At the top, the row of tiles:
+The top row contains Status, Core, connection checks and Usage. Usage shows upload, download and total for today, the last seven days or the last thirty days; the selected period is remembered in the browser. The banner shows the application version and Uptime below the language button.
+
+Connection and core cards:
 
 | Tile | What it shows |
 |---|---|
-| **Core Xray** | The core's name beside the word, and under it **RUNNING** in green or **NOT RUNNING** in red. Rest the pointer on it for its version |
-| **Instagram / Reddit / X Connection** | Press one: a single request is made through whatever the router's traffic goes through, and the time it took is shown — green under a second, amber under two, red above, or *Problem detected!* |
+| **Core** | Core name, version below the title, and RUNNING or NOT RUNNING status |
+| **Instagram / Reddit / X Connection** | Press one: a single request is made through whatever the router's traffic goes through, and the time it took is shown — green under a second, amber under two, red above, or *N/A* when the check fails |
 
-Under them the **Status** card: whether the tunnel is connected, which config
+The **Status** card shows whether the tunnel is connected, which config
 it is using, its protocol, its latency, and how routing is set. The server's
 IP address is **blurred** so that it does not end up in a screenshot or a video;
-the **eye** beside it shows it, and the choice is remembered in that browser. Beside it are the flag and name of the country the tunnel comes out in - the country sites see you in - asked through the tunnel itself for each new config and every quarter of an hour. A
+Hover over or tap the address to reveal it. Beside it are the flag and name of the country the tunnel comes out in - the country sites see you in - asked through the tunnel itself for each new config and every quarter of an hour. A
 config chosen by hand gets its latency from one handshake to its port. A
 progress bar appears while configs are being measured; **Choose again** throws away the
 current choice and measures afresh. A message the router needs you to act on
 appears here, with a cross to put it away. Each time the tunnel starts again the old message goes; if the trouble is still there, that start says so again.
 
-The form below has four tabs.
+The form below has five tabs: Main, Shunt Rule, DNS, Log and Maintain.
 
 #### Main
 
@@ -320,10 +361,17 @@ a **Remote DNS** for everything that goes through the tunnel.
 | **Log Level** | `loglevel` | warning | debug, info, warning or error. debug is a great deal of output |
 
 Under them, **Traffic through the tunnel**: today, the last seven days and this
-month as rings — the total in the middle, download and upload under it — and
+calendar month as rings — the total in the middle, download and upload under it — and
 the last fortnight as bars, plus how much went straight out this month. The
 figures are read from the core every five minutes and added up in memory; how
 often they reach flash is set on Other Settings.
+
+#### Maintain
+
+**Backup** saves client and server settings, configs, subscriptions, shunt rules,
+WARP and Aether accounts, and routing data. Core binaries and traffic history
+are excluded. **Restore** imports the backup; settings from a different version
+may be incompatible.
 
 ### 📋 4.2 Configs
 
@@ -482,8 +530,8 @@ The Node Subscribe. First, for all subscriptions:
 Then the table, a `config subscription` section per row: **Name**, **Subscribe
 Info** (how many configs, what is left of the allowance and when it runs out —
 when the provider says — and when it was last read or why it could not be),
-**Subscribe URL**, **On**, and per row **Delete the subscribed node** and
-**Manual subscription**.
+**Subscribe URL**, **On**, and per row **Delete Nodes** and
+**Update**.
 
 Accepted: a plain list of links, one base64 block, or a whole configuration —
 Xray, sing-box (the [sing-box-lx](https://github.com/Leadaxe/sing-box-lx) fork
@@ -517,7 +565,7 @@ For an ECH node whose plain DNS key lookup is blocked, open the node editor and 
 
 ### 🧰 4.4 Other Settings
 
-**LED color** is off by default and leaves the indicator under OpenWrt control. Supported indicators have three matching, independently dimmable RGB channels. While enabled, a URL test through the current connection runs every 15 seconds: below 200 ms green, 200–299 ms yellow, 300–499 ms orange, 500–1000 ms red, and above 1000 ms or a failed test off. All four boundaries are editable. Each colour can be steady or blinking when supported. Disabling restores OpenWrt LED settings.
+**LED color**, at the end of the Other Settings form, is off by default and leaves the indicator under OpenWrt control. Supported indicators have three matching, independently dimmable RGB channels. While enabled, a URL test through the current connection runs every 15 seconds: below 200 ms green, 200–299 ms yellow, 300–499 ms orange, 500–1000 ms red, and above 1000 ms or a failed test off. All four boundaries are editable. Each colour can be steady or blinking when supported. Disabling restores OpenWrt LED settings.
 
 Home renders without waiting for subscription processing; node choices are filled in afterwards. The traffic period is remembered in the same browser.
 
@@ -549,7 +597,7 @@ switch is on.
 | **Forward these TCP ports** | `tcp_redir_ports` | All | The TCP ports that do: all, common ones, or only web (80, 443) |
 | **Forward these UDP ports** | `udp_redir_ports` | All | The same for UDP |
 | **Prefer firewall tools** | `firewall_backend` | Auto | nftables or iptables. Auto is right unless the router has both and the wrong one is picked |
-| **TCP Proxy Way** | `tcp_proxy_way` | TPROXY | TPROXY carries TCP and UDP on one port. REDIRECT sends TCP to a port of its own, for a kernel whose TPROXY misbehaves with TCP; UDP is always TPROXY |
+| **TCP Proxy Way** | `tcp_proxy_way` | REDIRECT | TPROXY carries TCP and UDP on one port. REDIRECT sends TCP to a port of its own, for a kernel whose TPROXY misbehaves with TCP; UDP is always TPROXY |
 | **Hijacking ICMP (PING)** | `accept_icmp` | off | A tunnel carries no ICMP, so a ping to a tunnelled address never comes back. With this on, the router answers it |
 | **IPv6** | `ipv6` | Refuse it while connected | Almost no free config carries IPv6, and a client that prefers it leaves without the tunnel while looking fine. Refusing it makes the client fall back to IPv4, which is tunnelled |
 | **Interfaces to tunnel** | `lan_zone` | All | Read from this router. Unset, every LAN interface is tunnelled; choose one to pick up traffic from that interface only |
@@ -567,7 +615,7 @@ switch is on.
 | **Mux** | `mux` | off | Several connections carried in one. Not used on a VLESS flow, xhttp or WireGuard config, where it cannot work |
 | **Mux concurrency** | `mux_concurrency` | 8 | Connections per Mux |
 | **XUDP Mux concurrency** | `xudp_concurrency` | 16 | The same for UDP |
-| **Override the connection destination address** | `sniffing_override_dest` | on | Replace the destination with the name found in the connection. Off, the name is used for routing only |
+| **Override the connection destination address** | `sniffing_override_dest` | off | Replace the destination with the name found in the connection. Off, the name is used for routing only |
 | **Excluded Domains** | `excluded_domains` | Apple push, Xiaomi, WeChat | A name found in the traffic and in this list does not replace the destination — services that break when their address is replaced |
 | **Buffer Size** | `buffer_size` | — | Buffer per connection, in kB. Empty is Xray's own |
 
@@ -579,6 +627,14 @@ switch is on.
 | **Type** | `type` | rand (a random length), str, hex, base64 or array |
 | **Packet \| Rand Length** | `packet` | The packet itself, or for rand its length or range, such as `10-20` |
 | **Delay (ms)** | `delay` | The gap after it, in ms, or a range |
+
+**Load Balancing**
+
+Install HAProxy from Cores, then enable Load Balancing in Other Settings.
+Configure the servers, local listener port, balancing method and health-check
+interval. Point a config at `127.0.0.1` and the group's listener port. Servers
+that stop answering are excluded. The optional status console has its own
+port, username and password settings.
 
 **Traffic history**
 
@@ -602,24 +658,45 @@ one package per component (at most 64 MiB each) under
 Missing cache, incompatible releases, little reusable data or failed range requests
 fall back to a complete download. Deleting this cache only disables reuse until
 the next successful download. This runs only when an update is requested; opening
-a page does not perform any additional checks or downloads.
+a page can refresh stale release metadata automatically, but package downloads require an install or update request.
 
 | Card | What it shows |
 |---|---|
 | **App Update** | This program's version and whether a newer one is published. **Update to …** downloads the new version from GitHub, checks it against that release's checksums and installs it with the router's own package manager (apk or opkg); the settings are kept, the tunnel comes back if it was on, and the page reloads by itself |
-| **Cores** | Xray, Xray (patterniha), sing-box, Geoview, warp-plus and Vwarp: what is installed, what each project has published, **Check update**, **Install / Update to …**, **Remove**. An update is only offered for something actually newer; for Xray, only a stable release, never a pre-release. Beside Xray is a list of its recent releases, pre-releases included, with **Install this version**. Of the Xray cores on the router the **newest** is used, unless Xray App Path names one. A release installed with **Install this version** is written into Xray App Path itself, and a running tunnel is restarted onto it; the Xray row always shows the one that runs. Empty Xray App Path to go back to the newest. sing-box and hysteria are only for configs that speak hysteria2 or tuic, which Xray does not; Geoview for the Geoview page, and for sing-box whenever the Iran split or ad blocking is on - sing-box cannot read the geo files without it, and it is installed by itself when missing; warp-plus only for WARP configs, and its download is checked against the checksum its release publishes; Vwarp only for WARP over MASQUE or with noize. **Xray (patterniha)** is [patterniha/Xray-core](https://github.com/patterniha/Xray-core): since 26.7 the official Xray refuses VLESS and Trojan without TLS to a public address - the configs that go over Cloudflare's plain-HTTP ports such as 80 and 8080, with no SNI for a filter to read - and this build takes them. It is installed beside the official one; every configuration is offered to every Xray on the router, and the first that accepts it runs it |
+| **Cores** | Installed version, release status, binary path and Check, Install, Reinstall, Update or Remove actions. The Xray release selector also offers pre-releases. Only a newer stable Xray release is suggested as an automatic upgrade |
 | **Router requirements** | One line: everything is ready, or how many things are missing. **Details** opens the questions put to the running system — transparent proxy, policy routing, HTTPS, the firewall in use, missing packages — with **Install them**. They open by themselves when something is missing |
+
+**Checking and installing cores.** **Check** examines only its row;
+**Check all** examines every core, without checking the application itself.
+**Up to date** means no newer version was found in the checked source.
+HAProxy and OpenVPN use the router package manager's available index.
+For Xray, **Reinstall** downloads the installed version again, while
+**Install this version** installs the selected release. Other installers use
+their project's release or the router package feed; exact-version reinstall
+is not implemented for every core. Download percentage and installation status
+appear below the affected row only.
+
+The list also includes sing-box-lx, Aether, Mihomo, shadowsocks-rust, OpenVPN
+and HAProxy. sing-box can run the entire tunnel as the active core.
+patterniha's build disables the check that rejects VLESS and Trojan without
+transport security to public destinations. Official Xray exempts private
+destinations and VLESS with its own encryption.
 
 **App Path**
 
 | Option | In the file | Default | What it does |
 |---|---|---|---|
-| **Folder for downloaded cores** | `core_dir` | `/usr/libexec/zirgozar` | Point it at USB storage on a router short of flash. A core another package installed is used where it is and never moved |
+| **Core download folder** | `core_dir` | `/usr/libexec/zirgozar` | Point it at USB storage on a router short of flash. A core another package installed is used where it is and never moved |
 | **Xray App Path** | `core_xray` | — | Empty means whichever Xray on this router accepts the configuration, preferring one already installed |
 | **Sing-Box App Path** | `core_singbox` | — | The file sing-box is installed, updated and run from. Empty is this program's own copy in the folder above |
 | **Geoview App Path** | `core_geoview` | — | The same for Geoview |
 | **warp-plus App Path** | `core_warpplus` | — | The same for warp-plus |
 | **Vwarp App Path** | `core_vwarp` | — | The same for Vwarp |
+
+| **Sing-Box-LX App Path** | `core_singbox_lx` | — | Install and run sing-box-lx from this path |
+| **Aether App Path** | `core_aether` | — | Aether executable for its supported configs |
+| **Mihomo App Path** | `core_mihomo` | — | Mihomo executable for SSR configs |
+| **shadowsocks-rust App Path** | `core_sslocal` | — | sslocal executable for Shadowsocks configs that select it |
 
 To run a core from memory, give a path beginning with `/tmp`, save and apply,
 and press Install beside it; it has to be installed again after every reboot.
@@ -669,7 +746,7 @@ exactly the other traffic. A `rule-set:local:` or `rule-set:remote:` line
 |---|---|---|---|
 | **Direct pass for Iranian traffic** | `route_ir` | off | Iranian sites and addresses skip the tunnel. Needs the routing data above — until then it does nothing, because a core asked for a geo file it has not got refuses to start |
 | **Block advertising** | `block_ads` | off | For every device. The names come from `category-ads-all` in the same routing data |
-| **Block BitTorrent** | `block_torrent` | on | BitTorrent gets a VPN server blocked and your config cut off for good |
+| **Block BitTorrent** | `block_torrent` | off | BitTorrent gets a VPN server blocked and your config cut off for good |
 | **Refuse QUIC** | `block_quic` | off | When the config cannot carry UDP, browsers are made to use TCP. Off by default: where UDP works, QUIC is faster |
 | **Sites with a rebind weakness** | `rebind_domain` | Iranian banks and services | Some sites answer with a private address — Iranian banks and government services among them. The router's rebind protection refuses those answers and the site does not open; every name here is excused, with everything under it |
 | **Direct IP List** | `direct_ip` | — | Addresses that connect directly and never enter the core |
@@ -710,7 +787,7 @@ A `config acl_rule` section per row:
 The Runtime Logs: this program's own log — each start and stop step by
 step, which config was chosen and why, what failed — with **Clear logs**, and
 under it the **Node log**, what the core itself said. Both refresh every few
-seconds. The lines are never translated: it is the router's own log.
+seconds. In Persian mode, recognised messages are translated for display; the original router log is preserved. Unknown messages remain unchanged.
 
 ---
 

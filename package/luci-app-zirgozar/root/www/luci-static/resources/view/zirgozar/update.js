@@ -5,7 +5,7 @@
  *
  * App Update: this program's version and the
  * latest one published, each core with its version, a Check update and a
- * Force update, and where each core lives. The routing data is here too -
+ * Reinstall, and where each core lives. The routing data is here too -
  * The rule files are kept beside the cores.
  */
 
@@ -35,7 +35,8 @@ function bytes(n) {
    everywhere else in English. Kept left to right inside the Persian text, so
    that the revision stays on the right. */
 function appVersion(v) {
-	if (!v || i18n.get() !== 'fa') return pui.versionText(v);
+	if (!v) return '';
+	if (i18n.get() !== 'fa') return ltr(String(v).replace(/^v/i, ''));
 	var m = /^(.*?)-r(\d+)$/.exec(String(v));
 	return '\u2066' + (m ? m[1] + '-' + m[2] : v + '-1') + '\u2069';
 }
@@ -50,13 +51,10 @@ function ltr(t) {
 	return '\u2066' + t + '\u2069';
 }
 
-/* The rows are read as columns: the version, then whether it is the latest,
-   then where the file is. Each of the first two is given a width of its
-   own, so the next one starts at the same place on every row whatever the
-   length of the version before it. */
+/* Keep the version badge sized to its text. */
 function verChip(text, tone) {
 	var c = chip(text, tone);
-	c.style.cssText = 'min-width:136px;justify-content:center;box-sizing:border-box';
+	c.style.cssText = 'width:max-content;flex:0 0 auto;justify-content:center;box-sizing:border-box';
 	return c;
 }
 
@@ -70,16 +68,26 @@ function verState(node) {
 var notes = {};
 
 /* How far the running download has got, for the row it belongs to. */
-var progressKey = '', progressPct = -1;
+var progressKey = '', progressPct = -1, progressJob = '';
+var progressPhase = '', phaseJob = '';
+
+function downloadText(name) {
+	var key = 'Downloading %s:', text = _(key);
+	if (i18n.get() === 'fa' && text === key) text = 'در حال دانلود %s:';
+	return text.format(ltr(String(name).replace(/^xray$/, 'Xray')));
+}
 
 function noteFor(key) {
 	var n = key && notes[key];
+	var active = key && key == progressKey && progressJob;
+	if (active && (!n || n.kind == 'info'))
+		n = { text: progressPhase == 'installing' ? jobName(progressJob) : downloadText(progressJob.replace(/^Installing /, '')), kind: 'info' };
 	var going = key && key == progressKey && progressPct >= 0;
 	/* A download keeps its note while it runs, however long it takes. */
 	if (n && going && n.until) n.until = Date.now() + 15000;
 	if (!n || (n.until && Date.now() > n.until)) return '';
-	return E('div', { 'class': 'pwp-note ' + n.kind, 'style': 'margin:0' },
-		going && n.kind == 'info' ? n.text + ' ' + progressPct + '%' : n.text);
+	return E('div', { 'class': 'pwp-note ' + n.kind, 'style': 'margin:0;display:flex;gap:6px;align-items:center', 'dir': i18n.dir() },
+		going && n.kind == 'info' ? [ E('span', {}, n.text), E('bdi', { 'dir': 'ltr' }, progressPct + '%') ] : n.text);
 }
 
 function say(key, text, kind) {
@@ -96,6 +104,7 @@ function say(key, text, kind) {
 
 function row(label, value, action, key) {
 	return E('div', {
+		'class': key && key.indexOf('core:') === 0 ? 'pwp-core-update-row' : '',
 		'style': 'display:flex;gap:12px;align-items:center;padding:10px 0;flex-wrap:wrap;' +
 		         'border-bottom:1px solid var(--line)'
 	}, [
@@ -124,7 +133,7 @@ var actAsked = 0, actKey = '';
 var xrayPicked = '';
 
 function working(d) {
-	return !!(d && d.job && d.job != CHECK_JOB) || (actAsked && Date.now() - actAsked < 8000);
+	return !!(d && d.job && d.job.indexOf(CHECK_JOB) !== 0) || (actAsked && Date.now() - actAsked < 8000);
 }
 
 /* The row a running job belongs to. */
@@ -139,7 +148,7 @@ function holdButtons(key) {
 	document.querySelectorAll('button.zgz-act').forEach(function(b) {
 		b.disabled = true;
 		b.zgzBusy = true;
-		if (b.dataset.key == key) b.classList.add('mk-running');
+		if (b.dataset.key == key && b.dataset.icon != 'trash') b.classList.add('mk-running');
 	});
 }
 
@@ -148,10 +157,11 @@ function actBtn(text, tone, key, fn, ico, d) {
 	var b = pui.btn(text, tone, fn, ico);
 	b.classList.add('zgz-act');
 	b.dataset.key = key;
+	b.dataset.icon = ico || '';
 	if (working(d)) {
 		b.disabled = true;
 		b.zgzBusy = true;
-		if (key == (jobKey(d && d.job) || actKey)) b.classList.add('mk-running');
+		if (ico != 'trash' && key == (jobKey(d && d.job) || actKey)) b.classList.add('mk-running');
 	}
 	return b;
 }
@@ -159,6 +169,7 @@ function actBtn(text, tone, key, fn, ico, d) {
 function act(key, name, arg, note) {
 	actAsked = Date.now();
 	actKey = key;
+	phaseJob = ''; progressPhase = '';
 	if (key == 'deps') lastDeps = '';
 	holdButtons(key);
 	return callAction(name, arg || '').then(function(r) {
@@ -181,18 +192,24 @@ function act(key, name, arg, note) {
    every few seconds, so the turning is drawn from this, not kept on a button;
    and the job may not have begun yet when the next drawing comes. */
 var CHECK_JOB = 'Checking for new versions';
-var checkAsked = 0;
+var checkAsked = 0, checkKey = '';
 var refreshNow = function() {};
 var quickRefresh = 0;
 
-function checking(d) {
-	return (d && d.job == CHECK_JOB) || (checkAsked && Date.now() - checkAsked < 5000);
+function checking(d, key) {
+	var job = d && d.job || '';
+	var target = job.indexOf(CHECK_JOB + ': ') === 0 ? job.slice(CHECK_JOB.length + 2) : '';
+	var selected = key === 'app' ? 'zirgozar' : String(key || '').replace(/^core:/, '');
+	var allCores = target === 'all-cores' || (!target && checkKey === 'all-cores');
+	return (job.indexOf(CHECK_JOB) === 0 && (!key || (allCores ? key !== 'app' : (target ? target === selected : key === checkKey)))) ||
+		(checkAsked && Date.now() - checkAsked < 5000 && (!key || key === checkKey || (checkKey === 'all-cores' && key !== 'app')));
 }
 
 function checkUpdate(key) {
 	return function() {
 		checkAsked = Date.now();
-		return callAction('cores_latest', '').then(function(r) {
+		checkKey = key;
+		return callAction('cores_latest', key === 'app' ? 'zirgozar' : key.replace(/^core:/, '')).then(function(r) {
 			if (r && r.error) {
 				checkAsked = 0;
 				say(key, _(r.error), 'error');
@@ -204,8 +221,8 @@ function checkUpdate(key) {
 	};
 }
 
-function checkBtn(tone, key, busy) {
-	var b = pui.btn(_('Check update'), tone + ' mk-small', checkUpdate(key), 'refresh');
+function checkBtn(tone, key, busy, label) {
+	var b = pui.btn(label || _('Check'), tone + ' mk-small', checkUpdate(key), 'refresh');
 	if (busy) {
 		b.classList.add('mk-running');
 		b.disabled = true;
@@ -361,15 +378,6 @@ function render(d, early) {
 	var cores = d.cores || {};
 	if (!early) { answered = true; keep(d); }
 
-	var job = document.getElementById('pwp-job');
-	if (job) {
-		var shown = d.job && d.job != CHECK_JOB;
-		job.style.display = shown ? 'flex' : 'none';
-		job.textContent = shown ? jobName(d.job) + (d.progress >= 0 ? ' ' + d.progress + '%' : '…') : '';
-		job.style.background = shown && d.progress >= 0
-			? 'linear-gradient(90deg, rgba(37,99,235,.18) ' + d.progress + '%, transparent ' + d.progress + '%)' : '';
-	}
-
 	/* This program's own update. The install restarts the services the page
 	   talks to, so how it went is read afterwards from what the router left
 	   behind: a failure is shown under the row, and success - a different
@@ -417,10 +425,18 @@ function render(d, early) {
 	var busy = checking(d);
 	if (!early) {
 		progressKey = jobKey(d.job);
+		progressJob = d.job || '';
 		progressPct = (d.job && d.progress >= 0) ? +d.progress : -1;
+		if (phaseJob != progressJob) {
+			phaseJob = progressJob;
+			progressPhase = '';
+		}
+		if (progressPct >= 0 && progressPhase != 'installing') progressPhase = 'downloading';
+		else if (progressPct < 0 && progressPhase == 'downloading') progressPhase = 'installing';
+		if (progressPhase == 'installing') progressPct = -1;
 	}
 	/* The job is the router's word now; the press no longer stands for it. */
-	if (!early && d.job && d.job != CHECK_JOB) actAsked = 0;
+	if (!early && d.job && d.job.indexOf(CHECK_JOB) !== 0) actAsked = 0;
 	if (!early && (busy || (d.deps || {}).pending || working(d)) && !quickRefresh)
 		quickRefresh = window.setTimeout(function() { quickRefresh = 0; refreshNow(); }, 2000);
 	if (!busy) checkAsked = 0;
@@ -428,26 +444,25 @@ function render(d, early) {
 	/* ------------------------------------------------------ this program */
 	var abox = document.getElementById('pwp-app');
 	if (abox) {
+		var appBusy = checking(d, 'app');
 		var app = cores.app || {};
 		while (abox.firstChild) abox.removeChild(abox.firstChild);
 		/* Shown as the cores below are: the installed version in brackets,
 		   and a newer one, when there is one, after an arrow. */
 		var value = [ app.unknown ? verChip('…') : verChip('【 ' + (appVersion(app.version) || '?') + ' 】', 'ok') ];
-		if (!busy && app.update && app.latest)
+		if (!appBusy && app.update && app.latest)
 			value.push(verState(chip((i18n.dir() === 'rtl' ? '← ' : '→ ') + appVersion(app.latest), 'info')));
-		else if (!busy && app.latest)
-			value.push(verState(E('span', { 'style': 'color:var(--muted)' }, _('It is the latest version'))));
+		else if (!appBusy && app.latest)
+			value.push(verState(E('span', { 'style': 'color:var(--muted)' }, _('Up to date'))));
 		abox.appendChild(row('Zirgozar', value, [
-			checkBtn('primary', 'app', busy),
-			!busy && app.update && app.latest
+			checkBtn('primary', 'app', appBusy),
+			!appBusy && app.update && app.latest
 				? actBtn(_('Update to %s').format(appVersion(app.latest)), 'success mk-small', 'app', function() {
 					return act('app', 'app_update', '',
 						_('Downloading and installing the new version. This takes a minute or two; the page reloads by itself when it is done.'));
 				}, 'download', d)
 				: ''
 		], 'app'));
-		abox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:8px 0 0' },
-			_('The update button downloads the new version from GitHub and installs it. The settings are kept.')));
 	}
 
 	/* ------------------------------------------------------------- cores */
@@ -458,22 +473,26 @@ function render(d, early) {
 		document.activeElement.classList.contains('pwp-vsel') && !working(d);
 	if (cbox && !picking) {
 		while (cbox.firstChild) cbox.removeChild(cbox.firstChild);
+		cbox.appendChild(E('div', { 'style': 'display:flex;justify-content:flex-end;margin-bottom:8px' }, [
+			checkBtn('soft-blue', 'all-cores', checking(d, 'all-cores'), _('Check all'))
+		]));
 		(cores.cores || []).forEach(function(c) {
+			var coreBusy = checking(d, 'core:' + c.name);
 			var value = [];
 			if (c.unknown) {
 				value.push(verChip('…'));
 				value.push(verState());
-				value.push(E('code', { 'style': 'font-size:11.5px;color:var(--muted)' }, c.path));
+				value.push(E('code', { 'title': c.path, 'style': 'font-size:11.5px;color:var(--muted)' }, c.path));
 			} else if (c.installed) {
 				value.push(verChip('【 ' + (c.version ? ltr(c.version) : _('installed')) + ' 】', 'ok'));
 				/* What the project has published, when it is not what is
 				   installed. Two different strings, not "newer" - version
 				   numbers written by three different projects are a way to be
 				   confidently wrong about which way round they go. */
-				if (!busy && c.update && c.latest)
+				if (!coreBusy && c.update && c.latest)
 					value.push(verState(chip((i18n.dir() === 'rtl' ? '← ' : '→ ') + ltr(c.latest), 'info')));
-				else if (!busy && c.latest)
-					value.push(verState(E('span', { 'style': 'color:var(--muted)' }, _('It is the latest version'))));
+				else if (!coreBusy && c.latest)
+					value.push(verState(E('span', { 'style': 'color:var(--muted)' }, _('Up to date'))));
 				else
 					value.push(verState());
 				value.push(E('code', { 'style': 'font-size:11.5px;color:var(--muted)' }, c.path));
@@ -490,11 +509,14 @@ function render(d, early) {
 
 			var actions = [];
 			if (c.arch_ok) {
-				actions.push(checkBtn('soft-blue', 'core:' + c.name, busy));
+				actions.push(checkBtn('soft-blue', 'core:' + c.name, coreBusy));
 				if (!c.unknown) actions.push(actBtn(c.installed
-					? (c.update && c.latest ? _('Update to %s').format(c.latest) : _('Force update'))
+					? (c.update && c.latest ? _('Update to %s').format(c.latest) : _('Reinstall'))
 					: _('Install'), 'primary mk-small', 'core:' + c.name, function() {
-					return act('core:' + c.name, 'core_install', c.name, _('Downloading %s.').format(c.name));
+					var target = c.name;
+					if (c.name == 'xray' && c.installed && !(c.update && c.latest))
+						target = 'xray@v' + String(c.version).replace(/^v/, '');
+					return act('core:' + c.name, 'core_install', target, downloadText(c.name));
 				}, 'download', d));
 			}
 			/* Any recent Xray, pre-releases included - those are what most
@@ -522,8 +544,10 @@ function render(d, early) {
 
 			cbox.appendChild(row({ xray: 'Xray', geoview: 'Geoview', 'sing-box-lx': 'sing-box-lx', 'warp-plus': 'warp-plus', vwarp: 'Vwarp', aether: 'Aether', mihomo: 'Mihomo', sslocal: 'shadowsocks-rust', haproxy: 'HAProxy', 'xray-patterniha': _('Xray (patterniha)'), openvpn: 'OpenVPN' }[c.name] || c.name, value, actions, 'core:' + c.name));
 		});
-		cbox.appendChild(row(_('Free space'),
-			[ E('span', {}, cores.unknown ? '…' : bytes(cores.free)), E('code', { 'style': 'font-size:11.5px;color:var(--muted)' }, cores.dir || '') ]));
+		var freeRow = row(_('Free space'),
+			[ E('span', {}, cores.unknown ? '…' : bytes(cores.free)), verState(), E('code', { 'title': cores.dir || '', 'style': 'font-size:11.5px;color:var(--muted)' }, cores.dir || '') ]);
+		freeRow.classList.add('pwp-core-update-row');
+		cbox.appendChild(freeRow);
 		cbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:8px 0 0' },
 			_('Xray carries the traffic. sing-box is only needed for nodes that speak what Xray does not — it is then run as a local helper for that one node, and everything else works exactly as before.')));
 		cbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:6px 0 0' },
@@ -559,7 +583,7 @@ return view.extend({
 		s = m.section(form.NamedSection, 'config', 'zirgozar', _('App Path'));
 		s.anonymous = true;
 
-		o = s.option(form.Value, 'core_dir', _('Folder for downloaded cores'),
+		o = s.option(form.Value, 'core_dir', _('Core download folder'),
 			_('Point this at USB storage on a router short of flash. A core another package installed is used where it is and never moved.'));
 		o.placeholder = '/usr/libexec/zirgozar';
 
@@ -610,7 +634,6 @@ return view.extend({
 
 		return m.render().then(function(mapEl) {
 			var content = [
-				E('div', { 'id': 'pwp-job', 'class': 'mk-alert', 'style': 'display:none' }, ''),
 				pui.card(_('App Update'), 'download', '#1e88e5', E('div', { 'id': 'pwp-app' })),
 				pui.card(_('Cores'), 'cpu', '#8b5cf6', E('div', { 'id': 'pwp-cores' })),
 				pui.card(_('Router requirements'), 'shield', '#f59e0b', E('div', { 'id': 'zgz-deps' })),
@@ -619,8 +642,11 @@ return view.extend({
 			/* Asked at once, and then every ten seconds while the page is open -
 			   often enough to see a download finish. */
 			refreshNow = refresh;
+			var pendingRefresh = null;
 			function refresh() {
-				return callSystem().then(render).catch(function() {});
+				if (pendingRefresh) return pendingRefresh;
+				pendingRefresh = callSystem().then(render).catch(function() {}).then(function() { pendingRefresh = null; });
+				return pendingRefresh;
 			}
 			poll.add(refresh, 10);
 			window.setTimeout(refresh, 0);

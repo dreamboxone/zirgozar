@@ -96,7 +96,7 @@
 /* Cards */
 .mk-card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:22px;margin-bottom:20px;box-shadow:var(--shadow);min-width:0;position:relative}
 /* Accent bar: a full-size layer with the card's own radius, masked to the top 5px, so its ends follow the rounded corners. */
-.mk-card::before,.mk-plan > div::before{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;background:linear-gradient(90deg,var(--accent,#3b82f6),color-mix(in srgb,var(--accent,#3b82f6) 45%,#ffffff));
+.mk-card::before,.mk-plan > div::before,.pwp-status-row .mk-metric::before{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;background:linear-gradient(90deg,var(--accent,#3b82f6),color-mix(in srgb,var(--accent,#3b82f6) 45%,#ffffff));
 	-webkit-mask:linear-gradient(#000 0 0) top/100% 5px no-repeat;mask:linear-gradient(#000 0 0) top/100% 5px no-repeat}
 .mk-card-title{display:flex;align-items:center;gap:12px;font-size:18px;font-weight:800}
 .mk-badge-ico{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
@@ -241,7 +241,7 @@
 
 /* Tabs */
 .mk-tabs{display:flex;gap:3px;flex-wrap:wrap;container-type:inline-size;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:6px;margin-bottom:20px;box-shadow:var(--shadow);position:sticky;top:0;z-index:5}
-.mk .mk-tab{display:inline-flex;flex:1 0 auto;justify-content:center;align-items:center;gap:clamp(3px,.35cqi,5px);white-space:nowrap;border:0;background:transparent;color:var(--muted);font-weight:700;font-size:clamp(11px,.95cqi,13px);padding:10px clamp(3px,.65cqi,9px);border-radius:13px;cursor:pointer;transition:background .15s,color .15s}
+.mk .mk-tab{display:inline-flex;flex:1 0 auto;justify-content:center;align-items:center;gap:clamp(3px,.35cqi,5px);white-space:nowrap;border:0;background:transparent;color:var(--muted);font-weight:700;font-size:clamp(12px,1.05cqi,14px);padding:10px clamp(3px,.65cqi,9px);border-radius:13px;cursor:pointer;transition:background .15s,color .15s}
 .mk-tab:hover{background:var(--soft);color:var(--text)}
 .mk-tab.mk-tab-on{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;box-shadow:0 6px 14px -8px #4f46e5}
 .mk-tab:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
@@ -279,7 +279,7 @@
 @media(max-width:700px){
 	.mk-tabs{position:static;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
 	.mk-tabs::-webkit-scrollbar{display:none}
-	.mk .mk-tab{flex:none;padding:9px 11px;font-size:13px;gap:5px}
+	.mk .mk-tab{flex:none;padding:9px 11px;font-size:14px;gap:5px}
 	.mk-urow{grid-template-columns:1fr auto;grid-template-areas:"name size" "bar bar"}
 	.mk-urow-name{grid-area:name}.mk-urow .mk-track{grid-area:bar}.mk-urow strong{grid-area:size}
 }
@@ -491,7 +491,10 @@ body.pwp-fa #modal_overlay:where(body.pwp-active *)>.modal textarea,body.pwp-fa 
 .pwp-status-card>div{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
 .pwp-status-card>div>.mk-row:last-child{margin-top:auto!important;padding-top:12px}
 .pwp-status-card #pwp-state{margin-inline-start:auto}
+.pwp-status-card #pwp-state .mk-chip{text-shadow:0 2px 4px color-mix(in srgb,currentColor 25%,transparent)}
+.mk-dark .pwp-status-card #pwp-state .mk-chip{text-shadow:0 2px 5px color-mix(in srgb,currentColor 40%,transparent)}
 .pwp-status-row #pwp-core-t{position:relative;overflow:visible}
+#pwp-core-v{text-shadow:0 2px 4px color-mix(in srgb,currentColor 25%,transparent)}
 .pwp-core-version{position:absolute;top:100%;inset-inline-start:0;margin-top:6px;font-size:12px;font-weight:400;color:var(--muted);direction:ltr;text-align:start}
 .pwp-status-card>div>.mk-row{margin-top:4px!important;margin-bottom:4px!important}
 .pwp-status-card .mk-row{flex-wrap:wrap}
@@ -588,7 +591,7 @@ body.pwp-fa #modal_overlay:where(body.pwp-active *)>.modal textarea,body.pwp-fa 
 .mk-follow :is(.mk-card,.mk-metric,.mk-user,.mk-empty,.mk-folder,.mk-conf,.mk-log){border-radius:var(--zgz-radius);box-shadow:var(--shadow)}
 .mk-follow :is(.mk-card,.mk-metric){padding:var(--zgz-card-padding,20px);background:var(--panel);border-color:var(--line)}
 .mk.mk-follow .cbi-section{border-radius:var(--zgz-radius)!important;padding:var(--zgz-card-padding,20px)!important;box-shadow:var(--shadow)}
-.mk-follow :is(.mk-card,.cbi-section,.mk-plan>div)::before,.mk-follow .mk-metric::after{display:none}
+.mk-follow :is(.mk-card,.cbi-section,.mk-plan>div,.mk-metric)::before,.mk-follow .mk-metric::after{display:none}
 .mk-follow :is(.mk-card-title,.mk-metric-title,.mk-field span){font-weight:500}
 .mk-follow .mk-metric-ico,.mk-follow .mk-badge-ico{background:var(--soft);color:var(--zgz-accent);box-shadow:none;border-radius:var(--zgz-field-radius)}
 .mk-follow .mk-big{font-weight:500;color:var(--text)}
@@ -664,7 +667,7 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 }
 
 /* The three site checks share two former tile columns; usage takes the third. */
-.mk-grid.pwp-status-row{grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,2fr) minmax(0,1fr)}
+.mk-grid.pwp-status-row{grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,2fr) minmax(220px,1fr)}
 .pwp-status-row .pwp-social-card{display:flex;flex-direction:column;gap:7px;justify-content:center}
 .mk .pwp-social-check{display:grid;grid-template-columns:32px minmax(0,1fr) minmax(70px,auto);gap:9px;align-items:center;min-height:43px;width:100%;padding:7px 9px;border:0;border-radius:10px;color:var(--text);background:var(--soft);background:color-mix(in srgb,var(--site-colour) 10%,var(--panel));font:inherit;text-align:start;cursor:pointer}
 .mk .pwp-social-check:hover{background:color-mix(in srgb,var(--site-colour) 17%,var(--panel))}
@@ -674,21 +677,21 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 .pwp-social-icon .mk-ico{width:18px;height:18px}
 .pwp-social-name{font-size:14px;font-weight:600;min-width:0}
 .pwp-check-value{font-size:13px;font-weight:600;text-align:end;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-.pwp-status-row .pwp-usage-card{--usage-padding:16px;position:relative;overflow:hidden;padding-inline-end:46px;display:flex;flex-direction:column;gap:10px;background:var(--panel);background:linear-gradient(145deg,var(--panel),color-mix(in srgb,var(--zgz-accent,#3b82f6) 7%,var(--panel)))}
-.pwp-usage-title{display:flex;justify-content:space-between;gap:6px;font-size:12px;color:var(--muted)}
+.pwp-status-row .pwp-usage-card{--usage-padding:16px;position:relative;overflow:hidden;padding-inline-end:46px;display:flex;flex-direction:column;gap:10px;background:#fff}
+.pwp-usage-title{display:flex;justify-content:space-between;gap:6px;font-size:14px;font-weight:700;line-height:1.5;color:var(--muted)}
 
 .pwp-usage-body{display:flex;gap:10px;flex:1;align-items:stretch}
-.pwp-usage-values{display:flex;flex-direction:column;justify-content:space-between;gap:8px;flex:1;min-width:0}
-.pwp-usage-value{display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px}
-.pwp-usage-value>span{font-size:11px;color:var(--muted)}
-.pwp-usage-value>strong{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;text-align:end}
+.pwp-usage-values{display:flex;flex-direction:column;justify-content:center;gap:7px;flex:1;min-width:0}
+.pwp-usage-value{display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;min-height:44px}
+.pwp-usage-value>span{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;flex-shrink:0}
+.pwp-usage-value>strong{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0;text-align:end}
 .pwp-usage-up>strong{color:#169c9a}.pwp-usage-down>strong{color:var(--zgz-accent,#3b82f6)}
 .pwp-usage-periods{position:absolute;inset-block:0;inset-inline-end:0;width:31px;display:flex;flex-direction:column;gap:0;align-self:stretch;padding:0;border-radius:0;overflow:visible;background:transparent;isolation:isolate}
 .mk .pwp-usage-periods button{font:inherit;position:relative;font-size:11px;min-width:31px;min-height:32px;flex:1;padding:8px 6px;border:1px solid var(--line);border-inline-end:0;border-radius:9px 0 0 9px;background:linear-gradient(105deg,var(--soft),var(--panel));color:var(--muted);cursor:pointer;white-space:nowrap;margin:0;box-shadow:2px -2px 5px #00000010;z-index:1}
 .mk .pwp-usage-periods button:first-child{border-top:0}.mk .pwp-usage-periods button:last-child{border-bottom:0}.mk .pwp-usage-periods button+button{margin-top:-6px}.mk .pwp-usage-periods button:nth-child(2){z-index:2;background:color-mix(in srgb,var(--zgz-accent,#3b82f6) 6%,var(--panel))}.mk .pwp-usage-periods button:nth-child(3){z-index:3;background:color-mix(in srgb,var(--zgz-accent,#3b82f6) 12%,var(--panel))}
 .mk .pwp-usage-periods button[aria-selected=true]{background:var(--zgz-accent,#3b82f6);color:var(--zgz-on-accent,#fff);font-weight:700;border-color:color-mix(in srgb,var(--zgz-accent,#3b82f6) 70%,var(--line));box-shadow:3px 0 8px #00000022;margin-inline-start:-5px;z-index:5}
 
-.mk[dir=ltr] .pwp-usage-periods button{border-radius:9px 0 0 9px;box-shadow:-2px -2px 5px #00000010}.mk[dir=ltr] .pwp-usage-periods button[aria-selected=true]{box-shadow:-3px 0 8px #00000022}
+.mk[dir=ltr] .pwp-usage-periods button{border-radius:0 9px 9px 0;box-shadow:none}.mk[dir=ltr] .pwp-usage-periods button[aria-selected=true]{box-shadow:none}
 @media(max-width:900px){.mk-grid.pwp-status-row{grid-template-columns:repeat(2,minmax(0,1fr))}.pwp-status-row .pwp-social-card{grid-column:1/-1;grid-row:3}.pwp-status-row .pwp-usage-card{grid-column:2;grid-row:2}}
 @media(max-width:420px){.mk .pwp-social-check{grid-template-columns:28px minmax(0,1fr) minmax(65px,auto);padding:7px;gap:7px}.pwp-status-row .pwp-usage-card{--usage-padding:12px;padding:12px;padding-inline-end:42px}.pwp-usage-body{gap:7px}.pwp-usage-value>strong{font-size:17px}}
 @media(pointer:coarse){.mk .pwp-social-check{min-height:44px}.mk .pwp-usage-periods button{min-height:30px}}
@@ -696,20 +699,52 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 .pwp-status-row .pwp-usage-card::before{inset:-1px;border-radius:inherit;z-index:8}
 
 /* Normal left corners, reverse right corners where the tab joins its sheet. */
-.mk .pwp-usage-periods button{--tab-paper:color-mix(in srgb,var(--line) 25%,var(--panel));background:var(--tab-paper);border:0;border-radius:9px 0 0 9px;box-shadow:none;color:var(--muted)}
-.mk .pwp-usage-periods button:nth-child(2){--tab-paper:color-mix(in srgb,var(--line) 18%,var(--panel));background:var(--tab-paper)}
-.mk .pwp-usage-periods button:nth-child(3){--tab-paper:color-mix(in srgb,var(--line) 32%,var(--panel));background:var(--tab-paper)}
-.mk .pwp-usage-periods button[aria-selected=true]{--tab-paper:color-mix(in srgb,var(--zgz-accent,#3b82f6) 18%,var(--panel));background:var(--tab-paper);color:color-mix(in srgb,var(--zgz-accent,#3b82f6) 65%,var(--text));border-color:transparent;box-shadow:none;font-weight:700}
+.mk .pwp-usage-periods button{--tab-paper:#fff;background:var(--tab-paper);border:0;border-radius:9px 0 0 9px;box-shadow:none;color:var(--muted)}
+.mk .pwp-usage-periods button:first-child{--tab-paper:#fff;background:var(--tab-paper);color:#df458e}
+.mk .pwp-usage-periods button:nth-child(2){--tab-paper:#fff;background:var(--tab-paper);color:#ec693c}
+.mk .pwp-usage-periods button:nth-child(3){--tab-paper:#fff;background:var(--tab-paper);color:#329dc2}
+.mk .pwp-usage-periods button[aria-selected=true]{--tab-paper:#fff;background:var(--tab-paper);color:color-mix(in srgb,var(--zgz-accent,#3b82f6) 65%,var(--text));border-color:transparent;box-shadow:none;font-weight:700}
+.mk .pwp-usage-periods button:first-child[aria-selected=true]{--tab-paper:#fff;color:#df458e}
+.mk .pwp-usage-periods button:nth-child(2)[aria-selected=true]{--tab-paper:#fff;color:#ec693c}
+.mk .pwp-usage-periods button:nth-child(3)[aria-selected=true]{--tab-paper:#fff;color:#329dc2}
 .mk .pwp-usage-periods button::before,.mk .pwp-usage-periods button::after{content:"";position:absolute;right:0;width:9px;height:9px;pointer-events:none;transform:none}
 .mk .pwp-usage-periods button::before{top:-9px;bottom:auto;background:radial-gradient(circle at top left,transparent 8.5px,var(--tab-paper) 9px)}
 .mk .pwp-usage-periods button::after{top:auto;bottom:-9px;background:radial-gradient(circle at bottom left,transparent 8.5px,var(--tab-paper) 9px)}
+.mk[dir=ltr] .pwp-usage-periods button::before,.mk[dir=ltr] .pwp-usage-periods button::after{right:auto;left:0}
+.mk[dir=ltr] .pwp-usage-periods button::before{background:radial-gradient(circle at top right,transparent 8.5px,var(--tab-paper) 9px)}
+.mk[dir=ltr] .pwp-usage-periods button::after{background:radial-gradient(circle at bottom right,transparent 8.5px,var(--tab-paper) 9px)}
+.mk .pwp-usage-periods button{filter:drop-shadow(-2px 1px 2px #0f172a24);clip-path:inset(-10px 0 -10px -10px)}
+.mk[dir=ltr] .pwp-usage-periods button{filter:drop-shadow(2px 1px 2px #0f172a24);clip-path:inset(-10px -10px -10px 0)}
 
 .pwp-usage-card[data-enabled=false] .pwp-usage-value>strong{font-size:12px;color:var(--muted)}.mk .pwp-usage-periods button:disabled{cursor:default;opacity:.6}
+
+.mk .pwp-core-update-row{display:grid!important;grid-template-columns:130px minmax(0,1fr) auto;gap:10px!important}
+.mk .pwp-core-update-row>div:nth-child(2){display:grid!important;grid-template-columns:125px 90px minmax(0,1fr);min-width:0}
+.mk .pwp-core-update-row>div:nth-child(2)>.mk-chip{justify-self:start}
+.mk .pwp-core-update-row>div:nth-child(2)>span:not(.mk-chip){min-width:0!important}
+.mk .pwp-core-update-row>div:nth-child(2)>code{justify-self:start;width:250px;min-width:0;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:ltr;unicode-bidi:isolate}
+.mk .pwp-core-update-row>div:nth-child(3){grid-column:3;min-width:0;max-width:none;justify-content:flex-end;flex-wrap:nowrap!important}
+.mk .pwp-core-update-row>div:nth-child(3) .mk-btn{padding-inline:10px;font-size:12px;gap:5px}
+.mk .pwp-core-update-row .pwp-vsel{width:170px;max-width:170px;min-width:0}
+.mk .pwp-core-update-row>[data-note]{grid-column:1/-1;min-width:0}
+@media(min-width:701px) and (max-width:1200px){
+	.mk .pwp-core-update-row{grid-template-columns:110px minmax(0,1fr) auto}
+	.mk .pwp-core-update-row>div:nth-child(2){grid-template-columns:125px minmax(0,1fr)}
+	.mk .pwp-core-update-row>div:nth-child(2)>code{grid-column:1/-1}
+	.mk .pwp-core-update-row>div:nth-child(3){max-width:none}
+}
+@media(max-width:700px){
+	.mk .pwp-core-update-row{grid-template-columns:minmax(0,1fr)}
+	.mk .pwp-core-update-row>div:nth-child(2){display:flex!important}
+	.mk .pwp-core-update-row>div:nth-child(3),.mk .pwp-core-update-row>[data-note]{grid-column:1}
+	.mk .pwp-core-update-row>div:nth-child(3){overflow-x:auto;justify-content:flex-start}
+	.mk .pwp-core-update-row>div:nth-child(3)>*{flex-shrink:0}
+}
 
 /* Reserve the tab rail even when the LuCI theme supplies card padding. */
 .mk.mk-follow .pwp-status-row .pwp-usage-card{padding-inline-end:46px!important}
 .pwp-status-row>*,.pwp-usage-body,.pwp-social-card{min-width:0}
-.pwp-usage-title,.pwp-usage-value>span{overflow-wrap:anywhere}
+.pwp-usage-title{overflow-wrap:anywhere}
 @media(max-width:700px){
 	.mk .mk-tabs{max-width:100%;min-width:0}
 	.mk .mk-hero-controls{max-width:100%;flex-wrap:wrap}
@@ -720,9 +755,8 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 	.pwp-status-row .pwp-status-card,.pwp-status-row .pwp-social-card,.pwp-status-row .pwp-usage-card{grid-column:1;grid-row:auto}
 	.pwp-status-row .pwp-usage-card{min-height:210px;padding-inline-end:50px}
 	.mk.mk-follow .pwp-status-row .pwp-usage-card{padding-inline-end:50px!important}
-	.pwp-usage-values{gap:16px}
 	.pwp-usage-value>strong{font-size:20px;white-space:nowrap;overflow-wrap:normal}
-	.pwp-usage-value>span{font-size:12px}
+	.pwp-usage-value>span{font-size:14px}
 	.pwp-usage-periods{width:36px}
 	.mk .pwp-usage-periods button{min-width:36px}
 }

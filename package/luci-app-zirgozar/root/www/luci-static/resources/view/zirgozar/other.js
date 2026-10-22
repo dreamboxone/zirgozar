@@ -62,32 +62,6 @@ return view.extend({
 
 		m = new form.Map('zirgozar', _('Other Settings'));
 
-		var led = data[2] || {};
-		s = m.section(form.NamedSection, 'config', 'zirgozar', _('LED color'));
-		s.anonymous = true;
-		o = s.option(form.Flag, 'led_enabled', _('LED color'), led.supported
-			? _('Use URL test latency of the current connection. Disabled follows OpenWrt LED settings. Failed tests or a disconnected tunnel turn the indicator off.')
-			: _('No supported dimmable RGB indicator was detected on this router.'));
-		o.default = '0'; o.rmempty = false; o.readonly = !led.supported;
-		if (led.supported) {
-			var bounds = [ ['green', 200, _('Green below (ms)')], ['yellow', 300, _('Yellow below (ms)')], ['orange', 500, _('Orange below (ms)')], ['red', 1000, _('Red up to (ms); above turns off')] ];
-			bounds.forEach(function(b) {
-				var v = s.option(form.Value, 'led_' + b[0] + '_ms', b[2]);
-				v.default = String(b[1]); v.rmempty = false; v.datatype = 'range(1,60000)'; v.depends('led_enabled', '1');
-				v.validate = function(sid, value) {
-					var vals = bounds.map(function(x) {
-						var opt = m.lookupOption('led_' + x[0] + '_ms', sid);
-						return Number(opt && opt[0] ? opt[0].formvalue(sid) : x[1]);
-					});
-					return vals.every(function(n) { return Number.isInteger(n) && n >= 1 && n <= 60000; }) && vals[0] < vals[1] && vals[1] < vals[2] && vals[2] < vals[3]
-						? true : _('LED thresholds must increase: green, yellow, orange, red.');
-				};
-				var mode = s.option(form.ListValue, 'led_' + b[0] + '_mode', b[2] + ' — ' + _('Light mode'));
-				mode.value('steady', _('Steady')); if (led.blink) mode.value('blink', _('Blinking'));
-				mode.default = 'steady'; mode.rmempty = false; mode.depends('led_enabled', '1');
-			});
-		}
-
 		/* ------------------------------------------------ Delay Settings */
 		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Delay Settings'));
 		s.anonymous = true;
@@ -400,6 +374,32 @@ return view.extend({
 				}, 'trash')
 			]);
 		};
+
+		var led = data[2] || {};
+		s = m.section(form.NamedSection, 'config', 'zirgozar', _('LED color'));
+		s.anonymous = true;
+		o = s.option(form.Flag, 'led_enabled', _('LED color'), led.supported
+			? _('Use URL test latency of the current connection. Disabled follows OpenWrt LED settings. Failed tests or a disconnected tunnel turn the indicator off.')
+			: _('No supported dimmable RGB indicator was detected on this router.'));
+		o.default = '0'; o.rmempty = false; o.readonly = !led.supported;
+		if (led.supported) {
+			var bounds = [ ['green', 200, _('Green below (ms)')], ['yellow', 300, _('Yellow below (ms)')], ['orange', 500, _('Orange below (ms)')], ['red', 1000, _('Red up to (ms); above turns off')] ];
+			bounds.forEach(function(b) {
+				var v = s.option(form.Value, 'led_' + b[0] + '_ms', b[2]);
+				v.default = String(b[1]); v.rmempty = false; v.datatype = 'range(1,60000)'; v.depends('led_enabled', '1');
+				v.validate = function(sid, value) {
+					var vals = bounds.map(function(x) {
+						var opt = m.lookupOption('led_' + x[0] + '_ms', sid);
+						return Number(opt && opt[0] ? opt[0].formvalue(sid) : x[1]);
+					});
+					return vals.every(function(n) { return Number.isInteger(n) && n >= 1 && n <= 60000; }) && vals[0] < vals[1] && vals[1] < vals[2] && vals[2] < vals[3]
+						? true : _('LED thresholds must increase: green, yellow, orange, red.');
+				};
+				var mode = s.option(form.ListValue, 'led_' + b[0] + '_mode', b[2] + ' — ' + _('Light mode'));
+				mode.value('steady', _('Steady')); if (led.blink) mode.value('blink', _('Blinking'));
+				mode.default = 'steady'; mode.rmempty = false; mode.depends('led_enabled', '1');
+			});
+		}
 
 		return m.render().then(function(mapEl) {
 			/* The router's clock: not a setting, one button. */

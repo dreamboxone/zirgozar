@@ -834,7 +834,7 @@ return view.extend({
 		/* ------------------------------------------------------ maintain */
 		o = s.taboption('maintain', form.DummyValue, '_backup', _('Backup and Restore'));
 		o.render = function() {
-			var down = pui.btn(_('Create Backup File'), 'primary mk-small', function(ev) {
+			var down = pui.btn(_('Backup'), 'primary mk-small', function(ev) {
 				var b = ev.currentTarget;
 				return callAction('backup_create', '').then(function(r) {
 					if (r && r.error) return pui.note(b, _(r.error), 'error');
@@ -843,7 +843,7 @@ return view.extend({
 			}, 'download');
 			/* Not returned to the button: the file chooser can be closed
 			   without a word, and the button would turn for ever. */
-			var up = pui.btn(_('Restore Backup File'), 'soft-blue mk-small', function(ev) {
+			var up = pui.btn(_('Restore'), 'soft-blue mk-small', function(ev) {
 				var b = ev.currentTarget;
 				backupRestore().then(function(r) {
 					if (!r) return;

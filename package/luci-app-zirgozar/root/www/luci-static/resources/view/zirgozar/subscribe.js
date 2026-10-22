@@ -474,8 +474,8 @@ return view.extend({
 		o.depends('chain_proxy', '2');
 		manual.forEach(function(n) { o.value(n['.name'], n.name || n['.name']); });
 
-		column(s, '_remove', _('Delete the subscribed node'), function(sid) {
-			return pui.btn(_('Delete the subscribed node'), 'danger mk-small', function(ev) {
+		column(s, '_remove', _('Delete Nodes'), function(sid) {
+			return pui.btn(_('Delete Nodes'), 'danger mk-small', function(ev) {
 				var b = ev.currentTarget;
 				return callAction('forget_nodes', sid).then(function(r) {
 					done(b, r, _('Deleted.'));
@@ -484,8 +484,8 @@ return view.extend({
 			}, 'trash');
 		});
 
-		column(s, '_update', _('Manual subscription'), function(sid) {
-			return pui.btn(_('Manual subscription'), 'primary mk-small', function(ev) {
+		column(s, '_update', _('Update'), function(sid) {
+			return pui.btn(_('Update'), 'primary mk-small', function(ev) {
 				var b = ev.currentTarget;
 				return callAction('refresh_nodes', sid).then(function(r) {
 					if (r && r.error) pui.note(b, _(r.error), 'error');
