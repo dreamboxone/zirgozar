@@ -672,7 +672,7 @@ var FA = {
 		'خودکار: Xray، و برای کانفیگی که Xray اجرا نمی‌کند sing-box. Xray (patterniha): اول هسته پترنیها، و QUIC مثل PattN بسته می‌شود. با sing-box یا sing-box-lx همه کانفیگ‌ها با آن اجرا می‌شوند؛ اگر راه نیفتد، Xray جایش را می‌گیرد. کانفیگ OpenVPN همیشه با خود OpenVPN اجرا می‌شود، کنار هر هسته‌ای که اینجا انتخاب شده باشد؛ آن را از صفحه‌ی «به‌روزرسانی» نصب کنید.',
 	'Direct addresses and domains': 'آدرس‌ها و دامنه‌های مستقیم',
 	'These sites always go straight out, never through the tunnel. A name covers everything under it: example.com also covers www.example.com. Xray’s own forms — full:, regexp:, keyword: — are accepted as written.':
-		'این سایت‌ها همیشه مستقیم می‌روند و هیچ‌وقت از تونل رد نمی‌شوند. هر دامنه زیردامنه‌هایش را هم شامل می‌شود: ‎example.com‎ شامل ‎www.example.com‎ هم هست. شکل‌های خود Xray — ‎full:‎، ‎regexp:‎، ‎keyword:‎ — همان‌طور که نوشته شوند پذیرفته می‌شوند.',
+		'دامنه سایت هایی را اینجا اضافه کنید که می خواهید بدون فیلترشکن باز شوند. هر مورد را جداگانه وارد کنید. مثلا \u2066example.com\u2069، خود این دامنه و همه زیردامنه های آن مثل \u2066www.example.com\u2069 را شامل می شود. برای محدود کردن به یک دامنه دقیق، \u2066full:example.com\u2069 بنویسید. با \u2066keyword:example\u2069 هر دامنه ای که عبارت example را داشته باشد انتخاب می شود. پیشوند \u2066regexp:\u2069 هم برای وارد کردن الگوی عبارت منظم است؛ اگر با آن آشنا نیستید، فقط دامنه معمولی را وارد کنید.',
 
 	/* --------------------------------------------------- the access control */
 	'Access Control': 'کنترل دسترسی',

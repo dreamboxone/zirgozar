@@ -430,8 +430,7 @@ return view.extend({
 		};
 
 		/* --------------------------------------------------- direct names */
-		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Direct addresses and domains'),
-			_('These sites always go straight out, never through the tunnel. A name covers everything under it: example.com also covers www.example.com. Xray’s own forms — full:, regexp:, keyword: — are accepted as written.'));
+		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Direct addresses and domains'));
 		s.anonymous = true;
 
 		o = s.option(form.DynamicList, 'direct_ip', _('Direct IP List'),
@@ -441,6 +440,7 @@ return view.extend({
 		o.placeholder = '1.2.3.4 or 5.6.0.0/16';
 
 		o = s.option(form.DynamicList, 'direct_domain', _('Domains'));
+		o.description = _('These sites always go straight out, never through the tunnel. A name covers everything under it: example.com also covers www.example.com. Xray’s own forms — full:, regexp:, keyword: — are accepted as written.');
 		o.placeholder = 'example.com';
 		o.validate = function(section_id, value) {
 			if (!value) return true;
