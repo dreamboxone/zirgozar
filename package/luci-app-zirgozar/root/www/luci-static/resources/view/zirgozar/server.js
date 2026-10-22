@@ -246,7 +246,7 @@ return view.extend({
 		o.rawhtml = true;
 		o.cfgvalue = function() { return '<span id="zgz-server-status" style="font-weight:600;display:inline-block;padding-top:10px"></span>'; };
 
-		o = s.option(form.Flag, 'enable', _('Enable'),
+		o = s.option(form.Flag, 'enable', _('Enable server'),
 			_('The router as a proxy server: phones and laptops away from home connect to it. A server that listens beyond the router has its port opened in the firewall while it runs.'));
 		o.rmempty = false;
 

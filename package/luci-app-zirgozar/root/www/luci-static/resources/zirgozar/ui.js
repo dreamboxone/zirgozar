@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.7.30-r4';
+var BUILD = '5.7.30-r5';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -576,6 +576,8 @@ var PAGES = [
 ];
 
 function tabs() {
+	var colours = { settings: '#3b82f6', nodes: '#8b5cf6', subscribe: '#ea580c', other: '#64748b',
+		update: '#0284c7', traffic: '#16a34a', geoview: '#0d9488', server: '#9333ea', acl: '#db2777', log: '#b45309' };
 	var here = (L.env.dispatchpath || [])[3] || 'settings';
 	if (here === 'overview') here = 'settings';
 	if (here === 'node') here = 'nodes';
@@ -583,6 +585,7 @@ function tabs() {
 	return E('nav', { 'class': 'mk-tabs', 'role': 'tablist' }, PAGES.map(function(p) {
 		return E('a', {
 			'class': 'mk-tab' + (p[0] === here ? ' mk-tab-on' : ''),
+			'style': '--tab-icon-colour:' + colours[p[0]],
 			'role': 'tab',
 			'aria-selected': String(p[0] === here),
 			'href': L.url('admin', 'services', 'zirgozar', p[0])
@@ -622,11 +625,21 @@ function optionHelp(root) {
 			if (desc.closest('.zgz-help') || !desc.textContent.trim()) return;
 			var row = desc.closest('.cbi-value');
 			var label = row && row.querySelector('.cbi-value-title');
+			if (!label && desc.classList.contains('zgz-card-help')) {
+				var card = desc.closest('.mk-card');
+				label = card && card.querySelector('.mk-card-title > span:last-child');
+			}
 			var help = E('details', { 'class': 'zgz-help' });
 			var summary = E('summary', { 'aria-label': i18n.get() === 'fa' ? 'راهنمای گزینه' : 'Option help', 'aria-expanded': 'false' }, i18n.get() === 'fa' ? '؟' : '?');
 			help.appendChild(summary);
 			desc.classList.add('zgz-help-content');
-			if (label) label.appendChild(help);
+			if (label) {
+				var labelText = E('span', { 'class': 'zgz-help-label' });
+				while (label.firstChild) labelText.appendChild(label.firstChild);
+				label.appendChild(labelText);
+				label.appendChild(help);
+				label.classList.add('zgz-has-help');
+			}
 			else desc.parentNode.insertBefore(help, desc);
 			help.appendChild(desc);
 			summary.addEventListener('click', function(ev) {

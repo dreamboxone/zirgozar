@@ -644,7 +644,10 @@ return view.extend({
 			_('With Xray as the active core the rule is left out.'));
 		so.modalonly = true;
 
-		sr.description = _('FakeDNS works with its main switch on, for a rule whose names go through a node. Preproxy: the rule’s node is reached through this node first — one layer only: a node with a chain of its own keeps it.');
+		sr.description = E('div', { 'class': 'cbi-value-description' }, [
+			E('p', {}, _('FakeDNS uses synthetic IP addresses for this rule’s domains. Enable the main FakeDNS switch and select a node as the rule destination.')),
+			E('p', {}, _('Preproxy connects to this rule’s destination node through the node selected here. If the destination node already has its own proxy chain, that chain is preserved.'))
+		]);
 
 		o = s.taboption('shunt', form.ListValue, 'default_node', _('Default'),
 			_('Where everything no rule claims goes.'));
@@ -800,7 +803,7 @@ return view.extend({
 
 		o = s.taboption('dns', form.Value, 'node_dns', _('Node address DNS'),
 			_('The resolver every node’s server name is looked up with, straight out - an IP address, since nothing can be looked up before the tunnel is up. Empty uses Direct DNS. Such as 1.1.1.1, tcp://8.8.8.8 or https://8.8.8.8/dns-query.'));
-		o.placeholder = _('Direct DNS');
+		o.placeholder = i18n.get() === 'fa' ? '\u2067' + _('Direct DNS') + '\u2069' : _('Direct DNS');
 		o.validate = function(section_id, value) {
 			if (!value || /^((udp|tcp):\/\/)?(\d{1,3}(\.\d{1,3}){3}|\[[0-9A-Fa-f:]+\])(:\d+)?$/.test(value) ||
 			    /^https:\/\/(\d{1,3}(\.\d{1,3}){3}|\[[0-9A-Fa-f:]+\])(:\d+)?(\/\S*)?$/.test(value)) return true;

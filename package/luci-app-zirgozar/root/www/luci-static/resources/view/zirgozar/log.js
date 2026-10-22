@@ -93,12 +93,12 @@ return view.extend({
 		var page = pui.page([
 			pui.card(_('Runtime Logs'), 'book', '#1e88e5', E('div', {}, [
 				E('div', { 'class': 'mk-row', 'style': 'margin-bottom:10px;justify-content:space-between' }, [
-					E('span', { 'style': 'font-size:13px;color:var(--muted)' },
+					E('span', { 'class': 'cbi-value-description zgz-card-help' },
 						_('What Zirgozar does is shown here, refreshed every 5 seconds. It is emptied when the router reboots.')),
-					E('div', { 'style': 'display:flex;gap:8px;align-items:center' }, [
+					E('div', { 'style': 'display:flex;gap:8px;align-items:center;margin-inline-start:auto' }, [
 						/* What is in the box, as it reads on the page. */
 						pui.copyBtn ? pui.copyBtn(function() { return runtime.textContent; }) : '',
-						pui.btn(_('Clear logs'), 'danger mk-small', function() {
+						pui.btn(_('Delete'), 'danger mk-small', function() {
 							return callAction('clear_log', '').then(function() {
 								return callLog().then(draw);
 							});
@@ -109,12 +109,12 @@ return view.extend({
 			])),
 			pui.card(_('Node log'), 'cpu', '#8b5cf6', E('div', {}, [
 				E('div', { 'class': 'mk-row', 'style': 'margin-bottom:10px;justify-content:space-between' }, [
-					E('span', { 'style': 'font-size:13px;color:var(--muted)' },
+					E('span', { 'class': 'cbi-value-description zgz-card-help' },
 						_('The Xray core’s messages are shown here.')),
-					E('div', { 'style': 'display:flex;gap:8px;align-items:center' }, [
+					E('div', { 'style': 'display:flex;gap:8px;align-items:center;margin-inline-start:auto' }, [
 						/* What is in the box, as it reads on the page. */
 						pui.copyBtn ? pui.copyBtn(function() { return core.textContent; }) : '',
-						pui.btn(_('Clear logs'), 'danger mk-small', function() {
+						pui.btn(_('Delete'), 'danger mk-small', function() {
 							return callAction('clear_core_log', '').then(function() {
 								return callLog().then(draw);
 							});

@@ -244,6 +244,10 @@
 .mk .mk-tab{display:inline-flex;flex:1 0 auto;justify-content:center;align-items:center;gap:clamp(3px,.35cqi,5px);white-space:nowrap;border:0;background:transparent;color:var(--muted);font-weight:700;font-size:clamp(12px,1.05cqi,14px);padding:10px clamp(3px,.65cqi,9px);border-radius:13px;cursor:pointer;transition:background .15s,color .15s}
 .mk-tab:hover{background:var(--soft);color:var(--text)}
 .mk-tab.mk-tab-on{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;box-shadow:0 6px 14px -8px #4f46e5}
+.mk .mk-tab>.mk-ico{color:var(--tab-icon-colour,currentColor)}
+.mk.mk-dark .mk-tab>.mk-ico{color:color-mix(in srgb,var(--tab-icon-colour,currentColor) 70%,#fff)}
+.mk .mk-tab.mk-tab-on>.mk-ico{color:#fff}
+.mk.mk-follow .mk-tab.mk-tab-on>.mk-ico{color:inherit}
 .mk-tab:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
 .mk-panel[hidden]{display:none}
 .mk-panel{animation:mk-fade .15s ease-out}
@@ -351,7 +355,7 @@ body.pwp-fa #modal_overlay:where(body.pwp-active *)>.modal textarea,body.pwp-fa 
 /* An option whose condition is not met: LuCI hides it with a class, and the
    flex above would otherwise win and show it anyway. */
 :is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value.hidden,:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value[hidden],.mk .hidden{display:none!important}
-:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-title{flex:0 0 220px;max-width:100%;font-weight:700;color:var(--text)!important;padding-top:10px!important;text-align:start!important;width:auto!important;float:none!important}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-title{flex:0 0 360px;max-width:100%;font-weight:700;color:var(--text)!important;padding-top:10px!important;text-align:start!important;width:auto!important;float:none!important}
 :is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-field{flex:1 1 280px;min-width:0;margin:0!important;padding:0!important;width:auto!important;float:none!important}
 :is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-description{color:var(--muted)!important;font-size:12.5px;line-height:1.8;margin-top:6px;padding:0!important;background:none!important}
 :is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-description::before{display:none!important}
@@ -452,11 +456,17 @@ body.pwp-fa #modal_overlay:where(body.pwp-active *)>.modal textarea,body.pwp-fa 
 :is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value:has(>.cbi-value-field input[type=checkbox])>.cbi-value-title{padding-top:0!important}
 :is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .zgz-help>summary{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1px solid var(--line);border-radius:50%;background:var(--soft);color:var(--zgz-accent,#3b82f6);cursor:pointer;list-style:none;font:700 11px/1 Arial,sans-serif}
 :is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .zgz-help>summary::-webkit-details-marker{display:none}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-title.zgz-has-help{display:flex!important;align-items:baseline;gap:4px}
+.mk .mk-card-title>.zgz-has-help{display:inline-flex;align-items:baseline;gap:4px}
+.mk .mk-card-title>.zgz-has-help>.zgz-help{font-size:14px}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .zgz-help-label{min-width:0;white-space:nowrap}
+
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .zgz-has-help>.zgz-help{flex:0 0 auto;margin-inline-start:0;align-self:flex-start;top:-1.25em}
 :is(.mk[dir=rtl],#modal_overlay:where(body.pwp-active.pwp-fa *)>.modal) .zgz-help{top:-.55em}
 :is(.mk[dir=rtl],#modal_overlay:where(body.pwp-active.pwp-fa *)>.modal) .zgz-help>summary{width:18px;height:18px;font-size:13px;font-weight:900;text-shadow:0 0 .35px currentColor}
 :is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .zgz-help>summary:focus-visible{outline:2px solid var(--zgz-accent,#3b82f6);outline-offset:3px}
 :is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .zgz-help[open]{z-index:30}
-:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .zgz-help .zgz-help-content{position:fixed;inset-inline-start:auto;right:auto;width:340px;max-width:calc(100vw - 64px);max-height:50vh;overflow:auto;padding:14px!important;margin:0;border:1px solid var(--line);border-radius:12px;background:var(--panel)!important;color:var(--text)!important;box-shadow:var(--shadow);font-size:13px;line-height:1.9;white-space:normal;overflow-wrap:anywhere;text-align:start}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .zgz-help .zgz-help-content{position:fixed;inset-inline-start:auto;right:auto;width:340px;max-width:calc(100vw - 64px);max-height:50vh;overflow:auto;padding:14px!important;margin:0;border:1px solid var(--line);border-radius:12px;background:var(--panel)!important;color:var(--text)!important;box-shadow:var(--shadow);font-size:13px;line-height:1.9;white-space:normal;overflow-wrap:anywhere;text-align:justify;text-align-last:start}
 :is(.mk,body.pwp-active #modal_overlay>.modal) :is(input,textarea)::placeholder{color:var(--muted);opacity:1}
 .mk .cbi-section-table .tr:hover .td{background:var(--soft)!important}
 /* The heading row and an empty table's one line are not rows to point at:

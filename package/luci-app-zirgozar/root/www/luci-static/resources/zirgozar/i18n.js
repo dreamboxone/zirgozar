@@ -62,7 +62,7 @@ var FA = {
 	'Additional protected DNS ports': 'پورت‌های DNS افزوده برای حفاظت',
 	'Strict mode always protects 853 and 5353. Add other DNS ports here. Port 443 follows website routing and cannot be added. Other services on these ports will also use the tunnel.': 'در حالت سخت‌گیرانه، پورت‌های ۸۵۳ و ۵۳۵۳ همیشه محافظت می‌شوند. پورت‌های دیگر DNS را اینجا اضافه کنید. پورت ۴۴۳ تابع مسیریابی سایت‌هاست و نمی‌توان آن را افزود. سرویس‌های دیگر روی این پورت‌ها هم از تونل عبور می‌کنند.',
 	'Port 443 follows website routing and cannot be a protected DNS port.': 'پورت ۴۴۳ تابع مسیریابی سایت‌هاست و نمی‌توان آن را به پورت‌های DNS افزود.',
-	'Client encrypted DNS policy': 'سیاست DNS رمزگذاری‌شدهٔ دستگاه‌ها',
+	'Client encrypted DNS policy': 'نحوه عبور DNS رمزگذاری شده دستگاه ها',
 	'Known services tunnels port 853 and known DoH destinations. Strict mode also tunnels TCP/UDP 5353 and additional protected DNS ports, while the Iran traffic split still controls ordinary websites. LAN and local mDNS remain available. With the Kill switch enabled, DNS protection stays active when the tunnel stops. Unknown DoH destinations and unlisted custom ports are not guaranteed.': 'حالت شناخته‌شده، پورت ۸۵۳ و مقصدهای شناخته‌شده DoH را از تونل می‌فرستد. حالت سخت‌گیرانه پورت ۵۳۵۳ و پورت‌های DNS افزوده را هم محافظت می‌کند؛ مسیر سایت‌های عادی همچنان تابع گزینه تفکیک ایران است. LAN و mDNS محلی حفظ می‌شوند. با قطع اضطراری روشن، محافظ DNS هنگام توقف تونل باقی می‌ماند. مقصدهای ناشناخته DoH و پورت‌های سفارشی ثبت‌نشده تضمین نمی‌شوند.',
 	'Tunnel known services': 'سرویس‌های شناخته‌شده از تونل',
 	'Strict DNS protection (preserve Iran split)': 'محافظت سخت‌گیرانه DNS با حفظ تفکیک ایران',
@@ -339,8 +339,8 @@ var FA = {
 	'Must start with http:// or https://': 'باید با ‎http://‎ یا ‎https://‎ شروع شود',
 	'On': 'فعال',
 	'Nodes added manually': 'ورود دستی کانفیگ‌ها',
-	'One share link per entry — vless, vmess, trojan, shadowsocks, socks, hysteria2, tuic or wireguard. A whole WireGuard .conf file can be pasted in as it stands. These are tried before the subscription list. The three test columns each measure something different; press one to run it.':
-		'هر ردیف یک لینک کانفیگ است: vless، vmess، trojan، shadowsocks، socks، hysteria2، tuic یا wireguard. فایل .conf وایرگارد را هم می‌شود کامل چسباند. این کانفیگ‌ها قبل از کانفیگ‌های اشتراک آزمایش می‌شوند. برای اجرای هر آزمایش روی ستون آن بزنید.',
+	'Manage configs you add manually here. Use Add to enter a config, or import share links and supported configuration files with the import buttons. The source selection setting determines whether manual configs, subscriptions or both are used. Click a config’s Ping, TCPing or URL Test result to run that test: Ping measures the server response, TCPing tests a TCP connection, and URL Test sends a request through the config.':
+		'کانفیگ هایی که خودتان اضافه می کنید در این جدول قرار می گیرند. با دکمه افزودن، کانفیگ بسازید یا با دکمه های ورود لینک و فایل، کانفیگ وارد کنید. تنظیم منبع کانفیگ تعیین می کند از کانفیگ های دستی، اشتراک ها یا هر دو استفاده شود. برای اجرای تست، روی نتیجه ستون Ping، TCPing یا URL Test همان کانفیگ بزنید. Ping پاسخ سرور را بررسی می کند، TCPing اتصال TCP را می سنجد و URL Test یک درخواست از داخل کانفیگ ارسال می کند.',
 	'Share link': 'لینک اشتراک‌گذاری',
 	'A share link, several of them one per line, or a whole WireGuard .conf file. Choose a file and its contents are put in the box for you.':
 		'یک لینک، یا چند لینک هر کدام در یک خط، یا کل یک فایل ‎.conf وایرگارد. فایل را انتخاب کنید تا محتوایش خودش داخل کادر بیاید.',
@@ -445,10 +445,10 @@ var FA = {
 	'Network': 'شبکه',
 	'Name lookups': 'روش پیدا کردن دامنه‌ها',
 	'Keeps local device and DHCP names working. Internet lookups use the tunnel DNS without inheriting the router’s upstream servers. DHCP name changes may take up to five seconds to appear. “Straight into the tunnel” omits local names.':
-		'نام دستگاه‌ها و DHCP حفظ می‌شود و دامنه‌های اینترنتی از DNS تونل پاسخ می‌گیرند؛ DNSهای بالادستی قبلی روتر به این مسیر منتقل نمی‌شوند. نمایش تغییر نام دستگاه‌های DHCP ممکن است تا پنج ثانیه زمان ببرد. حالت «مستقیم داخل تونل» نام‌های محلی را پشتیبانی نمی‌کند.',
+		'نام دستگاه‌ها و DHCP حفظ می‌شود و دامنه‌های اینترنتی از DNS تونل پاسخ می‌گیرند؛ DNSهای بالادستی قبلی روتر به این مسیر منتقل نمی‌شوند. نمایش تغییر نام دستگاه‌های DHCP ممکن است تا پنج ثانیه زمان ببرد. حالت «DNS از طریق هسته تونل» نام‌های محلی را پشتیبانی نمی‌کند.',
 	'Through dnsmasq (recommended)': 'از راه dnsmasq (پیشنهادی)',
-	'Straight into the tunnel': 'مستقیم داخل تونل',
-	'Leave alone': 'دست نزن',
+	'Straight into the tunnel': 'DNS از طریق هسته تونل',
+	'Leave alone': 'حفظ تنظیمات DNS روتر',
 	'Force DNS through the router': 'اجبار DNS از راه روتر',
 	'Some devices ignore the router and ask 8.8.8.8 or 1.1.1.1 themselves. Those questions leave without the tunnel, so the answer is whatever the censor wants it to be, and the device then connects to it — looking perfectly healthy while doing so. This drags such queries back to the router. Leave it on unless a device on your network genuinely has to reach a DNS server of its own.':
 		'بعضی دستگاه‌ها DNS روتر را نادیده می‌گیرند و مستقیم از 8.8.8.8 یا 1.1.1.1 می‌پرسند. این درخواست‌ها بدون فیلترشکن می‌روند و جواب فیلترشده می‌گیرند، پس سایت باز نمی‌شود. این گزینه آن‌ها را به روتر برمی‌گرداند تا جواب درست بگیرند. روشن بماند.',
@@ -683,6 +683,7 @@ var FA = {
 	'Main': 'اصلی',
 	'Proxy': 'پروکسی',
 	'Enable': 'فعال',
+	'Enable server': 'فعال سازی سرور',
 	'Remarks': 'نام',
 	'Source Interface': 'اینترفیس مبدا',
 	'All': 'همه',
@@ -770,11 +771,11 @@ var FA = {
 	'Remote': 'از تونل',
 	'Direct': 'مستقیم',
 	'Answers with a made-up address and lets the tunnel find the real one at the far end, which saves a lookup on every new site. Only takes effect with “Straight into the tunnel” above: with dnsmasq in front, the router’s own lookups would be made up too, and nothing the router fetches for itself would work.':
-		'به جای آدرس واقعی یک آدرس موقت ساختگی داده می‌شود و آدرس واقعی در سمت سرور پیدا می‌شود؛ سایت‌های تازه کمی سریع‌تر باز می‌شوند. فقط با «مستقیم داخل تونل» کار می‌کند.',
+		'به جای آدرس واقعی یک آدرس موقت ساختگی داده می‌شود و آدرس واقعی در سمت سرور پیدا می‌شود؛ سایت‌های تازه کمی سریع‌تر باز می‌شوند. فقط با «DNS از طریق هسته تونل» کار می‌کند.',
 	'Remote Query Strategy': 'روش درخواست DNS راه دور',
 	'Domain Override': 'جایگزینی دامنه',
 	'One per line: a name, a space, and the address it should resolve to.':
-		'در هر خط یک دامنه، یک فاصله و آدرس IP جایگزین آن دامنه را وارد کنید؛ مثل: example.com 1.2.3.4',
+		'با این گزینه مشخص می کنید یک دامنه به کدام آدرس IP تبدیل شود، به جای اینکه IP آن از سرور DNS دریافت شود. در هر خط، دامنه و IP را با یک فاصله بنویسید. مثلا example.com 1.2.3.4 یعنی برای دامنه example.com از IP برابر 1.2.3.4 استفاده شود؛ این فقط یک مثال است. این گزینه مسیر اتصال را تعیین نمی کند؛ عبور مستقیم یا از تونل همچنان تابع قوانین مسیریابی است. اگر IP مشخصی برای جایگزینی ندارید، این بخش را خالی بگذارید.',
 	'DNS Redirect': 'تغییر مسیر DNS',
 
 	'Preproxy': 'پیش‌پروکسی',
@@ -1221,7 +1222,7 @@ var FA = {
 	'HTTP Listen Port': 'پورت HTTP',
 	'Not the SOCKS port.': 'نباید همان پورت SOCKS باشد.',
 	'Node address DNS': 'DNS آدرس نودها',
-	'The resolver every node’s server name is looked up with, straight out - an IP address, since nothing can be looked up before the tunnel is up. Empty uses Direct DNS. Such as 1.1.1.1, tcp://8.8.8.8 or https://8.8.8.8/dns-query.': 'سرور DNS برای تبدیل دامنه سرور همه کانفیگ ها، از جمله کانفیگ های اشتراک، به آدرس IP است. درخواست ها مستقیم ارسال می شوند. آدرس این DNS باید IP باشد تا برای دسترسی به آن به تبدیل دامنه دیگری نیاز نباشد. خالی یعنی استفاده از DNS مستقیم. مثلا 1.1.1.1، tcp://8.8.8.8 یا https://8.8.8.8/dns-query.',
+	'The resolver every node’s server name is looked up with, straight out - an IP address, since nothing can be looked up before the tunnel is up. Empty uses Direct DNS. Such as 1.1.1.1, tcp://8.8.8.8 or https://8.8.8.8/dns-query.': 'برای اتصال به کانفیگی که آدرس سرورش دامنه است، ابتدا باید IP آن پیدا شود. مثلا vpn.example.com باید به یک آدرس IP تبدیل شود. این گزینه مشخص می کند کدام DNS این کار را انجام دهد. اگر آدرس سرور از ابتدا IP باشد، این تبدیل لازم نیست. این گزینه DNS باز کردن سایت ها از داخل تونل را تغییر نمی دهد. خالی بگذارید تا از گزینه «DNS مستقیم» استفاده شود؛ معمولا نیازی به تغییر آن نیست. برای تعیین DNS جداگانه، مثلا 1.1.1.1 یا tcp://8.8.8.8 یا https://8.8.8.8/dns-query وارد کنید. آدرس این DNS باید با IP نوشته شود و درخواست به آن مستقیم و خارج از تونل ارسال می شود تا برقراری اتصال به خود تونل وابسته نباشد.',
 	'An IP address, such as 1.1.1.1, tcp://8.8.8.8 or https://8.8.8.8/dns-query.': 'یک آدرس IP، مثلاً 1.1.1.1، tcp://8.8.8.8 یا https://8.8.8.8/dns-query.',
 	'%d added; %d were already in the list.': '%d کانفیگ اضافه شد؛ %d تا از قبل در فهرست بودند.',
 	'Enter share links, one per line. Subscription links are not supported!': 'لینک‌های کانفیگ را وارد کنید، هر خط یک لینک. لینک اشتراک پذیرفته نمی‌شود!',
@@ -1266,10 +1267,12 @@ var FA = {
 	'Not valid, please re-enter: %s': 'نادرست است، دوباره وارد کنید: %s',
 	'Names that go through a node are answered with made-up addresses, and the node looks up the real one at the far end — for streaming services that unlock by DNS, or to save a lookup. Tick it for each rule below that should use it. The router itself can open those names only with Localhost Proxy on.':
 		'اگر روشن باشد، برای سایت‌هایی که از فیلترشکن می‌روند یک آدرس موقت ساختگی داده می‌شود و آدرس واقعی در سمت سرور پیدا می‌شود؛ سایت‌ها سریع‌تر باز می‌شوند و بعضی سرویس‌های ویدیویی هم باز می‌شوند. در جدول پایین برای هر قانونی که می‌خواهید تیک FakeDNS را بزنید.',
-	'FakeDNS works with its main switch on, for a rule whose names go through a node. Preproxy: the rule’s node is reached through this node first — one layer only: a node with a chain of its own keeps it.':
-		'FakeDNS: فقط وقتی کار می‌کند که «کلید اصلی FakeDNS» روشن باشد و قانون به یک کانفیگ برود. پیش‌پروکسی: اتصال کانفیگ قانون اول از این کانفیگ رد می‌شود (دو لایه).',
+	'FakeDNS uses synthetic IP addresses for this rule’s domains. Enable the main FakeDNS switch and select a node as the rule destination.':
+		'FakeDNS: برای دامنه های این قانون، آدرس IP ساختگی استفاده می شود. کلید اصلی FakeDNS باید روشن باشد و مقصد قانون یک کانفیگ باشد.',
+	'Preproxy connects to this rule’s destination node through the node selected here. If the destination node already has its own proxy chain, that chain is preserved.':
+		'پیش پروکسی: کانفیگ مقصد این قانون از طریق کانفیگی که اینجا انتخاب می کنید وصل می شود. اگر کانفیگ مقصد زنجیره اتصال خودش را داشته باشد، همان زنجیره حفظ می شود.',
 	'Everything the tunnel carries gets made-up addresses — the DNS tab’s FakeDNS. Like that one, it takes effect only with lookups sent straight into the tunnel.':
-		'برای همه سایت‌هایی که از فیلترشکن می‌روند آدرس ساختگی داده می‌شود. فقط وقتی کار می‌کند که در برگه DNS، «روش پیدا کردن دامنه‌ها» روی «مستقیم داخل تونل» باشد.',
+		'برای همه سایت‌هایی که از فیلترشکن می‌روند آدرس ساختگی داده می‌شود. فقط وقتی کار می‌کند که در برگه DNS، «روش پیدا کردن دامنه‌ها» روی «DNS از طریق هسته تونل» باشد.',
 	'When the Default row goes to a node, it is reached through this node first.':
 		'اگر ردیف پیش‌فرض به یک کانفیگ می‌رود، اتصال اول از این کانفیگ رد می‌شود.',
 	'Delete the subscribed node': 'حذف کانفیگ‌ها',
@@ -1457,7 +1460,7 @@ var FA = {
 	'No server is running. Add one below and press Save & Apply.': 'هیچ سروری در حال اجرا نیست. پایین یکی اضافه کنید و «ذخیره و اعمال» را بزنید.',
 	'Running (%s), listening on %s.': 'در حال اجرا (%s)، روی پورت‌های %s.',
 	'The router as a proxy server: phones and laptops away from home connect to it. A server that listens beyond the router has its port opened in the firewall while it runs.':
-		'روتر به‌عنوان سرور پروکسی: گوشی و لپ‌تاپ بیرون از خانه به آن وصل می‌شوند. پورت سرورهایی که فقط روی خود روتر نیستند، تا وقتی اجرا می‌شوند در فایروال باز می‌شود.',
+		'با روشن کردن این گزینه و زدن «ذخیره و اعمال»، سرورهایی که در جدول پایین فعال کرده اید اجرا می شوند. سپس دستگاه های دیگر می توانند با آدرس روتر، پورت و اطلاعات اتصال همان سرور به آن وصل شوند. این کلید برای ارایه اتصال به دستگاه های دیگر است و کانفیگ اصلی زیرگذر را روشن نمی کند. برای اتصال از بیرون خانه، روتر باید از اینترنت قابل دسترسی باشد؛ مثلا IP عمومی داشته باشد یا پورت لازم روی مودم به روتر منتقل شده باشد. زیرگذر هنگام اجرای سرور، پورت آن را در فایروال روتر باز می کند، مگر اینکه سرور فقط برای اتصال از خود روتر تنظیم شده باشد.',
 	'Log level': 'سطح گزارش',
 	'Users Manager': 'مدیریت کاربران',
 	'Outbound': 'خروجی',

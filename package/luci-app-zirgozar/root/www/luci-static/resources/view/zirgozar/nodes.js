@@ -552,7 +552,7 @@ return view.extend({
 
 		/* ---------------------------------------------- added by hand */
 		s = m.section(form.GridSection, 'node', _('Nodes added manually'),
-			_('One share link per entry — vless, vmess, trojan, shadowsocks, socks, hysteria2, tuic or wireguard. A whole WireGuard .conf file can be pasted in as it stands. These are tried before the subscription list. The three test columns each measure something different; press one to run it.'));
+			E('div', { 'class': 'cbi-value-description' }, _('Manage configs you add manually here. Use Add to enter a config, or import share links and supported configuration files with the import buttons. The source selection setting determines whether manual configs, subscriptions or both are used. Click a config’s Ping, TCPing or URL Test result to run that test: Ping measures the server response, TCPing tests a TCP connection, and URL Test sends a request through the config.')));
 		s.addremove = true;
 		s.anonymous = true;
 		s.sortable = true;
