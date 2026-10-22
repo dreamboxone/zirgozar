@@ -418,11 +418,11 @@ return view.extend({
 		o.rmempty = false;
 
 		/* ------------------------------------------------------ rebind */
-		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Sites with a rebind weakness'),
-			E('div', { 'class': 'cbi-value-description' }, _('Some sites answer with a private address — Iranian banks and government services among them, which resolve to 10.x addresses inside the country. The router’s DNS protection against rebind attacks refuses those answers, and the site simply does not open. Every name listed here is excused from that protection, together with everything under it.')));
+		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Sites with a rebind weakness'));
 		s.anonymous = true;
 
 		o = s.option(form.DynamicList, 'rebind_domain', _('Domains'));
+		o.description = _('Some sites answer with a private address — Iranian banks and government services among them, which resolve to 10.x addresses inside the country. The router’s DNS protection against rebind attacks refuses those answers, and the site simply does not open. Every name listed here is excused from that protection, together with everything under it.');
 		o.placeholder = 'example.ir';
 		o.validate = function(section_id, value) {
 			if (!value || hostname(value)) return true;

@@ -436,9 +436,9 @@ var FA = {
 	'Iranian DNS': 'DNS ایرانی',
 	'Used for Iranian domains in split mode to keep CDN traffic local. Leave empty to keep split routing active without exposing DNS lookups to Iranian servers.':
 		'در حالت تفکیک برای دامنه‌های ایرانی استفاده می‌شود تا ترافیک CDN داخل کشور بماند. خالی بگذارید تا تفکیک کار کند بدون اینکه سرورهای ایرانی ببینند چه دامنه‌هایی جست‌وجو می‌شود.',
-	'Block advertising': 'مسدود کردن تبلیغات',
+	'Block advertising': 'مسدودسازی تبلیغات',
 	'Also needs the routing data.': 'این هم به داده مسیریابی نیاز دارد.',
-	'Block BitTorrent': 'مسدود کردن بیت‌تورنت',
+	'Block BitTorrent': 'مسدودسازی بیت تورنت',
 	'BitTorrent through a free node is how a free node stops existing.':
 		'استفاده از بیت‌تورنت موجب انسداد سرور فیلترشکن و قطع دایمی کانفیگ شما می‌گردد.',
 
@@ -623,7 +623,7 @@ var FA = {
 	'Traffic Rules': 'قوانین ترافیکی',
 	'Sites with a rebind weakness': 'سایت‌های دارای ضعف امنیتی Rebind Attack',
 	'Some sites answer with a private address — Iranian banks and government services among them, which resolve to 10.x addresses inside the country. The router’s DNS protection against rebind attacks refuses those answers, and the site simply does not open. Every name listed here is excused from that protection, together with everything under it.':
-		'بعضی سایت‌های ایرانی، مثل بانک‌ها و سرویس‌های دولتی، آدرس داخلی (10.x.x.x) دارند. روتر برای امنیت این جواب‌ها را رد می‌کند و سایت باز نمی‌شود. سایت‌هایی که اینجا بنویسید، با زیردامنه‌هایشان، از این محدودیت معاف می‌شوند.',
+		'بعضی سایت‌های ایرانی، مثل بانک‌ها و سرویس‌های دولتی، آدرس داخلی (⁦10.x.x.x⁩) دارند. روتر برای امنیت این جواب‌ها را رد می‌کند و سایت باز نمی‌شود. سایت‌هایی که اینجا بنویسید، با زیردامنه‌هایشان، از این محدودیت معاف می‌شوند.',
 	'Domains': 'دامنه‌ها',
 	'That does not look like a domain name': 'این شبیه یک نام دامنه نیست',
 	'Direct addresses': 'IPهای مستقیم',
@@ -1072,11 +1072,11 @@ var FA = {
 	'Geoview': 'موقعیت‌یاب',
 	'Geoview App Path': 'مسیر Geoview',
 	'The Geoview page needs it, and so does sing-box whenever the Iran split or ad blocking is on - it is then installed by itself. Empty means this program’s own copy in the folder above.':
-		'صفحه «موقعیت‌یاب» به آن نیاز دارد، و sing-box هم وقتی تفکیک ایران یا مسدود کردن تبلیغات روشن است — آن وقت خودش نصب می‌شود. خالی یعنی نسخه خود این برنامه در پوشه بالا.',
+		'صفحه «موقعیت‌یاب» به آن نیاز دارد، و sing-box هم وقتی تفکیک ایران یا مسدودسازی تبلیغات روشن است — آن وقت خودش نصب می‌شود. خالی یعنی نسخه خود این برنامه در پوشه بالا.',
 	'Geoview shows where a name or an address belongs, on the Geoview page. sing-box cannot read the routing data without it: when sing-box carries the tunnel with the Iran split or ad blocking on, Geoview is installed by itself if it is missing.':
 		'موقعیت‌یاب نشان می‌دهد یک دامنه یا آدرس به کدام کشور تعلق دارد. سینگ‌باکس بدون آن تفکیک ترافیک نمی‌کند.',
 	'sing-box needs Geoview to read the routing data, and it could not be installed, so the Iran split and ad blocking are off. Install Geoview on the App Update page, or choose Xray under Active core in Basic Settings.':
-		'sing-box برای خواندن داده‌های مسیریابی به Geoview نیاز دارد و نصب آن ممکن نشد، پس تفکیک ایران و مسدود کردن تبلیغات خاموش است. Geoview را از صفحه «به‌روزرسانی» نصب کنید، یا در تنظیمات پایه زیر «هسته فعال» Xray را انتخاب کنید.',
+		'sing-box برای خواندن داده‌های مسیریابی به Geoview نیاز دارد و نصب آن ممکن نشد، پس تفکیک ایران و مسدودسازی تبلیغات خاموش است. Geoview را از صفحه «به‌روزرسانی» نصب کنید، یا در تنظیمات پایه زیر «هسته فعال» Xray را انتخاب کنید.',
 	'Enter something to look for first.': 'اول چیزی برای جست‌وجو وارد کنید.',
 	'Processing, please wait…': 'در حال پردازش، لطفا صبر کنید…',
 	'Geoview is not installed. Install it with the button below, or on the App Update page.':
