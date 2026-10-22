@@ -629,6 +629,11 @@ function optionHelp(root) {
 				var card = desc.closest('.mk-card');
 				label = card && card.querySelector('.mk-card-title > span:last-child');
 			}
+			var existingHelp = label && label.querySelector('.zgz-help');
+			if (existingHelp) {
+				existingHelp.querySelector('.zgz-help-content').appendChild(desc);
+				return;
+			}
 			var help = E('details', { 'class': 'zgz-help' });
 			var summary = E('summary', { 'aria-label': i18n.get() === 'fa' ? 'راهنمای گزینه' : 'Option help', 'aria-expanded': 'false' }, i18n.get() === 'fa' ? '؟' : '?');
 			help.appendChild(summary);
