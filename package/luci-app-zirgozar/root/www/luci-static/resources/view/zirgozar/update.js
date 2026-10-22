@@ -74,7 +74,8 @@ var progressPhase = '', phaseJob = '';
 function downloadText(name) {
 	var key = 'Downloading %s:', text = _(key);
 	if (i18n.get() === 'fa' && text === key) text = 'در حال دانلود %s:';
-	return text.format(ltr(String(name).replace(/^xray$/, 'Xray')));
+	name = String(name).replace(/^(?:Installing|Updating) /, '').replace(/^xray$/, 'Xray');
+	return text.format(name === 'Zirgozar' && i18n.get() === 'fa' ? 'زیرگذر' : ltr(name));
 }
 
 function noteFor(key) {
@@ -249,6 +250,8 @@ function noRoom(need, free) {
 
 /* What the router says it is busy with, in the page's language. */
 function jobName(j) {
+	if (j === 'Updating Zirgozar')
+		return _('Installing %s').format(i18n.get() === 'fa' ? 'زیرگذر' : 'Zirgozar');
 	var m = /^Installing (.+)$/.exec(j);
 	if (m && m[1] != 'dependencies') return _('Installing %s').format(m[1]);
 	return _(j);
