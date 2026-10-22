@@ -276,14 +276,17 @@ case "$MODE" in
 		umask 077
 		cat > "$TEST_IN"
 		NODE="$TEST_IN"
+		# curl binds to the tunnel device, so a localhost REDIRECT would
+		# send it to a loopback listener it cannot reach. Pause interception
+		# for reused connections too; cleanup restores it after the request.
+		if [ "$(cfg_bool localhost_proxy 1)" = 1 ]; then
+			"$ZGZ_LIB/zgz-rules" local pause >/dev/null 2>&1; PAUSED=1
+		fi
 		# An already connected identical account can be measured without reconnecting.
 		if cmp -s "$NODE" "$ZGZ_ETC/bridge.json" && ip -4 addr show dev zgzikev2 2>/dev/null | grep -q 'inet '; then
 			DEV=zgzikev2
 			measure
 			exit 0
-		fi
-		if [ "$(cfg_bool localhost_proxy 1)" = 1 ]; then
-			"$ZGZ_LIB/zgz-rules" local pause >/dev/null 2>&1; PAUSED=1
 		fi
 		connect
 		measure ;;

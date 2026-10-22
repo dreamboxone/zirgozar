@@ -63,4 +63,29 @@ SH
 chmod +x "$RIG/lib/zgz-deps" "$RIG/bin/modprobe"
 ensure_dependencies
 check "$(cat "$ZGZ_RUN/protocol-install.calls")" 'install ikev2' 'connection bootstrap installs the scoped protocol prerequisites'
+
+# The active connection path must bypass localhost interception as well.
+rig_set localhost_proxy 1
+printf '{"type":"ikev2"}\n' > "$ZGZ_ETC/bridge.json"
+cat > "$RIG/bin/ip" <<'SH'
+#!/bin/sh
+echo '    inet 192.0.2.1/32 scope global zgzikev2'
+SH
+cat > "$RIG/lib/zgz-rules" <<'SH'
+#!/bin/sh
+echo "$*" >> "$ZGZ_RUN/local.calls"
+case "$2" in
+    pause) touch "$ZGZ_RUN/local.paused" ;;
+    resume) rm -f "$ZGZ_RUN/local.paused" ;;
+esac
+SH
+cat > "$RIG/bin/curl" <<'SH'
+#!/bin/sh
+[ -f "$ZGZ_RUN/local.paused" ] || exit 1
+echo 0.125
+SH
+chmod +x "$RIG/bin/ip" "$RIG/bin/curl" "$RIG/lib/zgz-rules"
+check "$(sh "$RIG/lib/zgz-ikev2" test url < "$ZGZ_ETC/bridge.json")" 125 'active IKEv2 URL test bypasses localhost interception'
+check "$(cat "$ZGZ_RUN/local.calls")" "$(printf 'local pause\nlocal resume')" 'active connection test restores localhost interception'
+[ ! -e "$ZGZ_RUN/.l2tp-test-lock" ] && ok 'active connection test releases its lock' || bad 'active test left its lock'
 rig_report
