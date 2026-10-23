@@ -21,3 +21,14 @@ for (const key of ['core:xray', 'core:sing-box', 'core:haproxy', 'all-cores'])
 	assert.ok(idle({job:'Checking for new versions: all-cores'}, key));
 assert.ok(!idle({job:'Checking for new versions: all-cores'}, 'app'));
 console.log('Update checks: only the selected component animates, including generic transitional jobs');
+const downloadSource = source.slice(source.indexOf('function downloadText('), source.indexOf('\nfunction noteFor('));
+let language = 'fa';
+const downloadText = new Function('_', 'i18n', 'ltr', downloadSource + '\nreturn downloadText;')(
+	key => ({ format: value => (language === 'fa' ? 'در حال دانلود %s:' : key).replace('%s', value) }),
+	{ get: () => language }, value => '\u2066' + value + '\u2069');
+for (const job of ['Zirgozar', 'Updating Zirgozar', 'Installing Zirgozar', ' updating  Zirgozar '])
+	assert.equal(downloadText(job), 'در حال دانلود زیرگذر:');
+assert.equal(downloadText('Installing xray'), 'در حال دانلود \u2066Xray\u2069:');
+language = 'en';
+assert.equal(downloadText('Updating Zirgozar'), 'Downloading \u2066Zirgozar\u2069:');
+console.log('Download labels passed: localized app name, normalized job prefixes and isolated core names');

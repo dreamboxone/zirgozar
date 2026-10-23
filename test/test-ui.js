@@ -6,6 +6,7 @@
 require('./test-status-ui.js');
 require('./test-home-ui.js');
 require('./test-update-check.js');
+require('./test-xdrive.js');
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

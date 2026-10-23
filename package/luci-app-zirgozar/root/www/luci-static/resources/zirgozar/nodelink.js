@@ -174,7 +174,29 @@ function withBrowse(o, hint, options) {
 	return o;
 }
 
+function validateXdrive(value) {
+	var config;
+	try { config = JSON.parse(value); } catch (e) { return _('Must be JSON text!'); }
+	function object(v) { return v != null && typeof v === 'object' && !Array.isArray(v); }
+	if (!object(config)) return _('Must be a JSON object.');
+	if (typeof config.remoteFolder !== 'string' || !config.remoteFolder.trim())
+		return _('XDRIVE needs a remoteFolder.');
+	if ([ 'local', 'google-drive', 'template' ].indexOf(config.service) < 0)
+		return _('XDRIVE service must be local, google-drive or template.');
+	if (config.secrets != null && (!Array.isArray(config.secrets) || config.secrets.some(function(v) { return typeof v !== 'string'; })))
+		return _('XDRIVE secrets must be an array of strings.');
+	if (config.service === 'google-drive' && (!config.secrets || config.secrets.length !== 3 || config.secrets.some(function(v) { return !v.trim(); })))
+		return _('Google Drive needs ClientID, ClientSecret and RefreshToken in secrets.');
+	if (config.service === 'template' && !object(config.template))
+		return _('XDRIVE template must be a JSON object.');
+	if (config.xmux != null && !object(config.xmux)) return _('XMUX must be a JSON object.');
+	if (config.xmux && config.xmux.maxConnections && config.xmux.maxConcurrency)
+		return _('Set either XMUX maxConnections or maxConcurrency.');
+	return true;
+}
+
 return baseclass.extend({
 	nameFromLink: nameFromLink,
-	withBrowse: withBrowse
+	withBrowse: withBrowse,
+	validateXdrive: validateXdrive
 });

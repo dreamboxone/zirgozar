@@ -68,6 +68,16 @@ jobs:
       - name: Check subscription import
         run: node test/test-subs-ui.js
 
+      - name: Check XDRIVE and inbound source filters
+        run: |
+          set -euo pipefail
+          mkdir -p .test-tools/xdrive
+          curl -fsSL --retry 3 -o .test-tools/xdrive/core.zip \
+            https://github.com/patterniha/Xray-core/releases/download/v26.10.22/Xray-linux-64.zip
+          unzip -q .test-tools/xdrive/core.zip xray -d .test-tools/xdrive
+          chmod +x .test-tools/xdrive/xray
+          RIG_XDRIVE_XRAY="$PWD/.test-tools/xdrive/xray" node test/test-xdrive.js
+
       - name: Fetch a core to check against
         run: |
           set -euo pipefail

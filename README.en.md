@@ -545,6 +545,10 @@ empty by design. **Check all** runs the handshake for the whole list
 without disturbing a tunnel that is carrying traffic; **Use** beside a row
 connects through that config.
 
+**XDRIVE (VLESS).** Select this transport for a VLESS config and paste its `xdriveSettings` object into **XDRIVE settings (JSON)**. `service` can be `google-drive`, `template` or `local`; set `remoteFolder` and the service credentials in `secrets`. Nested `template` operations, including `hrefPath`/`hrefMethod`, and `xmux` settings are preserved. For HTTP/3 select TLS with ALPN set to `h3` only. Use Xray 26.10.22 or newer.
+
+XDRIVE requires VLESS encryption and no `flow`. Generate a matching pair with `xray vlessenc`: put `decryption` on the server and `encryption` in the client. The required client Mux is enabled automatically; `xmux` separately controls connections to storage. Imported Xray JSON and the app's VLESS share links keep the transport settings. Automatic selection skips the TCP prefilter for XDRIVE and measures the actual proxy path instead.
+
 ### 🔗 4.3 Node Subscribe
 
 The Node Subscribe. First, for all subscriptions:
@@ -838,7 +842,9 @@ not the tunnel does.
 | **Listen Port** / **Bind Local** | `port` / `bind_local` | Each server's port is opened in the firewall while it runs, unless it listens on the router only |
 | **ID / Password** | `uuid` | One per user |
 | **Security** | `security` | None, TLS (certificate and key as files on the router) or REALITY. REALITY needs no certificate and no domain; **Generate** makes its key pair |
-| **Transport** | `transport` | RAW, WebSocket, gRPC, HTTPUpgrade, XHTTP, mKCP |
+| **Transport** | `transport` | RAW, WebSocket, gRPC, HTTPUpgrade, XHTTP, XDRIVE (VLESS), mKCP |
+| **XDRIVE settings** | `xdrive_settings`, `vless_decryption`, `vless_encryption` | Storage settings and the matching VLESS key pair. Only encryption is included in the share link |
+| **Allowed / blocked source IPs** | `filter_allowed`, `filter_blocked` | Finalmask filters incoming TCP and UDP by IP or CIDR. A nonempty allowlist rejects other sources; the blocklist takes precedence. Empty lists leave filtering off. Xray servers only; requires Xray 26.10.21 or newer |
 | **Outbound** | `outbound` | Where the traffic of whoever connects leaves from: directly, through the Zirgozar tunnel, through a SOCKS server, or through one of the configs added by hand |
 | **Accept LAN Access** | `accept_lan` | Off, the private ranges - the home network and the router itself - are refused |
 | **Address in the share link** | `link_address` | The router's public address or domain for the link; empty is the address the page was opened at |

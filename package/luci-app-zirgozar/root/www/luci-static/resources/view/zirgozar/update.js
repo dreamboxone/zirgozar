@@ -74,7 +74,7 @@ var progressPhase = '', phaseJob = '';
 function downloadText(name) {
 	var key = 'Downloading %s:', text = _(key);
 	if (i18n.get() === 'fa' && text === key) text = 'در حال دانلود %s:';
-	name = String(name).replace(/^(?:Installing|Updating) /, '').replace(/^xray$/, 'Xray');
+	name = String(name).trim().replace(/^(?:Installing|Updating)\s+/i, '').replace(/^xray$/i, 'Xray');
 	return text.format(name === 'Zirgozar' && i18n.get() === 'fa' ? 'زیرگذر' : ltr(name));
 }
 

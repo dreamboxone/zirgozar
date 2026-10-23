@@ -180,9 +180,10 @@ function hostport(s,   p) {
 
 # ------------------------------------------------------------ streamSettings
 
-function stream(net, sec, host, path, sni, fp, alpn, pbk, sid, spx, svc, hdr, mode,   s, t, n, a, i, pqv) {
+function stream(net, sec, host, path, sni, fp, alpn, pbk, sid, spx, svc, hdr, mode,   s, t, n, a, i, pqv, drive) {
 	# One link's pqv is its own, like its cipher suites.
 	pqv = XPQV; XPQV = ""
+	drive = XDRIVE; XDRIVE = ""
 	if (net == "") net = "tcp"
 	if (net == "h2") net = "http"
 	if (net == "splithttp") net = "xhttp"
@@ -283,6 +284,9 @@ function stream(net, sec, host, path, sni, fp, alpn, pbk, sid, spx, svc, hdr, mo
 		if (XEXTRA ~ /^\{.*\}$/ && XEXTRA !~ /[[:cntrl:]]/)
 			s = s ",\"extra\":" XEXTRA
 		s = s "}"
+	} else if (net == "xdrive") {
+		# The settings object includes nested templates and XMUX. Keep it intact.
+		s = s ",\"xdriveSettings\":" (drive ~ /^\{.*\}$/ && drive !~ /[[:cntrl:]]/ ? drive : "{}")
 	} else if (net == "httpupgrade") {
 		s = s ",\"httpupgradeSettings\":{\"path\":\"" jesc(path != "" ? path : "/") "\""
 		if (host != "") s = s ",\"host\":\"" jesc(host) "\""
@@ -482,6 +486,7 @@ function emit(label, proto, payload,   key, tag) {
 	# list unescaped, and the one bad node took the whole list down with it.
 	if (HOST !~ /^[A-Za-z0-9._:-]+$/) return
 	if (NXN > 0) payload = node_extras(payload)
+	payload = xdrive_mux(payload)
 	if (label == "") label = HOST ":" PORT
 	if (filtered(label)) return
 	key = proto "|" HOST "|" PORT "|" payload
@@ -718,6 +723,7 @@ function do_vless(body,   label, uuid, query, p, sec, flow, enc) {
 	flow = qs(query, "flow")
 	enc = qs(query, "encryption"); if (enc == "") enc = "none"
 	XEXTRA = qs(query, "extra")
+	XDRIVE = qs(query, "xdriveSettings")
 	XCS = qs(query, "cs")
 	XFM = qs(query, "fm")
 	XECH = qs(query, "ech")
@@ -747,6 +753,7 @@ function do_trojan(body,   label, pass, query, p, sec) {
 	# which patterniha's Xray carries and the official one refuses.
 	sec = qs(query, "security"); if (sec == "") sec = "tls"
 	XEXTRA = qs(query, "extra")
+	XDRIVE = qs(query, "xdriveSettings")
 	XCS = qs(query, "cs")
 	XFM = qs(query, "fm")
 	XECH = qs(query, "ech")
@@ -831,6 +838,7 @@ function do_proxy(body, proto,   label, p, cred, user, pass, dec, q, query) {
 	}
 
 	XEXTRA = qs(query, "extra")
+	XDRIVE = qs(query, "xdriveSettings")
 	emit(label, proto, mk_proxy(proto, user, pass, \
 		stream(qs(query, "type"), "none", qs(query, "host"), qs(query, "path"), \
 		       "", "", "", "", "", "", qs(query, "serviceName"), qs(query, "headerType"), \
@@ -1885,8 +1893,15 @@ function decorate(p, hp,   proto, ss, sock, net, fm, tcp, udp, first, d, wgs, bt
 
 	if (ENVIRON["MUX"] != "" && jraw(p, "mux") == "" &&
 	    proto ~ /^(vmess|vless|trojan|shadowsocks|socks|http)$/ &&
-	    p !~ /"flow":[ \t]*"[^"]+"/ && net !~ /^(xhttp|splithttp)$/)
+	    p !~ /"flow":[ \t]*"[^"]+"/ && net !~ /^(xhttp|splithttp|xdrive)$/)
 		p = jset(p, "mux", ENVIRON["MUX"])
+	return xdrive_mux(p)
+}
+
+function xdrive_mux(p) {
+	# XDRIVE requires VLESS Mux even when the global Mux setting is off.
+	if (jstr(p, "protocol") == "vless" && jstr(jraw(p, "streamSettings"), "network") == "xdrive" && jraw(p, "mux") == "")
+		p = jset(p, "mux", "{\"enabled\":true,\"concurrency\":8,\"xudpConcurrency\":8}")
 	return p
 }
 
@@ -2645,6 +2660,7 @@ function do_line(line) {
 	if (n >= LIMIT) return
 
 	HOST = ""; PORT = 0
+	XDRIVE = ""
 	RAWLINE = line
 
 	if      (index(line, "vmess://")     == 1) do_vmess(substr(line, 9))

@@ -160,7 +160,7 @@ sift_one() {
 	# a real request, decides whether they work.
 	case "$_proto" in
 		balancing|shunt|interface) return 0 ;;
-		wireguard|hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|warp|aether|l2tp|pptp|sstp|ikev2)
+		xdrive|wireguard|hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|warp|aether|l2tp|pptp|sstp|ikev2)
 			printf '%06d\t%s\n' 9000 "$_tag" >> "$ALIVE"
 			echo x >> "$ATTEMPTS"
 			return 0
@@ -213,7 +213,10 @@ cmd_sift() {
 		if first_hop_is_chained "$payload"; then _ch=own
 		elif [ "$_everyone" = "1" ]; then _ch=all
 		fi
-		sift_one "$tag" "$host" "$port" "$proto" "$_ch" &
+		# XDRIVE reaches shared storage, not the address in the VLESS link.
+		_sproto="$proto"
+		if printf '%s' "$payload" | grep -qE '"network"[[:space:]]*:[[:space:]]*"xdrive"'; then _sproto=xdrive; fi
+		sift_one "$tag" "$host" "$port" "$_sproto" "$_ch" &
 		_pids="$_pids $!"
 		_running=$((_running + 1))
 		if [ "$_running" -ge "$SIFT_PARALLEL" ]; then
@@ -564,6 +567,9 @@ cmd_use() {
 		balancing|shunt|interface) select_row "$_row" 0; return $? ;;
 		warp|aether|l2tp|pptp|sstp|ikev2) select_row "$_row" 0; return $? ;;
 	esac
+	if printf '%s' "$_row" | cut -f6- | grep -qE '"network"[[:space:]]*:[[:space:]]*"xdrive"'; then
+		select_row "$_row" 0; return $?
+	fi
 	select_row "$_row" "$(tcp_ms "$(printf '%s' "$_row" | cut -f4)" "$(printf '%s' "$_row" | cut -f5)")"
 }
 

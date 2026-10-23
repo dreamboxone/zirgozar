@@ -100,9 +100,15 @@ xray_out() {
 
 xray_stream() {
 	_u="$1"; _proto="$2"
-	case "$_proto" in shadowsocks|socks|http|tunnel) return 0 ;; esac
 	_net="$(s_get "$_u" transport)"; _net="${_net:-raw}"
 	_sec="$(s_get "$_u" security)"; _sec="${_sec:-none}"
+	case "$_proto" in shadowsocks|socks|http|tunnel) _net=raw; _sec=none ;; esac
+	if [ "$_net:$_sec" = "xdrive:reality" ]; then
+		echo 'XDRIVE does not support REALITY.' >&2; return 1
+	fi
+	if [ "$_net" = xdrive ] && [ "$_proto" != vless ]; then
+		echo 'XDRIVE works with VLESS only.' >&2; return 1
+	fi
 	[ "$_sec" = "reality" ] && case "$_proto" in vless|trojan) : ;; *) _sec=none ;; esac
 	_path="$(s_get "$_u" path)"; _host="$(s_get "$_u" host)"
 	_ss=""
@@ -110,6 +116,13 @@ xray_stream() {
 		ws) _ss="\"wsSettings\":{\"path\":\"$(j "${_path:-/}")\"$([ -n "$_host" ] && printf ',"host":"%s"' "$(j "$_host")")}" ;;
 		httpupgrade) _ss="\"httpupgradeSettings\":{\"path\":\"$(j "${_path:-/}")\"$([ -n "$_host" ] && printf ',"host":"%s"' "$(j "$_host")")}" ;;
 		grpc) _ss="\"grpcSettings\":{\"serviceName\":\"$(j "$(s_get "$_u" service_name)")\"}" ;;
+		xdrive)
+			_xd="$(s_get "$_u" xdrive_settings | jsonfilter -e '@' 2>/dev/null)" || {
+				echo 'Invalid XDRIVE settings JSON.' >&2; return 1;
+			}
+			case "$_xd" in \{*\}) : ;; *) echo 'XDRIVE settings must be a JSON object.' >&2; return 1 ;; esac
+			_ss="\"xdriveSettings\":$_xd"
+			;;
 		xhttp)
 			_m="$(s_get "$_u" xhttp_mode)"
 			_ss="\"xhttpSettings\":{\"path\":\"$(j "${_path:-/}")\"$([ -n "$_host" ] && printf ',"host":"%s"' "$(j "$_host")"),\"mode\":\"${_m:-auto}\"}"
@@ -124,7 +137,12 @@ xray_stream() {
 	case "$_sec" in
 		tls)
 			_alpn="$(s_list "$_u" alpn | jarr)"
-			_sx="\"tlsSettings\":{\"certificates\":[{\"certificateFile\":\"$(j "$(s_get "$_u" tls_cert)")\",\"keyFile\":\"$(j "$(s_get "$_u" tls_key)")\"}]$([ "$_alpn" != "[]" ] && printf ',"alpn":%s' "$_alpn")}"
+			if [ "$_net" = xdrive ]; then
+				# XDRIVE's TLS connects to storage; it does not accept TLS sockets.
+				_sx="\"tlsSettings\":{$([ "$_alpn" != "[]" ] && printf '"alpn":%s' "$_alpn")}"
+			else
+				_sx="\"tlsSettings\":{\"certificates\":[{\"certificateFile\":\"$(j "$(s_get "$_u" tls_cert)")\",\"keyFile\":\"$(j "$(s_get "$_u" tls_key)")\"}]$([ "$_alpn" != "[]" ] && printf ',"alpn":%s' "$_alpn")}"
+			fi
 			;;
 		reality)
 			_dest="$(s_get "$_u" reality_dest)"; _dest="${_dest:-www.microsoft.com:443}"
@@ -135,7 +153,14 @@ xray_stream() {
 			_sx="\"realitySettings\":{\"show\":false,\"target\":\"$(j "$_dest")\",\"serverNames\":$_names,\"privateKey\":\"$(j "$(s_get "$_u" reality_private_key)")\",\"shortIds\":$_sids}"
 			;;
 	esac
-	printf ',"streamSettings":{"network":"%s","security":"%s"%s%s}' "$_net" "$_sec" "${_ss:+,$_ss}" "${_sx:+,$_sx}"
+	_fa="$(s_list "$_u" filter_allowed | jarr)"
+	_fb="$(s_list "$_u" filter_blocked | jarr)"
+	_fm=""
+	if [ "$_fa" != '[]' ] || [ "$_fb" != '[]' ]; then
+		_filter="{\"type\":\"filter\",\"settings\":{\"allowedSourceIPs\":$_fa,\"blockedSourceIPs\":$_fb}}"
+		_fm=",\"finalmask\":{\"tcp\":[$_filter],\"udp\":[$_filter]}"
+	fi
+	printf ',"streamSettings":{"network":"%s","security":"%s"%s%s%s}' "$_net" "$_sec" "${_ss:+,$_ss}" "${_sx:+,$_sx}" "$_fm"
 	return 0
 }
 
@@ -144,6 +169,11 @@ xray_inbound() {
 	_set=""
 	case "$_proto" in
 		vless)
+			_dec=none
+			if [ "$(s_get "$_u" transport)" = xdrive ]; then
+				_dec="$(s_get "$_u" vless_decryption)"
+				case "$_dec" in ''|none) echo 'XDRIVE requires VLESS decryption.' >&2; return 1 ;; esac
+			fi
 			_flow="$(s_get "$_u" flow)"
 			# Vision only on raw TCP with TLS or REALITY; anywhere else Xray
 			# refuses the whole file.
@@ -152,7 +182,7 @@ xray_inbound() {
 				*) _flow="" ;;
 			esac
 			_cl="$(s_list "$_u" uuid | awk -v f="$_flow" '{ printf "%s{\"id\":\"%s\"%s}", (n++ ? "," : ""), $0, (f != "" ? ",\"flow\":\"" f "\"" : "") }')"
-			_set="{\"clients\":[$_cl],\"decryption\":\"none\"}"
+			_set="{\"clients\":[$_cl],\"decryption\":\"$(j "$_dec")\"}"
 			;;
 		vmess)
 			_cl="$(s_list "$_u" uuid | awk '{ printf "%s{\"id\":\"%s\"}", (n++ ? "," : ""), $0 }')"
@@ -188,8 +218,9 @@ xray_inbound() {
 			;;
 		*) return 1 ;;
 	esac
+	_stream="$(xray_stream "$_u" "$_proto")" || return 1
 	printf '{"tag":"in-%s","listen":"%s","port":%s,"protocol":"%s","settings":%s%s,"sniffing":{"enabled":true,"destOverride":["http","tls","quic"],"routeOnly":true}}' \
-		"$_u" "$(listen_of "$_u")" "$(port_of "$_u")" "$_proto" "$_set" "$(xray_stream "$_u" "$_proto")"
+		"$_u" "$(listen_of "$_u")" "$(port_of "$_u")" "$_proto" "$_set" "$_stream"
 	return 0
 }
 
@@ -197,7 +228,7 @@ config_xray() {
 	_ins=""; _outs=""; _rules=""; _ds=AsIs
 	for _u in $(users); do
 		case "$XRAY_PROTOS" in *" $(s_get "$_u" protocol) "*) : ;; *) continue ;; esac
-		_in="$(xray_inbound "$_u")" || continue
+		_in="$(xray_inbound "$_u")" || return 1
 		_ins="$_ins${_ins:+,}$_in"
 		_outs="$_outs${_outs:+,}$(xray_out "$_u")"
 		if [ "$(s_get "$_u" accept_lan)" != "1" ]; then

@@ -351,6 +351,7 @@ function parseLink(link) {
 		var mode = take('mode');
 		if (f.type == 'grpc') f.grpc_mode = mode; else f.xhttp_mode = mode;
 		f.extra = take('extra');
+		if (f.type == 'xdrive') f.xdrive_settings = take('xdriveSettings');
 		if (f.type == 'kcp') { f.kcp_seed = take('seed') || f.path; f.path = ''; }
 	} else if (proto == 'shadowsocks') {
 		var c = cred.indexOf('@plain@') == 0 ? cred.slice(7) : (b64dec(cred) || dec(cred));
@@ -374,6 +375,7 @@ function parseLink(link) {
 		var pmode = take('mode');
 		if (f.type == 'grpc') f.grpc_mode = pmode; else f.xhttp_mode = pmode;
 		f.extra = take('extra');
+		if (f.type == 'xdrive') f.xdrive_settings = take('xdriveSettings');
 		if (f.type == 'kcp') { f.kcp_seed = take('seed') || f.path; f.path = ''; }
 	} else if (proto == 'hysteria2' || proto == 'hysteria') {
 		f.password = dec(cred);
@@ -445,6 +447,7 @@ function transportQuery(f, q) {
 	    (f.type == 'tcp' && f.header_type == 'http')) { q.host = f.host; q.path = f.path; }
 	if (f.type == 'grpc') { q.serviceName = f.service_name; q.mode = f.grpc_mode; }
 	if (f.type == 'xhttp') { q.mode = f.xhttp_mode; q.extra = f.extra; }
+	if (f.type == 'xdrive') q.xdriveSettings = f.xdrive_settings ? JSON.stringify(JSON.parse(f.xdrive_settings)) : '';
 	if (f.type == 'tcp' || f.type == 'kcp') q.headerType = f.header_type;
 	if (f.type == 'kcp') q.seed = f.kcp_seed;
 }
@@ -1352,12 +1355,20 @@ return view.extend({
 			o = field(form.Value, 'encryption', _('Encrypt Method (encryption)'));
 			o.placeholder = 'none';
 			o.depends('_proto', 'vless');
+			o.validate = function(section_id, value) {
+				return this.section.formvalue(section_id, '_type') == 'xdrive' && (!value || value == 'none')
+					? _('XDRIVE requires VLESS encryption from xray vlessenc.') : true;
+			};
 
 			o = field(form.Value, 'flow', _('flow'));
 			o.value('', _('Disable'));
 			o.value('xtls-rprx-vision', 'xtls-rprx-vision');
 			o.value('xtls-rprx-vision-udp443', 'xtls-rprx-vision-udp443');
 			o.depends('_proto', 'vless');
+			o.validate = function(section_id, value) {
+				return value && this.section.formvalue(section_id, '_type') == 'xdrive'
+					? _('Disable VLESS flow for XDRIVE.') : true;
+			};
 
 			o = field(form.Value, 'alter_id', 'alterId');
 			o.datatype = 'uinteger';
@@ -1423,6 +1434,10 @@ return view.extend({
 			o.value('tls', 'TLS');
 			o.value('reality', 'REALITY');
 			TLSP.forEach(function(p) { o.depends('_proto', p); });
+			o.validate = function(section_id, value) {
+				return value == 'reality' && this.section.formvalue(section_id, '_type') == 'xdrive'
+					? _('XDRIVE supports TLS or no security, not REALITY.') : true;
+			};
 
 			function onTls(x, withHyTuic) {
 				TLSP.forEach(function(p) {
@@ -1541,13 +1556,24 @@ return view.extend({
 			/* ----------------------------------------------- transport */
 			o = field(form.ListValue, 'type', _('Transport'));
 			[ [ 'tcp', 'RAW (TCP)' ], [ 'ws', 'WebSocket' ], [ 'grpc', 'gRPC' ], [ 'http', 'HTTP/2' ],
-			  [ 'httpupgrade', 'HTTPUpgrade' ], [ 'xhttp', 'XHTTP' ], [ 'kcp', 'mKCP' ] ]
+			  [ 'httpupgrade', 'HTTPUpgrade' ], [ 'xhttp', 'XHTTP' ], [ 'xdrive', 'XDRIVE (VLESS)' ], [ 'kcp', 'mKCP' ] ]
 				.forEach(function(v) { o.value(v[0], v[1]); });
 			TRP.forEach(function(p) { o.depends('_proto', p); });
+			o.validate = function(section_id, value) {
+				return value == 'xdrive' && this.section.formvalue(section_id, '_proto') != 'vless'
+					? _('XDRIVE works with VLESS only.') : true;
+			};
 
 			function onType(x, types) {
 				TRP.forEach(function(p) { types.forEach(function(t) { x.depends({ '_proto': p, '_type': t }); }); });
 			}
+
+			o = field(form.TextValue, 'xdrive_settings', _('XDRIVE settings (JSON)'),
+				_('Set service, remoteFolder and secrets here. Optional xmux and template settings are preserved, including hrefPath. For HTTP/3, select TLS and set ALPN to h3 only. Requires Xray 26.10.22 or newer.'));
+			o.rows = 10; o.monospace = true; o.rmempty = false;
+			o.placeholder = '{"service":"google-drive","remoteFolder":"folder-id","secrets":["ClientID","ClientSecret","RefreshToken"]}';
+			o.validate = function(section_id, value) { return nodelink.validateXdrive(value); };
+			o.depends({ '_proto': 'vless', '_type': 'xdrive' });
 
 			o = field(form.ListValue, 'header_type', _('Camouflage Type'));
 			[ 'none', 'http' ].forEach(function(v) { o.value(v); });

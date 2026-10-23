@@ -22,6 +22,7 @@
 'require zirgozar.i18n as i18n';
 'require zirgozar.ui as pui';
 'require zirgozar.qr as qr';
+'require zirgozar.nodelink as nodelink';
 
 var _ = i18n.tr;
 
@@ -93,7 +94,7 @@ function shareLink(sid) {
 	if (proto == 'vless' || proto == 'trojan') {
 		var q = { security: sec, type: net == 'raw' ? 'tcp' : net };
 		if (proto == 'vless') {
-			q.encryption = 'none';
+			q.encryption = net == 'xdrive' ? get(sid, 'vless_encryption') : 'none';
 			if ((net == 'raw') && sec != 'none') q.flow = get(sid, 'flow');
 		}
 		if (sec == 'tls') { q.sni = sni; q.alpn = (uci.get(CONF, sid, 'alpn') || []).join(','); }
@@ -106,6 +107,9 @@ function shareLink(sid) {
 		}
 		if (net == 'ws' || net == 'httpupgrade' || net == 'xhttp') { q.path = get(sid, 'path') || '/'; q.host = get(sid, 'host'); }
 		if (net == 'xhttp') q.mode = get(sid, 'xhttp_mode') || 'auto';
+		if (net == 'xdrive') {
+			try { q.xdriveSettings = JSON.stringify(JSON.parse(get(sid, 'xdrive_settings'))); } catch (e) { return ''; }
+		}
 		if (net == 'grpc') q.serviceName = get(sid, 'service_name');
 		if (net == 'kcp') { q.headerType = get(sid, 'header_type') || 'none'; q.seed = get(sid, 'kcp_seed'); }
 		return proto + '://' + encodeURIComponent(first(sid, 'uuid')) + '@' + host + ':' + port + '?' + query(q) + name;
@@ -411,12 +415,38 @@ return view.extend({
 		o = s.taboption('transport', form.ListValue, 'transport', _('Transport'));
 		o.modalonly = true;
 		[ [ 'raw', 'RAW (TCP)' ], [ 'ws', 'WebSocket' ], [ 'grpc', 'gRPC' ], [ 'httpupgrade', 'HTTPUpgrade' ],
-		  [ 'xhttp', 'XHTTP' ], [ 'kcp', 'mKCP' ] ].forEach(function(v) { o.value(v[0], v[1]); });
+		  [ 'xhttp', 'XHTTP' ], [ 'xdrive', 'XDRIVE (VLESS)' ], [ 'kcp', 'mKCP' ] ].forEach(function(v) { o.value(v[0], v[1]); });
 		TLS_PROTOS.forEach(function(p) { o.depends('protocol', p); });
+		o.validate = function(section_id, value) {
+			return value == 'xdrive' && this.section.formvalue(section_id, 'protocol') != 'vless'
+				? _('XDRIVE works with VLESS only.') : true;
+		};
 
 		function onNet(x, nets) {
 			TLS_PROTOS.forEach(function(p) { nets.forEach(function(n) { x.depends({ protocol: p, transport: n }); }); });
 		}
+
+		o = s.taboption('transport', form.TextValue, 'xdrive_settings', _('XDRIVE settings (JSON)'),
+			_('Set service, remoteFolder and secrets here. Optional xmux and template settings are preserved, including hrefPath. For HTTP/3, select TLS and set ALPN to h3 only. Requires Xray 26.10.22 or newer.'));
+		o.modalonly = true; o.rows = 10; o.monospace = true; o.rmempty = false;
+		o.placeholder = '{"service":"google-drive","remoteFolder":"folder-id","secrets":["ClientID","ClientSecret","RefreshToken"]}';
+		o.validate = function(section_id, value) { return nodelink.validateXdrive(value); };
+		o.depends({ protocol: 'vless', transport: 'xdrive' });
+		[ [ 'vless_decryption', _('VLESS decryption'), true ], [ 'vless_encryption', _('VLESS encryption in share link'), false ] ].forEach(function(item) {
+			var key = s.taboption('transport', form.Value, item[0], item[1],
+				_('Use the matching decryption and encryption pair from xray vlessenc. Decryption stays on the server; encryption is included in the client link. XDRIVE enables the required client Mux automatically.'));
+			key.modalonly = true; key.rmempty = false; key.password = item[2];
+			key.depends({ protocol: 'vless', transport: 'xdrive' });
+			key.validate = function(section_id, value) { return value && value != 'none' ? true : _('XDRIVE requires VLESS encryption from xray vlessenc.'); };
+		});
+
+		[ [ 'filter_allowed', _('Allowed source IPs') ], [ 'filter_blocked', _('Blocked source IPs') ] ].forEach(function(item) {
+			var filter = s.taboption('transport', form.DynamicList, item[0], item[1],
+				_('Finalmask inbound filter for TCP and UDP. Enter IP addresses or CIDR ranges. A nonempty allowed list rejects other sources; blocked entries take precedence. Empty lists disable the filter. Requires Xray 26.10.21 or newer.'));
+			filter.modalonly = true; filter.datatype = 'ipaddr';
+			filter.placeholder = '192.0.2.0/24';
+			TLS_PROTOS.concat([ 'shadowsocks', 'socks', 'http', 'tunnel' ]).forEach(function(p) { filter.depends('protocol', p); });
+		});
 
 		o = s.taboption('transport', form.Value, 'path', 'Path');
 		o.modalonly = true;
@@ -450,11 +480,15 @@ return view.extend({
 		o.validate = function(section_id, value) {
 			var p = this.section.formvalue(section_id, 'protocol');
 			if (value == 'reality' && p == 'vmess') return _('REALITY works with VLESS and Trojan only.');
+			if (value == 'reality' && this.section.formvalue(section_id, 'transport') == 'xdrive') return _('XDRIVE supports TLS or no security, not REALITY.');
 			return true;
 		};
 
-		function onTls(x) {
-			TLS_PROTOS.forEach(function(p) { x.depends({ protocol: p, security: 'tls' }); });
+		function onTls(x, certificate) {
+			TLS_PROTOS.forEach(function(p) {
+				if (certificate) [ 'raw', 'ws', 'grpc', 'httpupgrade', 'xhttp', 'kcp' ].forEach(function(n) { x.depends({ protocol: p, security: 'tls', transport: n }); });
+				else x.depends({ protocol: p, security: 'tls' });
+			});
 			SB_PROTOS.forEach(function(p) { x.depends('protocol', p); });
 		}
 
@@ -462,11 +496,11 @@ return view.extend({
 			_('The certificate, as a file on the router. Hysteria, TUIC, AnyTLS and NaiveProxy always need one.'));
 		o.modalonly = true;
 		o.placeholder = '/etc/zirgozar/server.crt';
-		onTls(o);
+		onTls(o, true);
 		o = s.taboption('transport', form.Value, 'tls_key', _('Private key absolute path'));
 		o.modalonly = true;
 		o.placeholder = '/etc/zirgozar/server.key';
-		onTls(o);
+		onTls(o, true);
 		o = s.taboption('transport', form.DynamicList, 'alpn', 'alpn');
 		o.modalonly = true;
 		[ 'h3', 'h2', 'http/1.1' ].forEach(function(v) { o.value(v); });
