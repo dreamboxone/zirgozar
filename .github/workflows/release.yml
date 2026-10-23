@@ -328,11 +328,13 @@ jobs:
               "$(printf '%s' "$payload" | sed 's/^{/{"tag":"proxy",/')" > one.json
             if ! ./prebuilt/x86_64/xray run -test -config one.json >one.err 2>&1; then
               rej=$((rej+1))
-              echo "::warning::today's list has a server the core will not accept: $proto $host:$port"
-              grep -o 'common/errors:.*' one.err | tail -1 | cut -c1-160 || true
+              echo "Live subscription entry rejected by the core: $proto $host:$port"
+              tail -n 4 one.err | cut -c1-240
             fi
           done < live.tsv
           echo "rejected by the core: $rej of $(wc -l < live.tsv)"
+          printf '### Live subscription check\n\nRejected entries: %s of %s. This external-data check is informational; deterministic config tests remain mandatory.\n' \
+            "$rej" "$(wc -l < live.tsv)" >> "$GITHUB_STEP_SUMMARY"
 
   build:
     needs: test
