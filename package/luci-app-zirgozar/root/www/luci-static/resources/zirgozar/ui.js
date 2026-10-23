@@ -402,9 +402,53 @@ function followTheme(root) {
 		panel = surfaceStyle.backgroundColor;
 		text = surfaceStyle.color;
 		accent = primary.backgroundColor;
+		function pixels(color) {
+			var match = color.match(/^rgba?\(([^)]+)\)/);
+			if (match) return match[1].match(/[\d.]+/g).slice(0, 3).map(Number);
+			/* Resolve lab()/oklch() through the browser's colour engine. */
+			var canvas = document.createElement('canvas');
+			canvas.width = canvas.height = 1;
+			var context = canvas.getContext('2d', { willReadFrequently: true });
+			if (!context) return null;
+			context.fillStyle = color;
+			context.fillRect(0, 0, 1, 1);
+			return Array.prototype.slice.call(context.getImageData(0, 0, 1, 1).data, 0, 3);
+		}
+		function contrast(a, b) {
+			function luminance(rgb) {
+				return rgb.reduce(function(sum, value, index) {
+					value /= 255;
+					return sum + [0.2126, 0.7152, 0.0722][index] * (value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4));
+				}, 0);
+			}
+			var x = luminance(a), y = luminance(b);
+			return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+		}
+		var panelPixels = pixels(opaque(panel) ? panel : background);
+		var accentPixels = pixels(opaque(accent) ? accent : '#5e72e4');
+		var onAccent = primary.color, onPixels = pixels(onAccent);
+		/* Older themes use white buttons with coloured text. Their text is
+		   the accent; treating the white surface as primary hides our tabs. */
+		if (panelPixels && accentPixels && onPixels && contrast(accentPixels, panelPixels) < 1.6 && contrast(onPixels, panelPixels) >= 3) {
+			var oldAccent = accent, oldPixels = accentPixels;
+			accent = onAccent; onAccent = oldAccent;
+			accentPixels = onPixels;
+			onPixels = oldPixels;
+		}
+		if (accentPixels && onPixels && contrast(accentPixels, onPixels) < 4.5) {
+			onAccent = contrast(accentPixels, [0, 0, 0]) > contrast(accentPixels, [255, 255, 255]) ? '#000' : '#fff';
+		}
+		var ink = accentPixels && accentPixels.slice(), textPixels = pixels(text);
+		if (ink && panelPixels && textPixels) {
+			var tonalPixels = panelPixels.map(function(value, index) { return value * 0.88 + accentPixels[index] * 0.12; });
+			for (var step = 0; step < 20 && Math.min(contrast(ink, panelPixels), contrast(ink, tonalPixels)) < 4.6; step++) {
+				ink = ink.map(function(value, index) { return value * 0.85 + textPixels[index] * 0.15; });
+			}
+		}
 		var values = { bg: background, panel: opaque(panel) ? panel : background,
 			text: text, line: style.borderTopColor, soft: opaque(panel) ? panel : background,
-			accent: opaque(accent) ? accent : '#5e72e4', 'on-accent': primary.color,
+			accent: opaque(accent) ? accent : '#5e72e4', 'on-accent': onAccent,
+			'accent-ink': ink ? 'rgb(' + ink.map(Math.round).join(', ') + ')' : text,
 			'card-radius': style.borderRadius, 'card-padding': parseFloat(style.padding) > 0 ? style.padding : '20px',
 			'card-shadow': style.boxShadow, 'button-radius': action.borderRadius,
 			'button-padding': action.padding, 'button-size': action.fontSize,
@@ -420,20 +464,7 @@ function followTheme(root) {
 			}
 		});
 		probe.remove();
-		var rgb = values.panel.match(/^rgba?\(([^)]+)\)/);
-		rgb = rgb ? rgb[1].match(/[\d.]+/g) : null;
-		if (!rgb) {
-			/* Tailwind themes can return lab()/oklch(). Convert through the
-			   browser's colour engine before measuring sRGB luminance. */
-			var canvas = document.createElement('canvas');
-			canvas.width = canvas.height = 1;
-			var context = canvas.getContext('2d', { willReadFrequently: true });
-			if (context) {
-				context.fillStyle = values.panel;
-				context.fillRect(0, 0, 1, 1);
-				rgb = context.getImageData(0, 0, 1, 1).data;
-			}
-		}
+		var rgb = panelPixels;
 		var dark = rgb ? (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) < 128 : false;
 		root.classList.toggle('mk-dark', dark);
 		document.body.classList.toggle('pwp-dark', dark);

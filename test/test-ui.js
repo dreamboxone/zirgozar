@@ -128,6 +128,30 @@ themeRoot.isConnected = false; synchronize();
 assert.ok(removedThemeTimer);
 assert.ok(!themeBody.classList.contains('pwp-dark'));
 console.log('Theme synchronization passed: host changes, modal colours, manual opt-out and navigation cleanup');
+function paletteTheme(panel, text, accent, onAccent) {
+	const root = themedElement(); root.parentElement = themedElement();
+	const sync = new Function('E', 'document', 'getComputedStyle', 'themeMode', 'secondTimer',
+		followSource + '; return followTheme;')(
+		(tag, attrs) => Object.assign(themedElement(), { attrs }),
+		{ body: themedElement() },
+		node => Object.assign({ backgroundColor: panel, color: text, borderTopColor: text,
+			borderRadius: '12px', padding: '16px', boxShadow: 'none', fontSize: '14px', fontWeight: '500', fontFamily: 'sans-serif' },
+			node.attrs?.style?.includes('--brand') ? { backgroundColor: accent, color: onAccent } : {}),
+		() => 'auto', { add() {} })(root);
+	sync();
+	return name => root.style.getPropertyValue('--zgz-' + name);
+}
+const legacyPalette = paletteTheme('rgb(245, 245, 245)', 'rgb(0, 0, 0)', 'rgb(255, 255, 255)', 'rgb(51, 119, 204)');
+assert.equal(legacyPalette('accent'), 'rgb(51, 119, 204)', 'OpenWrt white button surfaces must not become white accent text');
+assert.equal(legacyPalette('on-accent'), 'rgb(255, 255, 255)');
+const materialPalette = paletteTheme('rgb(255, 255, 255)', 'rgb(0, 0, 0)', 'rgb(93, 192, 210)', 'rgb(255, 255, 255)');
+assert.equal(materialPalette('accent'), 'rgb(93, 192, 210)', 'Keep the host button colour');
+assert.equal(materialPalette('on-accent'), '#000', 'Light native buttons need dark labels');
+assert.notEqual(materialPalette('accent-ink'), materialPalette('accent'), 'Accent text needs a stronger shade on white cards');
+const darkPalette = paletteTheme('rgb(37, 37, 38)', 'rgb(230, 230, 230)', 'rgb(96, 105, 201)', 'rgb(255, 255, 255)');
+assert.equal(darkPalette('accent'), 'rgb(96, 105, 201)');
+assert.notEqual(darkPalette('accent-ink'), darkPalette('accent'), 'Accent text needs a lighter shade on dark cards');
+console.log('Native theme contrast passed: OpenWrt white buttons, Material light buttons and Argon dark cards');
 assert.equal(ui.uptimeText(0), '00:00:00');
 assert.equal(ui.uptimeText(90061.9), '1 day 01:01:01');
 assert.equal(ui.uptimeText(null), '-');
