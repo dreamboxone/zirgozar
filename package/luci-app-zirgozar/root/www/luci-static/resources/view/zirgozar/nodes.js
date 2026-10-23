@@ -249,7 +249,7 @@ function addViaLinks() {
 	   once something was added, closing shows it in the list. */
 	var needsBox = E('div', {});
 	var added = false;
-	ui.showModal(_('Add the node via the link'), [
+	ui.showModal(_('Import share links'), [
 		E('p', {}, _('Enter share links, one per line. Subscription links are not supported!')),
 		box,
 		needsBox,
@@ -350,7 +350,7 @@ function toolbar(s) {
 		pui.btn(_('Add'), 'success mk-small', function() {
 			window.location.href = L.url('admin', 'services', 'zirgozar', 'node') + '?new=1';
 		}, 'plus'),
-		pui.btn(_('Add the node via the link'), 'primary mk-small', addViaLinks, 'link'),
+		pui.btn(_('Import share links'), 'primary mk-small', addViaLinks, 'link'),
 		/* A WireGuard .conf, an OpenVPN .ovpn, an Xray .json or a Clash
 		   .yaml, on the Node Config page as one node. */
 		pui.btn(_('Add file'), 'primary mk-small', function() {
@@ -446,6 +446,8 @@ function renderNodes(d) {
 	while (box.firstChild) box.removeChild(box.firstChild);
 
 	var nodes = (d && d.nodes) || [];
+	var count = document.getElementById('pwp-nodecount');
+	if (count) count.textContent = _('%d nodes').format(nodes.length);
 	if (!nodes.length) {
 		box.appendChild(E('div', { 'style': 'opacity:.65;font-size:13px;padding:8px 0' },
 			_('Nothing read yet. Read the subscriptions on Node Subscribe, or turn on the main switch in Basic Settings.')));
@@ -509,8 +511,6 @@ function renderNodes(d) {
 	});
 
 	box.appendChild(E('table', { 'class': 'table cbi-section-table' }, rows));
-	var m = document.getElementById('pwp-nodecount');
-	if (m) m.textContent = _('%d nodes').format(nodes.length);
 }
 
 return view.extend({
@@ -520,18 +520,6 @@ return view.extend({
 			callTests().catch(function() { return {}; }),
 			uci.load('zirgozar').catch(function() { return null; })
 		]);
-	},
-
-	/* A node deleted here vanishes from the file the moment Save is pressed,
-	   and used to sit in the list underneath until the quarter-hourly refresh
-	   came round - so the reader deleted something and watched it stay, for up
-	   to fifteen minutes, with nothing to say why. This rebuilds the list from
-	   what has already been fetched: no subscription is re-read, so it costs
-	   no network and finishes at once. */
-	handleSave: function(ev) {
-		return view.prototype.handleSave.apply(this, [ ev ]).then(function() {
-			return callAction('rebuild_nodes', '').catch(function() {});
-		});
 	},
 
 	render: function(data) {
@@ -824,10 +812,10 @@ return view.extend({
 			return _('Two passes. A quick handshake to every node, then a real request through the ones that answered — %d at a time (at most %d batches), best first, stopping at the first node faster than %d ms. Connecting therefore takes seconds, not a minute. WireGuard has no TCP port and skips the first pass; hysteria2, tuic and OpenVPN are not part of the automatic choice.')
 				.format(batch, most, good);
 		}
-		s = m.section(form.NamedSection, 'config', 'zirgozar', _('How the fastest node is chosen'),
-			selectionText(parseInt(uci.get('zirgozar', 'config', 'batch_size')) || 30,
+		var selectionDescription = selectionText(parseInt(uci.get('zirgozar', 'config', 'batch_size')) || 30,
 				parseInt(uci.get('zirgozar', 'config', 'good_ms')) || 1000,
-				parseInt(uci.get('zirgozar', 'config', 'max_batches')) || 5));
+				parseInt(uci.get('zirgozar', 'config', 'max_batches')) || 5);
+		s = m.section(form.NamedSection, 'config', 'zirgozar', _('How the fastest node is chosen'), selectionDescription);
 		s.anonymous = true;
 
 		o = s.option(form.ListValue, 'prefilter', _('First pass'),
@@ -858,6 +846,10 @@ return view.extend({
 		o.default = '30';
 
 		return m.render().then(function(mapEl) {
+			mapEl.querySelectorAll('.cbi-section-descr').forEach(function(desc) {
+				if (desc.textContent === selectionDescription)
+					desc.classList.add('cbi-value-description', 'zgz-section-help');
+			});
 			/* The buttons, above the table of nodes added by hand. */
 			var grid = mapEl.querySelector('#cbi-zirgozar-node');
 			var table = grid && grid.querySelector('.cbi-section-table');

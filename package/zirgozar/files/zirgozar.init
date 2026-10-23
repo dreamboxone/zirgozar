@@ -553,6 +553,12 @@ reload_service() {
 		return
 	fi
 
+	# LuCI Save stages changes; Apply commits them before this reload. Rebuild
+	# from the committed sources even when the tunnel is disabled or a fixed
+	# node is selected. Otherwise the Nodes page keeps reading the old cache.
+	# An empty source list is valid here and must replace the previous list.
+	"$ZGZ_LIB/zgz-nodes" build >/dev/null 2>&1 || true
+
 	# The node chosen in Basic Settings is read first, because everything
 	# below is decided by it. Deciding first and reading it afterwards was
 	# deciding about the node before last: a save that moved from an OpenVPN

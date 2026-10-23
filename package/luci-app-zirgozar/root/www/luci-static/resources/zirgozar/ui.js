@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.8.1-r1';
+var BUILD = '5.8.2-r1';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -552,13 +552,24 @@ function hero(root, version) {
 	root.zgzPaintTheme = paint;
 	paint();
 
-	/* The other language's own name, in its own script. */
-	var lang = E('button', {
-		'type': 'button', 'class': 'mk-btn glass', 'lang': fa ? 'en' : 'fa',
-		'click': ui.createHandlerFn(null, function() {
-			return callAction('set_lang', fa ? 'en' : 'fa').then(function() { location.reload(); });
+	var names = i18n.languages();
+	var lang = E('select', {
+		'class': 'mk-btn glass mk-language', 'aria-label': _('Language'),
+		'change': ui.createHandlerFn(null, function(ev) {
+			var select = ev.currentTarget;
+			select.disabled = true;
+			return callAction('set_lang', select.value).then(function(result) {
+				if (result && result.error) throw new Error(result.error);
+				location.reload();
+			}).catch(function(error) {
+				select.disabled = false;
+				select.value = i18n.get();
+				ui.addNotification(null, E('p', {}, error.message));
+			});
 		})
-	}, [ icon('globe'), E('span', {}, fa ? 'English' : 'فارسی') ]);
+	}, Object.keys(names).map(function(code) {
+		return E('option', { 'value': code, 'lang': code, 'selected': i18n.get() === code ? '' : null }, names[code]);
+	}));
 
 	var ver = E('span', { 'class': 'mk-version', 'id': 'pwp-version' }, versionText(version || BUILD));
 	var uptime = E('span', { 'class': 'mk-uptime-value', 'id': 'pwp-uptime', 'dir': 'auto' }, '-');
@@ -656,6 +667,10 @@ function optionHelp(root) {
 			if (desc.closest('.zgz-help') || !desc.textContent.trim()) return;
 			var row = desc.closest('.cbi-value');
 			var label = row && row.querySelector('.cbi-value-title');
+			if (!label && desc.classList.contains('zgz-section-help')) {
+				var section = desc.closest('.cbi-section');
+				label = section && section.querySelector('h3');
+			}
 			if (!label && desc.classList.contains('zgz-card-help')) {
 				var card = desc.closest('.mk-card');
 				label = card && card.querySelector('.mk-card-title > span:last-child');
@@ -666,7 +681,7 @@ function optionHelp(root) {
 				return;
 			}
 			var help = E('details', { 'class': 'zgz-help' });
-			var summary = E('summary', { 'aria-label': i18n.get() === 'fa' ? 'راهنمای گزینه' : 'Option help', 'aria-expanded': 'false' }, i18n.get() === 'fa' ? '؟' : '?');
+			var summary = E('summary', { 'aria-label': _('Option help'), 'aria-expanded': 'false' }, i18n.get() === 'fa' ? '؟' : '?');
 			help.appendChild(summary);
 			desc.classList.add('zgz-help-content');
 			if (label) {
@@ -729,7 +744,7 @@ function page(children, opts) {
 	   a page of full-size icons and bare text for a moment, which reads as
 	   broken rather than as loading. A stylesheet that never comes still lets
 	   the page be seen after a second and a half. */
-	var root = E('div', { 'class': 'mk', 'dir': fa ? 'rtl' : 'ltr', 'style': 'visibility:hidden' });
+	var root = E('div', { 'class': 'mk', 'lang': i18n.get(), 'dir': fa ? 'rtl' : 'ltr', 'style': 'visibility:hidden' });
 	function show() { root.style.visibility = ''; }
 	root.appendChild(E('link', {
 		'rel': 'stylesheet',

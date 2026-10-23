@@ -3,7 +3,7 @@
  * Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
  * Part of Zirgozar - https://github.com/dreamboxone/zirgozar
  *
- * The Persian interface.
+ * Application interface translations.
  *
  * LuCI translates through .lmo catalogues built by po2lmo, which is part of
  * the OpenWrt build system - and this package is built by three shell scripts
@@ -37,10 +37,15 @@
 
 'use strict';
 'require baseclass';
+'require zirgozar.lang_zh as zh';
+'require zirgozar.lang_ru as ru';
 
 var LANG = 'en';
+var LANGUAGES = { en: 'English', fa: 'فارسی', zh: '简体中文', ru: 'Русский' };
+var CATALOGS = { zh: zh.strings, ru: ru.strings };
 
 var FA = {
+	'Option help': 'راهنمای گزینه',
 	'Usage (GB)': 'میزان مصرف (GB)',
 	'N/A': 'ندارد',
 	'Connection checks': 'بررسی اتصال',
@@ -53,7 +58,7 @@ var FA = {
 	'Use an HTTPS URL. A hostname requires one literal bootstrap IP after a comma; no direct DNS lookup is performed.': 'نشانی HTTPS وارد کنید. برای نام دامنه، یک IP اولیه بعد از ویرگول الزامی است؛ درخواست DNS مستقیم ارسال نمی‌شود.',
 	'A DoH endpoint is required.': 'نشانی سرور DoH الزامی است.',
 	'Invalid HTTPS endpoint.': 'نشانی HTTPS معتبر نیست.',
-	'Enter one literal bootstrap IP.': 'یک IP اولیهٔ معتبر وارد کنید.',
+	'Enter one literal bootstrap IP.': 'یک IP اولیه معتبر وارد کنید.',
 	'A hostname requires a bootstrap IP after a comma.': 'برای نام دامنه، IP اولیه را بعد از ویرگول وارد کنید.',
 	'DoT server IP': 'IP سرور DoT',
 	'DoT server port': 'پورت سرور DoT',
@@ -135,7 +140,7 @@ var FA = {
 	'Used only to create WARP keys; it does not enable ECH on the tunnel.': 'فقط برای ساخت کلیدهای وارپ استفاده می‌شود و ECH تونل را فعال نمی‌کند.',
 	'Leave empty to scan automatically. A fixed endpoint disables automatic endpoint selection.': 'برای اسکن خودکار خالی بگذارید. با وارد کردن آدرس ثابت، انتخاب خودکار مقصد غیرفعال می‌شود.',
 	'Invalid Aether account ECH setting.': 'تنظیم ECH ساخت حساب اتر معتبر نیست.',
-	'Aether could not create its WARP account. On the Configs page, edit this config, turn on Advanced Aether options and change the WARP account API address or WARP account ECH. Runtime Logs has the details.': 'ساخت حساب وارپ اتر انجام نشد. در صفحه «کانفیگ‌ها» این کانفیگ را ویرایش کنید، «تنظیمات پیشرفته اتر» را روشن کنید و «آدرس API ساخت حساب وارپ» یا «ECH ساخت حساب وارپ» را تغییر دهید. جزئیات در «گزارش‌ها» است.',
+	'Aether could not create its WARP account. On the Configs page, edit this config, turn on Advanced Aether options and change the WARP account API address or WARP account ECH. Runtime Logs has the details.': 'ساخت حساب وارپ اتر انجام نشد. در صفحه «کانفیگ‌ها» این کانفیگ را ویرایش کنید، «تنظیمات پیشرفته اتر» را روشن کنید و «آدرس API ساخت حساب وارپ» یا «ECH ساخت حساب وارپ» را تغییر دهید. جزییات در «گزارش‌ها» است.',
 	'Exit countries': 'کشورهای خروجی',
 	'Germany': 'آلمان',
 	'Sweden': 'سوید',
@@ -256,18 +261,18 @@ var FA = {
 	'Enter the server IPv4 address or domain name.': 'آدرس IPv4 یا نام دامنه سرور را وارد کنید.',
 	'This account requires a username and password.': 'برای این اکانت نام کاربری و رمز عبور لازم است.',
 	'MPPE encryption': 'رمزگذاری MPPE',
-	'Almost every PPTP server requires it. Turn it off only if the provider says the server does not encrypt.': 'تقریباً همه سرورهای PPTP آن را لازم دارند. فقط وقتی خاموشش کنید که فروشنده بگوید سرور رمزگذاری ندارد.',
+	'Almost every PPTP server requires it. Turn it off only if the provider says the server does not encrypt.': 'تقریبا همه سرورهای PPTP آن را لازم دارند. فقط وقتی خاموشش کنید که فروشنده بگوید سرور رمزگذاری ندارد.',
 	'PPTP tests': 'تست‌های PPTP',
 	'SSTP tests': 'تست‌های SSTP',
 	'PPTP uses TCP port 1723 and GRE. Its encryption is weak: use it only when nothing else gets through. Ping measures the server address. TCPing measures a TCP connection through the tunnel to the test URL; URL Test measures the full request.': 'PPTP از پورت TCP شماره ۱۷۲۳ و GRE استفاده می‌کند. رمزگذاری آن ضعیف است: فقط وقتی استفاده کنید که چیز دیگری رد نمی‌شود. پینگ زمان پاسخ آدرس سرور را می‌سنجد. TCPing زمان اتصال TCP از داخل تونل به مقصد تست و URL Test زمان درخواست کامل را می‌سنجد.',
-	'SSTP runs inside HTTPS, normally on port 443, so it gets through most firewalls. The server certificate is not checked. Ping measures the server address. TCPing measures a TCP connection through the tunnel to the test URL; URL Test measures the full request.': 'SSTP داخل HTTPS و معمولاً روی پورت ۴۴۳ کار می‌کند، برای همین از بیشتر فایروال‌ها رد می‌شود. گواهی سرور بررسی نمی‌شود. پینگ زمان پاسخ آدرس سرور را می‌سنجد. TCPing زمان اتصال TCP از داخل تونل به مقصد تست و URL Test زمان درخواست کامل را می‌سنجد.',
+	'SSTP runs inside HTTPS, normally on port 443, so it gets through most firewalls. The server certificate is not checked. Ping measures the server address. TCPing measures a TCP connection through the tunnel to the test URL; URL Test measures the full request.': 'SSTP داخل HTTPS و معمولا روی پورت ۴۴۳ کار می‌کند، برای همین از بیشتر فایروال‌ها رد می‌شود. گواهی سرور بررسی نمی‌شود. پینگ زمان پاسخ آدرس سرور را می‌سنجد. TCPing زمان اتصال TCP از داخل تونل به مقصد تست و URL Test زمان درخواست کامل را می‌سنجد.',
 	"OpenVPN could not be installed: a kernel module it needs is not available for this router's firmware. Update the firmware to the latest official OpenWrt release.":
 		'OpenVPN نصب نشد: ماژول کرنلی که لازم دارد برای فریم‌ور این روتر وجود ندارد. فریم‌ور را به آخرین نسخه رسمی OpenWrt به‌روز کنید.',
 	"OpenVPN could not be installed: the official source of kernel modules (kmods) is missing from this router's package sources, so no kernel module can be installed. The line to add is on the Runtime Logs page.":
 		'OpenVPN نصب نشد: منبع رسمی ماژول‌های کرنل (kmods) در فهرست منبع‌های بسته این روتر نیست، پس هیچ ماژول کرنلی نصب نمی‌شود. خطی که باید اضافه شود در صفحه «گزارش‌ها» نوشته شده.',
 	'The %s that was downloaded could not be installed - %s.': '%s که دانلود شد نصب نشد - %s.',
 	'what came back is not a program at all - the address may have moved, or answered with an error page':
-		'چیزی که دانلود شد اصلاً برنامه نیست - ممکن است آدرس عوض شده باشد یا یک صفحه خطا برگشته باشد',
+		'چیزی که دانلود شد اصلا برنامه نیست - ممکن است آدرس عوض شده باشد یا یک صفحه خطا برگشته باشد',
 	'it is built for a different processor than this router': 'برای پردازنده‌ای غیر از پردازنده این روتر ساخته شده',
 	'it stopped the moment it was started, without a word - the download was most likely cut off part way; try again':
 		'همان لحظه اجرا متوقف شد و چیزی نگفت - به احتمال زیاد دانلود نیمه‌کاره قطع شده؛ دوباره امتحان کنید',
@@ -296,10 +301,10 @@ var FA = {
 	'Invalid L2TP account or missing ucode socket module. Install dependencies and check the account.': 'اطلاعات اکانت L2TP درست نیست یا ماژول socket نصب نشده است. وابستگی‌ها و اطلاعات اکانت را بررسی کنید.',
 	'L2TP/IPsec negotiation failed. Check PSK and Runtime Logs.': 'برقراری IPsec ناموفق بود. کلید مشترک و گزارش‌ها را بررسی کنید.',
 	'L2TP did not connect. Check server, account password and IPsec settings.': 'L2TP وصل نشد. آدرس سرور، رمز اکانت و تنظیمات IPsec را بررسی کنید.',
-	'L2TP did not connect. The Runtime Logs page says how far it got.': 'L2TP وصل نشد. جزئیات اتصال در برگه گزارش‌ها موجود است.',
-	'PPTP did not connect. The Runtime Logs page says how far it got.': 'PPTP وصل نشد. جزئیات اتصال در برگه گزارش‌ها موجود است.',
-	'SSTP did not connect. The Runtime Logs page says how far it got.': 'SSTP وصل نشد. جزئیات اتصال در برگه گزارش‌ها موجود است.',
-	'IKEv2 did not connect. The Runtime Logs page says how far it got.': 'IKEv2 وصل نشد. جزئیات اتصال در برگه گزارش‌ها موجود است.',
+	'L2TP did not connect. The Runtime Logs page says how far it got.': 'L2TP وصل نشد. جزییات اتصال در برگه گزارش‌ها موجود است.',
+	'PPTP did not connect. The Runtime Logs page says how far it got.': 'PPTP وصل نشد. جزییات اتصال در برگه گزارش‌ها موجود است.',
+	'SSTP did not connect. The Runtime Logs page says how far it got.': 'SSTP وصل نشد. جزییات اتصال در برگه گزارش‌ها موجود است.',
+	'IKEv2 did not connect. The Runtime Logs page says how far it got.': 'IKEv2 وصل نشد. جزییات اتصال در برگه گزارش‌ها موجود است.',
 	'Sign-in': 'روش ورود',
 	'Authentication method': 'روش احراز هویت',
 	'Certificate file (PEM / DER)': 'فایل گواهی (PEM / DER)',
@@ -522,16 +527,16 @@ var FA = {
 	'busybox ip cannot add the route this needs — install ip-full':
 		'ip بیزی‌باکس این مسیر را نمی‌تواند اضافه کند — ip-full را نصب کنید',
 	'HTTPS': 'HTTPS',
-	'The HTTPS check could not resolve the proxy hostname.': 'در بررسی HTTPS، نام دامنهٔ پروکسی پیدا نشد.',
-	'The HTTPS check could not resolve the download hostname. Check the router DNS.': 'نام دامنهٔ سرور دانلود پیدا نشد؛ DNS روتر را بررسی کنید.',
+	'The HTTPS check could not resolve the proxy hostname.': 'در بررسی HTTPS، نام دامنه پروکسی پیدا نشد.',
+	'The HTTPS check could not resolve the download hostname. Check the router DNS.': 'نام دامنه سرور دانلود پیدا نشد؛ DNS روتر را بررسی کنید.',
 	'The HTTPS check could not connect to the download server.': 'بررسی HTTPS نتوانست به سرور دانلود وصل شود.',
 	'The download server returned an HTTP error. Check the HTTPS probe URL.': 'سرور دانلود خطای HTTP داد؛ نشانی تست HTTPS را بررسی کنید.',
 	'The HTTPS check timed out. Check access to the download server.': 'مهلت بررسی HTTPS تمام شد؛ دسترسی به سرور دانلود را بررسی کنید.',
 	'The HTTPS TLS handshake failed.': 'برقراری ارتباط TLS در بررسی HTTPS ناموفق بود.',
-	'The HTTPS certificate could not be verified. Check CA certificates and the router clock.': 'گواهی HTTPS تأیید نشد؛ گواهی‌های ریشه و ساعت روتر را بررسی کنید.',
-	'The HTTPS CA certificate file is missing or unreadable.': 'فایل گواهی‌های ریشهٔ HTTPS وجود ندارد یا قابل خواندن نیست.',
+	'The HTTPS certificate could not be verified. Check CA certificates and the router clock.': 'گواهی HTTPS تایید نشد؛ گواهی‌های ریشه و ساعت روتر را بررسی کنید.',
+	'The HTTPS CA certificate file is missing or unreadable.': 'فایل گواهی‌های ریشه HTTPS وجود ندارد یا قابل خواندن نیست.',
 	'curl is unavailable. Install the missing packages.': 'دستور curl در دسترس نیست؛ بسته‌های موردنیاز را نصب کنید.',
-	'The HTTPS download check failed. This does not establish that all downloads are blocked.': 'تست دانلود HTTPS ناموفق بود؛ این نتیجه به‌تنهایی به معنی مسدود بودن همهٔ دانلودها نیست.',
+	'The HTTPS download check failed. This does not establish that all downloads are blocked.': 'تست دانلود HTTPS ناموفق بود؛ این نتیجه به‌تنهایی به معنی مسدود بودن همه دانلودها نیست.',
 	'the router can fetch over HTTPS': 'روتر می‌تواند از HTTPS دانلود کند',
 	'certificates are missing or the connection is blocked — nothing can be downloaded':
 		'گواهی‌ها نیستند یا اتصال مسدود است — هیچ چیزی دانلود نمی‌شود',
@@ -540,7 +545,7 @@ var FA = {
 	'Packages': 'پکیج‌ها',
 	'%d missing': '%d مورد کم است',
 	'everything needed is installed': 'هرچه لازم بود نصب است',
-	'Dependency installation failed. Details: %s': 'نصب پیش‌نیازها ناموفق بود. جزئیات: %s',
+	'Dependency installation failed. Details: %s': 'نصب پیش‌نیازها ناموفق بود. جزییات: %s',
 	'See the installation log.': 'گزارش نصب را در /var/run/zirgozar/deps-install.log بررسی کنید.',
 	'Install them': 'نصب',
 	'Installing. This needs a working connection and may take a minute.':
@@ -583,26 +588,26 @@ var FA = {
 	'Light mode': 'حالت چراغ',
 	'Steady': 'ثابت',
 	'Blinking': 'چشمک‌زن',
-	'The installed kernel identity could not be read. Package sources were left unchanged.': 'شناسهٔ کرنل نصب‌شده خوانده نشد؛ مخازن بسته تغییر نکردند.',
+	'The installed kernel identity could not be read. Package sources were left unchanged.': 'شناسه کرنل نصب‌شده خوانده نشد؛ مخازن بسته تغییر نکردند.',
 	'The matching kernel repository could not be determined. Package sources were left unchanged.': 'مخزن سازگار با کرنل مشخص نشد؛ مخازن بسته تغییر نکردند.',
-	'The kernel repository hostname could not be resolved. Check router DNS.': 'دامنهٔ مخزن کرنل پیدا نشد؛ DNS روتر را بررسی کنید.',
-	'The kernel repository certificate could not be verified. Check CA certificates and the router clock.': 'گواهی مخزن کرنل تأیید نشد؛ گواهی‌های ریشه و ساعت روتر را بررسی کنید.',
-	'The matching kernel repository returned an HTTP error. Firmware incompatibility has not been established. See Runtime Logs.': 'مخزن سازگار با کرنل خطای HTTP داد؛ ناسازگاری فریمور ثابت نشده است. جزئیات در گزارش‌هاست.',
+	'The kernel repository hostname could not be resolved. Check router DNS.': 'دامنه مخزن کرنل پیدا نشد؛ DNS روتر را بررسی کنید.',
+	'The kernel repository certificate could not be verified. Check CA certificates and the router clock.': 'گواهی مخزن کرنل تایید نشد؛ گواهی‌های ریشه و ساعت روتر را بررسی کنید.',
+	'The matching kernel repository returned an HTTP error. Firmware incompatibility has not been established. See Runtime Logs.': 'مخزن سازگار با کرنل خطای HTTP داد؛ ناسازگاری فریمور ثابت نشده است. جزییات در گزارش‌هاست.',
 	'The matching kernel repository could not be downloaded. Check connectivity and Runtime Logs.': 'دانلود مخزن سازگار با کرنل ناموفق بود؛ اتصال و گزارش‌ها را بررسی کنید.',
-	'The kernel repository signature could not be verified. Package sources were left unchanged.': 'امضای مخزن کرنل تأیید نشد؛ مخازن بسته تغییر نکردند.',
+	'The kernel repository signature could not be verified. Package sources were left unchanged.': 'امضای مخزن کرنل تایید نشد؛ مخازن بسته تغییر نکردند.',
 	'Package installation ran out of storage. Free space and try again.': 'فضای ذخیره‌سازی برای نصب بسته کافی نیست؛ فضا آزاد کنید و دوباره امتحان کنید.',
-	'Router storage is read-only. Package installation cannot continue.': 'حافظهٔ روتر فقط‌خواندنی است؛ نصب بسته نمی‌تواند ادامه پیدا کند.',
+	'Router storage is read-only. Package installation cannot continue.': 'حافظه روتر فقط‌خواندنی است؛ نصب بسته نمی‌تواند ادامه پیدا کند.',
 	'Package HTTPS verification failed. Check CA certificates and the router clock.': 'اعتبارسنجی HTTPS بسته‌ها ناموفق بود؛ گواهی‌های ریشه و ساعت روتر را بررسی کنید.',
-	'Package repository DNS lookup failed. Check router DNS.': 'نام دامنهٔ مخزن بسته پیدا نشد؛ DNS روتر را بررسی کنید.',
-	'Package signature verification failed. Check the repository and its trusted signing keys.': 'امضای بسته تأیید نشد؛ مخزن و کلیدهای امضای معتبر آن را بررسی کنید.',
+	'Package repository DNS lookup failed. Check router DNS.': 'نام دامنه مخزن بسته پیدا نشد؛ DNS روتر را بررسی کنید.',
+	'Package signature verification failed. Check the repository and its trusted signing keys.': 'امضای بسته تایید نشد؛ مخزن و کلیدهای امضای معتبر آن را بررسی کنید.',
 	'Package repositories could not be reached. Check connectivity and try again.': 'دسترسی به مخازن بسته برقرار نشد؛ اتصال را بررسی کنید و دوباره امتحان کنید.',
-	'Required packages are unavailable or incompatible in the current repositories. See the installation log; a firmware change may not be necessary.': 'بسته‌های موردنیاز در مخازن فعلی موجود یا سازگار نیستند؛ گزارش نصب را بررسی کنید. تغییر فریمور لزوماً لازم نیست.',
+	'Required packages are unavailable or incompatible in the current repositories. See the installation log; a firmware change may not be necessary.': 'بسته‌های موردنیاز در مخازن فعلی موجود یا سازگار نیستند؛ گزارش نصب را بررسی کنید. تغییر فریمور لزوما لازم نیست.',
 	'The package operation failed. See the installation log for the original error.': 'عملیات بسته ناموفق بود؛ علت اصلی را در گزارش نصب بررسی کنید.',
-	'OpenVPN was installed but its executable did not pass verification. See the installation log.': 'بستهٔ OpenVPN نصب شد اما اجرای آن تأیید نشد؛ گزارش نصب را بررسی کنید.',
-	'HAProxy was installed but its executable did not pass verification. See the installation log.': 'بستهٔ HAProxy نصب شد اما اجرای آن تأیید نشد؛ گزارش نصب را بررسی کنید.',
+	'OpenVPN was installed but its executable did not pass verification. See the installation log.': 'بسته OpenVPN نصب شد اما اجرای آن تایید نشد؛ گزارش نصب را بررسی کنید.',
+	'HAProxy was installed but its executable did not pass verification. See the installation log.': 'بسته HAProxy نصب شد اما اجرای آن تایید نشد؛ گزارش نصب را بررسی کنید.',
 	'The package manager finished but required packages are still missing. See the installation log.': 'مدیر بسته تمام شد اما بعضی بسته‌های لازم هنوز نصب نیستند؛ گزارش نصب را بررسی کنید.',
 	'The release checksum could not be retrieved or is invalid. Nothing was installed.': 'چک‌سام انتشار دریافت نشد یا معتبر نیست؛ چیزی نصب نشد.',
-	'Package installation finished. Check the capability results above.': 'نصب بسته‌ها تمام شد؛ نتیجهٔ بررسی قابلیت‌ها را در ردیف‌های بالا ببینید.',
+	'Package installation finished. Check the capability results above.': 'نصب بسته‌ها تمام شد؛ نتیجه بررسی قابلیت‌ها را در ردیف‌های بالا ببینید.',
 	'Install': 'نصب',
 	'Downloading %s:': 'در حال دانلود %s:',
 	'Remove': 'حذف',
@@ -644,7 +649,7 @@ var FA = {
 	'Group': 'گروه',
 	'Optional.': 'اختیاری.',
 	'Path': 'مسیر',
-	'Optional, such as /staff.': 'اختیاری، مثلاً /staff.',
+	'Optional, such as /staff.': 'اختیاری، مثلا /staff.',
 	'Certificate fingerprint': 'اثر انگشت گواهی',
 	'Optional. For a self-signed server certificate.': 'اختیاری. برای گواهی خودامضای سرور.',
 	'Auth key': 'کلید احراز هویت',
@@ -806,27 +811,27 @@ var FA = {
 	'Enable Node Log': 'ثبت گزارش کانفیگ',
 	'XDRIVE settings (JSON)': 'تنظیمات XDRIVE به شکل JSON',
 	'Set service, remoteFolder and secrets here. Optional xmux and template settings are preserved, including hrefPath. For HTTP/3, select TLS and set ALPN to h3 only. Requires Xray 26.10.22 or newer.':
-		'گزینه‌های service، remoteFolder و secrets را وارد کنید. تنظیمات اختیاری xmux و template، از جمله hrefPath، حفظ می‌شوند. برای HTTP/3، امنیت را TLS و ALPN را فقط h3 بگذارید. به Xray نسخهٔ 26.10.22 یا جدیدتر نیاز دارد.',
-	'Must be a JSON object.': 'باید یک شیء JSON باشد.',
-	'XDRIVE needs a remoteFolder.': 'پوشهٔ remoteFolder برای XDRIVE لازم است.',
-	'XDRIVE service must be local, google-drive or template.': 'گزینهٔ service در XDRIVE باید local، google-drive یا template باشد.',
-	'XDRIVE secrets must be an array of strings.': 'گزینهٔ secrets در XDRIVE باید آرایه‌ای از متن‌ها باشد.',
+		'گزینه‌های service، remoteFolder و secrets را وارد کنید. تنظیمات اختیاری xmux و template، از جمله hrefPath، حفظ می‌شوند. برای HTTP/3، امنیت را TLS و ALPN را فقط h3 بگذارید. به Xray نسخه 26.10.22 یا جدیدتر نیاز دارد.',
+	'Must be a JSON object.': 'باید یک ساختار JSON باشد.',
+	'XDRIVE needs a remoteFolder.': 'پوشه remoteFolder برای XDRIVE لازم است.',
+	'XDRIVE service must be local, google-drive or template.': 'گزینه service در XDRIVE باید local، google-drive یا template باشد.',
+	'XDRIVE secrets must be an array of strings.': 'گزینه secrets در XDRIVE باید آرایه‌ای از متن‌ها باشد.',
 	'Google Drive needs ClientID, ClientSecret and RefreshToken in secrets.': 'برای گوگل درایو، ClientID، ClientSecret و RefreshToken را به همین ترتیب در secrets وارد کنید.',
-	'XDRIVE template must be a JSON object.': 'گزینهٔ template در XDRIVE باید یک شیء JSON باشد.',
-	'XMUX must be a JSON object.': 'تنظیمات XMUX باید یک شیء JSON باشد.',
+	'XDRIVE template must be a JSON object.': 'گزینه template در XDRIVE باید یک ساختار JSON باشد.',
+	'XMUX must be a JSON object.': 'تنظیمات XMUX باید یک ساختار JSON باشد.',
 	'Set either XMUX maxConnections or maxConcurrency.': 'در XMUX فقط یکی از maxConnections یا maxConcurrency را تنظیم کنید.',
 	'XDRIVE supports TLS or no security, not REALITY.': 'XDRIVE با TLS یا بدون امنیت کار می‌کند؛ REALITY پشتیبانی نمی‌شود.',
-	'Disable VLESS flow for XDRIVE.': 'برای XDRIVE، گزینهٔ flow در VLESS را خاموش کنید.',
+	'Disable VLESS flow for XDRIVE.': 'برای XDRIVE، گزینه flow در VLESS را خاموش کنید.',
 	'XDRIVE works with VLESS only.': 'XDRIVE فقط با VLESS کار می‌کند.',
 	'XDRIVE requires VLESS encryption from xray vlessenc.': 'برای XDRIVE، مقدار encryption یا decryption تولیدشده با xray vlessenc لازم است.',
 	'VLESS decryption': 'کلید decryption در VLESS',
 	'VLESS encryption in share link': 'کلید encryption در لینک اشتراک',
 	'Use the matching decryption and encryption pair from xray vlessenc. Decryption stays on the server; encryption is included in the client link. XDRIVE enables the required client Mux automatically.':
 		'کلیدهای متناظر decryption و encryption را با xray vlessenc بسازید. decryption در سرور می‌ماند و encryption در لینک کلاینت قرار می‌گیرد. Mux موردنیاز XDRIVE در کلاینت خودکار فعال می‌شود.',
-	'Allowed source IPs': 'IPهای مبدأ مجاز',
-	'Blocked source IPs': 'IPهای مبدأ مسدود',
+	'Allowed source IPs': 'IPهای مبدا مجاز',
+	'Blocked source IPs': 'IPهای مبدا مسدود',
 	'Finalmask inbound filter for TCP and UDP. Enter IP addresses or CIDR ranges. A nonempty allowed list rejects other sources; blocked entries take precedence. Empty lists disable the filter. Requires Xray 26.10.21 or newer.':
-		'فیلتر ورودی Finalmask برای TCP و UDP. آدرس IP یا محدودهٔ CIDR وارد کنید. اگر فهرست مجاز پر باشد، سایر مبدأها رد می‌شوند؛ فهرست مسدود اولویت دارد. با خالی‌بودن هر دو فهرست، فیلتر خاموش است. به Xray نسخهٔ 26.10.21 یا جدیدتر نیاز دارد.',
+		'فیلتر ورودی Finalmask برای TCP و UDP. آدرس IP یا محدوده CIDR وارد کنید. اگر فهرست مجاز پر باشد، سایر مبداها رد می‌شوند؛ فهرست مسدود اولویت دارد. با خالی‌بودن هر دو فهرست، فیلتر خاموش است. به Xray نسخه 26.10.21 یا جدیدتر نیاز دارد.',
 	'What the core itself says, shown on the Log page beside this program’s own runtime log.':
 		'چیزهایی که خود هسته می‌گوید، که در صفحه گزارش کنار گزارش خود برنامه نشان داده می‌شود.',
 	'Log Level': 'سطح گزارش',
@@ -1135,16 +1140,16 @@ var FA = {
 		'همه کانفیگ‌های این اشتراک از طریق کانفیگی که اینجا انتخاب می‌شود وصل می‌شوند.',
 	'Traffic goes through a node of this subscription first and leaves from the one chosen here.':
 		'ترافیک اول از یک کانفیگ این اشتراک عبور می‌کند و از کانفیگی که اینجا انتخاب می‌شود خارج می‌شود.',
-	'Add the node via the link': 'افزودن با لینک',
+	'Import share links': 'وارد کردن لینک اشتراک',
 	'This config is already in the list: %s': 'این کانفیگ از قبل در فهرست هست: %s',
 	'They are already in the list.': 'این‌ها از قبل در فهرست هستند.',
 	'This subscription is already in the list: %s': 'این اشتراک از قبل در فهرست هست: %s',
-	'Source port': 'پورت مبدأ',
+	'Source port': 'پورت مبدا',
 	'UDP relay mode': 'حالت رله UDP',
 	'0-RTT handshake': 'دست‌دادن 0-RTT',
 	'Heartbeat (s)': 'Heartbeat (ثانیه)',
 	'Port hopping': 'پرش پورت',
-	'Ports the server hops over, such as 20000-30000. Empty for none.': 'پورت‌هایی که سرور بین آن‌ها جابه‌جا می‌شود، مثلاً 20000-30000. خالی یعنی ندارد.',
+	'Ports the server hops over, such as 20000-30000. Empty for none.': 'پورت‌هایی که سرور بین آن‌ها جابه‌جا می‌شود، مثلا 20000-30000. خالی یعنی ندارد.',
 	'Hop interval (s)': 'فاصله پرش (ثانیه)',
 	'Upload (Mbps)': 'آپلود (مگابیت)',
 	'Download (Mbps)': 'دانلود (مگابیت)',
@@ -1152,7 +1157,7 @@ var FA = {
 	'Optional, instead of the password.': 'اختیاری، به‌جای رمز.',
 	'Plugin': 'پلاگین',
 	'Plugin options': 'گزینه‌های پلاگین',
-	'Such as obfs=http;obfs-host=bing.com': 'مثلاً obfs=http;obfs-host=bing.com',
+	'Such as obfs=http;obfs-host=bing.com': 'مثلا obfs=http;obfs-host=bing.com',
 	'Uplink capacity (MB/s)': 'ظرفیت آپلود (مگابایت بر ثانیه)',
 	'Downlink capacity (MB/s)': 'ظرفیت دانلود (مگابایت بر ثانیه)',
 	'Read buffer (MB)': 'بافر خواندن (مگابایت)',
@@ -1172,7 +1177,7 @@ var FA = {
 	'TCP Brutal download (Mbps)': 'دانلود TCP Brutal (مگابیت)',
 	'System interface': 'رابط سیستمی',
 	'Protocol parameter': 'پارامتر پروتکل',
-	'Only if the provider asks for one, such as session=abc; token=xyz': 'فقط اگر فروشنده خواسته باشد، مثلاً session=abc; token=xyz',
+	'Only if the provider asks for one, such as session=abc; token=xyz': 'فقط اگر فروشنده خواسته باشد، مثلا session=abc; token=xyz',
 	'Port mapping': 'باز کردن پورت مودم',
 	'Opens a port on the modem by UPnP or NAT-PMP, for a better chance of a direct connection.': 'با UPnP یا NAT-PMP یک پورت روی مودم باز می‌کند تا اتصال مستقیم راحت‌تر برقرار شود.',
 	'The certificate, as a file on the router. Hysteria, TUIC, AnyTLS and NaiveProxy always need one.': 'گواهی، به‌صورت فایلی روی روتر. Hysteria، TUIC، AnyTLS و NaiveProxy همیشه به آن نیاز دارند.',
@@ -1191,7 +1196,7 @@ var FA = {
 	'Installed.': 'نصب شد.',
 	'Another install is still running. Try again when it is done.': 'یک نصب دیگر هنوز در جریان است. وقتی تمام شد دوباره امتحان کنید.',
 	'Port range': 'بازه پورت',
-	'Such as 2090-2099, in place of the port. Empty for one port.': 'مثلاً 2090-2099، به‌جای پورت. خالی یعنی یک پورت.',
+	'Such as 2090-2099, in place of the port. Empty for one port.': 'مثلا 2090-2099، به‌جای پورت. خالی یعنی یک پورت.',
 	'Multiplexing': 'مالتی‌پلکس',
 	'Handshake': 'دست‌دادن',
 	'Standard': 'معمولی',
@@ -1239,14 +1244,14 @@ var FA = {
 	'Failures before switching': 'تعداد خطا پیش از تعویض',
 	'Back to the main node': 'برگشت به کانفیگ اصلی',
 	'Return to the node above as soon as it works again.': 'به محض اینکه کانفیگ بالا دوباره کار کند، به آن برمی‌گردد.',
-	'The port the connection comes from. Such as 1000-2000,3000.': 'پورتی که اتصال از آن می‌آید. مثلاً 1000-2000,3000.',
+	'The port the connection comes from. Such as 1000-2000,3000.': 'پورتی که اتصال از آن می‌آید. مثلا 1000-2000,3000.',
 	'Node HTTP Listen Port': 'پورت HTTP نود',
 	'An HTTP proxy beside it, the same way out. Empty for none.': 'یک پراکسی HTTP کنار آن، با همان مسیر خروج. خالی یعنی ندارد.',
 	'HTTP Listen Port': 'پورت HTTP',
 	'Not the SOCKS port.': 'نباید همان پورت SOCKS باشد.',
 	'Node address DNS': 'DNS آدرس نودها',
 	'The resolver every node’s server name is looked up with, straight out - an IP address, since nothing can be looked up before the tunnel is up. Empty uses Direct DNS. Such as 1.1.1.1, tcp://8.8.8.8 or https://8.8.8.8/dns-query.': 'برای اتصال به کانفیگی که آدرس سرورش دامنه است، ابتدا باید IP آن پیدا شود. مثلا vpn.example.com باید به یک آدرس IP تبدیل شود. این گزینه مشخص می کند کدام DNS این کار را انجام دهد. اگر آدرس سرور از ابتدا IP باشد، این تبدیل لازم نیست. این گزینه DNS باز کردن سایت ها از داخل تونل را تغییر نمی دهد. خالی بگذارید تا از گزینه «DNS مستقیم» استفاده شود؛ معمولا نیازی به تغییر آن نیست. برای تعیین DNS جداگانه، مثلا 1.1.1.1 یا tcp://8.8.8.8 یا https://8.8.8.8/dns-query وارد کنید. آدرس این DNS باید با IP نوشته شود و درخواست به آن مستقیم و خارج از تونل ارسال می شود تا برقراری اتصال به خود تونل وابسته نباشد.',
-	'An IP address, such as 1.1.1.1, tcp://8.8.8.8 or https://8.8.8.8/dns-query.': 'یک آدرس IP، مثلاً 1.1.1.1، tcp://8.8.8.8 یا https://8.8.8.8/dns-query.',
+	'An IP address, such as 1.1.1.1, tcp://8.8.8.8 or https://8.8.8.8/dns-query.': 'یک آدرس IP، مثلا 1.1.1.1، tcp://8.8.8.8 یا https://8.8.8.8/dns-query.',
 	'%d added; %d were already in the list.': '%d کانفیگ اضافه شد؛ %d تا از قبل در فهرست بودند.',
 	'Enter share links, one per line. Subscription links are not supported!': 'لینک‌های کانفیگ را وارد کنید، هر خط یک لینک. لینک اشتراک پذیرفته نمی‌شود!',
 	'Please enter the correct link.': 'لطفا لینک درست وارد کنید.',
@@ -1417,7 +1422,7 @@ var FA = {
 	'ID': 'شناسه (UUID)',
 	'Username': 'نام کاربری',
 	'Password': 'رمز عبور',
-	'Encrypt Method (encryption)': 'روش رمزنگاری (encryption)',
+	'VLESS encryption value': 'مقدار رمزنگاری VLESS',
 	'flow': 'flow',
 	'Encrypt Method': 'روش رمزنگاری',
 	'Security': 'امنیت',
@@ -1456,7 +1461,7 @@ var FA = {
 	'ECH DNS through TLS (echOutbound)':
 		'دریافت کلید ECH از مسیر TLS (echOutbound)',
 	'Fetches ECH keys with h2c through 1.1.1.1:443 using the Microsoft TLS preset. Requires Xray with echSockopt and fromMitM support. An explicit ECH query domain is preserved; otherwise SNI is used.':
-		'کلید ECH را با h2c از مسیر 1.1.1.1:443 و تنظیم TLS مایکروسافت می‌گیرد. به Xray با پشتیبانی echSockopt و fromMitM نیاز دارد. دامنهٔ مشخص‌شده در فیلد ECH حفظ می‌شود؛ در غیر این صورت SNI استفاده می‌شود.',
+		'کلید ECH را با h2c از مسیر 1.1.1.1:443 و تنظیم TLS مایکروسافت می‌گیرد. به Xray با پشتیبانی echSockopt و fromMitM نیاز دارد. دامنه مشخص‌شده در فیلد ECH حفظ می‌شود؛ در غیر این صورت SNI استفاده می‌شود.',
 	'Cipher Suites': 'مجموعه رمزها (Cipher Suites)',
 	'Configures the list of supported cipher suites, separated by colons.': 'فهرست مجموعه رمزهای مجاز، جداشده با دونقطه.',
 	'Xray’s finalmask for this node, as a JSON object. The fragment and noise of the Xray tab are still added, unless this has its own.':
@@ -1733,8 +1738,9 @@ function patchLuci() {
 	if (patched || typeof window._ !== 'function') return;
 	var orig = window._;
 	window._ = function(s, c) {
-		if (LANG === 'fa' && c == null && Object.prototype.hasOwnProperty.call(LUCI_FA, s))
-			return LUCI_FA[s];
+		var catalog = LANG === 'fa' ? LUCI_FA : CATALOGS[LANG];
+		if (c == null && Object.prototype.hasOwnProperty.call(LUCI_FA, s) && catalog && Object.prototype.hasOwnProperty.call(catalog, s))
+			return catalog[s];
 		return orig.apply(this, arguments);
 	};
 	patched = true;
@@ -1765,6 +1771,7 @@ function nodeWord(s) {
 }
 
 function tr(s) {
+	if (CATALOGS[LANG]) return Object.prototype.hasOwnProperty.call(CATALOGS[LANG], s) ? CATALOGS[LANG][s] : s;
 	if (LANG !== 'fa') return nodeWord(s);
 	var v = FA[s];
 	if (v === undefined && typeof s === 'string') {
@@ -1823,10 +1830,10 @@ function page(children) {
 }
 
 return baseclass.extend({
-	/* Called by each view once it knows what the setting says. Anything other
-	   than "fa" is English, including a value nobody has set yet. */
-	setLang: function(l) { LANG = (l === 'fa') ? 'fa' : 'en'; if (LANG === 'fa') patchLuci(); },
+	/* Unknown settings fall back to English. */
+	setLang: function(l) { LANG = Object.prototype.hasOwnProperty.call(LANGUAGES, l) ? l : 'en'; if (LANG !== 'en') patchLuci(); },
 	get: function() { return LANG; },
+	languages: function() { return Object.assign({}, LANGUAGES); },
 	dir: function() { return LANG === 'fa' ? 'rtl' : 'ltr'; },
 	page: page,
 	tr: tr

@@ -5,6 +5,8 @@
 'use strict';
 require('./test-status-ui.js');
 require('./test-home-ui.js');
+require('./test-nodes-ui.js');
+require('./test-i18n.js');
 require('./test-update-check.js');
 require('./test-xdrive.js');
 

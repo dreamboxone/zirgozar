@@ -1112,7 +1112,7 @@ case "$remote_proto" in
 		;;
 	doh|http3)
 		if [ "$remote_proto" = http3 ] && [ "${ZGZ_FOR_SINGBOX:-0}" != 1 ]; then
-		 echo 'DoH3 به هستهٔ sing-box نیاز دارد.' >&2; exit 1
+		 echo 'DoH3 به هسته sing-box نیاز دارد.' >&2; exit 1
 		fi
 		# No network lookup is permitted while constructing the DoH endpoint.
 		_url="${remote_doh%%,*}"
@@ -1132,7 +1132,7 @@ case "$remote_proto" in
 		 fi
 		 add_host "$_dohhost" "$_boot"
 		elif [ -n "$_boot" ] && ! dns_ip_literal "$_boot"; then
-		 echo 'IP اولیهٔ DoH معتبر نیست.' >&2; exit 1
+		 echo 'IP اولیه DoH معتبر نیست.' >&2; exit 1
 		fi
 		[ "$remote_proto" != http3 ] || _url="h3://${_url#https://}"
 		remote_server="\"address\":\"$(json_escape "$_url")\""
@@ -1142,7 +1142,7 @@ case "$remote_proto" in
 		;;
 	tls|quic)
 		if [ "$remote_proto" = quic ] && [ "${ZGZ_FOR_SINGBOX:-0}" != 1 ]; then
-		 echo 'DoQ به هستهٔ sing-box نیاز دارد.' >&2; exit 1
+		 echo 'DoQ به هسته sing-box نیاز دارد.' >&2; exit 1
 		fi
 		remote_ip="$(cfg remote_dns_tls 1.1.1.1)"
 		remote_port="$(cfg remote_dns_tls_port 853)"

@@ -712,7 +712,7 @@ method_action() {
 			"$NODES" forget $arg >/dev/null 2>&1
 			;;
 		add_links)
-			# The "Add the node via the link": one node per link.
+			# Import share links: one node per link.
 			_n="$(printf '%s\n' "$arg" | "$NODES" addlinks 2>/dev/null)" || _n="0 0"
 			detach "$NODES" build
 			json_init
@@ -929,7 +929,7 @@ method_action() {
 			# The language button in the page header. A plain uci commit
 			# rather than a LuCI save, which would restart the tunnel for
 			# the sake of a word on a button.
-			case "$arg" in fa|en) : ;; *) fail "unknown language"; return ;; esac
+			case "$arg" in fa|en|zh|ru) : ;; *) fail "unknown language"; return ;; esac
 			uci -q set zirgozar.config.lang="$arg" && uci -q commit zirgozar
 			;;
 		clear_log)

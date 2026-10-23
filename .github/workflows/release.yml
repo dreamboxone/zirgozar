@@ -147,6 +147,7 @@ jobs:
             ZGZ_GEO_DIR="$PWD/geo" \
             PATH="$PATH" \
             timeout -k 5 90 sh test/test-sources.sh
+            timeout -k 5 90 sh test/test-nodes-reload.sh
 
       - name: Test schedule
         run: |

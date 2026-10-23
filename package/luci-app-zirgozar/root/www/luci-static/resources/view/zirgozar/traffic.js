@@ -92,7 +92,7 @@ function removableCustom(o, list) {
 }
 
 function when(t) {
-	return t ? new Date(t * 1000).toLocaleString(i18n.get() === 'fa' ? 'fa-IR' : undefined) : _('date unknown');
+	return t ? new Date(t * 1000).toLocaleString(i18n.get() === 'fa' ? 'fa-IR' : i18n.get()) : _('date unknown');
 }
 
 /* The size and update time of each routing data file. */

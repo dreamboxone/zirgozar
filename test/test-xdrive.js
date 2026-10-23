@@ -22,6 +22,13 @@ const links = new Function('baseclass', 'i18n', read('zirgozar/nodelink.js'))({ 
 const id = '11111111-2222-3333-4444-555555555555';
 const encryption = 'mlkem768x25519plus.native.0rtt.apQiS2-cDV2HqW1e13TSG6p4v9NCRVDln8RCeA3kDmM';
 const decryption = 'mlkem768x25519plus.native.600s.iGNJoyV9gKt7Xbn8ypzLqxEiXtt2v61Wh_fLzj6UUWk';
+for (const flow of ['xtls-rprx-vision','xtls-rprx-vision-udp443','previous-custom-value']) {
+	const node=api.parseLink('vless://'+id+'@example.com:443?security=tls&type=tcp&flow='+flow);
+	node.flow='';
+	const saved=api.buildLink(node,'disabled');
+	assert.ok(!new URL(saved).searchParams.has('flow'),'Disabled must remove even an imported custom flow');
+	assert.equal(api.parseLink(saved).flow,'');
+}
 const drive = {
 	service: 'google-drive', remoteFolder: 'folder-id', secrets: ['client', 'secret', 'token'],
 	xmux: { maxConnections: 2, hMaxReusableSecs: '1800-3000' }, segmentBytes: 65536

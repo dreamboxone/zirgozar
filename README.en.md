@@ -21,6 +21,7 @@
 
 ## ✨ Features
 
+- **Four interface languages:** English, Persian, Simplified Chinese (简体中文) and Russian (Русский), selectable from the page header.
 - **LuCI appearance:** follows Argon, Material, Material3 and Aurora, including mobile layouts. Select **Follow LuCI theme** in Zirgozar; independent light and dark appearances are also available.
 
 - 🌐 **Every device on the network** — phone, laptop, TV, console — goes through the tunnel with nothing installed on it
@@ -235,7 +236,7 @@ The router are left alone.
 
 That is all. If there is no list to choose from — the default subscription
 cannot be read, and you have no config of your own — go to **Configs**, press
-**Add the node via the link**, paste one of your own configs, and come back.
+**Import share links**, paste one of your own configs, and come back.
 
 > [!WARNING]
 > **If PassWall2 is running on the same router, turn it off first.** Two
@@ -251,8 +252,8 @@ The tabs across the top: **Basic
 Settings, Configs, Node Subscribe, Other Settings, App Update, Rule Manage,
 Geoview, Server-Side, Access Control, Runtime Logs**.
 
-The pages' language, English or Persian, is switched with the language button
-at the top and kept in `lang`.
+Choose English, Persian, Simplified Chinese or Russian from the language selector
+at the top. The choice is saved in `lang` as `en`, `fa`, `zh` or `ru`.
 
 Every option is also a line in `/etc/config/zirgozar`, an ordinary UCI
 file; the name in backticks is its name there. Anything a page does can be done
@@ -270,7 +271,7 @@ Two things hold on every page:
 
 ### ⚙️ 4.1 Basic Settings
 
-The top row contains Status, Core, connection checks and Usage. Usage shows upload, download and total for today, the last seven days or the last thirty days; the selected period is remembered in the browser. The banner shows the application version and Uptime below the language button.
+The top row contains Status, Core, connection checks and Usage. Usage shows upload, download and total for today, the last seven days or the last thirty days; the selected period is remembered in the browser. The banner shows the application version and Uptime below the language selector.
 
 Connection and core cards:
 
@@ -433,7 +434,7 @@ The buttons:
 | Button | What it does |
 |---|---|
 | **Add** | A new config on its own page, field by field: every protocol, WARP, WireGuard and OpenVPN among them |
-| **Add the node via the link** | Paste share links, one per line; each becomes a config of its own, named the way its link names it |
+| **Import share links** | Paste share links, one per line; each becomes a config of its own, named the way its link names it |
 | **Add file** | A config from a link or a whole file: a WireGuard .conf, an OpenVPN .ovpn, an Xray .json, a Clash .yaml or .yml |
 | **Select all / DeSelect all** | Ticks or clears the box on every row |
 | **Delete select nodes** | Deletes the ticked configs — never the one the tunnel is using right now |

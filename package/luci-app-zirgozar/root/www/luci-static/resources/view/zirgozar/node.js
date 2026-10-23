@@ -1352,7 +1352,7 @@ return view.extend({
 			/* sing-box's socks has no transport, so plain TCP only. */
 			o.depends({ '_proto': 'socks', '_type': 'tcp', '_header_type': 'none' });
 
-			o = field(form.Value, 'encryption', _('Encrypt Method (encryption)'));
+			o = field(form.Value, 'encryption', _('VLESS encryption value'));
 			o.placeholder = 'none';
 			o.depends('_proto', 'vless');
 			o.validate = function(section_id, value) {
@@ -1360,7 +1360,8 @@ return view.extend({
 					? _('XDRIVE requires VLESS encryption from xray vlessenc.') : true;
 			};
 
-			o = field(form.Value, 'flow', _('flow'));
+			o = field(form.ListValue, 'flow', _('flow'));
+			o.default = '';
 			o.value('', _('Disable'));
 			o.value('xtls-rprx-vision', 'xtls-rprx-vision');
 			o.value('xtls-rprx-vision-udp443', 'xtls-rprx-vision-udp443');

@@ -55,7 +55,7 @@ function infoCell(sid) {
 		var extra = [];
 		if (d.rem >= 0) extra.push(pui.bytes(d.rem));
 		if (d.expire > 0)
-			extra.push(new Date(d.expire * 1000).toLocaleDateString(i18n.get() === 'fa' ? 'fa-IR' : undefined));
+			extra.push(new Date(d.expire * 1000).toLocaleDateString(i18n.get() === 'fa' ? 'fa-IR' : i18n.get()));
 		if (extra.length)
 			out.push(E('div', { 'style': 'font-size:12px;color:var(--muted)' }, extra.join(' / ')));
 		if (d.error)

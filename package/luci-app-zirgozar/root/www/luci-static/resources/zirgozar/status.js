@@ -102,7 +102,7 @@ function usageCard() {
 					else return;
 					event.preventDefault(); chooseUsagePeriod(periods[next]);
 					var target = byId('pwp-period-' + usagePeriod); if (target) target.focus();
-				} }, (fa ? ['۱ر', '۷ر', '۳۰ر'] : ['1d', '1w', '1m'])[index]);
+				} }, (fa ? ['۱ر', '۷ر', '۳۰ر'] : [_('1d'), _('1w'), _('1m')])[index]);
 			}))
 		])
 	]);
@@ -179,7 +179,7 @@ function protoLine() {
    name is the browser's own for the code, in the page's language. */
 function countryName(cc) {
 	try {
-		var dn = new Intl.DisplayNames([ i18n.get() === 'fa' ? 'fa' : 'en' ], { type: 'region' });
+		var dn = new Intl.DisplayNames([ i18n.get() ], { type: 'region' });
 		return dn.of(cc) || cc;
 	} catch (e) {
 		return cc;

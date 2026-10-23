@@ -518,10 +518,10 @@ dns_failed() {
 		# original resolver free to answer through its old upstreams.
 		touch "$ZGZ_RUN/dns.main-stopped"
 		bounded 30 /etc/init.d/dnsmasq stop >/dev/null 2>&1 || true
-		say_message "محافظ DNS تأیید نشد؛ سرویس اصلی dnsmasq برای جلوگیری از درخواست مستقیم متوقف شد. DNS و DHCP ممکن است تا رفع خطا در دسترس نباشند."
+		say_message "محافظ DNS تایید نشد؛ سرویس اصلی dnsmasq برای جلوگیری از درخواست مستقیم متوقف شد. DNS و DHCP ممکن است تا رفع خطا در دسترس نباشند."
 		if dnsmasq_running; then
 			warn "the system resolver is still running; DNS protection is not guaranteed"
-			say_message "محافظ DNS و توقف سرویس اصلی تأیید نشدند. جلوگیری از نشت تضمین نمی‌شود؛ اتصال را متوقف و گزارش اجرا را بررسی کنید."
+			say_message "محافظ DNS و توقف سرویس اصلی تایید نشدند. جلوگیری از نشت تضمین نمی‌شود؛ اتصال را متوقف و گزارش اجرا را بررسی کنید."
 		fi
 	fi
 	return 1
