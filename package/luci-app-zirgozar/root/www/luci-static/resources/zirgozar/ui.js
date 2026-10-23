@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.8.2-r2';
+var BUILD = '5.8.2-r3';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -372,6 +372,7 @@ function followTheme(root) {
 			return;
 		}
 		attached = true;
+		if (root.zgzSyncHeader) root.zgzSyncHeader();
 		var automatic = themeMode() === 'auto';
 		root.classList.toggle('mk-follow', automatic);
 		document.body.classList.toggle('pwp-follow', automatic);
@@ -469,6 +470,7 @@ function followTheme(root) {
 		root.classList.toggle('mk-dark', dark);
 		document.body.classList.toggle('pwp-dark', dark);
 		if (root.zgzPaintTheme) root.zgzPaintTheme();
+		if (root.zgzSyncHeader) root.zgzSyncHeader();
 	}
 	secondTimer.add(sync);
 	return sync;
@@ -521,6 +523,12 @@ function uptimeTicker(node, read, clock, scheduler) {
 	}
 	scheduler.add(tick, 1);
 	return sync;
+}
+
+function matchControlHeight(control, reference) {
+	var height = reference.getBoundingClientRect().height;
+	if (height > 0 && control.style.height !== height + 'px')
+		control.style.setProperty('height', height + 'px', 'important');
 }
 
 function hero(root, version) {
@@ -587,13 +595,15 @@ function hero(root, version) {
 		logoImg('logo.png', 60, 'zgz-logo-normal')
 	]);
 
+	var themes = E('div', { 'class': 'mk-seg', 'role': 'group', 'aria-label': _('Display mode') }, [ auto, light, dark ]);
+	root.zgzSyncHeader = function() { matchControlHeight(lang, themes); };
 	return E('div', { 'class': 'mk-hero' }, [
 		E('div', { 'class': 'mk-brand' }, [ E('div', {}, [
 			E('h2', { 'aria-label': 'Zirgozar' }, [ heroLogo, ver ]),
 			E('p', {}, _('A total VPN manger for your router'))
 		]) ]),
 		E('div', { 'class': 'mk-row mk-hero-controls' }, [
-			E('div', { 'class': 'mk-seg', 'role': 'group', 'aria-label': _('Display mode') }, [ auto, light, dark ]),
+			themes,
 			E('div', { 'class': 'mk-language-column' }, [ lang,
 				E('div', { 'class': 'mk-uptime' }, [ E('span', {}, _('Uptime')), uptime ])
 			])

@@ -192,6 +192,10 @@ for v in $(grep -o '"path": *"[^"]*"' "$ROOT/package/luci-app-zirgozar/root/usr/
 	LUCI_FILES="$LUCI_FILES
 www/luci-static/resources/view/$v.js"
 done
+for f in "$ROOT"/package/luci-app-zirgozar/root/www/luci-static/resources/zirgozar/*.js; do
+	LUCI_FILES="$LUCI_FILES
+www/luci-static/resources/zirgozar/$(basename "$f")"
+done
 MISSING=""
 for f in $LUCI_FILES; do
 	[ -f "$ROOT/package/luci-app-zirgozar/root/$f" ] || MISSING="$MISSING $f(not in the tree)"
@@ -205,6 +209,18 @@ if [ -z "$MISSING" ]; then
 else
 	bad "missing:$MISSING"
 fi
+
+echo "== the staged web package contains every application module"
+(
+	_stage="$(mktemp -d)"
+	trap 'rm -rf "$_stage"' EXIT
+	. "$ROOT/build/packages.inc.sh"
+	stage_luci "$_stage" "$ROOT"
+	for _source in "$ROOT"/package/luci-app-zirgozar/root/www/luci-static/resources/zirgozar/*.js; do
+		_module="$(basename "$_source")"
+		cmp -s "$_source" "$_stage/luci-app-zirgozar/www/luci-static/resources/zirgozar/$_module" || exit 1
+	done
+) && ok 'all application modules reach the staged package unchanged' || bad 'an application module is missing or changed in the staged package'
 
 # A shared helper must not take a variable name away from whoever called it.
 #

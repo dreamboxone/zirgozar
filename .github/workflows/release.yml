@@ -531,6 +531,9 @@ jobs:
           for base in verifyl/apk verifyl/ipk/data; do
             test -s "$base/usr/share/luci/menu.d/luci-app-zirgozar.json"
             test -s "$base/usr/share/rpcd/acl.d/luci-app-zirgozar.json"
+            for module in package/luci-app-zirgozar/root/www/luci-static/resources/zirgozar/*.js; do
+              cmp "$module" "$base/www/luci-static/resources/zirgozar/$(basename "$module")"
+            done
             for v in settings nodes node subscribe other update traffic geoview acl log; do
               test -s "$base/www/luci-static/resources/view/zirgozar/$v.js"
             done

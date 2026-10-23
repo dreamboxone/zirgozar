@@ -57,7 +57,7 @@
 .mk-btn:active:not(:disabled){transform:translateY(0)}
 .mk-btn:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
 .mk-btn:disabled{opacity:.55;cursor:not-allowed}
-.mk select.mk-language{width:auto;min-width:118px;max-width:100%;height:auto;appearance:auto;direction:ltr;font-family:Tahoma,"Microsoft YaHei",sans-serif!important}
+.mk select.mk-language{box-sizing:border-box;margin:0!important;width:auto;min-width:118px;max-width:100%;min-height:0!important;height:44px;appearance:auto;direction:ltr;font-family:Tahoma,"Microsoft YaHei",sans-serif!important}
 .mk select.mk-language option{background:var(--panel);color:var(--text)}
 .mk-btn.mk-running .mk-ico{animation:mk-spin 1s linear infinite}
 /* LuCI's own busy spinner, should anything still put it on one of these: the

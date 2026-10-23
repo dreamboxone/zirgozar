@@ -48,6 +48,19 @@ function element(tag, attrs, children) {
 }
 
 const source = fs.readFileSync(path.join(resources, 'zirgozar/ui.js'), 'utf8');
+const matchHeight = new Function(source.slice(source.indexOf('function matchControlHeight('), source.indexOf('\nfunction hero(')) + '\nreturn matchControlHeight;')();
+let headerHeight = 58, headerWrites = 0;
+const languageControl = { style: { height: '', setProperty(name, value, priority) { assert.equal(name, 'height'); assert.equal(priority, 'important'); this.height = value; headerWrites++; } } };
+const themeControl = { getBoundingClientRect: () => ({ height: headerHeight }) };
+matchHeight(languageControl, themeControl);
+assert.equal(languageControl.style.height, '58px');
+matchHeight(languageControl, themeControl);
+assert.equal(headerWrites, 1);
+headerHeight = 48; matchHeight(languageControl, themeControl);
+assert.equal(languageControl.style.height, '48px');
+headerHeight = 0; matchHeight(languageControl, themeControl);
+assert.equal(languageControl.style.height, '48px');
+console.log('Language selector matches theme control height and follows size changes');
 const ui = new Function('baseclass', 'rpc', 'i18n', 'L', 'E', source)(
 	{ extend: value => value }, { declare: () => () => Promise.resolve({}) },
 	{ tr: value => value },

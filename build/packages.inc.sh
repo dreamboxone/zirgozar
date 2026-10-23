@@ -8,7 +8,7 @@
 # builders so the two formats can never drift apart.
 
 VERSION=5.8.2
-RELEASE=2
+RELEASE=3
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -285,6 +285,10 @@ stage_luci() {
 	# three blank pages - it ships beside them, not as an extra.
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/i18n.js" \
 		"$i/www/luci-static/resources/zirgozar/i18n.js"
+	install -m 0644 "$l/www/luci-static/resources/zirgozar/lang_zh.js" \
+		"$i/www/luci-static/resources/zirgozar/lang_zh.js"
+	install -m 0644 "$l/www/luci-static/resources/zirgozar/lang_ru.js" \
+		"$i/www/luci-static/resources/zirgozar/lang_ru.js"
 	# The runtime log said again in Persian, for the Log page.
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/logfa.js" \
 		"$i/www/luci-static/resources/zirgozar/logfa.js"
