@@ -18,6 +18,9 @@ warn() { :; }
 forget_caps() { :; }
 firewall_backend() { echo none; }
 bounded() { shift; "$@"; }
+# Package-manager outcomes are tested here; the provider replacement and
+# offline rollback are exercised by test-dnsmasq-install.sh.
+install_dnsmasq_full() { bounded 180 opkg install dnsmasq-full; }
 ''')
     common = source.with_name('zgz-common.sh').read_text()
     helpers = '\n'.join(re.search(r'^' + name + r'\(\) \{[\s\S]*?^\}', common, re.M).group(0)

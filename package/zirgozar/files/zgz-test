@@ -218,15 +218,64 @@ url_ms() {
 	return 0
 }
 
+endpoint_url_ms() (
+	# An isolated protocol helper: no UCI changes, shared bridge files or
+	# system routes. Serialize its loopback port and always reap the process.
+	local work pid='' core='' waited=0 target time before attempt capability=with_openconnect
+	while ! mkdir "$DIR/.oc-lock" 2>/dev/null; do
+		waited=$((waited + 1)); [ "$waited" -le 15 ] || { echo -2; exit 1; }
+		sleep 1
+	done
+	work="$(mktemp -d "$DIR/oc-test.XXXXXX")" || { rmdir "$DIR/.oc-lock"; echo -2; exit 1; }
+	trap '[ -z "$pid" ] || { kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; }; rm -f "$work"/*; rmdir "$work" "$DIR/.oc-lock" 2>/dev/null || true' EXIT
+	trap 'exit 1' INT TERM
+	[ "${2:-openconnect}" != hysteria2 ] || capability=with_quic
+	for core in "$(singbox_path)" "$(singbox_lx_path)"; do
+		[ -x "$core" ] && "$core" version 2>/dev/null | grep -q "$capability" && break
+		core=''
+	done
+	[ -n "$core" ] && command -v ucode >/dev/null 2>&1 || { echo -2; exit 1; }
+	umask 077
+	printf '%s\n' "$1" > "$work/node.json"
+	ucode "$ZGZ_LIB/zgz-sbconfig" mode=bridge bridge="$work/node.json" bridgeport=24901 mark=255 lib="$ZGZ_LIB" etc="$ZGZ_ETC" > "$work/config.json" 2> "$work/error" &&
+		"$core" check -c "$work/config.json" >> "$work/error" 2>&1 || { echo -2; exit 1; }
+	"$core" run -c "$work/config.json" > "$work/run.log" 2>&1 &
+	pid=$!
+	sleep 2
+	target="$(cfg test_url 'http://www.gstatic.com/generate_204')"
+	attempt=0
+	while [ "$attempt" -lt 20 ]; do
+		before="$(wc -c < "$work/run.log")"
+		if time="$(curl -fsS -o /dev/null --socks5-hostname 127.0.0.1:24901 --connect-timeout 8 --max-time 15 -w '%{time_total}' "$target" 2>/dev/null)"; then
+			awk -v t="$time" 'BEGIN { m=int(t*1000+0.5); print (m<1 ? 1 : m) }'; exit 0
+		fi
+		# Some gateways refuse the stock plaintext probe. Explicit user URLs
+		# remain authoritative, with one HTTPS control for the default.
+		if [ "$target" = 'http://www.gstatic.com/generate_204' ] &&
+		   time="$(curl -fsS -o /dev/null --socks5-hostname 127.0.0.1:24901 --connect-timeout 8 --max-time 15 -w '%{time_total}' https://www.google.com/generate_204 2>/dev/null)"; then
+			awk -v t="$time" 'BEGIN { m=int(t*1000+0.5); print (m<1 ? 1 : m) }'; exit 0
+		fi
+		# The SOCKS listener can open before endpoint authentication finishes.
+		# Retry only a fresh readiness error, never an authenticated failure.
+		[ "$(wc -c < "$work/run.log")" -gt "$before" ] &&
+			tail -4 "$work/run.log" | grep -q 'endpoint is not ready yet' &&
+			! grep -q 'client terminated' "$work/run.log" || { echo 0; exit 1; }
+		attempt=$((attempt + 1)); sleep 1
+	done
+	echo 0; exit 1
+)
+
 do_url() {
 	_out="$DIR/$1.url"
 	_proto="$2"; _payload2="$3"
 	echo -1 > "$_out"
 
-	# Xray does not speak these, and standing up the bridge for one button
-	# would be a second core, a second port and a second thing to leave
-	# running. Say so rather than reporting a working node as broken.
+	# Protocol helpers keep their temporary processes separate from the live
+	# bridge. Unsupported protocols must not be reported as failed accounts.
 	case "$_proto" in
+		openconnect|hysteria2)
+			endpoint_url_ms "$_payload2" "$_proto" > "$_out" 2>/dev/null || true
+			return 0 ;;
 		l2tp|pptp|sstp|ikev2)
 			_l2tp_ms="$(printf '%s\n' "$_payload2" | "$ZGZ_LIB/$(tunnel_helper "$_proto")" test url 2>/dev/null)" || _l2tp_ms=0
 			printf '%s\n' "$_l2tp_ms" > "$_out"
@@ -235,7 +284,7 @@ do_url() {
 			_aether_ms="$(printf '%s\n' "$_payload2" | "$ZGZ_LIB/zgz-aether" test "$1" 2>/dev/null)" || _aether_ms=0
 			printf '%s\n' "$_aether_ms" > "$_out"
 			return 0 ;;
-		hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg) echo -2 > "$_out"; return 0 ;;
+		hysteria|tuic|anytls|snell|naive|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg) echo -2 > "$_out"; return 0 ;;
 		# WARP is the exception: warp-plus is one small program and is stood
 		# up for the test, because without it the column could only ever
 		# say that it cannot say.
@@ -284,12 +333,18 @@ cmd_live() {
 	[ "$_sp" != 0 ] || { cmd_current; return $?; }
 	case "$_sp" in ''|*[!0-9]*) echo 0; return 1 ;; esac
 	[ "$_sp" -ge 1 ] && [ "$_sp" -le 65535 ] || { echo 0; return 1; }
+	_probe_urls="$(cfg test_url 'http://www.gstatic.com/generate_204')"
+	if [ "$_probe_urls" = 'http://www.gstatic.com/generate_204' ]; then
+		case "$(bridge_type)" in openconnect|hysteria2) _probe_urls="$_probe_urls https://www.google.com/generate_204" ;; esac
+	fi
+	for _probe_url in $_probe_urls; do
 	if _time="$(curl -fsS -o /dev/null --socks5-hostname "127.0.0.1:$_sp" \
 		--connect-timeout 5 --max-time 10 -w '%{time_total}' \
-		"$(cfg test_url 'http://www.gstatic.com/generate_204')" 2>/dev/null)"; then
+		"$_probe_url" 2>/dev/null)"; then
 		awk -v t="$_time" 'BEGIN { m=int(t*1000+0.5); print (m<1 ? 1 : m) }'
 		return 0
 	fi
+	done
 	echo 0
 	return 1
 }
@@ -388,7 +443,7 @@ cmd_run() {
 			URL_REPEAT=1 url_ms "$_payload" "$_host" "$_port" > "$DIR/$_id.tcp" 2>/dev/null || true
 			return 0
 			;;
-		tcp:hysteria2|tcp:hysteria|tcp:tuic|tcp:anytls|tcp:snell|tcp:naive|tcp:openconnect|tcp:tailscale|tcp:ssh|tcp:ssplugin|tcp:ssr|tcp:ssrust|tcp:mieru|tcp:shadowquic|tcp:trusttunnel|tcp:openvpn|tcp:amneziawg|tcp:warp)
+		tcp:hysteria2|tcp:hysteria|tcp:tuic|tcp:anytls|tcp:snell|tcp:naive|tcp:tailscale|tcp:ssh|tcp:ssplugin|tcp:ssr|tcp:ssrust|tcp:mieru|tcp:shadowquic|tcp:trusttunnel|tcp:openvpn|tcp:amneziawg|tcp:warp)
 			# Not something Xray can carry, and the column has no other
 			# honest answer for them.
 			put "$_id.tcp" -2

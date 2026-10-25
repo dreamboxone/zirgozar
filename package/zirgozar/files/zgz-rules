@@ -21,12 +21,9 @@
 # right one is chosen at run time, and `firewall_backend` in the settings can
 # override the choice.
 #
-# What the firewall does NOT decide is where traffic goes. Iranian addresses,
-# advertising, private ranges - all of that is decided inside Xray, from
-# geoip.dat. Doing it here would mean writing the same list twice, once in
-# nftables syntax and once in iptables syntax, and keeping both in step with
-# a file that changes every week. The firewall's whole job is to hand Xray
-# the packets and stay out of the way.
+# With nftables, Iranian IPv4 destinations bypass the core using the same
+# extracted geoip list as the Kill switch. Domain rules remain in the core.
+# Custom shunt rules retain their precedence by keeping traffic in the core.
 #
 # Deliberately hooks prerouting only. Nothing here touches the output hook, so
 # traffic the router itself creates - Xray reaching its server, the list
@@ -507,7 +504,8 @@ $_aclnat"
 "
 			[ -n "$_direct" ] && _natrules="$_natrules		ip daddr @direct return
 "
-			_natrules="$_natrules		ip protocol icmp icmp type echo-request counter redirect
+			_natrules="$_natrules$(ir_nft_return)
+		ip protocol icmp icmp type echo-request counter redirect
 "
 		fi
 		# And IPv6's, when IPv6 goes through the tunnel too.
@@ -568,6 +566,7 @@ table inet $TABLE {
 		elements = { ::1/128, fc00::/7, fe80::/10, ff00::/8 }
 	}
 
+$(ir_nft_set)
 $_directset$_aclchains	chain prerouting {
 		type filter hook prerouting priority mangle; policy accept;
 
@@ -581,7 +580,8 @@ $_divert
 		meta l4proto { tcp, udp } th dport 53 return
 $_poison		ip daddr @reserved return
 		ip6 daddr @reserved6 return
-$_direct$_acljumps$_v6pre$_defaults	}
+$_direct$_acljumps$(ir_nft_return)
+$_v6pre$_defaults	}
 
 $_forward$_dnschain$_nat}
 NFT
@@ -601,6 +601,7 @@ nft_local_ruleset() {
 	_lex="$(local_exclusions | awk 'NF { printf "%s%s", (n++ ? ", " : ""), $0 }')"
 	cat <<NFT
 table inet $LOCAL_TABLE {
+$(ir_nft_set)
 	set reserved {
 		type ipv4_addr
 		flags interval
@@ -622,6 +623,7 @@ $([ -n "$_lex" ] && printf '\tset exclude {\n\t\ttype ipv4_addr\n\t\tflags inter
 		ct direction reply return
 		meta l4proto { tcp, udp } th dport 53 return
 		ip daddr @reserved return
+$(ir_nft_return)
 $([ -n "$_ldl" ] && printf '\t\tip daddr @direct return\n')
 $([ -n "$_lex" ] && printf '\t\tip daddr @exclude return\n')
 $(if [ "$tcp_way" = "redirect" ]; then printf '\t\tmeta l4proto udp meta mark set %s\n' "$MARK"; else printf '\t\tmeta l4proto { tcp, udp } meta mark set %s\n' "$MARK"; fi)
@@ -635,6 +637,7 @@ $(if [ "$tcp_way" = "redirect" ]; then
 	printf '\t\tmeta nfproto ipv6 return\n'
 	printf '\t\tmeta l4proto tcp th dport 53 return\n'
 	printf '\t\tip daddr @reserved return\n'
+	ir_nft_return
 	[ -n "$_ldl" ] && printf '\t\tip daddr @direct return\n'
 	[ -n "$_lex" ] && printf '\t\tip daddr @exclude return\n'
 	printf '\t\tmeta l4proto tcp counter redirect to :%s\n\t}\n' "$redir_port"
@@ -1112,19 +1115,65 @@ ks_ir_refresh() {
 		return 0
 	fi
 	_kg="$(find_geoview)" || {
-		[ -s "$KS_IR" ] || warn "Kill switch: Geoview is not installed, so Iranian addresses cannot be let past it - install Geoview on the App Update page"
+		[ -s "$KS_IR" ] || warn "Geoview is not installed; Iranian firewall bypass is unavailable - install Geoview on the App Update page"
 		return 0
 	}
-	_kn="$KS_IR.new"
-	"$_kg" -type geoip -action extract -input "$_kd/geoip.dat" -list ir -lowmem=true > "$_kn" 2>/dev/null || true
-	if [ "$(grep -c . "$_kn" 2>/dev/null || echo 0)" -gt 10 ]; then
+	_kn="$KS_IR.new.$$"
+	if "$_kg" -type geoip -action extract -input "$_kd/geoip.dat" -list ir -lowmem=true > "$_kn" 2>/dev/null &&
+	   [ "$(grep -c . "$_kn" 2>/dev/null || echo 0)" -gt 10 ] &&
+	   ! grep -qEv '^[0-9A-Fa-f:.]+(/[0-9]+)?$' "$_kn"; then
 		write_if_changed "$_kn" "$KS_IR" || true
 		touch "$KS_IR" 2>/dev/null || true
 	else
-		warn "Kill switch: Geoview could not read the Iranian addresses out of geoip.dat"
+		warn "Geoview could not read the Iranian addresses out of geoip.dat; keeping the previous list"
 	fi
 	rm -f "$_kn"
 	return 0
+}
+
+# Empty sets keep updates atomic even when the split is switched off. Shunt
+# rules can select a different outbound for Iranian destinations, so defer to
+# the core whenever any are configured. Access Control runs before this path.
+ir_cidrs() {
+	[ "$(cfg_bool route_ir_pre 1)" = 1 ] || return 0
+	if uci -q show zirgozar 2>/dev/null | grep -q '=shunt_rules$'; then
+		return 0
+	fi
+	ks_ir_cidrs | grep -v : || true
+}
+
+ir_nft_set() {
+	printf '\tset iran4 {\n\t\ttype ipv4_addr\n\t\tflags interval\n\t\tauto-merge\n'
+	_ir_elements="$(ir_cidrs | awk 'NF { printf "%s%s", (n++ ? ", " : ""), $0 }')"
+	[ -z "$_ir_elements" ] || printf '\t\telements = { %s }\n' "$_ir_elements"
+	printf '\t}\n'
+}
+
+ir_nft_return() {
+	# Keep DNS redirection and encrypted DNS policies in force. The explicit
+	# strict ports must continue through the core even on Iranian addresses.
+	_ir_ports=53,853
+	if [ "$(cfg encrypted_dns_policy proxy)" = strict ]; then
+		_ir_strict="$(strict_dns_ports)" || return 1
+		for _ir_port in $_ir_strict; do _ir_ports="$_ir_ports,$_ir_port"; done
+	fi
+	_ir_ports="$(printf '%s' "$_ir_ports" | tr ',' '\n' | sort -un | awk '{ printf "%s%s", (NR > 1 ? "," : ""), $0 }')"
+	printf '\t\tip daddr @iran4 meta l4proto { tcp, udp } th dport != { %s } counter return\n' "$_ir_ports"
+	printf '\t\tip daddr @iran4 meta l4proto icmp counter return\n'
+}
+
+ir_nft_sync() {
+	[ "$(firewall_backend)" = nft ] || return 0
+	_ir_elements="$(ir_cidrs | awk 'NF { printf "%s%s", (n++ ? ", " : ""), $0 }')"
+	# Both live sets change in one transaction; failed updates keep the old sets.
+	{
+		for _ir_table in "$TABLE" "$LOCAL_TABLE"; do
+			nft list set inet "$_ir_table" iran4 >/dev/null 2>&1 || continue
+			printf 'flush set inet %s iran4\n' "$_ir_table"
+			[ -z "$_ir_elements" ] || printf 'add element inet %s iran4 { %s }\n' "$_ir_table" "$_ir_elements"
+		done
+		:
+	} | nft -f - || { warn "could not refresh the Iranian firewall sets"; return 1; }
 }
 
 ks_nft_ruleset() {
@@ -1545,7 +1594,9 @@ cmd_ks() {
 			if ks_on; then ks_up; else ks_down; fi
 			;;
 		sync)
-			if ks_on; then ks_ir_refresh; ks_up; else ks_down; fi
+			ks_ir_refresh
+			ir_nft_sync || true
+			if ks_on; then ks_up; else ks_down; fi
 			;;
 		status)
 			if ks_loaded; then echo "killswitch: yes"; else echo "killswitch: no"; fi
@@ -1579,6 +1630,7 @@ cmd_up() {
 		warn "another transparent proxy is active - expect trouble"
 	fi
 
+	ks_ir_refresh
 	cmd_down
 
 	_devs="$(lan_devices)"

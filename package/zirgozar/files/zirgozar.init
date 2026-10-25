@@ -111,6 +111,9 @@ start_service() {
 	fi
 
 	mkdir -p "$ZGZ_RUN" /var/etc "$ZGZ_ETC"
+	# DNS isolation and the Iranian direct path are available before a node
+	# connects, including while a selected node is unreachable.
+	"$DNS" up >/dev/null 2>&1 || { say_status failed; return 1; }
 	log_trim
 	log "Start running..."
 	# What the page was saying is about the last start - another node, another
@@ -347,7 +350,13 @@ wait_for_port() {
 # keeps lookups pointed at a listener whose tunnel is not there.
 # Under the Kill switch the devices have no way out anyway, and it stays.
 start_failed() {
-	ks_on || "$DNS" down >/dev/null 2>&1 || true
+	# An enabled but unusable node must not send foreign DNS to system
+	# upstreams. The isolated resolver can still answer Iranian names.
+	if [ "$(cfg_bool enabled 0)" = 1 ]; then
+		"$DNS" up >/dev/null 2>&1 || true
+	else
+		"$DNS" down >/dev/null 2>&1 || true
+	fi
 	return 0
 }
 
@@ -527,6 +536,7 @@ service_stopped() {
 # What the DNS step depends on. Kept beside the ruleset for the same reason.
 dns_signature() {
 	echo "$(cfg dns_mode dnsmasq) $(cfg dns_port 1053) $(cfg dnsmasq_port 1054) $(cfg encrypted_dns_policy proxy) $(cfg dns_guard_ports '')"
+	echo "$(cfg_bool route_ir 0) $(cfg_bool route_ir_pre 1) $(direct_dns) $(cfg direct_domain '')"
 }
 
 # A save. Every save on every page lands here, and restarting the tunnel for

@@ -7,8 +7,8 @@
 # packages.inc.sh - what goes into a package, shared by the .apk and .ipk
 # builders so the two formats can never drift apart.
 
-VERSION=5.8.2
-RELEASE=3
+VERSION=5.8.3
+RELEASE=1
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -30,7 +30,7 @@ MAINTAINER="routekernel <https://t.me/routekernel1>"
 # another program pulled it in - needs nothing, and this finds it. Depending on it
 # would drag a second copy onto routers that do not need one, and refusing to
 # install alongside it would be worse still.
-ZGZ_DEPS="dnsmasq jshn libubox curl ca-bundle nftables kmod-nft-tproxy kmod-nft-socket ip-full unzip ucode ucode-mod-fs"
+ZGZ_DEPS="dnsmasq-full jshn libubox curl ca-bundle nftables kmod-nft-tproxy kmod-nft-socket ip-full unzip ucode ucode-mod-fs"
 LUCI_DEPS="zirgozar luci-base"
 
 ZGZ_DESC="Transparent proxy client for OpenWrt built on Xray, for Iran. Reads its server list every quarter of an hour, sifts a hundred servers with one handshake each and then measures only the ones that answered, ten at a time, until it finds one fast enough. Optional Iran routing split, per-day traffic accounting, and both nftables and iptables."

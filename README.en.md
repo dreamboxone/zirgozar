@@ -28,6 +28,7 @@
 - ⚡ **Picks the fastest working config** by itself, and moves to the next one when a config stops working
 - 🔗 **Subscriptions** on schedules of their own; the default free list is refreshed every quarter of an hour
 - 🇮🇷 **Direct pass for Iranian traffic** — Iranian sites skip the tunnel and cost the config nothing
+  With nftables and Geoview, Iranian IPv4 destinations bypass the core. In dnsmasq mode, Iranian zones also use the configured direct UDP DNS independently of the core; foreign DNS has no direct fallback while the service is enabled. With dnsmasq-full (nftset support), learned IPv4 addresses of Iranian domains bypass the core too, including domains hosted abroad. These mappings survive core restarts and are cleared when the service is stopped. Custom shunt and client rules keep routing in the core. Set `route_ir_pre` to `0` to return to core-only splitting.
 - 🧭 **Shunt rules**: any site or service through a config of your choice, direct, or blocked
 - ☁️ **Cloudflare WARP** through warp-plus: a free account made by itself, a scan for a WARP address that works, WARP in WARP and Psiphon behind WARP
 - 📊 **Traffic used** today, this week and this month
@@ -225,6 +226,8 @@ The router are left alone.
 > the **Main switch** on.
 
 ---
+
+**DNS prerequisite:** packages now require `dnsmasq-full`. For existing installations, the Dependencies installer replaces basic dnsmasq while preserving DNS and DHCP configuration. apk replaces the provider in one transaction. With opkg, all downloads and an offline rollback package are prepared before removal; a failed replacement restores basic dnsmasq. New opkg installations may need this one-time replacement before installing the package, since opkg cannot resolve the conflict automatically. See the [Persian installation example](README.md#-۲-نصب) for the download, replacement and rollback commands. The in-app updater performs this preparation automatically.
 
 ## 🚀 3. Your first connection
 

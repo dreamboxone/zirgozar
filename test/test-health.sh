@@ -136,4 +136,13 @@ echo 3000 > "$RIG/run/live.delay"
 sh "$RIG/lib/zgz-connect" degraded "$signature" >/dev/null 2>&1
 check "$(grep -c 'zirgozar restart' "$RIG/run/service.calls")" 1 'a replacement that changes only the account restarts too'
 rm -f "$RIG/etc/bridge.json"
+# A node that fails to start must not restore the ISP resolver while enabled.
+sed -n '/^start_failed() {/,/^}/p' "$RIG_SRC/package/zirgozar/files/zirgozar.init" > "$RIG/start-failed"
+: > "$ZGZ_RUN/dns.calls"
+rig_set enabled 1
+sh -c '. "$ZGZ_LIB/zgz-common.sh"; DNS="$ZGZ_LIB/zgz-dns"; . "$ZGZ_LIB/../start-failed"; start_failed'
+check "$(tail -1 "$ZGZ_RUN/dns.calls")" up 'failed enabled node keeps isolated DNS and Iranian zones'
+rig_set enabled 0
+sh -c '. "$ZGZ_LIB/zgz-common.sh"; DNS="$ZGZ_LIB/zgz-dns"; . "$ZGZ_LIB/../start-failed"; start_failed'
+check "$(tail -1 "$ZGZ_RUN/dns.calls")" down 'disabled service restores normal DNS deliberately'
 rig_report

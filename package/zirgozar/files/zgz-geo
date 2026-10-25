@@ -188,9 +188,12 @@ cmd_update() {
 	# something that was true a week ago.
 	if [ "$_rc" = "0" ]; then
 		log "routing data updated - reconnect for it to take effect"
-		# The Kill switch lets Iranian addresses past from a list cut out of
-		# this file, which is now out of date.
-		if ks_on; then "${ZGZ_LIB:-/usr/libexec}/zgz-rules" ks sync >/dev/null 2>&1 || true; fi
+		# Refresh the core bypass and Kill switch from the same Iranian ranges,
+		# including when the Kill switch is off.
+		"${ZGZ_LIB:-/usr/libexec}/zgz-rules" ks sync >/dev/null 2>&1 || true
+		if [ "$(cfg_bool enabled 0)" = 1 ]; then
+			ZGZ_DNS_QUIET=1 "$ZGZ_LIB/zgz-dns" up >/dev/null 2>&1 || true
+		fi
 	fi
 	fetch_extra force || true
 	return "$_rc"

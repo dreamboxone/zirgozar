@@ -18,7 +18,7 @@ ip6tables() { printf 'IPv6 ' >> "$ZGZ_RUN/iptables.calls"; iptables "$@"; }
 lan_devices() { echo br-lan; }
 nft() {
  case "$*" in
-  '-f -') cat > "$ZGZ_RUN/guard.nft"; echo guard >> "$ZGZ_RUN/events"; [ "$DNS_TEST" != install-fail ] ;;
+  '-f -') _rules=$(cat); case "$_rules" in *'add table inet zirgozar_ir'*) printf '%s\n' "$_rules" > "$ZGZ_RUN/ir-guard.nft" ;; *) printf '%s\n' "$_rules" > "$ZGZ_RUN/guard.nft" ;; esac; echo guard >> "$ZGZ_RUN/events"; [ "$DNS_TEST" != install-fail ] ;;
   'list chain inet zirgozar_dns dnsmasq_out') [ "$DNS_TEST" != verify-fail ] ;;
   *) return 0 ;;
  esac
@@ -191,4 +191,45 @@ rig_set encrypted_dns_policy rules
 reset_dns
 run_dns success || bad 'traffic-rule policy failed'
 if grep -q 'chain encrypted_' "$RIG/run/guard.nft"; then bad 'disabled encrypted guard persisted'; else ok 'traffic-rule policy removes encrypted guard'; fi
+echo '== independent Iranian DNS and domain bypass'
+rig_clear
+rig_set route_ir 1
+rig_set route_ir_pre 1
+rig_set dns_mode dnsmasq
+rig_set direct_dns_protocol udp
+rig_set direct_dns 192.0.2.53
+rig_set encrypted_dns_policy proxy
+export ZGZ_PASSWD="$RIG/passwd"
+printf 'zirgozar-dns:x:32769:32769:Split DNS:/var/empty:/bin/false\n' > "$ZGZ_PASSWD"
+printf 'aparat.com\nexample.ir\n' > "$RIG/etc/ir-domains.list"
+# A prepared list is sufficient: no account or geo extraction is needed here.
+sh "$RIG/lib/zgz-dns-local" config > "$RIG/run/split.conf"
+grep -q '^user=zirgozar-dns$' "$RIG/run/split.conf" && ok 'split resolver uses its own account' || bad 'split resolver shares a UID'
+splitfile=$(sed -n 's/^conf-file=//p' "$RIG/run/split.conf")
+grep -q '/aparat.com/example.ir/ir/192.0.2.53#53' "$splitfile" && ok 'only Iranian zones have the direct upstream' || bad 'Iranian upstream missing'
+check "$(grep '^server=127' "$RIG/run/split.conf")" 'server=127.0.0.1#1053' 'foreign upstream remains core-only'
+if grep -q 'cloudflare.com' "$splitfile"; then bad 'foreign zone entered direct list'; else ok 'foreign names have no direct fallback'; fi
+cp "$RIG/run/split.conf" "$RIG/run/split-first.conf"
+sh "$RIG/lib/zgz-dns-local" config > "$RIG/run/split.conf"
+cmp -s "$RIG/run/split-first.conf" "$RIG/run/split.conf" && ok 'unchanged split data does not restart DNS' || bad 'split file path changes without data changes'
+reset_dns
+run_dns success || bad 'split DNS guard failed'
+grep -q 'meta skuid 32769 ip daddr 192.0.2.53' "$RIG/run/guard.nft" && ok 'only split resolver UID can use direct DNS' || bad 'direct DNS UID exception missing'
+if command -v nft >/dev/null 2>&1; then
+ if nft --check -f "$RIG/run/guard.nft" > "$RIG/nft.err" 2>&1; then ok 'split DNS mark and guard parse'; else bad "split guard: $(head -2 "$RIG/nft.err")"; fi
+fi
+grep -q 'priority -151' "$RIG/run/ir-guard.nft" && ok 'domain addresses bypass interception before mangle' || bad 'domain bypass hook missing'
+if grep -q 'flush set\|delete table\|timeout' "$RIG/run/ir-guard.nft"; then bad 'core restart loses cached domain mappings'; else ok 'learned mappings survive resolver refresh and core restart'; fi
+grep -q '8.8.8.8' "$RIG/run/ir-guard.nft" && ok 'known encrypted DNS endpoints stay outside domain bypass' || bad 'encrypted DNS endpoints can bypass interception'
+if command -v nft >/dev/null 2>&1; then
+ if nft --check -f "$RIG/run/ir-guard.nft" > "$RIG/nft.err" 2>&1; then ok 'persistent domain set and rules parse'; else bad "domain rules: $(head -2 "$RIG/nft.err")"; fi
+fi
+rig_set encrypted_dns_policy strict
+rig_set dns_guard_ports '1853 8853'
+run_dns success || bad 'strict split DNS failed'
+grep -q 'th dport != { 53,853,1853,5353,8853 }' "$RIG/run/ir-guard.nft" && ok 'domain bypass preserves strict DNS ports' || bad 'domain bypass overrides strict DNS ports'
+rig_set route_ir 0
+sh "$RIG/lib/zgz-dns-local" config > "$RIG/run/split-off.conf"
+if grep -q '^conf-file=' "$RIG/run/split-off.conf"; then bad 'disabled split retains direct zones'; else ok 'disabling Iran split removes direct DNS zones'; fi
+unset ZGZ_PASSWD
 rig_report

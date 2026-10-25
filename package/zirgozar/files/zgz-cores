@@ -873,6 +873,29 @@ cmd_latest() {
 	local _only="${2:-}"
 	local _cores_only=0
 	if [ "$_only" = all-cores ]; then _cores_only=1; _only=''; fi
+	# Explicit checks of repository-managed cores need a fresh package index.
+	# Background polling must never run the package manager's network update.
+	if [ "${1:-}" = force ]; then
+		case "$_only" in
+			openvpn|haproxy|'')
+				local _manager="$(ovpn_pkg_manager)" _check_log="$ZGZ_RUN/package-check.log"
+				if [ "$_manager" != none ]; then
+					: > "$_check_log"
+					if ! pkg_refresh "$_manager" "$_check_log"; then
+						# A failed refresh must not appear as an up-to-date result.
+						awk -F '\t' -v name="$_only" 'name != "" ? $1 != name : ($1 != "openvpn" && $1 != "haproxy")' \
+							"$LATEST_CACHE" > "$LATEST_CACHE.failed" 2>/dev/null || true
+						mv -f "$LATEST_CACHE.failed" "$LATEST_CACHE"
+						printf '%s error %s\n' "${_only:-openvpn}" "$(head -1 "$ZGZ_MESSAGE")" > "$CORE_RESULT"
+						return 1
+					fi
+					case "$(cat "$CORE_RESULT" 2>/dev/null)" in
+						openvpn\ error\ *|haproxy\ error\ *) rm -f "$CORE_RESULT" ;;
+					esac
+				fi
+				;;
+		esac
+	fi
 	# Refresh only when it is old, unless asked to do it anyway. Three small
 	# requests twice a day is nothing; three on every page poll is a habit
 	# that gets a router rate-limited.
@@ -1238,6 +1261,11 @@ $_b/$_n"
 	space_for $((_psize * 3)) / || { self_fail "Not enough room."; return 1; }
 
 	log "update: installing with $_pm"
+	if ! { case "$_pm" in apk) apk info -e dnsmasq-full ;; *) opkg list-installed dnsmasq-full ;; esac; } 2>/dev/null | grep -q .; then
+		pkg_refresh "$_pm" "$SELF_DIR/log" && install_dnsmasq_full "$_pm" >>"$SELF_DIR/log" 2>&1 || {
+			self_fail "Could not install dnsmasq-full. See the dependency installation log."; return 1;
+		}
+	fi
 	# The release is not signed with a key this router knows, so apk has to
 	# be told to take it; the checksums above are what vouch for it. The
 	# `|| _rc=$?` because under set -e a bare failure would end the script

@@ -53,6 +53,56 @@ local_records() {
 	done < "$file"
 }
 
+cmd_prepare() {
+	local geo bin tmp="$ZGZ_ETC/ir-domains.list.$$"
+	[ "$(cfg_bool route_ir 0)" = 1 ] && [ "$(cfg_bool route_ir_pre 1)" = 1 ] || return 0
+	[ "$(cfg dns_mode dnsmasq)" = dnsmasq ] && [ "$(firewall_backend)" = nft ] || return 0
+	geo="$(geo_dir)" || return 0
+	if [ ! -s "$ZGZ_ETC/ir-domains.list" ] || [ "$geo/geosite.dat" -nt "$ZGZ_ETC/ir-domains.list" ]; then
+		bin="$(find_geoview)" || { warn 'Independent Iranian DNS needs Geoview; retaining core DNS'; return 0; }
+		if ! "$bin" -type geosite -action extract -input "$geo/geosite.dat" -list ir -lowmem=true > "$tmp"; then
+			rm -f "$tmp"; warn 'Could not extract Iranian DNS zones; keeping the previous list'; return 0
+		fi
+		[ "$(wc -l < "$tmp")" -gt 10 ] && ! grep -qEv '^[A-Za-z0-9][A-Za-z0-9.-]*$' "$tmp" || { rm -f "$tmp"; return 1; }
+		chmod 644 "$tmp"; mv -f "$tmp" "$ZGZ_ETC/ir-domains.list"
+	fi
+	ir_dns_target >/dev/null 2>&1 || return 0
+	# A dedicated account makes the upstream exception specific to this
+	# resolver; the system resolver cannot inherit it through a shared UID.
+	if [ -z "$(ir_dns_uid)" ]; then
+		(
+			. /lib/functions.sh
+			local gid
+			gid="$(group_add_next zirgozar-dns)" || exit 1
+			user_exists zirgozar-dns || user_add zirgozar-dns '' "$gid" 'Zirgozar split DNS' /var/empty /bin/false
+		) || return 1
+	fi
+	[ -n "$(ir_dns_uid)" ]
+}
+
+ir_servers() {
+	local target="$1" nftsets=0 name
+	dnsmasq --version 2>/dev/null | grep -q ' no-nftset' || nftsets=1
+	{
+		cat "$ZGZ_ETC/ir-domains.list"
+		printf 'ir\n'
+		for name in $(cfg direct_domain ''); do
+			case "$name" in domain:*) name="${name#domain:}" ;; *:*) continue ;; esac
+			printf '%s\n' "$name"
+		done
+	} | LC_ALL=C sort -u | awk -v target="$target" -v nftsets="$nftsets" '
+		/^[A-Za-z0-9][A-Za-z0-9.-]*$/ {
+			zones=zones "/" tolower($0); n++
+			if(n == 100) { emit(); zones=""; n=0 }
+		}
+		function emit() {
+			print "server=" zones "/" target
+			if(nftsets) print "nftset=" zones "/4#inet#zirgozar_ir#domains4"
+		}
+		END { if(n) emit() }
+	'
+}
+
 system_configs() {
 	local file
 	for file in "${ZGZ_DNS_CONFIG_DIR:-/var/etc}"/dnsmasq.conf.*; do
@@ -62,7 +112,7 @@ system_configs() {
 }
 
 cmd_config() {
-	local port core dev file records
+	local port core dev file records splitfile
 	port="$(cfg dnsmasq_port 1054)"; core="$(cfg dns_port 1053)"
 	case "$port:$core" in *[!0-9:]*|:*|*:) return 1 ;; esac
 	[ "$port" -gt 1023 ] && [ "$port" -le 65535 ] &&
@@ -71,6 +121,15 @@ cmd_config() {
 	printf 'no-resolv\nno-poll\nbind-dynamic\ninterface=lo\ncache-size=150\n'
 	for dev in $(lan_devices); do printf 'interface=%s\n' "$dev"; done
 	printf 'server=127.0.0.1#%s\naddn-hosts=%s/resolver.hosts\n' "$core" "$ZGZ_RUN"
+	if ir_dns_target >/dev/null 2>&1 && [ -n "$(ir_dns_uid)" ]; then
+		set -- $(ir_dns_target)
+		printf 'user=zirgozar-dns\ngroup=zirgozar-dns\n'
+		ir_servers "$2#$3" > "$ZGZ_RUN/ir-dns.servers.new" || return 1
+		chmod 644 "$ZGZ_RUN/ir-dns.servers.new"
+		splitfile="$ZGZ_RUN/ir-dns.$(md5sum "$ZGZ_RUN/ir-dns.servers.new" | cut -d' ' -f1).conf"
+		mv -f "$ZGZ_RUN/ir-dns.servers.new" "$splitfile"
+		printf 'conf-file=%s\n' "$splitfile"
+	fi
 	records="$ZGZ_RUN/resolver.records.new"
 	: > "$records"
 	for file in $(system_configs); do local_records "$file" >> "$records" || { rm -f "$records"; return 1; }; done
@@ -147,6 +206,7 @@ cmd_watch() {
 }
 
 case "${1:-}" in
+	prepare) cmd_prepare ;;
 	config) cmd_config ;;
 	hosts) hosts_refresh "${2:-$ZGZ_RUN/resolver.conf}" ;;
 	watch) cmd_watch ;;

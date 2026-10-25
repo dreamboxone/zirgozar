@@ -1413,6 +1413,27 @@ json_escape() {
 # answer - and a dead tunnel cannot answer at all, so the moment a node dies
 # every node with a name in its address looks dead too. So node names are
 # always resolved through this, and this never through the tunnel.
+ir_dns_uid() {
+	awk -F: '$1 == "zirgozar-dns" && $3 ~ /^[0-9]+$/ && $3 != 0 { print $3; exit }' "${ZGZ_PASSWD:-/etc/passwd}"
+}
+
+# Only the isolated resolver may use this direct upstream, and only its
+# explicitly selected Iranian zones use it. There is no foreign fallback.
+ir_dns_target() {
+	[ "$(cfg_bool route_ir 0)" = 1 ] && [ "$(cfg_bool route_ir_pre 1)" = 1 ] || return 1
+	[ "$(cfg dns_mode dnsmasq)" = dnsmasq ] && [ "$(firewall_backend)" = nft ] || return 1
+	[ -s "$ZGZ_ETC/ir-domains.list" ] || return 1
+	set -- $(direct_dns)
+	[ "$#" = 3 ] || return 1
+	# dnsmasq's ordinary upstream transport is UDP. An explicitly TCP-only
+	# direct resolver stays in the core instead of silently changing transport.
+	[ "$1" = udp ] || return 1
+	printf '%s\n' "$2" | awk -F. 'NF != 4 { exit 1 } { for(i=1;i<=4;i++) if($i !~ /^[0-9]+$/ || $i>255) exit 1 }' || return 1
+	case "$3" in ''|*[!0-9]*) return 1 ;; esac
+	[ "$3" -gt 0 ] && [ "$3" -le 65535 ] || return 1
+	printf '%s %s %s\n' "$1" "$2" "$3"
+}
+
 direct_dns() {
 	_dd_p="$(cfg direct_dns_protocol '')"
 	_dd_v="$(cfg direct_dns '')"
@@ -2057,6 +2078,49 @@ ensure_kmods_feed() {
 	log "added verified matching kernel repository: $candidate"
 	return 0
 }
+
+# Called with the package lock held and fresh indexes. apk replaces the
+# provider in one transaction; opkg needs all downloads before the old DNS
+# service is removed. Keep an offline rollback package and the user's config.
+install_dnsmasq_full() (
+	manager="$1"
+	keep="$(mktemp -d "$ZGZ_RUN/dnsmasq-replace.XXXXXX")" || exit 1
+	config_root="${ZGZ_DNSMASQ_CONFIG_ROOT:-/etc}"
+	for file in config/dhcp dnsmasq.conf ethers; do
+		[ ! -f "$config_root/$file" ] || { mkdir -p "$keep/config/$(dirname "$file")"; cp -p "$config_root/$file" "$keep/config/$file"; }
+	done
+	rc=0
+	case "$manager" in
+		apk) bounded 180 apk add dnsmasq-full || rc=$? ;;
+		opkg)
+			mkdir -p "$keep/cache"
+			bounded 180 opkg --cache "$keep/cache" install --download-only dnsmasq-full || exit 1
+			if opkg list-installed dnsmasq 2>/dev/null | grep -q '^dnsmasq '; then
+				(cd "$keep/cache" && bounded 60 opkg download dnsmasq) || exit 1
+				old=""
+				for package in "$keep/cache"/dnsmasq_*.ipk; do [ ! -s "$package" ] || old="$package"; done
+				[ -n "$old" ] || exit 1
+				# Existing Zirgozar versions depend on the virtual dnsmasq
+				# provider. Keep them installed during this offline replacement.
+				bounded 60 opkg --force-depends remove dnsmasq || exit 1
+			fi
+			bounded 180 opkg --cache "$keep/cache" install dnsmasq-full || rc=$?
+			if [ "$rc" != 0 ] && [ -n "${old:-}" ]; then
+				bounded 60 opkg install "$old" || warn "Could not restore dnsmasq; rollback package is in $keep/cache"
+			fi
+			;;
+		*) exit 1 ;;
+	esac
+	for file in config/dhcp dnsmasq.conf ethers; do
+		[ ! -f "$keep/config/$file" ] || cp -p "$keep/config/$file" "$config_root/$file"
+	done
+	# Package scripts may restart the main resolver with their defaults.
+	bounded 30 /etc/init.d/dnsmasq restart >/dev/null 2>&1 || rc=1
+	if [ "$(cfg_bool enabled 0)" = 1 ] && [ -x "$ZGZ_LIB/zgz-dns" ]; then
+		"$ZGZ_LIB/zgz-dns" up >/dev/null 2>&1 || rc=1
+	fi
+	[ "$rc" = 0 ]
+)
 
 # One package transaction across all entry points, including direct CLI calls.
 pkg_lock() {

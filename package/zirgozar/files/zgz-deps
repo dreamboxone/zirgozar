@@ -92,7 +92,7 @@ wanted() {
 		printf 'ikev2://required\n' | link_wanted
 		return 0
 	fi
-	echo "curl ca-bundle ip-full"
+	echo "dnsmasq-full curl ca-bundle ip-full"
 	case "$(firewall_backend)" in
 		nft) echo "kmod-nft-tproxy kmod-nft-socket" ;;
 		ipt) echo "iptables-mod-tproxy iptables-mod-conntrack-extra" ;;
@@ -174,6 +174,10 @@ cmd_check() {
 		"$(pkg_manager)" "$(firewall_backend)"
 	_first=1
 	for _p in $_missing; do
+		if [ "$_p" = dnsmasq-full ]; then
+			install_dnsmasq_full "$_m" >>"$ZGZ_RUN/deps-install.log" 2>&1 || _failed="$_failed $_p"
+			continue
+		fi
 		[ "$_first" = "1" ] || printf ','
 		printf '"%s"' "$_p"
 		_first=0

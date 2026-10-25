@@ -5,8 +5,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zirgozar
-PKG_VERSION:=5.8.2
-PKG_RELEASE:=3
+PKG_VERSION:=5.8.3
+PKG_RELEASE:=1
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
 PKG_LICENSE:=AGPL-3.0-or-later
@@ -23,7 +23,7 @@ define Package/zirgozar
   CATEGORY:=Network
   TITLE:=Transparent proxy client built on Xray
   URL:=https://github.com/dreamboxone/zirgozar
-  DEPENDS:=+dnsmasq +jshn +libubox +curl +ca-bundle +nftables +kmod-nft-tproxy +kmod-nft-socket +ip-full +unzip +ucode +ucode-mod-fs
+  DEPENDS:=+dnsmasq-full +jshn +libubox +curl +ca-bundle +nftables +kmod-nft-tproxy +kmod-nft-socket +ip-full +unzip +ucode +ucode-mod-fs
 endef
 
 define Package/zirgozar/description

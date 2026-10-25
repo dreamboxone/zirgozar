@@ -210,6 +210,8 @@ function checkUpdate(key) {
 	return function() {
 		checkAsked = Date.now();
 		checkKey = key;
+		lastCore = '';
+		say(key, '', 'info');
 		return callAction('cores_latest', key === 'app' ? 'zirgozar' : key.replace(/^core:/, '')).then(function(r) {
 			if (r && r.error) {
 				checkAsked = 0;
