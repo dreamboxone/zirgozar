@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
 . "$(dirname "$0")/rig.sh"
+REAL_UCODE="$(command -v ucode 2>/dev/null || true)"
 rig_setup
 . "$ZGZ_LIB/zgz-common.sh"
 DIR="$ZGZ_RUN/tests"
@@ -75,4 +76,27 @@ rig_set test_url http://www.gstatic.com/generate_204
 OC_ACTIVE=wireguard
 result=$(cmd_live) || true
 check "$result" 0 'OpenConnect fallback does not change other protocols'
+# The built-in server trust applies to every translator call, including
+# candidate probes and the native engine, without weakening other servers.
+if [ -n "$REAL_UCODE" ]; then
+	pin='pin-sha256:Oy/sb1sK7ypwJrJMDDhHMumz4HX+8qYJQC6oZlCPGHA='
+	for scenario in known explicit other port insecure; do
+		case "$scenario" in
+			known) node='{"type":"openconnect","server":"ir.farhany.net","port":2050}' ;;
+			explicit) node='{"type":"openconnect","server":"ir.farhany.net","port":2050,"fingerprint":"pin-sha256:custom"}' ;;
+			other) node='{"type":"openconnect","server":"example.org","port":2050}' ;;
+			port) node='{"type":"openconnect","server":"ir.farhany.net","port":443}' ;;
+			insecure) node='{"type":"openconnect","server":"ir.farhany.net","port":2050,"insecure":true}' ;;
+		esac
+		printf '%s\n' "$node" > "$RIG/run/trust-node.json"
+		if "$REAL_UCODE" "$RIG_SRC/package/zirgozar/files/zgz-sbconfig" mode=bridge bridge="$RIG/run/trust-node.json" > "$RIG/run/trust-config.json"; then
+			case "$scenario" in
+				known) grep -q "$pin" "$RIG/run/trust-config.json" && ok 'known OpenConnect server gets its verified pin automatically' || bad 'known server has no pin' ;;
+				explicit) grep -q 'pin-sha256:custom' "$RIG/run/trust-config.json" && ok 'explicit server pin takes priority' || bad 'explicit pin replaced' ;;
+				*) if grep -q "$pin" "$RIG/run/trust-config.json"; then bad "built-in pin incorrectly applied: $scenario"; else ok "built-in pin does not override $scenario"; fi ;;
+			esac
+		else bad "OpenConnect trust translation: $scenario"; fi
+	done
+fi
+
 rig_report

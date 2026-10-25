@@ -290,8 +290,13 @@ function bridge_node(b, tag, mark) {
 		let t = {};
 		if (b.insecure)
 			t.insecure = true;
-		if (b.fingerprint)
-			t.peer_fingerprint = [ b.fingerprint ];
+		let fingerprint = b.fingerprint;
+		// This server presents a certificate for its IP rather than its host.
+		// Pin its verified key when the profile supplies no trust override.
+		if (!fingerprint && !b.insecure && lc(b.server ?? '') == 'ir.farhany.net' && int(b.port) == 2050)
+			fingerprint = 'pin-sha256:Oy/sb1sK7ypwJrJMDDhHMumz4HX+8qYJQC6oZlCPGHA=';
+		if (fingerprint)
+			t.peer_fingerprint = [ fingerprint ];
 		if (length(t))
 			r.tls = t;
 		break;
