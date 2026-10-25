@@ -56,6 +56,12 @@ result=$(endpoint_url_ms '{"type":"hysteria2","server":"test.example","port":443
 check "$result" 123 'Hysteria2 URL testing uses a QUIC-capable helper'
 sed -n '/^cmd_live() {/,/^}/p' "$ZGZ_LIB/zgz-test" > "$RIG/oc-live"
 . "$RIG/oc-live"
+sed -n '/^subscription_test_engine() {/,/^}/p' "$ZGZ_LIB/zgz-test" > "$RIG/sub-test-engine"
+. "$RIG/sub-test-engine"
+rig_set provider.vless_type singbox
+rig_set provider.ss_type xray
+check "$(subscription_test_engine 'sub:provider:vless|test.example|443|label' vless)" singbox 'VLESS test uses the subscription core choice'
+check "$(subscription_test_engine 'sub:provider:shadowsocks|test.example|443|label' shadowsocks)" xray 'Shadowsocks test uses the subscription core choice'
 bridge_type() { echo "$OC_ACTIVE"; }
 OC_MODE=fallback; OC_ACTIVE=openconnect
 rig_set test_url http://www.gstatic.com/generate_204

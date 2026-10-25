@@ -132,7 +132,7 @@ say_status() {
 		printf '%s-%s\n' "$$" "$(date +%s)" > "$ZGZ_RUN/active.token.tmp"
 		mv -f "$ZGZ_RUN/active.token.tmp" "$ZGZ_RUN/active.token"
 	else
-		rm -f "$ZGZ_RUN/active.token" "$ZGZ_RUN/exit"
+		rm -f "$ZGZ_RUN/active.token" "$ZGZ_RUN/exit" "$ZGZ_RUN/connectivity"
 	fi
 	echo "$1" > "$ZGZ_STATUS" 2>/dev/null || true
 	return 0
@@ -143,6 +143,14 @@ exit_identity() {
 	cmp -s "$ZGZ_BEST_META" "$ZGZ_RUN/active.meta" || return 1
 	[ -s "$ZGZ_RUN/active.token" ] || return 1
 	cat "$ZGZ_RUN/active.token"
+}
+
+connectivity_identity() {
+	local token processes
+	token="$(exit_identity)" || return 1
+	processes="$(pgrep -f "run -c(onfig)? $ZGZ_CONFIG_JSON" | tr '\n' ',')"
+	[ -n "$processes" ] || return 1
+	printf '%s:%s\n' "$token" "$processes"
 }
 
 # ------------------------------------------------------------------ timing
@@ -303,21 +311,38 @@ find_xray() {
 	# same router connected perfectly, which is what made it look like a
 	# problem with the split rather than with where the core was told to look.
 	_geo="$(geo_dir)" || _geo=""
+	_xlog="${ZGZ_XRAY_CHECK_LOG:-/dev/null}"
+	_xerr="$_xlog"
+	if [ "$_xlog" != /dev/null ]; then
+		: > "$_xlog"
+		_xerr="$_xlog.$$.new"
+		: > "$_xerr"
+		chmod 600 "$_xlog" "$_xerr"
+	fi
 	for _x in $_pref $(xray_by_version); do
 		[ -n "$_x" ] || continue
 		[ -x "$_x" ] || continue
 		if [ -n "$_cfg" ]; then
 			if [ -n "$_geo" ]; then
-				XRAY_LOCATION_ASSET="$_geo" "$_x" run -test -config "$_cfg" >/dev/null 2>&1 || continue
+				_xok=0; XRAY_LOCATION_ASSET="$_geo" "$_x" run -test -config "$_cfg" >"$_xerr" 2>&1 || _xok=$?
 			else
-				"$_x" run -test -config "$_cfg" >/dev/null 2>&1 || continue
+				_xok=0; "$_x" run -test -config "$_cfg" >"$_xerr" 2>&1 || _xok=$?
+			fi
+			if [ "$_xok" != 0 ]; then
+				if [ "$_xlog" != /dev/null ]; then
+					printf '%s:\n' "$_x" >> "$_xlog"
+					cat "$_xerr" >> "$_xlog"
+				fi
+				continue
 			fi
 		else
 			"$_x" version >/dev/null 2>&1 || continue
 		fi
+		[ "$_xlog" = /dev/null ] || rm -f "$_xlog" "$_xerr"
 		echo "$_x"
 		return 0
 	done
+	[ "$_xlog" = /dev/null ] || rm -f "$_xerr"
 	return 1
 }
 
@@ -511,7 +536,7 @@ active_engine() {
 # the log.
 core_label() {
 	if [ "$1" = "singbox" ]; then
-		case "$(engine_singbox_path)" in *-lx) echo sing-box-lx ;; *) echo sing-box ;; esac
+		case "${2:-$(engine_singbox_path)}" in *-lx) echo sing-box-lx ;; *) echo sing-box ;; esac
 	else
 		echo xray
 	fi
@@ -556,7 +581,7 @@ sb_certpin() {
 #                   rewritten in sing-box's words
 test_core() {
 	_tc_cfg="$1"
-	if [ "$(core_engine)" = "singbox" ] && _tc_sb="$(engine_singbox_path)" && [ -x "$_tc_sb" ]; then
+	if [ "${TEST_ENGINE:-$(core_engine)}" = "singbox" ] && _tc_sb="$(engine_singbox_path)" && [ -x "$_tc_sb" ]; then
 		if sbconfig mode=test level=none < "$_tc_cfg" > "$_tc_cfg.sb" 2>/dev/null &&
 		   "$_tc_sb" check -c "$_tc_cfg.sb" >/dev/null 2>&1; then
 			mv -f "$_tc_cfg.sb" "$_tc_cfg"

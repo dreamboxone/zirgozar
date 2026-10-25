@@ -77,6 +77,15 @@ row_for() {
 	return 0
 }
 
+subscription_test_engine() {
+	local origin section protocol="$2" choice
+	case "$1" in sub:*) origin="$1" ;; *) origin="$("$ZGZ_LIB/zgz-nodes" origin "$1" 2>/dev/null)" ;; esac
+	case "$origin" in sub:*:*) section="${origin#sub:}"; section="${section%%:*}" ;; *) return 0 ;; esac
+	[ "$protocol" != shadowsocks ] || protocol=ss
+	choice="$(uci -q get "zirgozar.$section.${protocol}_type" 2>/dev/null)" || choice=''
+	case "$choice" in xray|singbox) printf '%s\n' "$choice" ;; esac
+}
+
 put() { echo "$2" > "$DIR/$1" 2>/dev/null || true; return 0; }
 
 # ------------------------------------------------------------------- ping
@@ -349,6 +358,34 @@ cmd_live() {
 	return 1
 }
 
+# A listening core is not proof of internet access. Probe only the running
+# instance, never a temporary candidate or the router's direct connection.
+cmd_connectivity() {
+	local identity lock result code port now
+	identity="$(connectivity_identity)" || return 1
+	lock="$ZGZ_RUN/connectivity.lock"
+	[ -z "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ] || rmdir "$lock" 2>/dev/null || true
+	mkdir "$lock" 2>/dev/null || return 0
+	port="$(cfg node_socks_port 1070)"
+	result=0
+	case "$port" in
+		''|0|*[!0-9]*) : ;;
+		*)
+			if [ "$port" -ge 1 ] && [ "$port" -le 65535 ]; then
+				code="$(curl -fsS -o /dev/null --socks5-hostname "127.0.0.1:$port" \
+					--connect-timeout 5 --max-time 10 -w '%{http_code}' \
+					https://www.google.com/generate_204 2>/dev/null)" &&
+					[ "$code" = 204 ] && result=1
+			fi ;;
+	esac
+	if [ "$(connectivity_identity)" = "$identity" ]; then
+		now="$(date +%s)"
+		printf '%s %s %s\n' "$identity" "$now" "$result" > "$ZGZ_RUN/connectivity.$$"
+		mv -f "$ZGZ_RUN/connectivity.$$" "$ZGZ_RUN/connectivity"
+	fi
+	rmdir "$lock" 2>/dev/null || true
+}
+
 # ------------------------------------------------------------------ exit
 
 # Where the tunnel comes out: the address the rest of the internet sees and
@@ -472,7 +509,7 @@ cmd_run() {
 				"$ZGZ_LIB/zgz-rules" local resume >/dev/null 2>&1 || true
 			fi
 			;;
-		url)  do_url  "$_id" "$_proto" "$_payload" "$_host" "$_port" "$_id" ;;
+		url)  TEST_ENGINE="$(subscription_test_engine "$_id" "$_proto")" do_url "$_id" "$_proto" "$_payload" "$_host" "$_port" "$_id" ;;
 		*) echo "usage: $0 ping|tcp|url <id>" >&2; return 1 ;;
 	esac
 	return 0
@@ -515,6 +552,7 @@ case "${1:-json}" in
 		;;
 	current) cmd_current ;;
 	live)    cmd_live ;;
+	connectivity) cmd_connectivity ;;
 	exit)    cmd_exit ;;
 	json)  cmd_json ;;
 	clear) rm -f "$DIR"/* 2>/dev/null || true ;;

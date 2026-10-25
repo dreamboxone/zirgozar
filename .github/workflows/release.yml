@@ -133,6 +133,7 @@ jobs:
         run: |
           RIG_ROOT="$RUNNER_TEMP/zirgozar-openconnect" sh test/test-openconnect.sh
           RIG_ROOT="$RUNNER_TEMP/zirgozar-dnsmasq-install" sh test/test-dnsmasq-install.sh
+          RIG_ROOT="$RUNNER_TEMP/zirgozar-core-check" sh test/test-core-check.sh
 
       - name: Test differential package downloads
         run: python3 test/test-delta.py

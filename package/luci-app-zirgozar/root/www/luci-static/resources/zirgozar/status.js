@@ -38,6 +38,35 @@ var callAction  = rpc.declare({ object: 'luci.zirgozar', method: 'action',
    is a fresh look at the router and the message ought to be shown again. */
 var dismissed = '';
 var stateRequest = 0;
+var mainSwitch = null, lastState = null;
+
+function switchOn(value) {
+	return value === true || value === 1 || /^(1|on|true|yes|enabled)$/.test(String(value));
+}
+
+function bindMainSwitch(option, section) {
+	var saved = lastState && lastState.enabled != null ? switchOn(lastState.enabled) : switchOn(uci.get('zirgozar', section, 'enabled'));
+	mainSwitch = { option: option, section: section, saved: saved, intent: saved, edited: false };
+}
+
+function mainSwitchChanged(value) {
+	if (!mainSwitch) return;
+	mainSwitch.intent = switchOn(value);
+	mainSwitch.edited = mainSwitch.intent !== mainSwitch.saved;
+	if (lastState) setNode('pwp-state', badge(lastState));
+}
+
+function syncMainSwitch(st) {
+	lastState = st;
+	if (!mainSwitch || st.enabled == null) return;
+	var saved = switchOn(st.enabled), binding = mainSwitch;
+	if (binding.edited && saved === binding.intent) binding.edited = false;
+	binding.saved = saved;
+	if (binding.edited) return;
+	binding.intent = saved;
+	var field = binding.option.getUIElement(binding.section), value = binding.option.formvalue(binding.section);
+	if (field && value != null && switchOn(value) !== saved) field.setValue(saved ? '1' : '0');
+}
 var refreshListeners = false;
 function savedUsagePeriod() {
 	try { var p = window.localStorage.getItem('zirgozar.usage.period'); return ['today', 'week', 'month'].indexOf(p) >= 0 ? p : 'today'; } catch (e) { return 'today'; }
@@ -137,12 +166,15 @@ function badge(st) {
 	   its way down; off and still is simply off, whatever the last attempt
 	   ended as - a failed measurement from before is not news with the switch
 	   off. */
-	if (!st.enabled && (st.running || st.connected))
+	if (st.enabled == null)             { text = _('Status unavailable'); cls = 'warn'; }
+	else if (mainSwitch && mainSwitch.edited && mainSwitch.intent !== switchOn(st.enabled))
+	                                   { text = mainSwitch.intent ? _('Switch on pending apply') : _('Switch off pending apply'); cls = 'warn'; }
+	else if (!switchOn(st.enabled) && (st.running || st.connected))
 	                                   { text = _('Disconnecting…'); cls = 'warn'; }
 	else if (st.connected)             { text = _('Connected');    cls = 'ok'; }
 	else if (st.status == 'selecting') { text = _('Finding a node…'); cls = 'warn'; }
 	else if (st.status == 'starting')  { text = _('Starting…');    cls = 'warn'; }
-	else if (!st.enabled)              { text = _('Main switch is off'); cls = ''; }
+	else if (!switchOn(st.enabled))    { text = _('Main switch is off'); cls = ''; }
 	else if (st.status == 'failed')    { text = _('Could not connect'); cls = 'error'; }
 	else if (st.running)               { text = _('Connecting…');  cls = 'warn'; }
 	else                               { text = _('Disconnected'); cls = ''; }
@@ -279,6 +311,7 @@ function renderState(st) {
 	}
 	window.requestAnimationFrame(updateTickers);
 	st = st || {};
+	syncMainSwitch(st);
 	if (st.version) {
 		var versionNode = byId('pwp-version'), versionLabel = pui.versionText(st.version);
 		if (versionNode && versionNode.textContent !== versionLabel) versionNode.textContent = versionLabel;
@@ -416,6 +449,8 @@ function check(id, url) {
 }
 
 return baseclass.extend({
+	bindMainSwitch: bindMainSwitch,
+	mainSwitchChanged: mainSwitchChanged,
 	/* A measurement started as the page opens, so that by the time the
 	   reader has turned the switch on the answer is there. The state and the
 	   traffic are not waited for: the page is drawn at once and they are
@@ -429,6 +464,7 @@ return baseclass.extend({
 
 	/* Everything for the top of the page, and the traffic for its foot. */
 	render: function(data) {
+		mainSwitch = null; lastState = null;
 		usagePeriod = savedUsagePeriod(); usageData = null;
 		var st = (data && data[0]) || null;
 		var tr = (data && data[1]) || null;

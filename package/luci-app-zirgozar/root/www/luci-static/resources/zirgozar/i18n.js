@@ -737,6 +737,10 @@ var FA = {
 
 	/* ------------------------------------------ the status page, PW2 style */
 	'Main switch is off': 'کلید اصلی خاموش است',
+	'Status unavailable': 'وضعیت در دسترس نیست',
+	'Switch on pending apply': 'روشن‌کردن در انتظار ذخیره و اعمال',
+	'Switch off pending apply': 'خاموش‌کردن در انتظار ذخیره و اعمال',
+	'Xray could not run this configuration, so sing-box is carrying it. See Runtime Logs for the rejection reason.': 'Xray این کانفیگ را نپذیرفت؛ اتصال با sing-box برقرار می‌شود. علت رد شدن در گزارش اجرا آمده است.',
 	'RUNNING': 'در حال اجرا',
 	'NOT RUNNING': 'اجرا نمی‌شود',
 	'Checking…': 'در حال بررسی…',

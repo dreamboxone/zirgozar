@@ -78,12 +78,19 @@ method_state() {
 		ipt) iptables -t mangle -S ZGZ_PRE >/dev/null 2>&1 && active=1 ;;
 	esac
 
-	# Connected has to mean traffic is going through the tunnel, not merely
-	# that a process is alive. The core can be running perfectly with no rules
-	# in front of it, and then every byte leaves exactly as it did before while
-	# the page reports a connection - which is the most misleading thing this
-	# page could possibly do.
-	[ "$running" = "1" ] && [ -s "$ZGZ_BEST" ] && [ "$active" = "1" ] && connected=1
+	# Cache a real HTTPS response through this running node. RPC stays quick;
+	# missing, failed, expired or previous-instance results never mean connected.
+	local ci ct cr age now identity
+	identity="$(connectivity_identity)" || identity=""
+	if [ "$running" = 1 ] && [ "$active" = 1 ] && [ -s "$ZGZ_BEST" ] && [ -n "$identity" ]; then
+		read -r ci ct cr < "$ZGZ_RUN/connectivity" 2>/dev/null || true
+		now="$(date +%s)"
+		case "$ct" in ''|*[!0-9]*) age=999 ;; *) age=$((now - ct)) ;; esac
+		[ "$ci" = "$identity" ] && [ "$age" -ge 0 ] && [ "$age" -le 60 ] && [ "$cr" = 1 ] && connected=1
+		if [ "$ci" != "$identity" ] || [ "$age" -lt 0 ] || [ "$age" -ge 30 ]; then
+			[ -d "$ZGZ_RUN/connectivity.lock" ] || detach "$TEST" connectivity
+		fi
+	fi
 
 	# what `/etc/init.d/zirgozar enabled` tests, done inline so that a busy procd
 	# can never hold this request open

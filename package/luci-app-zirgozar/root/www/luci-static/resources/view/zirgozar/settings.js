@@ -311,6 +311,11 @@ return view.extend({
 		o = s.taboption('main', form.Flag, 'enabled', _('Main switch'),
 			_('The tunnel on or off. Save and apply for it to take effect; it holds across a reboot.'));
 		o.rmempty = false;
+		o.default = '0';
+		if (status.bindMainSwitch) status.bindMainSwitch(o, 'config');
+		o.onchange = function(ev, section_id, value) {
+			if (status.mainSwitchChanged) status.mainSwitchChanged(value);
+		};
 
 		o = s.taboption('main', form.ListValue, 'core_engine', _('Active core'),
 			_('Auto: Xray, and sing-box for a config Xray cannot run. Xray (patterniha): his build first, with QUIC refused as PattN does. sing-box or sing-box-lx: every config through it; if it cannot start, Xray takes over. An OpenVPN config is always carried by OpenVPN itself, beside whichever is chosen here; install it on the App Update page.'));

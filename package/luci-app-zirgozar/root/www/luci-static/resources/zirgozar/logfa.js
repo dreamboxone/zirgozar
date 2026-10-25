@@ -22,6 +22,8 @@
 var T = [
 	/* ------------------------------------------------------ start and stop */
 	[ 'Start running...', 'شروع اجرا...' ],
+	[ 'core rejected configuration: {}', 'هسته پیکربندی را رد کرد: {1}' ],
+	[ 'Xray rejected this configuration - using a compatible sing-box', 'Xray این پیکربندی را رد کرد؛ از sing-box سازگار استفاده می‌شود' ],
 	[ 'Running complete!', 'اجرا کامل شد!' ],
 	[ 'Clearing and closing related programs complete.', 'پاک‌سازی و بستن برنامه‌های مرتبط کامل شد.' ],
 	[ 'Main switch is off - not starting', 'کلید اصلی خاموش است - اجرا نمی‌شود' ],

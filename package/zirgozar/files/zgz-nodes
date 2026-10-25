@@ -198,6 +198,20 @@ fetch_one() {
 	local url name enabled content ua mode hwid cookie
 	config_get url "$_sec" url ""
 	config_get name "$_sec" name "$_sec"
+	# Fragments are subscription labels, never part of the HTTP request.
+	# Apply the same rule to subscriptions added outside the web interface.
+	case "$url" in
+		*\#*)
+			_label="$(ZGZ_URL_LABEL="${url#*#}" LC_ALL=C awk -v LABEL_DECODE=1 -f "$PARSE" </dev/null)"
+			url="${url%%#*}"
+			if [ -n "$_label" ]; then
+				name="$_label"
+				uci -q set "zirgozar.$_sec.name=$name" || true
+				uci -q set "zirgozar.$_sec.url=$url" || true
+				uci -q commit zirgozar || true
+			fi
+			;;
+	esac
 	config_get content "$_sec" content ""
 	config_get_bool enabled "$_sec" enabled 1
 	config_get ua "$_sec" user_agent "$SUB_UA_DEFAULT"

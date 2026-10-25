@@ -162,13 +162,30 @@ function filterModes(o, withGlobal) {
 var NAME_KEYS = [ 'name', 'remarks', 'remark', 'title', 'label', 'tag', 'group' ];
 var URL_KEYS = /^(\d+|url|uri|link|href|address|sub|subs?url|subscribe|subscription|subscribe_?url|subscription_?url)$/i;
 
+function subscriptionAddress(value) {
+	var url = String(value || '').trim(), hash = url.indexOf('#'), name = '';
+	if (hash >= 0) {
+		name = url.slice(hash + 1);
+		url = url.slice(0, hash);
+		try { name = decodeURIComponent(name); } catch (e) {}
+	}
+	return { url: url, name: name.replace(/[\u0000-\u001f\u007f]/g, ' ').trim() };
+}
+
+function subscriptionName(url, name, fallback) {
+	var address = subscriptionAddress(url);
+	return address.name || String(name || '').trim() ||
+		address.url.replace(/^https?:\/\//, '').split(/[\/?]/)[0] || fallback;
+}
+
 function subsInFile(text) {
 	var out = [], seen = {};
 	function add(url, name) {
-		url = String(url).trim();
+		var address = subscriptionAddress(url);
+		url = address.url;
 		if (!/^https?:\/\/\S+$/.test(url) || seen[url]) return;
 		seen[url] = true;
-		out.push({ url: url, name: String(name || '').trim() });
+		out.push({ url: url, name: address.name || String(name || '').trim() });
 	}
 	function walk(v, name) {
 		if (typeof v == 'string') return add(v, name);
@@ -200,19 +217,20 @@ function subsInFile(text) {
 function importSubs(found) {
 	var have = {}, names = {}, added = 0;
 	uci.sections('zirgozar', 'subscription').forEach(function(x) {
-		if (x.url) have[String(x.url).trim()] = true;
+		if (x.url) have[subscriptionAddress(x.url).url] = true;
 		names[String(x.name || '').toLowerCase()] = true;
 	});
 	found.forEach(function(f) {
-		if (have[f.url]) return;
-		have[f.url] = true;
-		var base = f.name || f.url.replace(/^https?:\/\//, '').split(/[\/?#]/)[0], name = base, i = 2;
+		var address = subscriptionAddress(f.url);
+		if (have[address.url]) return;
+		have[address.url] = true;
+		var base = subscriptionName(f.url, f.name, 'subscription'), name = base, i = 2;
 		while (names[name.toLowerCase()]) name = base + ' ' + i++;
 		names[name.toLowerCase()] = true;
 		var sid = sectionName('s');
 		uci.add('zirgozar', 'subscription', sid);
 		uci.set('zirgozar', sid, 'name', name);
-		uci.set('zirgozar', sid, 'url', f.url);
+		uci.set('zirgozar', sid, 'url', address.url);
 		uci.set('zirgozar', sid, 'enabled', '1');
 		added++;
 	});
@@ -288,23 +306,41 @@ return view.extend({
 		s.tab('chain', _('Chain Proxy'));
 		s.tab('core', _('Core and connection'));
 
-		o = s.taboption('main', form.Value, 'name', _('Name'));
-		o.rmempty = false;
+		var nameOption = s.taboption('main', form.Value, 'name', _('Name'));
+		o = nameOption;
+		o.rmempty = true;
 		o.placeholder = 'my list';
 		o.validate = function(section_id, value) {
 			value = String(value || '').trim();
-			if (!value) return _('Remark cannot be empty.');
+			var url = urlOption.formvalue(section_id) || uci.get('zirgozar', section_id, 'url');
+			value = subscriptionName(url, value, section_id);
 			var dup = uci.sections('zirgozar', 'subscription').some(function(x) {
 				return x['.name'] != section_id && String(x.name || '').toLowerCase() == value.toLowerCase();
 			});
 			return dup ? _('This remark already exists, please change a new remark.') : true;
+		};
+		o.write = function(section_id, value) {
+			var url = urlOption.formvalue(section_id) || uci.get('zirgozar', section_id, 'url');
+			uci.set('zirgozar', section_id, 'name', subscriptionName(url, value, section_id));
 		};
 
 		o = column(s, '_info', _('Subscribe Info'), function(sid) {
 			return E('div', { 'class': 'pwp-subinfo', 'data-sub': sid }, infoCell(sid));
 		});
 
-		o = s.taboption('main', form.Value, 'url', _('Subscribe URL'));
+		var urlOption = s.taboption('main', form.Value, 'url', _('Subscribe URL'));
+		o = urlOption;
+		o.onchange = function(ev, section_id, value) {
+			var name = subscriptionAddress(value).name, field = nameOption.getUIElement(section_id);
+			if (name && field) field.setValue(name);
+		};
+		o.write = function(section_id, value) {
+			var address = subscriptionAddress(value);
+			uci.set('zirgozar', section_id, 'url', address.url);
+			var name = nameOption.formvalue(section_id);
+			if (name === undefined) name = uci.get('zirgozar', section_id, 'name');
+			uci.set('zirgozar', section_id, 'name', subscriptionName(value, name, section_id));
+		};
 		o.placeholder = 'https://…';
 		o.textvalue = function(section_id) {
 			var v = String(this.cfgvalue(section_id) || '');
@@ -323,7 +359,7 @@ return view.extend({
 			if (!/^https?:\/\//.test(value))
 				return _('Must start with http:// or https://');
 			/* The same list twice is every node in it twice. */
-			var key = function(u) { return String(u || '').trim().replace(/\/+$/, '').toLowerCase(); };
+			var key = function(u) { return subscriptionAddress(u).url; };
 			var other = uci.sections('zirgozar', 'subscription').filter(function(x) {
 				return x['.name'] != section && x.url && key(x.url) == key(value);
 			})[0];

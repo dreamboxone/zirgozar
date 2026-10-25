@@ -191,7 +191,7 @@ start_service() {
 	# candidate has to accept this exact configuration to be chosen, which is
 	# a question no version number can answer.
 	if [ "$ENGINE" = "xray" ]; then
-		PROG="$(find_xray "$ZGZ_CONFIG_JSON")" || PROG=""
+		PROG="$(ZGZ_XRAY_CHECK_LOG="$ZGZ_RUN/config-check.err" find_xray "$ZGZ_CONFIG_JSON")" || PROG=""
 	fi
 
 	# Refused by every core on the router. When the configuration named a geo
@@ -203,7 +203,7 @@ start_service() {
 	# the page says which of the two happened.
 	if [ "$ENGINE" = "xray" ] && [ -z "$PROG" ] && grep -q 'geoip:ir\|geosite:ir\|geosite:category-ads-all' "$ZGZ_CONFIG_JSON" 2>/dev/null; then
 		if "$MKCONFIG" nogeo > "$ZGZ_CONFIG_JSON.nogeo" 2>/dev/null &&
-		   PROG="$(find_xray "$ZGZ_CONFIG_JSON.nogeo")"; then
+		   PROG="$(ZGZ_XRAY_CHECK_LOG="$ZGZ_RUN/config-check.err" find_xray "$ZGZ_CONFIG_JSON.nogeo")"; then
 			mv -f "$ZGZ_CONFIG_JSON.nogeo" "$ZGZ_CONFIG_JSON"
 			chmod 600 "$ZGZ_CONFIG_JSON"
 			log "the core would not read the routing data - connected with the Iran split off"
@@ -214,15 +214,24 @@ start_service() {
 		fi
 	fi
 
+	if [ "$ENGINE" = xray ] && [ -z "$PROG" ]; then
+		try_compatible_singbox || true
+	fi
+
 	if [ -z "$PROG" ]; then
 		log "no $ENGINE on this router can run the generated configuration"
+		if [ -s "$ZGZ_RUN/config-check.err" ]; then
+			tail -8 "$ZGZ_RUN/config-check.err" | while IFS= read -r _reason; do
+				[ -z "$_reason" ] || warn "core rejected configuration: $_reason"
+			done
+		fi
 		return 1
 	fi
 	# Which core, and which version of it, written down once here for the
 	# status page - which asks every few seconds, and starting a core just to
 	# ask it its version is not something to do every few seconds.
 	_ver="$(core_version "$PROG")" || _ver=""
-	printf 'name=%s\npath=%s\nversion=%s\n' "$(core_label "$ENGINE")" "$PROG" "$_ver" > "$ZGZ_RUN/core.info" 2>/dev/null || true
+	printf 'name=%s\npath=%s\nversion=%s\n' "$(core_label "$ENGINE" "$PROG")" "$PROG" "$_ver" > "$ZGZ_RUN/core.info" 2>/dev/null || true
 	log_step "Core: $(core_title "$ENGINE") ${_ver:-?} ($PROG)"
 	_gp="$(global_preproxy)" && log_step "Pre-proxy: $(uci -q get "zirgozar.$_gp.name" 2>/dev/null || echo "$_gp")"
 	[ "$(cfg_bool fragment 0)" = "1" ] && log_step "Fragment: $(cfg fragment_packets tlshello), length $(cfg fragment_lengths '3-5,6-8,10-20'), delay $(cfg fragment_delays '10-20')"
@@ -313,6 +322,35 @@ start_service() {
 
 	touch "$STARTED_FLAG"
 	return 0
+}
+
+# Configuration compatibility, not a version guess. Keep the original file
+# and diagnostic when no installed alternative accepts the whole tunnel.
+try_compatible_singbox() {
+	local candidate="$ZGZ_CONFIG_JSON.compat" compatible warnings
+	[ "$ENGINE" = xray ] && [ -z "$PROG" ] || return 1
+	: > "$candidate"
+	chmod 600 "$candidate"
+	if core_config singbox > "$candidate" 2>"$ZGZ_RUN/sbconfig.err" &&
+	   compatible="$(find_engine_singbox "$candidate")"; then
+		mv -f "$candidate" "$ZGZ_CONFIG_JSON"
+		chmod 600 "$ZGZ_CONFIG_JSON"
+		ENGINE=singbox
+		PROG="$compatible"
+		log "Xray rejected this configuration - using a compatible sing-box"
+		if [ -s "$ZGZ_RUN/config-check.err" ]; then
+			tail -8 "$ZGZ_RUN/config-check.err" | while IFS= read -r reason; do
+				[ -z "$reason" ] || warn "core rejected configuration: $reason"
+			done
+		fi
+		warnings="$(sed -n 's/^warn: //p' "$ZGZ_RUN/sbconfig.err")"
+		[ -z "$warnings" ] || printf '%s\n' "$warnings" | while IFS= read -r reason; do log_step "sing-box: $reason"; done
+		say_message 'Xray could not run this configuration, so sing-box is carrying it. See Runtime Logs for the rejection reason.'
+		geoview_for_singbox
+		return 0
+	fi
+	rm -f "$candidate"
+	return 1
 }
 
 # Is anything listening on this port? Ask three ways rather than one: a check

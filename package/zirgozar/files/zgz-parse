@@ -2501,6 +2501,13 @@ BEGIN {
 	n = 0
 	FS = "\n"
 	b64init()
+	if (LABEL_DECODE) {
+		label = urldec(ENVIRON["ZGZ_URL_LABEL"])
+		gsub(/[[:cntrl:]]/, " ", label)
+		sub(/^[[:space:]]+/, "", label); sub(/[[:space:]]+$/, "", label)
+		print label
+		exit
+	}
 	if (LIMIT + 0 <= 0) LIMIT = 400
 }
 
