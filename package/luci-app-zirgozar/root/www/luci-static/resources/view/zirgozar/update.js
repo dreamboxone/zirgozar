@@ -436,7 +436,7 @@ function render(d, early) {
 			phaseJob = progressJob;
 			progressPhase = '';
 		}
-		if (progressPct >= 0 && progressPhase != 'installing') progressPhase = 'downloading';
+		if (progressPct >= 0) progressPhase = 'downloading';
 		else if (progressPct < 0 && progressPhase == 'downloading') progressPhase = 'installing';
 		if (progressPhase == 'installing') progressPct = -1;
 	}

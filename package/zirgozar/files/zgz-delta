@@ -12,8 +12,9 @@ case "$key" in main|luci) ;; *) exit 2 ;; esac
 case "$url" in https://github.com/dreamboxone/zirgozar/releases/download/v*/*.apk|https://github.com/dreamboxone/zirgozar/releases/download/v*/*.ipk) ;; *) exit 2 ;; esac
 name="${url##*/}"
 work="${dest}.delta"
+run="${ZGZ_RUN:-/var/run/zirgozar}"
 mkdir -p "$work"
-trap 'rm -rf "$work"' EXIT
+trap 'rm -rf "$work"; if [ "$mode" = fetch ]; then rm -f "$run/download"; fi' EXIT
 
 hash() { sha256sum "$1" | awk '{ print $1 }'; }
 manifest="$work/manifest.json"
@@ -43,6 +44,8 @@ fi
 ucode "$PLAN" plan "$manifest" "$CACHE/$key.json" "$name" "$expected" > "$work/plan" 2>/dev/null || exit 2
 : > "$work/package"
 while read -r source offset length; do
+	rm -f "$work/part"
+	printf '%s %s %s\n' "$size" "$work/part" "$(wc -c < "$work/package")" > "$run/download" 2>/dev/null || true
 	if [ "$source" = local ]; then
 		ucode "$PLAN" copy "$CACHE/$key.package" "$work/part" "$offset" "$length" || exit 2
 	else
@@ -61,6 +64,7 @@ while read -r source offset length; do
 	fi
 	[ "$(wc -c < "$work/part")" -eq "$length" ] || exit 2
 	cat "$work/part" >> "$work/package"
+	rm -f "$work/part"
 done < "$work/plan"
 [ "$(wc -c < "$work/package")" -eq "$size" ] && [ "$(hash "$work/package")" = "$expected" ] || exit 2
 mv -f "$work/package" "$dest"

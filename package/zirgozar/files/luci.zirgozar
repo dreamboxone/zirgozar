@@ -587,8 +587,10 @@ method_system() {
 
 	# A download under way: how much of it is here, in percent.
 	_pct=-1
-	if [ -n "$(cat "$JOB" 2>/dev/null)" ] && read -r _dsz _dpart < "$ZGZ_RUN/download" 2>/dev/null && [ "${_dsz:-0}" -gt 0 ] 2>/dev/null; then
-		_pct=$(( $(file_size "$_dpart") * 100 / _dsz ))
+	if [ -n "$(cat "$JOB" 2>/dev/null)" ] && read -r _dsz _dpart _dassembled < "$ZGZ_RUN/download" 2>/dev/null && [ "${_dsz:-0}" -gt 0 ] 2>/dev/null; then
+		_done="$(file_size "$_dpart")"
+		_done=$((_done + ${_dassembled:-0}))
+		_pct=$(( _done * 100 / _dsz ))
 		[ "$_pct" -le 100 ] || _pct=100
 	fi
 
