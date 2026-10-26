@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/dreamboxone/zirgozar/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/dreamboxone/zirgozar?style=for-the-badge&color=0b3d91&label=release&cacheSeconds=300"></a>
-  <a href="https://github.com/dreamboxone/zirgozar/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/dreamboxone/zirgozar/total?style=for-the-badge&color=0ea5e9"></a>
+  <a href="https://github.com/dreamboxone/zirgozar/releases"><img alt="downloads" src=".github/badges/downloads.svg"></a>
   <img alt="OpenWrt" src="https://img.shields.io/badge/OpenWrt-23.05%20%7C%2024.10%20%7C%2025.12-00B5E2?style=for-the-badge&logo=openwrt&logoColor=white">
   <img alt="Xray" src="https://img.shields.io/badge/core-Xray-7c3aed?style=for-the-badge">
   <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-AGPL--3.0-16a34a?style=for-the-badge"></a>
