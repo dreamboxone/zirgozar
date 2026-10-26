@@ -59,3 +59,14 @@ assert.equal(fields.aether_inner, '162.159.192.1:2408', 'a new outer scan preser
 assert.equal(applied._aether_outer, '162.159.198.201:443');
 assert.throws(() => scan.applyEndpoints(map, 'node', fields, {}, 'mim'), /protocol changed/);
 console.log('FinalMask presets, custom-value protection, default clearing and scan result application passed');
+let automatic = null, modal = null;
+const autoScan = new Function('baseclass', 'rpc', 'ui', 'i18n', 'E', 'window', source('aetherscan.js'))(
+ {extend: x => x}, {declare: () => () => Promise.resolve({ok:true,state:'found',running:false,protocol:'masque',result:{endpoint:'162.159.198.201:443'}})},
+ {showModal: (title, nodes) => {modal=nodes[0];}, hideModal:()=>{}}, {tr:x=>x}, E, {clearTimeout:()=>{},setTimeout:()=>{throw Error('completed scan must not poll');}}
+);
+autoScan.open({sid:'node'}, (result, protocol) => {automatic={result,protocol};}).then(()=>{
+ assert.equal(automatic.result.endpoint,'162.159.198.201:443');
+ assert.equal(automatic.protocol,'masque');
+ assert.match(modal.children[1].textContent,/applied to form/);
+ console.log('Successful endpoint scans automatically fill the form without saving it');
+}).catch(error=>{console.error(error);process.exitCode=1;});

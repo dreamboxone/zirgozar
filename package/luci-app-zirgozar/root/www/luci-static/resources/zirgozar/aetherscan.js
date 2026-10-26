@@ -31,7 +31,7 @@ function open(draft, apply) {
 	var endpoints = E('bdi', { dir: 'ltr', style: 'display:block;white-space:pre-wrap' });
 	var log = E('pre', { dir: 'ltr', style: 'max-height:260px;overflow:auto;white-space:pre-wrap;text-align:left' });
 	var box = E('div', {}, [
-		E('p', {}, _('The scan tests the current form without saving it. Apply the result to the form, then save the config.')),
+		E('p', {}, _('The scan tests the current form without saving it. A working result is applied to the form automatically; save the config to keep it.')),
 		status, endpoints, log
 	]);
 	function stopPolling() { closed = true; if (timer) window.clearTimeout(timer); }
@@ -44,11 +44,7 @@ function open(draft, apply) {
 		cancel.disabled = true; status.textContent = _('Stopping Aether scan…');
 		return action('aether_scan_cancel', draft.sid).catch(showError);
 	} }, _('Cancel scan'));
-	var use = E('button', { class: 'btn cbi-button cbi-button-positive', disabled: true, click: function() {
-		try { apply(found, protocol); stopPolling(); ui.hideModal(); }
-		catch (e) { showError(e); }
-	} }, _('Apply endpoints to form'));
-	box.appendChild(E('div', { class: 'right' }, [ cancel, ' ', close, ' ', use ]));
+	box.appendChild(E('div', { class: 'right' }, [ cancel, ' ', close ]));
 	ui.showModal(_('Aether endpoint scan'), [ box ]);
 	function showError(error) {
 		running = false; cancel.disabled = true;
@@ -62,7 +58,8 @@ function open(draft, apply) {
 		if (response.state == 'found') {
 			found = response.result; protocol = response.protocol;
 			endpoints.textContent = [ found.endpoint, found.outer, found.inner ].filter(Boolean).join('\n');
-			status.textContent = _('A working Aether endpoint was found.'); use.disabled = false;
+			try { apply(found, protocol); status.textContent = _('Endpoints applied to form. Save the config to keep them.'); }
+			catch (e) { showError(e); }
 		} else if (response.state == 'cancelled') status.textContent = _('Aether scan cancelled.');
 		else if (response.state == 'error') status.textContent = _(response.message || 'Aether scan failed.');
 		else status.textContent = _('Scanning and testing Aether endpoints…');

@@ -26,6 +26,8 @@ printf '%s\n' "${AETHER_MASQUE_H2_FRAGMENT:-}" > "$ZGZ_RUN/aether-fragment"
 CORE
 chmod +x "$WORK/aether"
 rig_set core_aether "$WORK/aether"
+printf '%s\n' 'aether://?protocol=masque&fm=%7B%22tcp%22%3A%5B%5D%2C%22note%22%3A%22path%5C%5Ckey%22%7D' | awk -f "$ZGZ_LIB/zgz-parse" | cut -f6- > "$WORK/quoted.json"
+if node -e 'let d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));let m=JSON.parse(d.fm);if(m.note!=="path\\key")process.exit(1)' "$WORK/quoted.json"; then ok 'Aether share-link FinalMask preserves JSON quotes and backslashes'; else bad 'Aether FinalMask JSON escaping failed'; fi
 PROFILE="$RIG_SRC/test/fixtures/aether-command.json"
 check "$(LC_ALL=C awk -f "$ZGZ_LIB/zgz-parse" < "$PROFILE" | cut -f3)" aether 'multiline Aether JSON parses as a document'
 rig_set a1.link "$(node -e 'process.stdout.write(JSON.stringify(require(process.argv[1])))' "$PROFILE")"

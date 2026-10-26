@@ -92,15 +92,16 @@ function exp2(n,   r, i) {
 
 # ------------------------------------------------------------- text utils
 
-function jesc(s) {
-	gsub(/\\/, "\\\\", s)
-	gsub(/"/, "\\\"", s)
-	gsub(/\t/, " ", s)
-	gsub(/\r/, "", s)
-	gsub(/\n/, " ", s)
-	return s
+function jesc(s,   out, i, c) {
+	out = ""
+	for (i = 1; i <= length(s); i++) {
+		c = substr(s, i, 1)
+		if (c == "\\" || c == "\"") out = out "\\" c
+		else if (c == "\t" || c == "\n") out = out " "
+		else if (c != "\r") out = out c
+	}
+	return out
 }
-
 function hex(h,   d, i, c, v) {
 	d = 0
 	for (i = 1; i <= length(h); i++) {
