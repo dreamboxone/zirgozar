@@ -89,6 +89,10 @@ args=sys.argv[1:]
 name=args[-1].split('/')[-1]
 data=(pathlib.Path(os.environ['DELTA_RELEASE'])/name).read_bytes()
 span=args[args.index('--range')+1] if '--range' in args else None
+if span:
+    progress=(pathlib.Path(os.environ['ZGZ_RUN'])/'download').read_text().split()
+    assert len(progress)==3 and int(progress[0])==len(data)
+    assert progress[1]==args[args.index('-o')+1] and 0<=int(progress[2])<len(data)
 with open(os.environ['DELTA_REQUESTS'],'a') as out: out.write(json.dumps([name,span])+'\\n')
 status=200
 if span and os.environ.get('DELTA_IGNORE_RANGE')!='1':
@@ -106,8 +110,10 @@ if '-w' in args: print(status,end='')
                         f"{manifest['sha256']}  {archive.name}\n")
 
     checksums()
+    runtime = base / 'run'
+    runtime.mkdir()
     env = dict(os.environ, PATH=str(binaries) + ':' + os.environ['PATH'],
-               ZGZ_LIB=str(lib), ZGZ_DELTA_CACHE=str(cache),
+               ZGZ_LIB=str(lib), ZGZ_DELTA_CACHE=str(cache), ZGZ_RUN=str(runtime),
                DELTA_RELEASE=str(release), DELTA_REQUESTS=str(requests))
     url = 'https://github.com/dreamboxone/zirgozar/releases/download/v5.7.30-r1/' + archive.name
 
@@ -120,6 +126,7 @@ if '-w' in args: print(status,end='')
     result = run()
     assert result.returncode == 0, result.stderr
     assert destination.read_bytes() == target
+    assert not (runtime / 'download').exists()
     ranges = [request[1] for request in map(json.loads, requests.read_text().splitlines()) if request[1]]
     transferred = sum(int(span.split('-')[1]) - int(span.split('-')[0]) + 1 for span in ranges)
     assert 0 < transferred < len(target) // 2

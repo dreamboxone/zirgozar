@@ -37,3 +37,10 @@ for (const protocol of ['wg', 'masque', 'gool', 'mim', 'wg-over-masque']) {
 	assert.equal(roundtrip.rest.custom, 'value');
 }
 console.log('Aether form import and export passed, including unknown parameters and IPv6');
+
+const fields = source.match(/var AETHER_EXTRA = '([^']+)'/)[1].split(' ');
+const advanced = 'aether://?protocol=masque&scan=verified&' + fields.map((k, i) => k + '=' + encodeURIComponent('test:' + i)).join('&');
+const parsedAdvanced = api.parseLink(advanced);
+assert.deepEqual(api.parseLink(api.buildLink(parsedAdvanced, parsedAdvanced.name)), parsedAdvanced);
+for (const [i, key] of fields.entries()) assert.equal(parsedAdvanced['aether_' + key], 'test:' + i, key);
+console.log('All Aether 2.4 advanced fields survive form import and export');

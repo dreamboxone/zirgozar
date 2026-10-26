@@ -240,6 +240,10 @@ install_aether() {
 		done
 	fi
 	mkdir -p "$_target/pt"
+	if tar -tzf "$_stage/core.tar.gz" | grep -q '^LICENSES/'; then
+		tar -xzf "$_stage/core.tar.gz" -C "$_stage" LICENSES || return 1
+		cp -R "$_stage/LICENSES" "$_target/" || return 1
+	fi
 	for _f in pt/psiphon-tunnel-core pt/lyrebird aether; do
 		cp "$_stage/$_f" "$_target/$_f.new" || return 1
 		chmod 755 "$_target/$_f.new"

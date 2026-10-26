@@ -125,6 +125,15 @@ function urldec(s,   out, i, c, h, v) {
 	return out
 }
 
+function urlencode(s,   out, i, c) {
+	out = ""
+	for (i = 1; i <= length(s); i++) {
+		c = substr(s, i, 1)
+		out = out (c ~ /^[A-Za-z0-9._~-]$/ ? c : sprintf("%%%02X", ORD[c]))
+	}
+	return out
+}
+
 # A server name is decoration. It arrives with channel advertising, control
 # characters and occasionally a whole line of emoji in it, so keep it short
 # and printable and let the rest go.
@@ -1291,7 +1300,7 @@ function do_tailscale(body,   pl) {
 #
 # Which account the node uses is its id: the section of a node added by hand,
 # so that each has an account of its own, kept under /etc/zirgozar/warp.
-function do_aether(body,   label, query, p, proto, scan, ip, transport, outer, inner, id, payload, keys, n, i, k, v) {
+function do_aether(body,   label, query, p, proto, scan, ip, transport, outer, inner, id, payload, keys, extra, n, m, i, k, v) {
 	p = index(body, "#")
 	if (p > 0) { label = clean_label(substr(body, p + 1)); body = substr(body, 1, p - 1) }
 	p = index(body, "?")
@@ -1299,7 +1308,7 @@ function do_aether(body,   label, query, p, proto, scan, ip, transport, outer, i
 	proto = qs(query, "protocol"); if (proto == "") proto = "wg"
 	if (proto !~ /^(wg|masque|gool|mim|wg-over-masque)$/) return
 	scan = qs(query, "scan"); if (scan == "") scan = "balanced"
-	if (scan !~ /^(turbo|balanced|thorough|stealth|ironclad)$/) return
+	if (scan !~ /^(turbo|balanced|thorough|verified|stealth|ironclad)$/) return
 	ip = qs(query, "ip"); if (ip == "") ip = "v4"
 	if (ip !~ /^(v4|v6|both)$/) return
 	transport = qs(query, "transport"); if (transport == "") transport = "h3"
@@ -1314,6 +1323,9 @@ function do_aether(body,   label, query, p, proto, scan, ip, transport, outer, i
 	id = NX["aether_id"]; if (id !~ /^[A-Za-z0-9_]+$/) id = "aether"
 	payload = "{\"type\":\"aether\",\"id\":\"" id "\",\"protocol\":\"" proto "\",\"scan\":\"" scan "\",\"ip\":\"" ip "\",\"transport\":\"" transport "\",\"endpoint\":\"" jesc(body) "\",\"outer\":\"" jesc(outer) "\",\"inner\":\"" jesc(inner) "\""
 	n = split("noize dns exit_loc fragment fragment_size fragment_delay ech ech_dns ech_domain api_address api_ech api_ech_dns fingerprint sni psiphon psiphon_mode region tor tor_bridges tor_relays bridges cdn_ips cdn_sni cdn_sets psiphon_bundled psiphon_servers", keys, " ")
+	m = split("api_host api_sni exit_loc_secs stats stats_secs quick_reconnect h2_peer quic_v2 data_check validate_secs startup_secs reconnect_secs tls_verify ech_config tls_ciphers tls13_ciphers tls_groups tls_key_shares disable_grease enable_grease_sigalgs tls_sigalgs tls_cert_compression tls_alps tls_trust_anchors tls_server_padding enable_ech_grease disable_ocsp_stapling disable_sct disable_session_ticket disable_extension_permutation keepalive profile_retry tor_relay_ports tor_bridge_file psiphon_config team access_id access_secret access_token gateway route_block route_direct routes perf log_level route_sniff route_sniff_ms wg_endpoint_cooldown_secs wg_stale_secs masque_h2_keepalive_secs masque_h2_keepalive_timeout_secs ironclad_port max_clients half_close_secs tcp_keepalive_secs tcp_connect_secs reprovision", extra, " ")
+	for (i = 1; i <= m; i++) keys[n + i] = extra[i]
+	n += m
 	for (i = 1; i <= n; i++) {
 		k = keys[i]; v = qs(query, k)
 		if (v != "") payload = payload ",\"" k "\":\"" jesc(v) "\""
@@ -2381,11 +2393,24 @@ function aether_args(cmd, args,   i, c, quote, word, active, count) {
 	return count
 }
 
-function from_aether_command(doc,   args, opts, count, i, key, val, query, endpoint, label, fp, ciphers, list, rules, inlets, m, j, tags, exit_tag, inlet, port, found, rest) {
+function from_aether_command(doc,   args, opts, count, i, key, val, query, endpoint, label, fp, ciphers, list, rules, inlets, m, j, tags, exit_tag, inlet, port, found, rest, extras, ek, option) {
 	count = aether_args(jstr(doc, "aetherCommand"), args)
 	if (count < 2 || args[1] !~ /(^|\/)aether$/) return
 	for (i = 2; i <= count; i++) {
 		key = args[i]
+		if (key ~ /^--(masque|wg|gool|gool-classic|mim)$/) {
+			if (opts["--protocol"] != "") return
+			opts["--protocol"] = substr(key, 3); continue
+		}
+		if (key ~ /^--(tor|psiphon)(-reverse|-only)?$/) {
+			ek = key ~ /^--tor/ ? "tor" : "psiphon"
+			extras[ek] = key ~ /-reverse$/ ? "reverse" : (key ~ /-only$/ ? "only" : "chain"); continue
+		}
+		if (key == "--ech") {
+			if (++i > count || args[i] == "") return
+			if (args[i] == "auto") extras["ech"] = "1"; else extras["ech_config"] = args[i]
+			continue
+		}
 		if (key ~ /^--(h2|h3|disable-grease|quick-reconnect)$/) {
 			if (key == "--h2" || key == "--h3") {
 				if (opts["transport"] != "") return
@@ -2393,13 +2418,26 @@ function from_aether_command(doc,   args, opts, count, i, key, val, query, endpo
 			} else opts[substr(key, 3)] = "1"
 			continue
 		}
+		if (key ~ /^--(fragment|stats|tls-verify|enable-grease-sigalgs|enable-ech-grease|disable-ocsp-stapling|disable-sct|disable-session-ticket|disable-extension-permutation|gateway)$/) {
+			ek = substr(key, 3); gsub(/-/, "_", ek); extras[ek] = "1"; continue
+		}
+		if (key ~ /^--no-(quick-reconnect|quic-v2|data-check|profile-retry)$/) {
+			ek = substr(key, 6); gsub(/-/, "_", ek); extras[ek] = "0"; continue
+		}
+		if (key ~ /^--(api-address|api-host|api-sni|exit-loc|exit-loc-secs|stats-secs|h2-peer|validate-secs|startup-secs|reconnect-secs|tls13-ciphers|tls-groups|tls-key-shares|tls-sigalgs|tls-cert-compression|tls-alps|tls-trust-anchors|tls-server-padding|keepalive|tor-relay-ports|tor-bridge-file|psiphon-config|team|access-id|access-secret|access-token|route-block|route-direct|routes|perf|log-level|fragment-size|fragment-delay|dns|ech-dns|ech-domain|noize)$/) {
+			if (++i > count || args[i] == "") return
+			ek = substr(key, 3); gsub(/-/, "_", ek)
+			if (ek in extras) return
+			extras[ek] = args[i]; continue
+		}
 		if (key !~ /^--(bind|protocol|scan|ip|masque-sni|tls-ciphers|peer|upstream)$/ || ++i > count) return
 		if (key in opts) return
 		val = args[i]
 		if (val == "" || val ~ /["\\#&?\r\n\t]/) return
 		opts[key] = val
 	}
-	if (opts["--protocol"] != "masque") return
+	if (opts["--protocol"] == "") opts["--protocol"] = "masque"
+	if (opts["--protocol"] !~ /^(wg|masque|gool|gool-classic|mim)$/) return
 	if (opts["--masque-sni"] != "" && opts["--masque-sni"] !~ /^[A-Za-z0-9.-]+$/) return
 	# Only the generated local SOCKS plumbing may be replaced automatically.
 	if (opts["--bind"] !~ /^127\.0\.0\.1:[0-9]+$/) return
@@ -2438,15 +2476,14 @@ function from_aether_command(doc,   args, opts, count, i, key, val, query, endpo
 		}
 		if (exit_tag == "" || found != 1) return
 	}
-	ciphers = opts["--tls-ciphers"]
-	if (ciphers != "") {
-		if (ciphers != "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256" || !opts["disable-grease"]) return
-		fp = "semi-python"
-	} else if (opts["disable-grease"]) return
+	if (opts["--tls-ciphers"] != "") extras["tls_ciphers"] = opts["--tls-ciphers"]
+	if (opts["disable-grease"]) extras["disable_grease"] = "1"
 	endpoint = opts["--peer"]
 	query = "?protocol=" (opts["--protocol"] != "" ? opts["--protocol"] : "masque") "&scan=" (opts["--scan"] != "" ? opts["--scan"] : "balanced") "&ip=" (opts["--ip"] != "" ? opts["--ip"] : "v4") "&transport=" (opts["transport"] != "" ? opts["transport"] : "h3")
 	if (opts["--masque-sni"] != "") query = query "&sni=" opts["--masque-sni"]
-	if (fp != "") query = query "&fingerprint=" fp
+	if (opts["--protocol"] == "gool") sub(/protocol=gool/, "protocol=wg-over-masque", query)
+	if (opts["--protocol"] == "gool-classic") sub(/protocol=gool-classic/, "protocol=gool", query)
+	for (ek in extras) query = query "&" ek "=" urlencode(extras[ek])
 	label = jstr(doc, "remarks"); if (label == "") label = "Aether"
 	do_aether(endpoint query "#" label)
 }

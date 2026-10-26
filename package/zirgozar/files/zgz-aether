@@ -7,7 +7,13 @@ set -e
 MODE="${1:-}"
 . "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
 NODE="$ZGZ_ETC/bridge.json"
-get() { sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p" "$NODE" | head -1; }
+get() {
+	if command -v jsonfilter >/dev/null 2>&1; then
+		jsonfilter -i "$NODE" -e "@.$1" 2>/dev/null || true
+	else
+		sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p" "$NODE" | head -1
+	fi
+}
 fail() { say_message "$1"; printf '%s\n' "$1" >&2; exit 1; }
 
 BIN="$(aether_path)"
@@ -134,10 +140,17 @@ STATE="$ZGZ_ETC/aether/$ID"
 API_ECH="$(get api_ech)"
 case "$API_ECH" in ''|auto|0|1) : ;; *) fail 'Invalid Aether account ECH setting.' ;; esac
 API_ADDRESS="$(get api_address)"
+TEAM="$(get team)"
+case "$TEAM" in *[!A-Za-z0-9-]*) fail 'Invalid Aether Zero Trust team name.' ;; esac
 API_DNS="$(get api_ech_dns)"; API_DNS="${API_DNS:-udp://8.8.8.8}"
 API_FLAG=--enroll-address
 if printf '%s\n' "$HELP" | grep -q -- '--api-address'; then API_FLAG=--api-address; fi
-set -- "$BIN" --config "$STATE/identity.toml" --bind "127.0.0.1:$PORT" --mark "${ZGZ_OUT_MARK:-255}" --quick-reconnect
+set -- "$BIN" --config "$STATE/identity.toml" --bind "127.0.0.1:$PORT" --mark "${ZGZ_OUT_MARK:-255}"
+case "$(get quick_reconnect)" in
+	0) set -- "$@" --no-quick-reconnect ;;
+	''|1) set -- "$@" --quick-reconnect ;;
+	*) fail 'Invalid Aether quick reconnect setting.' ;;
+esac
 PROTO="$(get protocol)"
 case "$PROTO" in
 	wg|masque|mim) set -- "$@" --protocol "$PROTO" ;;
@@ -146,7 +159,7 @@ case "$PROTO" in
 	*) fail 'Unsupported Aether protocol.' ;;
 esac
 SCAN="$(get scan)"; IP="$(get ip)"; TRANSPORT="$(get transport)"
-case "$SCAN" in turbo|balanced|thorough|stealth|ironclad) : ;; *) fail 'Invalid Aether scan mode.' ;; esac
+case "$SCAN" in turbo|balanced|thorough|verified|stealth|ironclad) : ;; *) fail 'Invalid Aether scan mode.' ;; esac
 case "$IP" in v4|v6|both) : ;; *) fail 'Invalid Aether IP version.' ;; esac
 case "$TRANSPORT" in h2|h3) set -- "$@" "--$TRANSPORT" ;; *) fail 'Invalid Aether transport.' ;; esac
 set -- "$@" --scan "$SCAN" --ip "$IP"
@@ -173,6 +186,7 @@ TOR="$(get tor)"; PSIPHON="$(get psiphon)"
 # an exit node; Tor and Psiphon, which do not mark every socket; and an API
 # address given as a name, which a marked Aether cannot look up.
 case "$API_ADDRESS" in ''|[0-9]*.*.*.*|\[*) UPNAME='' ;; *) UPNAME=1 ;; esac
+if [ -z "$API_ADDRESS" ] && { [ -n "$(get api_host)" ] || [ -n "$(get api_sni)" ]; }; then UPNAME=1; fi
 if [ -n "$VIA" ] || [ -n "$UPNAME" ] || { [ -n "$TOR" ] && [ "$TOR" != off ]; } || { [ -n "$PSIPHON" ] && [ "$PSIPHON" != off ]; }; then
 	set -- "$@" --upstream "socks5://127.0.0.1:$UPORT"
 fi
@@ -183,17 +197,57 @@ if [ "$TOR" = reverse ] || [ "$PSIPHON" = reverse ]; then
 	case "$PROTO:$TRANSPORT" in masque:h2|wg-over-masque:h2|mim:h2) : ;; *) fail 'Tor/Psiphon reverse mode requires MASQUE over HTTP/2.' ;; esac
 fi
 # Values are separate argv entries, never executable shell text.
-for KEY in dns exit_loc fragment_size fragment_delay ech_dns ech_domain sni noize region psiphon_mode cdn_ips cdn_sni cdn_sets; do
+for KEY in dns exit_loc fragment_size fragment_delay ech_dns ech_domain sni noize region psiphon_mode cdn_ips cdn_sni cdn_sets api_host api_sni exit_loc_secs stats_secs h2_peer validate_secs startup_secs reconnect_secs tls_ciphers tls13_ciphers tls_groups tls_key_shares tls_sigalgs tls_cert_compression tls_alps tls_trust_anchors tls_server_padding keepalive tor_relay_ports tor_bridge_file psiphon_config team access_id access_secret access_token route_block route_direct routes perf log_level; do
 	VALUE="$(get "$KEY")"; [ -n "$VALUE" ] || continue
 	case "$KEY" in
 		exit_loc) FLAG=exit-loc ;; fragment_size) FLAG=fragment-size ;; fragment_delay) FLAG=fragment-delay ;;
 		ech_dns) FLAG=ech-dns ;; ech_domain) FLAG=ech-domain ;; sni) FLAG=masque-sni ;;
 		region) FLAG=psiphon-region ;; psiphon_mode) FLAG=psiphon-mode ;;
 		cdn_ips) FLAG=psiphon-cdn-ips ;; cdn_sni) FLAG=psiphon-cdn-sni ;; cdn_sets) FLAG=psiphon-cdn-sets ;;
-		*) FLAG="$KEY" ;;
+		*) FLAG="$(printf '%s' "$KEY" | tr '_' '-')" ;;
+	esac
+	case "$KEY" in
+		*_secs|keepalive|tls_server_padding)
+			case "$VALUE" in *[!0-9]*) fail "Invalid Aether numeric option: $KEY." ;; esac ;;
+		tor_bridge_file|psiphon_config|routes)
+			case "$VALUE" in /etc/zirgozar/*) : ;; *) fail 'Aether files must be under /etc/zirgozar.' ;; esac
+			case "$VALUE" in */../*|*/..|*/./*) fail 'Invalid Aether file path.' ;; esac
+			[ -s "$VALUE" ] || fail "The Aether file is missing or empty: $KEY." ;;
 	esac
 	printf '%s\n' "$HELP" | grep -Fq -- "--$FLAG" || fail "The installed Aether does not support --$FLAG."
 	set -- "$@" "--$FLAG" "$VALUE"
+done
+# Switches and environment tuning are allowlisted; no shell text is evaluated.
+for KEY in stats tls_verify disable_grease enable_grease_sigalgs enable_ech_grease disable_ocsp_stapling disable_sct disable_session_ticket disable_extension_permutation gateway; do
+	VALUE="$(get "$KEY")"
+	case "$VALUE" in
+		''|0) : ;;
+		1)
+			FLAG="$(printf '%s' "$KEY" | tr '_' '-')"
+			printf '%s\n' "$HELP" | grep -Fq -- "--$FLAG" || fail "The installed Aether does not support --$FLAG."
+			set -- "$@" "--$FLAG" ;;
+		*) fail "Invalid Aether switch: $KEY." ;;
+	esac
+done
+case "$(get tls_verify)" in 0) export AETHER_TLS_VERIFY=0 ;; esac
+for KEY in quic_v2 data_check profile_retry; do
+	VALUE="$(get "$KEY")"
+	case "$VALUE" in
+		''|1) : ;;
+		0)
+			FLAG="no-$(printf '%s' "$KEY" | tr '_' '-')"
+			printf '%s\n' "$HELP" | grep -Fq -- "--$FLAG" || fail "The installed Aether does not support --$FLAG."
+			set -- "$@" "--$FLAG" ;;
+		*) fail "Invalid Aether switch: $KEY." ;;
+	esac
+done
+for KEY in route_sniff route_sniff_ms wg_endpoint_cooldown_secs wg_stale_secs masque_h2_keepalive_secs masque_h2_keepalive_timeout_secs ironclad_port max_clients half_close_secs tcp_keepalive_secs tcp_connect_secs reprovision; do
+	VALUE="$(get "$KEY")"; [ -n "$VALUE" ] || continue
+	case "$VALUE" in *[!0-9]*) fail "Invalid Aether numeric option: $KEY." ;; esac
+	case "$KEY:$VALUE" in route_sniff:0|route_sniff:1|reprovision:0|reprovision:1) : ;;
+		route_sniff:*|reprovision:*) fail "Invalid Aether switch: $KEY." ;; esac
+	ENV_KEY="AETHER_$(printf '%s' "$KEY" | tr 'a-z' 'A-Z')"
+	export "$ENV_KEY=$VALUE"
 done
 # Match the cipher lists and GREASE choice of the shared Aether profiles.
 case "$(get fingerprint)" in
@@ -211,7 +265,6 @@ case "$(get fragment)" in
 		if printf '%s\n' "$HELP" | grep -q -- '--no-fragment'; then set -- "$@" --no-fragment; fi ;;
 	*) fail 'Invalid Aether fragmentation setting.' ;;
 esac
-[ "$(get ech)" != 1 ] || set -- "$@" --ech auto
 case "$(get tor_bridges)" in
 	''|auto) : ;; first) set -- "$@" --tor-bridges ;; never) set -- "$@" --no-tor-bridges ;;
 	own)
@@ -223,9 +276,15 @@ case "$(get tor_bridges)" in
 		IFS="$OLDIFS" ;;
 	*) fail 'Invalid Aether Tor bridge mode.' ;;
 esac
-case "$(get tor_relays)" in ''|auto) : ;; only|off) set -- "$@" --tor-relays "$(get tor_relays)" ;; *) fail 'Invalid Aether Tor relay mode.' ;; esac
+case "$(get tor_relays)" in
+	''|auto) : ;;
+	only|off) set -- "$@" --tor-relays "$(get tor_relays)" ;;
+	*[!0-9]*) fail 'Invalid Aether Tor relay mode.' ;;
+	*) set -- "$@" --tor-relays "$(get tor_relays)" ;;
+esac
 PSIPHON_ENTRIES="$(get psiphon_servers)"
 case "$PSIPHON_ENTRIES" in ''|/etc/zirgozar/*) : ;; *) fail 'The Psiphon server list must be under /etc/zirgozar.' ;; esac
+case "$PSIPHON_ENTRIES" in */../*|*/..|*/./*) fail 'Invalid Aether file path.' ;; esac
 case "$(get psiphon_bundled)" in
 	0)
 		unset AETHER_PSIPHON_SERVER_ENTRIES
@@ -247,27 +306,31 @@ mkdir -p "$STATE"
 # the account API without requiring the MASQUE gateway to accept ECH too.
 # Keep existing identities; never replace working keys during a reconnect.
 REGISTER=''
+WG_ID="$STATE/identity"; MASQUE_ID="$STATE/identity-masque"
+if [ -n "$TEAM" ]; then WG_ID="$STATE/identity-team-$TEAM"; MASQUE_ID="$WG_ID"; fi
 case "$PROTO" in
-	wg) [ -s "$STATE/identity.toml" ] || REGISTER=wg ;;
-	masque|wg-over-masque|mim) [ -s "$STATE/identity-masque.toml" ] || REGISTER=masque ;;
+	wg) [ -s "$WG_ID.toml" ] || REGISTER=wg ;;
+	gool) [ -s "$WG_ID.toml" ] && [ -s "$WG_ID-secondary.toml" ] || REGISTER=gool-classic ;;
+	masque|wg-over-masque|mim) [ -s "$MASQUE_ID.toml" ] || REGISTER=masque ;;
 esac
+if [ "$PROTO" = mim ] && [ ! -s "$MASQUE_ID-secondary.toml" ]; then REGISTER=mim; fi
 if [ "$TOR" = only ] || [ "$PSIPHON" = only ]; then REGISTER=''; fi
 register_account() {
-	_ech="$1"
-	set -- "$BIN" --config "$STATE/identity.toml" --register "$REGISTER" --mark "${ZGZ_OUT_MARK:-255}" --upstream "socks5://127.0.0.1:$UPORT"
-	[ -z "$CIPHERS" ] || set -- "$@" --tls-ciphers "$CIPHERS" --disable-grease
-	[ "$(get fragment)" != 1 ] || set -- "$@" --fragment
+	_ech="$1"; shift
+	set -- "$@" --register "$REGISTER" --upstream "socks5://127.0.0.1:$UPORT"
 	[ -z "$API_ADDRESS" ] || set -- "$@" "$API_FLAG" "$API_ADDRESS"
 	[ "$_ech" != 1 ] || set -- "$@" --ech auto --ech-dns "$API_DNS"
-	bounded 30 "$@"
+	bounded 120 "$@"
 }
 if [ -n "$REGISTER" ]; then
 	case "$API_ECH" in
-		0) register_account 0 || fail 'Aether could not create its WARP account. On the Configs page, edit this config, turn on Advanced Aether options and change the WARP account API address or WARP account ECH. Runtime Logs has the details.' ;;
-		1) register_account 1 || fail 'Aether could not create its WARP account. On the Configs page, edit this config, turn on Advanced Aether options and change the WARP account API address or WARP account ECH. Runtime Logs has the details.' ;;
-		*) register_account 1 || register_account 0 || fail 'Aether could not create its WARP account. On the Configs page, edit this config, turn on Advanced Aether options and change the WARP account API address or WARP account ECH. Runtime Logs has the details.' ;;
+		0) register_account 0 "$@" || fail 'Aether could not create its WARP account. On the Configs page, edit this config, turn on Advanced Aether options and change the WARP account API address or WARP account ECH. Runtime Logs has the details.' ;;
+		1) register_account 1 "$@" || fail 'Aether could not create its WARP account. On the Configs page, edit this config, turn on Advanced Aether options and change the WARP account API address or WARP account ECH. Runtime Logs has the details.' ;;
+		*) register_account 1 "$@" || register_account 0 "$@" || fail 'Aether could not create its WARP account. On the Configs page, edit this config, turn on Advanced Aether options and change the WARP account API address or WARP account ECH. Runtime Logs has the details.' ;;
 	esac
 fi
 [ "$MODE" != prepare ] || exit 0
+[ "$(get ech)" != 1 ] || set -- "$@" --ech auto
+[ -z "$(get ech_config)" ] || set -- "$@" --ech "$(get ech_config)"
 [ -z "$API_ADDRESS" ] || set -- "$@" "$API_FLAG" "$API_ADDRESS"
 exec "$@"

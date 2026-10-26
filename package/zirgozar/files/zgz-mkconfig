@@ -1277,8 +1277,8 @@ done
 if bridge_is_aether; then
 	# Enrollment, ECH and Tor bridge discovery run before Aether's SOCKS
 	# listener opens. Their DNS must leave by its entry node as well.
-	_ab_names='"domain:cloudflareclient.com","domain:torproject.org","full:cloudflare-ech.com","full:www.cloudflare.com","full:s3.amazonaws.com"'
-	_ab_extra="$(grep -oE '"(endpoint|outer|inner|ech_domain|ech_dns)":"[^"]*"' "$ZGZ_ETC/bridge.json" |
+	_ab_names='"domain:cloudflareclient.com","full:api.devices.cloudflare.com","domain:cloudflareaccess.com","domain:torproject.org","full:cloudflare-ech.com","full:www.cloudflare.com","full:s3.amazonaws.com"'
+	_ab_extra="$(grep -oE '"(endpoint|outer|inner|h2_peer|ech_domain|ech_dns|api_address|api_host|api_sni|api_ech_dns)":"[^"]*"' "$ZGZ_ETC/bridge.json" |
 		sed 's/^"[a-z_]*":"//; s/"$//; s|^https://||; s|/.*||; s|@.*||; s/:[0-9]*$//' |
 		grep -E '^[A-Za-z0-9.-]+$' | grep '[a-zA-Z]' | sort -u |
 		awk 'NF { printf ",\"full:%s\"", $0 }')"

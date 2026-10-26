@@ -12,13 +12,15 @@ mkdir -p "$WORK"
 cat > "$WORK/aether" <<'CORE'
 #!/bin/sh
 case "$1" in
- --help) printf '%s\n' '--gool-peer --upstream --h2 --tor-only --psiphon-only --masque-sni --tls-ciphers --disable-grease'; exit 0 ;;
+ --help) if [ -s "$ZGZ_RUN/aether-help" ]; then cat "$ZGZ_RUN/aether-help"; else printf '%s\n' '--gool-peer --upstream --h2 --tor-only --psiphon-only --masque-sni --tls-ciphers --disable-grease'; fi; exit 0 ;;
  --version) echo 'aether 2.3.0'; exit 0 ;;
 esac
 for arg in "$@"; do
 	case "$arg" in --no-fragment|--psiphon-no-bundled) echo "unsupported option: $arg" >&2; exit 1 ;; esac
 done
 printf '%s\n' "$@" > "$ZGZ_RUN/aether-argv"
+printf '%s\n' "$@" >> "$ZGZ_RUN/aether-calls"
+env | grep '^AETHER_' > "$ZGZ_RUN/aether-env"
 printf '%s\n' "${AETHER_MASQUE_H2_FRAGMENT:-}" > "$ZGZ_RUN/aether-fragment"
 CORE
 chmod +x "$WORK/aether"
@@ -34,7 +36,7 @@ if cut -f6- "$WORK/import.tsv" | grep -q '"id":"a1"'; then ok 'JSON Aether has i
 "$ZGZ_LIB/zgz-probe" use a1 >/dev/null 2>&1
 "$ZGZ_LIB/zgz-aether" run
 node "$RIG_SRC/test/test-aether.js" imported "$ZGZ_RUN/aether-argv" || bad 'JSON Aether command was not reproduced'
-for MUTATION in shell unknown quote upstream bind cipher; do
+for MUTATION in shell unknown quote upstream bind; do
  node "$RIG_SRC/test/test-aether.js" "$MUTATION" "$PROFILE" > "$WORK/invalid.json"
  check "$(LC_ALL=C awk -f "$ZGZ_LIB/zgz-parse" < "$WORK/invalid.json")" '' "unsupported JSON Aether $MUTATION is rejected without fallback"
 done
@@ -55,6 +57,11 @@ if "$ZGZ_LIB/zgz-aether" check; then ok 'Aether validates without starting a tun
 "$ZGZ_LIB/zgz-aether" run
 node "$RIG_SRC/test/test-aether.js" argv "$ZGZ_RUN/aether-argv" || bad 'wrong Gool, transport or socket mark arguments'
 ok 'helper command completed'
+
+node -e 'const fs=require("fs"); const c=JSON.parse(fs.readFileSync(process.argv[1])); c.aetherCommand+=" --api-host api.devices.cloudflare.com --tls13-ciphers TLS_AES_128_GCM_SHA256 --disable-sct --route-block port:25,full:blocked.example --ech auto"; process.stdout.write(JSON.stringify(c));' "$PROFILE" > "$WORK/advanced.json"
+LC_ALL=C awk -f "$ZGZ_LIB/zgz-parse" < "$WORK/advanced.json" > "$WORK/advanced.tsv"
+if grep -q '"api_host":"api.devices.cloudflare.com"' "$WORK/advanced.tsv" && grep -q '"disable_sct":"1"' "$WORK/advanced.tsv" && grep -q '"route_block":"port:25,full:blocked.example"' "$WORK/advanced.tsv" && grep -q '"ech":"1"' "$WORK/advanced.tsv"; then ok 'JSON command preserves new TLS, API, routing and ECH options'; else bad 'JSON command dropped advanced options'; fi
+
 if grep -qx -- '--upstream' "$ZGZ_RUN/aether-argv"; then bad 'a plain Aether config is sent back through the core'; else ok 'a plain Aether config goes straight out, marked'; fi
 "$ZGZ_LIB/zgz-mkconfig" nogeo > "$WORK/direct.json"
 if node "$RIG_SRC/test/test-aether.js" direct "$WORK/direct.json"; then ok 'direct Aether keeps marked egress and bootstrap DNS outside its tunnel'; else bad 'direct Aether has a bootstrap loop'; fi
@@ -85,6 +92,26 @@ for LINK in 'aether://?protocol=unknown' 'aether://?protocol=masque&scan=unknown
  check "$(printf '%s\n' "$LINK" | LC_ALL=C awk -f "$ZGZ_LIB/zgz-parse")" '' 'invalid Aether options are ignored without a partial record'
 done
 rig_set aether_upstream_port 10809
+node "$RIG_SRC/test/test-aether-v240.js" help > "$ZGZ_RUN/aether-help"
+rig_set a1.link "$(node "$RIG_SRC/test/test-aether-v240.js" link)"
+"$ZGZ_LIB/zgz-probe" use a1 >/dev/null 2>&1
+"$ZGZ_LIB/zgz-aether" run
+node "$RIG_SRC/test/test-aether-v240.js" argv "$ZGZ_RUN/aether-argv" "$ZGZ_RUN/aether-env" || bad 'Aether 2.4 options lost between link and command'
+ok 'Aether 2.4 TLS, transport, tuning and account options reach the core'
+for LINK in 'aether://?startup_secs=bad' 'aether://?route_sniff=2' 'aether://?routes=%2Fetc%2Fzirgozar%2F..%2Fshadow' 'aether://?psiphon_servers=%2Fetc%2Fzirgozar%2F..%2Fshadow'; do
+ rig_set a1.link "$LINK"
+ "$ZGZ_LIB/zgz-probe" use a1 >/dev/null 2>&1
+ if "$ZGZ_LIB/zgz-aether" check >/dev/null 2>&1; then bad 'invalid Aether advanced value accepted'; else ok 'invalid Aether advanced value rejected'; fi
+done
+for PROTOCOL in gool mim; do
+ rig_set a1.link "aether://?protocol=$PROTOCOL&api_ech=0&api_host=api.devices.cloudflare.com&tls_groups=X25519&team=example&access_token=test-token"
+ "$ZGZ_LIB/zgz-probe" use a1 >/dev/null 2>&1
+ rm -f "$ZGZ_RUN/aether-calls"
+ "$ZGZ_LIB/zgz-aether" prepare
+ EXPECT_REGISTER=gool-classic; [ "$PROTOCOL" != mim ] || EXPECT_REGISTER=mim
+ if grep -qx -- "$EXPECT_REGISTER" "$ZGZ_RUN/aether-calls" && grep -qx -- '--api-host' "$ZGZ_RUN/aether-calls" && grep -qx -- '--tls-groups' "$ZGZ_RUN/aether-calls" && grep -qx -- '--team' "$ZGZ_RUN/aether-calls"; then ok 'registration keeps both identities and API/TLS/team settings'; else bad 'registration dropped an identity or account settings'; fi
+done
+rm -f "$ZGZ_RUN/aether-help"
 rig_set a1.aether_exit_node _direct
 rig_set a1.link 'aether://?protocol=masque&transport=h2&fragment=0&psiphon=chain&psiphon_bundled=0#test'
 "$ZGZ_LIB/zgz-probe" use a1 >/dev/null 2>&1

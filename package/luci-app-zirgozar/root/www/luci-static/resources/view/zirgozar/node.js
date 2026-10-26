@@ -76,6 +76,8 @@ var OC_FLAVORS = [ [ 'anyconnect', 'Cisco AnyConnect / ocserv' ], [ 'gp', 'Globa
    providers hand them out with only a server name. */
 var PPP_PORT = { l2tp: '1701', pptp: '1723', sstp: '443', ikev2: '500' };
 var AETHER_FIELDS = 'protocol scan ip transport outer inner noize dns exit_loc fragment fragment_size fragment_delay ech ech_dns ech_domain api_address api_ech api_ech_dns fingerprint sni psiphon psiphon_mode region tor tor_bridges tor_relays bridges cdn_ips cdn_sni cdn_sets psiphon_bundled psiphon_servers'.split(' ');
+var AETHER_EXTRA = 'api_host api_sni exit_loc_secs stats stats_secs quick_reconnect h2_peer quic_v2 data_check validate_secs startup_secs reconnect_secs tls_verify ech_config tls_ciphers tls13_ciphers tls_groups tls_key_shares disable_grease enable_grease_sigalgs tls_sigalgs tls_cert_compression tls_alps tls_trust_anchors tls_server_padding enable_ech_grease disable_ocsp_stapling disable_sct disable_session_ticket disable_extension_permutation keepalive profile_retry tor_relay_ports tor_bridge_file psiphon_config team access_id access_secret access_token gateway route_block route_direct routes perf log_level route_sniff route_sniff_ms wg_endpoint_cooldown_secs wg_stale_secs masque_h2_keepalive_secs masque_h2_keepalive_timeout_secs ironclad_port max_clients half_close_secs tcp_keepalive_secs tcp_connect_secs reprovision'.split(' ');
+AETHER_FIELDS = AETHER_FIELDS.concat(AETHER_EXTRA);
 
 /* Vwarp's disguises for the first packets, lightest first. */
 var NOIZE = [ 'minimal', 'light', 'medium', 'heavy', 'stealth', 'gfw', 'firewall' ];
@@ -994,7 +996,7 @@ return view.extend({
 
 			var aetherChoices = {
 				protocol: [ 'wg', 'masque', 'gool', 'mim', 'wg-over-masque' ],
-				transport: [ 'h2', 'h3' ], scan: [ 'balanced', 'turbo', 'thorough', 'stealth', 'ironclad' ],
+				transport: [ 'h2', 'h3' ], scan: [ 'balanced', 'turbo', 'thorough', 'verified', 'stealth', 'ironclad' ],
 				ip: [ 'v4', 'v6', 'both' ], tor: [ 'off', 'only', 'chain', 'reverse' ],
 				psiphon: [ 'off', 'only', 'chain', 'reverse' ], psiphon_mode: [ 'auto', 'cdn', 'direct' ],
 				noize: [ '', 'off', 'light', 'firewall', 'balanced', 'gfw', 'aggressive' ],
@@ -1003,6 +1005,11 @@ return view.extend({
 				api_ech: [ '', '0', '1' ],
 				tor_bridges: [ 'auto', 'first', 'never', 'own' ], tor_relays: [ 'auto', 'only', 'off' ]
 			};
+			'stats quick_reconnect quic_v2 data_check tls_verify disable_grease enable_grease_sigalgs enable_ech_grease disable_ocsp_stapling disable_sct disable_session_ticket disable_extension_permutation profile_retry gateway route_sniff reprovision'.split(' ').forEach(function(k) { aetherChoices[k] = [ '', '0', '1' ]; });
+			aetherChoices.perf = [ '', 'low', 'medium', 'high' ];
+			aetherChoices.log_level = [ '', 'error', 'warn', 'info', 'debug', 'trace' ];
+			aetherChoices.tor_relay_ports = [ '', 'web', 'any' ];
+			aetherChoices.tls_alps = [ '', 'new', 'old' ];
 			var aetherTitles = { protocol: _('Aether protocol'), transport: _('MASQUE transport'),
 				scan: _('Scan mode'), ip: _('IP version'), outer: _('Outer endpoint'), inner: _('Inner endpoint'),
 				tor: _('Tor mode'), psiphon: _('Psiphon mode'), noize: _('Obfuscation profile'),
@@ -1014,6 +1021,33 @@ return view.extend({
 				tor_relays: _('Tor relay source'), bridges: _('Tor bridge lines'), psiphon_bundled: _('Psiphon bundled servers'),
 				cdn_ips: _('CDN addresses'), cdn_sni: _('CDN server names'), cdn_sets: _('CDN sets'),
 				psiphon_servers: _('Psiphon server list file') };
+			Object.assign(aetherTitles, {
+				api_host: _('WARP API HTTP host'), api_sni: _('WARP API TLS server name'),
+				exit_loc_secs: _('Exit country check interval'), stats: _('Traffic statistics'), stats_secs: _('Statistics interval'),
+				quick_reconnect: _('Reuse last working gateway'), h2_peer: _('HTTP/2 endpoint'), quic_v2: _('QUIC v2 opener'),
+				data_check: _('Validate tunnel traffic'), validate_secs: _('Validation timeout'), startup_secs: _('Startup timeout'),
+				reconnect_secs: _('Reconnect delay'), tls_verify: _('Verify MASQUE certificate'), ech_config: _('Custom ECH key'),
+				keepalive: _('WireGuard keepalive'), profile_retry: _('Retry obfuscation profiles'),
+				tor_relay_ports: _('Tor relay ports'), tor_bridge_file: _('Tor bridge file'), psiphon_config: _('Psiphon configuration file'),
+				team: _('Zero Trust team'), access_id: _('Service token client ID'), access_secret: _('Service token secret'),
+				access_token: _('Zero Trust enrollment token'), gateway: _('Organization gateway'),
+				route_block: _('Aether blocked destinations'), route_direct: _('Aether direct destinations'), routes: _('Aether routes file'),
+				perf: _('Resource profile'), log_level: _('Log level'), route_sniff: _('Read destination server name'),
+				route_sniff_ms: _('Server name read timeout (ms)'), wg_endpoint_cooldown_secs: _('Endpoint cooldown'),
+				wg_stale_secs: _('WireGuard silence timeout'), masque_h2_keepalive_secs: _('HTTP/2 keepalive interval'),
+				masque_h2_keepalive_timeout_secs: _('HTTP/2 keepalive timeout'), ironclad_port: _('Ironclad test port'),
+				max_clients: _('Maximum proxy clients'), half_close_secs: _('Half-closed connection timeout'),
+				tcp_keepalive_secs: _('TCP keepalive interval'), tcp_connect_secs: _('TCP connection timeout'),
+				reprovision: _('Replace rejected WARP identity')
+			});
+			Object.assign(aetherTitles, {
+				tls_ciphers: _('TLS 1.2 cipher suites'), tls13_ciphers: _('TLS 1.3 cipher suites'), tls_groups: _('TLS groups'),
+				tls_key_shares: _('TLS key shares'), disable_grease: _('Disable TLS GREASE'), enable_grease_sigalgs: _('GREASE signature algorithms'),
+				tls_sigalgs: _('TLS signature algorithms'), tls_cert_compression: _('TLS certificate compression'), tls_alps: _('TLS ALPS'),
+				tls_trust_anchors: _('TLS trust anchors'), tls_server_padding: _('TLS server padding'), enable_ech_grease: _('ECH GREASE'),
+				disable_ocsp_stapling: _('Disable OCSP stapling'), disable_sct: _('Disable certificate timestamps'),
+				disable_session_ticket: _('Disable TLS session tickets'), disable_extension_permutation: _('Keep TLS extension order')
+			});
 			var aetherBasic = [ 'protocol', 'transport', 'scan', 'ip', 'outer', 'inner', 'endpoint', 'tor', 'psiphon' ];
 			o = s.option(form.Flag, '_aether_advanced', _('Advanced Aether options'));
 			o.depends('_proto', 'aether');
@@ -1022,6 +1056,14 @@ return view.extend({
 			AETHER_FIELDS.concat([ 'endpoint' ]).forEach(function(k) {
 				var values = aetherChoices[k];
 				var x = field(values ? form.ListValue : form.Value, 'aether_' + k, aetherTitles[k] || ('Aether ' + k));
+				if (/^(access_secret|access_token|ech_config)$/.test(k)) x.password = true;
+				if (/(_secs|_ms)$/.test(k) || k == 'keepalive' || k == 'max_clients') x.datatype = 'uinteger';
+				if (k == 'ironclad_port') x.datatype = 'port';
+				if (k == 'tls_server_padding') x.datatype = 'range(0,65535)';
+				if (k == 'tor_relays') x.value('80', '80');
+				if (/^(tor_bridge_file|psiphon_config|routes)$/.test(k)) x.description = _('Existing file under /etc/zirgozar; leave empty for the default.');
+				if (k == 'gateway') x.description = _('Send web traffic through the organization gateway, including its filtering and logging.');
+				if (k == 'route_direct') x.description = _('Matching destinations bypass Aether. Router traffic rules still apply before Aether.');
 				if (k == 'exit_loc' || k == 'region') {
 					x.value('', _('Auto'));
 					[ ['DE', 'Germany'], ['SE', 'Sweden'], ['FI', 'Finland'], ['NL', 'Netherlands'],
@@ -1048,12 +1090,14 @@ return view.extend({
 				if (k == 'cdn_sets') x.description = 'cloudflare, fastly, cloudfront, psiphon-akamai, psiphon-bunny, vercel, github, curated-fronting, legacy-android-overrides';
 				if (k == 'api_ech') x.description = _('Used only to create WARP keys; it does not enable ECH on the tunnel.');
 				if (k == 'api_ech_dns') x.placeholder = 'udp://8.8.8.8';
-				if (k == 'api_address') x.placeholder = 'api.cloudflareclient.com';
+				if (k == 'api_address') x.placeholder = _('Auto');
+				if (k == 'api_host' || k == 'api_sni') x.placeholder = 'api.devices.cloudflare.com';
 				if (k == 'outer' || k == 'endpoint') x.description = _('Leave empty to scan automatically. A fixed endpoint disables automatic endpoint selection.');
 				if (aetherBasic.indexOf(k) >= 0) x.depends('_proto', 'aether');
 				else x.depends({ '_proto': 'aether', '_aether_advanced': '1' });
 				if (values) values.forEach(function(v) {
 					var label = v || _('Auto');
+					if (v == '0' || v == '1') label = v == '1' ? _('On') : _('Off');
 					if (k == 'protocol') label = { wg: 'WireGuard', masque: 'MASQUE', gool: 'WARP in WARP (classic Gool)', mim: 'MASQUE in MASQUE', 'wg-over-masque': 'WireGuard over MASQUE (new Gool)' }[v];
 					x.value(v, label);
 				});
