@@ -1203,7 +1203,7 @@ var FA = {
 		'همه کانفیگ‌های این اشتراک از طریق کانفیگی که اینجا انتخاب می‌شود وصل می‌شوند.',
 	'Traffic goes through a node of this subscription first and leaves from the one chosen here.':
 		'ترافیک اول از یک کانفیگ این اشتراک عبور می‌کند و از کانفیگی که اینجا انتخاب می‌شود خارج می‌شود.',
-	'Import share links': 'وارد کردن لینک اشتراک',
+	'Import share links': 'وارد کردن لینک کانفیگ',
 	'This config is already in the list: %s': 'این کانفیگ از قبل در فهرست هست: %s',
 	'They are already in the list.': 'این‌ها از قبل در فهرست هستند.',
 	'This subscription is already in the list: %s': 'این اشتراک از قبل در فهرست هست: %s',
@@ -1316,7 +1316,7 @@ var FA = {
 	'The resolver every node’s server name is looked up with, straight out - an IP address, since nothing can be looked up before the tunnel is up. Empty uses Direct DNS. Such as 1.1.1.1, tcp://8.8.8.8 or https://8.8.8.8/dns-query.': 'برای اتصال به کانفیگی که آدرس سرورش دامنه است، ابتدا باید IP آن پیدا شود. مثلا vpn.example.com باید به یک آدرس IP تبدیل شود. این گزینه مشخص می کند کدام DNS این کار را انجام دهد. اگر آدرس سرور از ابتدا IP باشد، این تبدیل لازم نیست. این گزینه DNS باز کردن سایت ها از داخل تونل را تغییر نمی دهد. خالی بگذارید تا از گزینه «DNS مستقیم» استفاده شود؛ معمولا نیازی به تغییر آن نیست. برای تعیین DNS جداگانه، مثلا 1.1.1.1 یا tcp://8.8.8.8 یا https://8.8.8.8/dns-query وارد کنید. آدرس این DNS باید با IP نوشته شود و درخواست به آن مستقیم و خارج از تونل ارسال می شود تا برقراری اتصال به خود تونل وابسته نباشد.',
 	'An IP address, such as 1.1.1.1, tcp://8.8.8.8 or https://8.8.8.8/dns-query.': 'یک آدرس IP، مثلا 1.1.1.1، tcp://8.8.8.8 یا https://8.8.8.8/dns-query.',
 	'%d added; %d were already in the list.': '%d کانفیگ اضافه شد؛ %d تا از قبل در فهرست بودند.',
-	'Enter share links, one per line. Subscription links are not supported!': 'لینک‌های کانفیگ را وارد کنید، هر خط یک لینک. لینک اشتراک پذیرفته نمی‌شود!',
+	'Enter share links, one per line. Subscription links are not supported!': 'لینک‌های کانفیگ را وارد کنید، هر خط یک لینک. آدرس اشتراک را در بخش «اشتراک‌ها» وارد کنید.',
 	'Please enter the correct link.': 'لطفا لینک درست وارد کنید.',
 	'None of those could be read as a node.': 'هیچ‌کدام از این‌ها به‌عنوان کانفیگ خوانده نشد.',
 	'No node is selected.': 'هیچ کانفیگی انتخاب نشده است.',

@@ -10,7 +10,7 @@
 # Solar Hijri date in Asia/Tehran: year since 1400, month, day.
 # Keep VERSION for the whole day; increment RELEASE for same-day updates.
 VERSION=5.8.4
-RELEASE=3
+RELEASE=4
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"

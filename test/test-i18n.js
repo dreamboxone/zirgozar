@@ -39,7 +39,7 @@ for (const [language, catalog] of Object.entries({ zh: zh.strings, ru: ru.string
 }
 i18n.setLang('fa');
 assert.equal(i18n.dir(), 'rtl');
-assert.equal(i18n.tr('Import share links'), 'وارد کردن لینک اشتراک');
+assert.equal(i18n.tr('Import share links'), 'وارد کردن لینک کانفیگ');
 assert.equal(original._('Save'), 'ذخیره');
 i18n.setLang('en');
 assert.equal(i18n.tr('All configs'), 'All nodes');
