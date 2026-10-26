@@ -566,9 +566,13 @@ method_system() {
 	# the whole App Update page used to wait the second and a half for it.
 	_dc="$ZGZ_RUN/deps.json"
 	_deps="$(cat "$_dc" 2>/dev/null)"
-	_age=600
+	# A failed network check can be transient during an upgrade or reconnect.
+	# Keep successful checks cheap, but retry failures while the page is open.
+	_deps_ttl=600
+	printf '%s' "$_deps" | grep -q '"https"[[:space:]]*:[[:space:]]*false' && _deps_ttl=30
+	_age=$_deps_ttl
 	[ -n "$_deps" ] && _age=$(( $(date +%s) - $(date -r "$_dc" +%s 2>/dev/null || echo 0) ))
-	if [ "$_age" -lt 0 ] || [ "$_age" -ge 600 ]; then
+	if [ "$_age" -lt 0 ] || [ "$_age" -ge "$_deps_ttl" ]; then
 		# One check at a time; a lock left by a check that died is let go
 		# after two minutes.
 		_dl="$ZGZ_RUN/deps.lock"
