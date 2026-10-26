@@ -5,6 +5,7 @@
 
 . "$(dirname "$0")/rig.sh"
 rig_setup
+node "$RIG_SRC/test/test-aether-scan.js" || bad 'Aether scan result parsing failed'
 node "$RIG_SRC/test/test-aether-ui.js" || bad 'Aether UI corrupts share links'
 . "$ZGZ_LIB/zgz-common.sh"
 WORK="$RIG/aether-test"
@@ -73,6 +74,30 @@ if node "$RIG_SRC/test/test-aether.js" config "$WORK/chained.json"; then ok 'exi
 if [ -n "$RIG_XRAY" ] && [ -x "$RIG_XRAY" ]; then
  if "$RIG_XRAY" run -test -config "$WORK/chained.json" > "$WORK/core.log" 2>&1; then ok 'Xray accepts chained Aether routing'; else bad 'Xray refuses Aether routing'; cat "$WORK/core.log"; fi
 fi
+rig_set a1.aether_exit_node _direct
+rig_set a1.aether_exit_finalmask '{"tcp":[{"type":"fragment","settings":{"packets":"tlshello","lengths":["6","98","1"],"delays":["0"],"maxSplit":"0"}}]}'
+"$ZGZ_LIB/zgz-aether" run
+if grep -qx -- '--upstream' "$ZGZ_RUN/aether-argv"; then ok 'Aether with an entry mask actually dials through Xray'; else bad 'entry mask is bypassed'; fi
+rig_set core_engine singbox
+check "$(wanted_engine)" xray 'Aether entry masks select Xray instead of dropping the mask in sing-box'
+rig_set core_engine xray
+"$ZGZ_LIB/zgz-mkconfig" nogeo > "$WORK/masked.json"
+node -e 'const c=require(process.argv[1]); const a=c.outbounds.find(x=>x.tag==="aether-entry"); if(!a?.streamSettings.finalmask.tcp.length || a.streamSettings.sockopt.mark!==255 || !c.routing.rules.some(r=>r.inboundTag?.includes("aether-via")&&r.outboundTag==="aether-entry")) process.exit(1);' "$WORK/masked.json" && ok 'entry mask and socket mark reach the outbound carrying Aether' || bad 'entry mask was applied to the wrong outbound'
+if find_xray "$WORK/masked.json" >/dev/null 2>&1; then bad 'entry mask silently fell back to an unrelated Xray'; else ok 'entry mask requires the compatible patterniha core'; fi
+mkdir -p "$(core_dir)"
+printf '#!/bin/sh\nexit 0\n' > "$(core_dir)/xray-patterniha"; chmod +x "$(core_dir)/xray-patterniha"
+check "$(find_xray "$WORK/masked.json")" "$(core_dir)/xray-patterniha" 'entry mask chooses patterniha'
+rm -f "$(core_dir)/xray-patterniha"
+for INVALID in null '[]' '{broken'; do
+ rig_set a1.aether_exit_finalmask "$INVALID"
+ if "$ZGZ_LIB/zgz-mkconfig" nogeo > /dev/null 2>&1; then bad 'invalid entry mask accepted'; else ok 'invalid entry mask rejected'; fi
+done
+rig_set a1.aether_exit_finalmask ''
+rig_set a1.aether_exit_dial_mode custom-core-mode
+"$ZGZ_LIB/zgz-mkconfig" nogeo > "$WORK/dial-mode.json"
+node -e 'const c=require(process.argv[1]); if(c.outbounds.find(x=>x.tag==="aether-entry")?.streamSettings.sockopt.dialMode!=="custom-core-mode") process.exit(1)' "$WORK/dial-mode.json" && ok 'custom dialMode reaches the Aether entry socket' || bad 'dialMode was lost'
+rig_set a1.aether_exit_dial_mode ''
+rig_set a1.aether_exit_node n1
 for KIND in tor psiphon; do
  rig_set a1.link "aether://?protocol=masque&transport=h2&$KIND=only#exit"
  "$ZGZ_LIB/zgz-probe" use a1 >/dev/null 2>&1

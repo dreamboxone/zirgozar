@@ -162,15 +162,15 @@ _aether_out=direct
 _aether_entry=''
 if bridge_is_aether && [ -z "$aether_via" ]; then
 	_ae_id="$(sed -n 's/.*"id":"\([A-Za-z0-9_]*\)".*/\1/p' "$ZGZ_ETC/bridge.json")"
-	_ae_mask="$(uci -q get "zirgozar.$_ae_id.aether_exit_finalmask")" || _ae_mask=''
-	_ae_mode="$(uci -q get "zirgozar.$_ae_id.aether_exit_dial_mode")" || _ae_mode=''
+	_ae_mask="$(aether_entry_setting fm)" || _ae_mask=''
+	_ae_mode="$(aether_entry_setting dialMode)" || _ae_mode=''
+	case "$_ae_mode" in *[!A-Za-z0-9_.-]*) echo 'Invalid Aether dialMode name.' >&2; exit 1 ;; esac
 	if [ -n "$_ae_mask$_ae_mode" ]; then
 		_ae_stream="\"sockopt\":{\"mark\":${ZGZ_OUT_MARK}"
 		if [ -n "$_ae_mode" ]; then _ae_stream="$_ae_stream,\"dialMode\":\"$(json_escape "$_ae_mode")\""; fi
 		_ae_stream="$_ae_stream}"
 		if [ -n "$_ae_mask" ]; then
-			case "$_ae_mask" in *'{'*'}'*) : ;; *) echo 'Aether FinalMask must be a JSON object.' >&2; exit 1 ;; esac
-			printf '%s\n' "$_ae_mask" | jsonfilter -e '@' >/dev/null 2>&1 || { echo 'Invalid Aether FinalMask JSON.' >&2; exit 1; }
+			printf '%s\n' "$_ae_mask" | ucode -e 'import { readfile } from "fs"; let v=json(readfile("/dev/stdin")); exit(type(v)=="object" ? 0 : 1);' >/dev/null 2>&1 || { echo 'Aether FinalMask must be a JSON object.' >&2; exit 1; }
 			_ae_stream="$_ae_stream,\"finalmask\":$_ae_mask"
 		fi
 		_aether_out=aether-entry

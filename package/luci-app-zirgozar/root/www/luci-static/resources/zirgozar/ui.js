@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.8.4-r4';
+var BUILD = '5.8.4-r5';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -92,7 +92,7 @@ function logoImg(file, height, cls) {
    removed. When the router says another version than the one these pages
    were built for, each file is fetched again past the cache and the page
    reloaded, once. */
-var OWN_FILES = [ 'zirgozar/ui', 'zirgozar/i18n', 'zirgozar/status', 'zirgozar/qr', 'zirgozar/logfa', 'zirgozar/nodelink',
+var OWN_FILES = [ 'zirgozar/ui', 'zirgozar/i18n', 'zirgozar/status', 'zirgozar/qr', 'zirgozar/logfa', 'zirgozar/nodelink', 'zirgozar/presets', 'zirgozar/aetherscan',
 	'view/zirgozar/settings', 'view/zirgozar/nodes', 'view/zirgozar/node', 'view/zirgozar/server', 'view/zirgozar/subscribe', 'view/zirgozar/other',
 	'view/zirgozar/shunt_rule',
 	'view/zirgozar/update', 'view/zirgozar/traffic', 'view/zirgozar/geoview', 'view/zirgozar/acl',

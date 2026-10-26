@@ -464,6 +464,8 @@ function node_extras(p,   ss, sec, t, sock, net, ws, k, v, pem, n, a, i, arr, h)
 	if (NX["finalmask"] ~ /^[ \t]*\{.*\}[ \t]*$/) ss = jset(ss, "finalmask", NX["finalmask"])
 	sock = jraw(ss, "sockopt")
 	if (sock == "") sock = "{}"
+	if (NX["dial_mode"] ~ /^[A-Za-z0-9_.-]+$/ && length(NX["dial_mode"]) <= 64)
+		sock = jset(sock, "dialMode", "\"" jesc(NX["dial_mode"]) "\"")
 	if (NX["tcp_fast_open"] == "1")  sock = jset(sock, "tcpFastOpen", "true")
 	if (NX["tcp_mptcp"] == "1")      sock = jset(sock, "tcpMptcp", "true")
 	if (NX["domain_strategy"] ~ /^(AsIs|UseIP|UseIPv4|UseIPv6|UseIPv4v6|UseIPv6v4|ForceIP|ForceIPv4|ForceIPv6|ForceIPv4v6|ForceIPv6v4)$/)
@@ -1326,6 +1328,7 @@ function do_aether(body,   label, query, p, proto, scan, ip, transport, outer, i
 	m = split("api_host api_sni exit_loc_secs stats stats_secs quick_reconnect h2_peer quic_v2 data_check validate_secs startup_secs reconnect_secs tls_verify ech_config tls_ciphers tls13_ciphers tls_groups tls_key_shares disable_grease enable_grease_sigalgs tls_sigalgs tls_cert_compression tls_alps tls_trust_anchors tls_server_padding enable_ech_grease disable_ocsp_stapling disable_sct disable_session_ticket disable_extension_permutation keepalive profile_retry tor_relay_ports tor_bridge_file psiphon_config team access_id access_secret access_token gateway route_block route_direct routes perf log_level route_sniff route_sniff_ms wg_endpoint_cooldown_secs wg_stale_secs masque_h2_keepalive_secs masque_h2_keepalive_timeout_secs ironclad_port max_clients half_close_secs tcp_keepalive_secs tcp_connect_secs reprovision", extra, " ")
 	for (i = 1; i <= m; i++) keys[n + i] = extra[i]
 	n += m
+	keys[++n] = "fm"; keys[++n] = "dialMode"
 	for (i = 1; i <= n; i++) {
 		k = keys[i]; v = qs(query, k)
 		if (v != "") payload = payload ",\"" k "\":\"" jesc(v) "\""

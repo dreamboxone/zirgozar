@@ -826,6 +826,16 @@ method_action() {
 				*) fail "unknown core"; return ;;
 			esac
 			;;
+		aether_scan_start)
+			json_load "$arg" 2>/dev/null || { fail 'Invalid Aether draft.'; return; }
+			json_get_var _scan_sid sid
+			case "$_scan_sid" in ''|*[!A-Za-z0-9_]*) fail 'Invalid Aether account identifier.'; return ;; esac
+			printf '%s' "$arg" | "$ZGZ_LIB/zgz-aether-scan" start "$_scan_sid"
+			return 0 ;;
+		aether_scan_status|aether_scan_cancel)
+			case "$arg" in ''|*[!A-Za-z0-9_]*) fail 'Invalid Aether account identifier.'; return ;; esac
+			"$ZGZ_LIB/zgz-aether-scan" "${name#aether_scan_}" "$arg"
+			return 0 ;;
 		aether_clear_psiphon)
 			case "$arg" in ''|*[!A-Za-z0-9_]*) fail 'Unknown Aether node.'; return ;; esac
 			_clear_error="$("$ZGZ_LIB/zgz-aether" clear-psiphon "$arg" 2>&1)" || { fail "$_clear_error"; return; }

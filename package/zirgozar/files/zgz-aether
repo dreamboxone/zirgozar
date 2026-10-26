@@ -19,6 +19,7 @@ fail() { say_message "$1"; printf '%s\n' "$1" >&2; exit 1; }
 BIN="$(aether_path)"
 case "$MODE" in version|--version) "$BIN" --version; exit $? ;; esac
 if [ "$MODE" = test ]; then
+	[ ! -d "$ZGZ_RUN/aether-scan.lock" ] || { echo -2; exit 0; }
 	SID="${2:-}"
 	case "$SID" in ''|*[!A-Za-z0-9_]*) echo -2; exit 0 ;; esac
 	[ -x "$BIN" ] || { echo -2; exit 0; }
@@ -69,6 +70,7 @@ if [ "$MODE" = test ]; then
 	printf '#!/bin/sh\nexec "%s" -c "%s/config" "$@"\n' "$UCI_BIN" "$WORK" > "$WORK/bin/uci"
 	chmod 700 "$WORK/bin/uci"
 	export PATH="$WORK/bin:$PATH" ZGZ_ETC="$WORK/etc" ZGZ_RUN="$WORK/run" ZGZ_LOG="$WORK/test.log"
+	. "$ZGZ_LIB/zgz-common.sh"
 	uci set "zirgozar.config.node=$ID"
 	uci set zirgozar.config.bridge_port=24920
 	uci set zirgozar.config.aether_aux_port=24921
@@ -187,6 +189,7 @@ TOR="$(get tor)"; PSIPHON="$(get psiphon)"
 # address given as a name, which a marked Aether cannot look up.
 case "$API_ADDRESS" in ''|[0-9]*.*.*.*|\[*) UPNAME='' ;; *) UPNAME=1 ;; esac
 if [ -z "$API_ADDRESS" ] && { [ -n "$(get api_host)" ] || [ -n "$(get api_sni)" ]; }; then UPNAME=1; fi
+if [ -z "$VIA" ] && { [ -n "$(aether_entry_setting fm)" ] || [ -n "$(aether_entry_setting dialMode)" ]; }; then UPNAME=1; fi
 if [ -n "$VIA" ] || [ -n "$UPNAME" ] || { [ -n "$TOR" ] && [ "$TOR" != off ]; } || { [ -n "$PSIPHON" ] && [ "$PSIPHON" != off ]; }; then
 	set -- "$@" --upstream "socks5://127.0.0.1:$UPORT"
 fi

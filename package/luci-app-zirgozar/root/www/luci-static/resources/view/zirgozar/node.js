@@ -29,6 +29,8 @@
 'require zirgozar.qr as qr';
 'require zirgozar.ui as pui';
 'require zirgozar.nodelink as nodelink';
+'require zirgozar.presets as presets';
+'require zirgozar.aetherscan as aetherscan';
 
 var _ = i18n.tr;
 
@@ -1108,7 +1110,19 @@ return view.extend({
 			o.value('_direct', _('Direct'));
 			aetherExitNodes(uci.sections('zirgozar', 'node'), sid).forEach(function(n) { o.value(n.tag, n.label); });
 			o.default = '_direct';
-			o = s.option(form.TextValue, 'aether_exit_finalmask', _('Exit-node FinalMask JSON'));
+			function aetherEntryField(option, key) {
+				option.cfgvalue = function(section) {
+					var v = uci.get('zirgozar', section, this.option);
+					return v == null ? ((f.rest || {})[key] || '') : v;
+				};
+				option.write = function(section, value) {
+					uci.set('zirgozar', section, this.option, value || '');
+					f.rest = f.rest || {}; f.rest[key] = value || '';
+				};
+				option.remove = function(section) { this.write(section, ''); };
+				return option;
+			}
+			o = presets.withFinalMask(aetherEntryField(s.option(form.TextValue, 'aether_exit_finalmask', _('Exit-node FinalMask JSON')), 'fm'));
 			o.depends('_proto', 'aether');
 			o.rows = 3;
 			o.description = _('Applied to the direct entry of Aether. When an exit node is selected, edit that node’s own settings.');
@@ -1117,9 +1131,20 @@ return view.extend({
 				try { var parsed = JSON.parse(value); return parsed && typeof parsed == 'object' && !Array.isArray(parsed) ? true : _('Expected a JSON object.'); }
 				catch (e) { return _('Expected a JSON object.'); }
 			};
-			o = s.option(form.Value, 'aether_exit_dial_mode', _('Exit-node dialMode'));
+			o = presets.withDialMode(aetherEntryField(s.option(form.Value, 'aether_exit_dial_mode', _('Exit-node dialMode')), 'dialMode'));
 			o.depends('_proto', 'aether');
-			o.description = _('Requires an Xray build supporting dialMode. Leave empty for the default.');
+			o = s.option(form.Button, '_aether_endpoint_scan', _('Endpoint scan'));
+			o.depends('_proto', 'aether');
+			o.inputtitle = _('Scan endpoints');
+			o.onclick = function() {
+				return m.parse().then(function() {
+					return aetherscan.open({ sid: sid, link: uci.get('zirgozar', sid, 'link'),
+						exit_node: uci.get('zirgozar', sid, 'aether_exit_node') || '_direct',
+						fm: uci.get('zirgozar', sid, 'aether_exit_finalmask') || (f.rest || {}).fm || '',
+						dialMode: uci.get('zirgozar', sid, 'aether_exit_dial_mode') || (f.rest || {}).dialMode || ''
+					}, function(result, protocol) { aetherscan.applyEndpoints(m, sid, f, result, protocol); });
+				});
+			};
 			o = s.option(form.Button, '_aether_clear_psiphon', _('Clear Psiphon data'));
 			o.depends('_proto', 'aether');
 			o.inputtitle = _('Clear Psiphon data');
@@ -1717,15 +1742,11 @@ return view.extend({
 			o.value('Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Safari/605.1.15', 'Safari');
 			onType(o, [ 'ws', 'httpupgrade', 'xhttp', 'grpc' ]);
 
-			o = xr(s.option(form.TextValue, 'finalmask', 'FinalMask',
-				_('Xray’s finalmask for this node, as a JSON object. The fragment and noise of the Xray tab are still added, unless this has its own.')));
+			o = presets.withFinalMask(xr(s.option(form.TextValue, 'finalmask', 'FinalMask',
+				_('Xray’s finalmask for this node, as a JSON object. The fragment and noise of the Xray tab are still added, unless this has its own.'))));
 			o.rows = 4;
 			o.monospace = true;
-			o.validate = function(section_id, value) {
-				if (!value) return true;
-				try { return (typeof JSON.parse(value) == 'object') ? true : _('Must be JSON text!'); }
-				catch (e) { return _('Must be JSON text!'); }
-			};
+			o = presets.withDialMode(xr(s.option(form.Value, 'dial_mode', 'dialMode')));
 
 			o = xr(s.option(form.Flag, 'tcp_fast_open', _('TCP Fast Open'), _('Need node support required')));
 			o = xr(s.option(form.Flag, 'tcp_mptcp', 'tcpMptcp',

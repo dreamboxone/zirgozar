@@ -1,0 +1,41 @@
+#!/usr/bin/ucode
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+import { readfile } from 'fs';
+let dir = ARGV[0];
+function text(name) { return trim(readfile(dir + '/' + name) || ''); }
+let log = readfile(dir + '/aether.log') || '';
+let proto = text('protocol'), found = {};
+function endpoint(value) {
+	return value && match(value, /^(\[[0-9a-fA-F:]+\]|[0-9.]+):[0-9]+$/) ? value : null;
+}
+for (let line in split(log, '\n')) {
+	let m;
+	if (proto == 'masque') {
+		m = match(line, /selected MASQUE gateway (\S+)/);
+		if (m && endpoint(m[1])) found = { endpoint: m[1] };
+	} else if (proto == 'wg') {
+		m = match(line, /selected WireGuard endpoint (\S+)/);
+		if (m && endpoint(m[1])) found = { endpoint: m[1] };
+	} else if (proto == 'wg-over-masque') {
+		m = match(line, /gool ready: masque (\S+) carries wireguard (\S+)/);
+		if (m && endpoint(m[1])) found = { outer: m[1] };
+	} else {
+		m = proto == 'mim'
+			? match(line, /masque-in-masque ready: (\S+) \(outer\) and (\S+) \(inner\)/)
+			: match(line, /using cloudflare edge (\S+) \(outer\) and (\S+) \(inner\)/);
+		if (m && endpoint(m[1]) && endpoint(m[2])) found = { outer: m[1], inner: m[2] };
+	}
+}
+let state = text('state') || 'idle';
+if (ARGV[1] == 'endpoints') {
+	if (!found.endpoint && !found.outer) exit(1);
+	printf('%J\n', found); exit(0);
+}
+let saved;
+try { saved = json(text('result.json')); } catch (e) { saved = {}; }
+printf('%J\n', {
+	ok: true, state: state, running: state == 'starting' || state == 'running',
+	protocol: proto, result: saved || {},
+	message: text('message'), log: join('\n', slice(split(substr(log, -8192), '\n'), -10))
+});

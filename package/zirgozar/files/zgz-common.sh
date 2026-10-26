@@ -293,6 +293,15 @@ xray_preferred() {
 find_xray() {
 	_cfg="$1"
 	_pref="$(xray_preferred)"
+	_xpool="$_pref $(xray_by_version)"
+	if [ -s "$_cfg" ] && grep -q '"tag"[[:space:]]*:[[:space:]]*"aether-entry"' "$_cfg"; then
+		_xpool="$(core_dir)/xray-patterniha"
+		if [ ! -x "$_xpool" ]; then
+			say_message 'Aether entry settings require Xray-patterniha. Install it on the App Update page.'
+			warn 'Aether entry settings require Xray-patterniha. Install it on the App Update page.'
+			return 1
+		fi
+	fi
 	# The configuration is offered to the core exactly as the service will run
 	# it, and that includes telling it where geoip.dat and geosite.dat are.
 	#
@@ -319,7 +328,7 @@ find_xray() {
 		: > "$_xerr"
 		chmod 600 "$_xlog" "$_xerr"
 	fi
-	for _x in $_pref $(xray_by_version); do
+	for _x in $_xpool; do
 		[ -n "$_x" ] || continue
 		[ -x "$_x" ] || continue
 		if [ -n "$_cfg" ]; then
@@ -381,6 +390,10 @@ core_engine() {
 # every directive of a profile works - see ovpn_conf in zgz-parse.
 wanted_engine() {
 	_we="$(core_engine)"
+	if bridge_is_aether && [ -z "$(aether_via)" ] &&
+	   { [ -n "$(aether_entry_setting fm)" ] || [ -n "$(aether_entry_setting dialMode)" ]; }; then
+		echo xray; return 0
+	fi
 	if [ "$_we" = "xray" ] && [ -s "$ZGZ_ETC/bridge.json" ] && ! bridge_is_warp && ! bridge_is_ovpn && ! bridge_is_aether && ! bridge_is_l2tp && ! bridge_is_ppp && ! bridge_is_ikev2 && ! bridge_is_own &&
 	   [ -x "$(engine_singbox_path)" ]; then
 		_we=singbox
@@ -492,6 +505,15 @@ aether_via() {
 	[ -n "$_av_via" ] && [ "$_av_via" != "_direct" ] || return 1
 	case "$_av_via" in *[!A-Za-z0-9_]*) return 1 ;; esac
 	echo "$_av_via"
+}
+
+# Link settings and the older per-node options describe the same entry hop.
+aether_entry_setting() {
+	case "$1" in fm) _aes_option=aether_exit_finalmask ;; dialMode) _aes_option=aether_exit_dial_mode ;; *) return 1 ;; esac
+	_aes_id="$(sed -n 's/.*"id":"\([A-Za-z0-9_]*\)".*/\1/p' "$ZGZ_ETC/bridge.json" | head -1)"
+	case "$_aes_id" in ''|*[!A-Za-z0-9_]*) return 1 ;; esac
+	uci -q get "zirgozar.$_aes_id.$_aes_option" 2>/dev/null && return 0
+	ucode -e 'import { readfile } from "fs"; let x=json(readfile(ARGV[0])); let v=x[ARGV[1]]; if (type(v)=="string") printf("%s",v);' "$ZGZ_ETC/bridge.json" "$1" 2>/dev/null
 }
 
 # The node an OpenVPN node is reached through, if any: its own pre-proxy,
@@ -825,7 +847,10 @@ missing_cores() {
 					*) [ -x "$(warpplus_path)" ] || [ -x "$(vwarp_path)" ] || echo warp-plus ;;
 				esac ;;
 			aether)
-				[ -x "$(aether_path)" ] || echo Aether ;;
+				[ -x "$(aether_path)" ] || echo Aether
+				if printf '%s' "$_mc_j" | grep -qE '"(fm|dialMode)":"[^" ]'; then
+					[ -x "$(core_dir)/xray-patterniha" ] || echo xray-patterniha
+				fi ;;
 			openvpn)
 				command -v openvpn >/dev/null 2>&1 || [ -x /usr/sbin/openvpn ] || echo OpenVPN ;;
 		esac
@@ -1810,7 +1835,7 @@ node_domain_strategy() {
 # as the lines zgz-parse reads them from: "#!zgz-x.<key>=<value>". A
 # certificate keeps its lines with a bar between them, a JSON object loses its
 # line breaks. Nothing at all for a node that has none.
-NODE_EXTRA_KEYS="ech ech_repack tls_pin cert_name tls_pem cipher_suites user_agent finalmask tcp_fast_open tcp_mptcp domain_strategy happy_eyeballs warpplus ws_heartbeat grpc_idle grpc_health grpc_window grpc_permit kcp_mtu kcp_tti kcp_uplink kcp_downlink kcp_read kcp_write kcp_congestion sb_mux sb_mux_streams sb_mux_padding sb_brutal_up sb_brutal_down wg_system ssrust hy_portmap"
+NODE_EXTRA_KEYS="ech ech_repack tls_pin cert_name tls_pem cipher_suites user_agent finalmask dial_mode tcp_fast_open tcp_mptcp domain_strategy happy_eyeballs warpplus ws_heartbeat grpc_idle grpc_health grpc_window grpc_permit kcp_mtu kcp_tti kcp_uplink kcp_downlink kcp_read kcp_write kcp_congestion sb_mux sb_mux_streams sb_mux_padding sb_brutal_up sb_brutal_down wg_system ssrust hy_portmap"
 
 node_extras() {
 	for _nk in $NODE_EXTRA_KEYS; do

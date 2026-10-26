@@ -45,6 +45,41 @@ var LANGUAGES = { en: 'English', fa: 'فارسی', zh: '简体中文', ru: 'Ру
 var CATALOGS = { zh: zh.strings, ru: ru.strings };
 
 var FA = {
+	'FinalMask preset': "حالت آماده FinalMask",
+	'Custom': "دلخواه",
+	'Replace the custom FinalMask with this preset?': "FinalMask دلخواه با این حالت آماده جایگزین شود؟",
+	'Empty uses the core default. Custom dialMode names require a core that implements them.': "خالی یعنی حالت پیش‌فرض هسته. نام دلخواه dialMode به هسته‌ای نیاز دارد که آن حالت را پیاده‌سازی کرده باشد.",
+	'Invalid dialMode name.': "نام dialMode معتبر نیست.",
+	'Endpoint scan': "اسکن اندپوینت",
+	'Scan endpoints': "اسکن اندپوینت‌ها",
+	'The Aether protocol changed; scan again.': "پروتکل اتر تغییر کرده؛ دوباره اسکن کنید.",
+	'Starting Aether scan…': "در حال شروع اسکن اتر…",
+	'The scan tests the current form without saving it. Apply the result to the form, then save the config.': "اسکن، تنظیمات فعلی فرم را بدون ذخیره‌کردن آزمایش می‌کند. نتیجه را به فرم اعمال کنید و سپس کانفیگ را ذخیره کنید.",
+	'Stopping Aether scan…': "در حال توقف اسکن اتر…",
+	'Cancel scan': "لغو اسکن",
+	'Apply endpoints to form': "اعمال اندپوینت‌ها به فرم",
+	'Aether endpoint scan': "اسکن اندپوینت اتر",
+	'Aether scan failed.': "اسکن اتر ناموفق بود.",
+	'A working Aether endpoint was found.': "یک اندپوینت سالم اتر پیدا شد.",
+	'Aether scan cancelled.': "اسکن اتر لغو شد.",
+	'Scanning and testing Aether endpoints…': "در حال اسکن و آزمایش اندپوینت‌های اتر…",
+	'Another Aether test is running.': "یک تست دیگر اتر در حال اجراست.",
+	'Stop this Aether connection before scanning its account.': "پیش از اسکن این حساب، اتصال اتر آن را متوقف کنید.",
+	'Another Aether scan is running.': "یک اسکن دیگر اتر در حال اجراست.",
+	'The Aether draft is too large.': "حجم تنظیمات اتر بیش از حد مجاز است.",
+	'The Aether scan stopped unexpectedly.': "اسکن اتر به‌طور غیرمنتظره متوقف شد.",
+	'Invalid Aether draft.': "تنظیمات موقت اتر معتبر نیست.",
+	'The draft is not an Aether config.': "تنظیمات موقت برای یک تونل وارپ اتر معتبر نیست.",
+	'Invalid Aether exit-node.': "نود ورودی اتر معتبر نیست.",
+	'An Aether scan port is already in use.': "یکی از پورت‌های اسکن اتر در حال استفاده است.",
+	'The Aether config could not be read.': "کانفیگ اتر خوانده نشد.",
+	'The scan configuration could not be built.': "تنظیمات اجرای اسکن ساخته نشد.",
+	'No compatible Xray is available for this Aether entry.': "هسته Xray سازگار با این مسیر ورودی اتر پیدا نشد.",
+	'The Aether draft contains unsupported settings.': "تنظیمات موقت اتر شامل گزینه‌های پشتیبانی‌نشده است.",
+	'Aether stopped before a working endpoint was found.': "اتر پیش از یافتن اندپوینت سالم متوقف شد.",
+	'No working Aether endpoint was found before the scan timed out.': "تا پایان مهلت اسکن، اندپوینت سالمی برای اتر پیدا نشد.",
+	'Aether entry settings require Xray-patterniha. Install it on the App Update page.': "تنظیمات این مسیر ورودی اتر به Xray پترنیها نیاز دارد؛ آن را در صفحه به‌روزرسانی برنامه نصب کنید.",
+
 	'WARP API HTTP host': 'نام میزبان HTTP برای API وارپ',
 	'WARP API TLS server name': 'نام سرور TLS برای API وارپ',
 	'Exit country check interval': 'فاصله بررسی کشور خروجی',
@@ -325,9 +360,9 @@ var FA = {
 	'SSTP tests': 'تست‌های SSTP',
 	'PPTP uses TCP port 1723 and GRE. Its encryption is weak: use it only when nothing else gets through. Ping measures the server address. TCPing measures a TCP connection through the tunnel to the test URL; URL Test measures the full request.': 'PPTP از پورت TCP شماره ۱۷۲۳ و GRE استفاده می‌کند. رمزگذاری آن ضعیف است: فقط وقتی استفاده کنید که چیز دیگری رد نمی‌شود. پینگ زمان پاسخ آدرس سرور را می‌سنجد. TCPing زمان اتصال TCP از داخل تونل به مقصد تست و URL Test زمان درخواست کامل را می‌سنجد.',
 	'SSTP runs inside HTTPS, normally on port 443, so it gets through most firewalls. The server certificate is not checked. Ping measures the server address. TCPing measures a TCP connection through the tunnel to the test URL; URL Test measures the full request.': 'SSTP داخل HTTPS و معمولا روی پورت ۴۴۳ کار می‌کند، برای همین از بیشتر فایروال‌ها رد می‌شود. گواهی سرور بررسی نمی‌شود. پینگ زمان پاسخ آدرس سرور را می‌سنجد. TCPing زمان اتصال TCP از داخل تونل به مقصد تست و URL Test زمان درخواست کامل را می‌سنجد.',
-	"OpenVPN could not be installed: a kernel module it needs is not available for this router's firmware. Update the firmware to the latest official OpenWrt release.":
+	'OpenVPN could not be installed: a kernel module it needs is not available for this router\'s firmware. Update the firmware to the latest official OpenWrt release.':
 		'OpenVPN نصب نشد: ماژول کرنلی که لازم دارد برای فریم‌ور این روتر وجود ندارد. فریم‌ور را به آخرین نسخه رسمی OpenWrt به‌روز کنید.',
-	"OpenVPN could not be installed: the official source of kernel modules (kmods) is missing from this router's package sources, so no kernel module can be installed. The line to add is on the Runtime Logs page.":
+	'OpenVPN could not be installed: the official source of kernel modules (kmods) is missing from this router\'s package sources, so no kernel module can be installed. The line to add is on the Runtime Logs page.':
 		'OpenVPN نصب نشد: منبع رسمی ماژول‌های کرنل (kmods) در فهرست منبع‌های بسته این روتر نیست، پس هیچ ماژول کرنلی نصب نمی‌شود. خطی که باید اضافه شود در صفحه «گزارش‌ها» نوشته شده.',
 	'The %s that was downloaded could not be installed - %s.': '%s که دانلود شد نصب نشد - %s.',
 	'what came back is not a program at all - the address may have moved, or answered with an error page':

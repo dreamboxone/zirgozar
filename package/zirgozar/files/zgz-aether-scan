@@ -1,0 +1,143 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+set -eu
+. "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
+MODE="${1:-}"; SID="${2:-}"
+case "$SID" in ''|*[!A-Za-z0-9_]*) printf '{"ok":false,"error":"Invalid Aether account identifier."}\n'; exit 1 ;; esac
+[ "${#SID}" -le 64 ] || { printf '{"ok":false,"error":"Invalid Aether account identifier."}\n'; exit 1; }
+BASE="$ZGZ_RUN/aether-scans"; DIR="$BASE/$SID"; LOCK="$ZGZ_RUN/aether-scan.lock"
+status() { ucode "$ZGZ_LIB/zgz-aether-scan-result" "$DIR"; }
+alive() {
+	_pid="$(cat "$DIR/pid" 2>/dev/null || true)"
+	case "$_pid" in ''|*[!0-9]*) return 1 ;; esac
+	if [ -r "/proc/$_pid/cmdline" ] && tr '\000' ' ' < "/proc/$_pid/cmdline" | grep -Fq -- "$0 run $SID"; then return 0; fi
+	return 1
+}
+case "$MODE" in
+	status)
+		if [ -d "$DIR" ] && ! alive; then
+			case "$(cat "$DIR/state" 2>/dev/null)" in running|starting) printf error > "$DIR/state"; printf 'The Aether scan stopped unexpectedly.' > "$DIR/message" ;; esac
+		fi
+		status; exit 0 ;;
+	cancel)
+		if alive; then kill -TERM "$_pid" 2>/dev/null || true; fi
+		status; exit 0 ;;
+	start)
+		if [ -d "$ZGZ_RUN/aether-url.lock" ]; then printf '{"ok":false,"error":"Another Aether test is running."}\n'; exit 1; fi
+		if bridge_is_aether && tunnel_running; then
+			_live="$(sed -n 's/.*"id":"\([A-Za-z0-9_]*\)".*/\1/p' "$ZGZ_ETC/bridge.json" | head -1)"
+			if [ "$_live" = "$SID" ]; then printf '{"ok":false,"error":"Stop this Aether connection before scanning its account."}\n'; exit 1; fi
+		fi
+		if ! mkdir "$LOCK" 2>/dev/null; then
+			_owner="$(cat "$LOCK/pid" 2>/dev/null || true)"
+			case "$_owner" in ''|*[!0-9]*) printf '{"ok":false,"error":"Another Aether scan is running."}\n'; exit 1 ;; esac
+			if kill -0 "$_owner" 2>/dev/null; then printf '{"ok":false,"error":"Another Aether scan is running."}\n'; exit 1; fi
+			rm -f "$LOCK/pid"; rmdir "$LOCK"; mkdir "$LOCK"
+		fi
+		umask 077; mkdir -p "$DIR"
+		printf '%s\n' "$$" > "$LOCK/pid"
+		head -c 65537 > "$DIR/draft.json"
+		if [ "$(wc -c < "$DIR/draft.json")" -gt 65536 ]; then
+			rm -f "$LOCK/pid"; rmdir "$LOCK"; printf '{"ok":false,"error":"The Aether draft is too large."}\n'; exit 1
+		fi
+		printf starting > "$DIR/state"; : > "$DIR/message"; : > "$DIR/aether.log"; : > "$DIR/result.json"
+		if command -v setsid >/dev/null 2>&1; then
+			setsid "$0" run "$SID" </dev/null >"$DIR/worker.log" 2>&1 &
+		else
+			"$0" run "$SID" </dev/null >"$DIR/worker.log" 2>&1 &
+		fi
+		printf '%s\n' "$!" > "$DIR/pid"; printf '%s\n' "$!" > "$LOCK/pid"
+		status; exit 0 ;;
+	run) : ;;
+	*) exit 2 ;;
+esac
+
+printf '%s\n' "$$" > "$DIR/pid"; printf '%s\n' "$$" > "$LOCK/pid"
+WORK="$DIR/work"; ORIGINAL_ETC="$ZGZ_ETC"; AP=''; XP=''
+cleanup() {
+	for _p in "$AP" "$XP"; do [ -z "$_p" ] || kill "$_p" 2>/dev/null || true; done
+	# Helpers can be provisioning when Cancel is pressed; only this worker's
+	# temporary config paths identify them, never the running router service.
+	for _proc in /proc/[0-9]*/cmdline; do
+		[ -r "$_proc" ] || continue
+		if tr '\000' '\n' < "$_proc" | grep -Fq -- "$WORK/"; then
+			_p="${_proc#/proc/}"; _p="${_p%/cmdline}"
+			[ "$_p" = "$$" ] || kill "$_p" 2>/dev/null || true
+		fi
+	done
+	case "$(cat "$DIR/state" 2>/dev/null)" in starting|running) printf error > "$DIR/state"; printf 'The Aether scan stopped unexpectedly.' > "$DIR/message" ;; esac
+	if [ "$(cat "$LOCK/pid" 2>/dev/null || true)" = "$$" ]; then rm -f "$LOCK/pid"; rmdir "$LOCK" 2>/dev/null || true; fi
+	rm -rf "$WORK"
+}
+trap cleanup EXIT
+trap 'printf cancelled > "$DIR/state"; exit 0' INT TERM
+fail_scan() { printf '%s' "$1" > "$DIR/message"; printf error > "$DIR/state"; exit 1; }
+umask 077
+mkdir -p "$WORK/config" "$WORK/bin" "$WORK/etc" "$WORK/run"
+for _sockets in /proc/net/tcp /proc/net/tcp6 /proc/net/udp /proc/net/udp6; do
+	[ -r "$_sockets" ] || continue
+	if awk '$2 ~ /:615[BCD]$/ && ($4=="0A" || $4=="07") { found=1 } END { exit !found }' "$_sockets"; then
+		fail_scan 'An Aether scan port is already in use.'
+	fi
+done
+UCI_BIN="$(command -v uci)"
+uci export zirgozar > "$WORK/config/zirgozar"
+printf '#!/bin/sh\nexec "%s" -c "%s/config" "$@"\n' "$UCI_BIN" "$WORK" > "$WORK/bin/uci"
+chmod 700 "$WORK/bin/uci"
+export PATH="$WORK/bin:$PATH" ZGZ_ETC="$WORK/etc" ZGZ_RUN="$WORK/run" ZGZ_LOG="$DIR/build.log"
+export ZGZ_CONFIG_JSON="$WORK/config.json" ZGZ_BRIDGE_JSON="$WORK/bridge-core.json"
+. "$ZGZ_LIB/zgz-common.sh"
+read_draft() { ucode -e 'import {readfile} from "fs"; let d=json(readfile(ARGV[0])); let v=d[ARGV[1]]; if(type(v)=="string") printf("%s",v);' "$DIR/draft.json" "$1"; }
+LINK="$(read_draft link)" || fail_scan 'Invalid Aether draft.'
+case "$LINK" in aether://*) : ;; *) fail_scan 'The draft is not an Aether config.' ;; esac
+uci set "zirgozar.$SID=node"; uci set "zirgozar.$SID.link=$LINK"
+uci set "zirgozar.$SID.enabled=1"
+uci set "zirgozar.config.node=$SID"
+EXIT_NODE="$(read_draft exit_node)"; EXIT_NODE="${EXIT_NODE:-_direct}"
+case "$EXIT_NODE" in *[!A-Za-z0-9_]*) fail_scan 'Invalid Aether exit-node.' ;; esac
+uci set "zirgozar.$SID.aether_exit_node=$EXIT_NODE"
+uci set "zirgozar.$SID.aether_exit_finalmask=$(read_draft fm)"
+uci set "zirgozar.$SID.aether_exit_dial_mode=$(read_draft dialMode)"
+for _pair in bridge_port:24923 aether_upstream_port:24924 aether_aux_port:24925; do uci set "zirgozar.config.${_pair%:*}=${_pair#*:}"; done
+uci commit zirgozar
+node_records "$SID" 1 | cut -f6- > "$WORK/payload.json"
+[ -s "$WORK/payload.json" ] || fail_scan 'The Aether config could not be read.'
+ucode -e '
+import {readfile,writefile} from "fs";
+let d=json(readfile(ARGV[0]));
+if(d.type!="aether") exit(1);
+if(d.tor=="only" || d.psiphon=="only") exit(1);
+d.endpoint=""; d.outer="";
+if(d.protocol!="wg-over-masque") d.inner="";
+d.quick_reconnect="0"; d.log_level="info";
+let raw=sprintf("%J",d), compact="", quoted=false, escaped=false;
+for(let i=0;i<length(raw);i++){let ch=substr(raw,i,1); if(quoted){compact+=ch; if(escaped) escaped=false; else if(ch=="\\") escaped=true; else if(ch=="\"") quoted=false;}else if(ch=="\""){quoted=true; compact+=ch;}else if(ch!=" " && ch!="\t" && ch!="\n" && ch!="\r") compact+=ch;}
+writefile(ARGV[1],compact); writefile(ARGV[2],d.protocol);
+' "$WORK/payload.json" "$ZGZ_ETC/bridge.json" "$DIR/protocol" || fail_scan 'The draft is not an Aether config.'
+mkdir -p "$ZGZ_ETC/aether/$SID"
+if [ -d "$ORIGINAL_ETC/aether/$SID" ]; then cp -R "$ORIGINAL_ETC/aether/$SID/." "$ZGZ_ETC/aether/$SID/"; fi
+printf '%s\n' '{"protocol":"socks","settings":{"servers":[{"address":"127.0.0.1","port":24923}]}}' > "$ZGZ_ETC/best.json"
+"$ZGZ_LIB/zgz-mkconfig" nogeo > "$WORK/full.json" 2>> "$DIR/build.log" || fail_scan 'The scan configuration could not be built.'
+ucode -e 'import {readfile} from "fs"; let d=json(readfile(ARGV[0])); printf("%J",{log:{loglevel:"warning"},inbounds:[{tag:"aether-via",listen:"127.0.0.1",port:24924,protocol:"socks",settings:{udp:true}}],outbounds:d.outbounds,dns:d.dns,routing:d.routing});' "$WORK/full.json" > "$WORK/upstream.json"
+X="$(find_xray "$WORK/upstream.json")" || fail_scan 'No compatible Xray is available for this Aether entry.'
+"$ZGZ_LIB/zgz-aether" check >> "$DIR/build.log" 2>&1 || fail_scan 'The Aether draft contains unsupported settings.'
+"$X" run -config "$WORK/upstream.json" > "$DIR/upstream.log" 2>&1 & XP=$!
+"$ZGZ_LIB/zgz-aether" run > "$DIR/aether.log" 2>&1 & AP=$!
+printf running > "$DIR/state"
+DEADLINE=$(( $(date +%s) + 480 ))
+while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+	if ! kill -0 "$AP" 2>/dev/null || ! kill -0 "$XP" 2>/dev/null; then fail_scan 'Aether stopped before a working endpoint was found.'; fi
+	if ucode "$ZGZ_LIB/zgz-aether-scan-result" "$DIR" endpoints > "$DIR/result.new" 2>/dev/null &&
+	   curl -fsS -o /dev/null -x socks5h://127.0.0.1:24923 --connect-timeout 3 --max-time 5 "$(cfg test_url 'http://www.gstatic.com/generate_204')" 2>/dev/null; then
+		mv -f "$DIR/result.new" "$DIR/result.json"
+		mkdir -p "$ORIGINAL_ETC/aether/$SID"
+		for _key in "$ZGZ_ETC/aether/$SID"/identity*.toml; do
+			[ -s "$_key" ] || continue
+			[ -s "$ORIGINAL_ETC/aether/$SID/${_key##*/}" ] || cp "$_key" "$ORIGINAL_ETC/aether/$SID/${_key##*/}"
+		done
+		printf found > "$DIR/state"; exit 0
+	fi
+	sleep 1
+done
+fail_scan 'No working Aether endpoint was found before the scan timed out.'

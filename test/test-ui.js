@@ -8,6 +8,7 @@ require('./test-home-ui.js');
 require('./test-nodes-ui.js');
 require('./test-i18n.js');
 require('./test-update-check.js');
+require('./test-presets.js');
 require('./test-xdrive.js');
 
 const assert = require('node:assert/strict');
