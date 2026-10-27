@@ -130,8 +130,9 @@ function restarting(e) {
    router's own word for it is its job; until that is first seen, the press
    itself stands for it. */
 var actAsked = 0, actKey = '';
-/* The Xray version chosen in the list, kept across the redraws. */
+/* Versions chosen in the lists, kept across redraws. */
 var xrayPicked = '';
+var lxPicked = '';
 
 function working(d) {
 	return !!(d && d.job && d.job.indexOf(CHECK_JOB) !== 0) || (actAsked && Date.now() - actAsked < 8000);
@@ -524,22 +525,27 @@ function render(d, early) {
 					return act('core:' + c.name, 'core_install', target, downloadText(c.name));
 				}, 'download', d));
 			}
-			/* Any recent Xray, pre-releases included - those are what most
-			   people run, and GitHub's "latest" leaves them out. */
-			if (c.name == 'xray' && c.arch_ok && (cores.xray_versions || []).length) {
+			/* Explicit version choices include upstream prereleases. */
+			var versions = c.name == 'sing-box-lx' ? (cores.singbox_lx_versions || []) : c.name == 'xray' ? (cores.xray_versions || []) : [];
+			if (c.arch_ok && versions.length) {
+				var picked = c.name == 'sing-box-lx' ? lxPicked : xrayPicked;
+				if (!picked && c.name == 'sing-box-lx') {
+					var stable = versions.filter(function(v) { return !v.pre; })[0];
+					if (stable) picked = stable.tag;
+				}
 				/* The row is drawn afresh every few seconds; the version picked
 				   here stays picked through that. */
-				var sel = E('select', { 'class': 'pwp-vsel', 'change': function(ev) { xrayPicked = ev.target.value; } },
-					(cores.xray_versions || []).map(function(v) {
+				var sel = E('select', { 'class': 'pwp-vsel', 'change': function(ev) { if (c.name == 'sing-box-lx') lxPicked = ev.target.value; else xrayPicked = ev.target.value; } },
+					versions.map(function(v) {
 						var t = v.tag.replace(/^v/, '');
 						return E('option', { 'value': v.tag }, v.pre ? _('%s (pre-release)').format(t) : t);
 					}));
-				if (xrayPicked && (cores.xray_versions || []).some(function(v) { return v.tag == xrayPicked; }))
-					sel.value = xrayPicked;
+				if (picked && versions.some(function(v) { return v.tag == picked; }))
+					sel.value = picked;
 				actions.push(sel);
-				actions.push(actBtn(_('Install this version'), 'soft-blue mk-small', 'core:xray', function() {
-					return act('core:xray', 'core_install', 'xray@' + sel.value,
-						_('Downloading Xray %s.').format(sel.value.replace(/^v/, '')));
+				actions.push(actBtn(_('Install this version'), 'soft-blue mk-small', 'core:' + c.name, function() {
+					return act('core:' + c.name, 'core_install', c.name + '@' + sel.value,
+						downloadText(c.name));
 				}, 'download', d));
 			}
 			if (c.installed && c.ours && c.name != 'xray')

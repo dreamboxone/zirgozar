@@ -76,6 +76,16 @@ function arr(v) {
 	return type(v) == 'array' ? v : [ v ];
 }
 
+// Keep native-only options while giving the router's translated settings
+// precedence. Arrays are atomic; dictionary keys are never case-converted.
+function native_defaults(target, original) {
+	for (let k, v in original ?? {}) {
+		if (!(k in target)) target[k] = v;
+		else if (type(v) == 'object' && type(target[k]) == 'object') native_defaults(target[k], v);
+	}
+	return target;
+}
+
 // ------------------------------------------------------------------ input
 
 let X = (args.mode == 'bridge') ? {} : json(stdin.read('all'));
@@ -559,6 +569,15 @@ function conv_outbound(o) {
 	if (o.streamSettings?.tlsSettings?.echSockopt?.dialerProxy == 'tls-repack-dns')
 		return fail_out(o.tag, 'ECH TLS repacking requires Xray; sing-box cannot preserve echSockopt/fromMitM');
 	let tag = o.tag;
+	if (o.protocol == 'masque' && o.sbNative?.type == 'masque') {
+		let r = { ...o.sbNative, tag };
+		let sock = o.streamSettings?.sockopt ?? {};
+		if (sock.dialerProxy) r.detour = sock.dialerProxy;
+		else r.routing_mark = sock.mark ?? MARK;
+		push(outbounds, r);
+		out_tags[tag] = true;
+		return;
+	}
 	let nb = native_bridge(o);
 	if (nb) {
 		// AmneziaWG, OpenConnect and Tailscale are endpoints in sing-box.
@@ -688,9 +707,9 @@ function conv_outbound(o) {
 			return fail_out(tag, `a ${proto} node over ${tr.type} has no sing-box equivalent`);
 		let tls = tls_of(ss);
 		if (tls)
-			r.tls = tls;
+			r.tls = native_defaults(tls, o.sbNative?.tls);
 		if (tr)
-			r.transport = tr;
+			r.transport = native_defaults(tr, o.sbNative?.transport);
 		// The node's own sing-box multiplex, set on its page.
 		let mx = o.sbMux;
 		if (type(mx) == 'object' && mx.protocol && proto != 'socks' && proto != 'http') {

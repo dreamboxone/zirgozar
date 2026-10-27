@@ -861,6 +861,11 @@ method_action() {
 		core_install)
 			case "$arg" in
 				xray|xray-patterniha|sing-box|sing-box-lx|geoview|warp-plus|vwarp|aether|mihomo|sslocal|haproxy|openvpn) run_job "Installing $arg" "$CORES install $arg" ;;
+				sing-box-lx@v[0-9]*)
+					_v="${arg#sing-box-lx@}"
+					case "$_v" in *[!A-Za-z0-9.-]*) fail "unknown core"; return ;; esac
+					run_job "Installing sing-box-lx" "$CORES install sing-box-lx $_v"
+					;;
 				# One particular Xray, picked from the list on the page.
 				xray@v[0-9]*)
 					_v="${arg#xray@}"

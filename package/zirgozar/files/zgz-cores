@@ -79,9 +79,8 @@ asset_for() {
 		# router, which has musl, is reported as "not found". The -musl ones are
 		# static. The ARMv7 build is static already.
 		sing-box) echo "$_a" | awk '{ s = $2; print (s == "mips" || s == "mipsle" || s == "mips64") ? s "-softfloat" : ((s == "arm64" || s == "amd64" || s == "386" || s == "riscv64") ? s "-musl" : s) }' ;;
-		# sing-box-lx has builds for amd64, arm64, armv7 and the two soft-float
-		# mips ones, and nothing else.
-		sing-box-lx) echo "$_a" | awk '{ s = $2; if (s == "mips" || s == "mipsle") s = s "-softfloat"; print (s == "amd64" || s == "arm64" || s == "armv7" || s == "mips-softfloat" || s == "mipsle-softfloat") ? s : "-" }' ;;
+		# sing-box-lx publishes these processor builds.
+		sing-box-lx) echo "$_a" | awk '{ s = $2; if (s == "mips" || s == "mipsle") s = s "-softfloat"; print (s == "amd64" || s == "arm64" || s == "armv7" || s == "386" || s == "riscv64" || s == "mips-softfloat" || s == "mipsle-softfloat") ? s : "-" }' ;;
 		# The soft-float MIPS builds, as for sing-box; the "compatible" x86
 		# build runs on any 64-bit x86.
 		mihomo) echo "$_a" | awk '{ s = $2
@@ -302,7 +301,7 @@ install_xray_patterniha() {
 
 # ---------------------------------------------------------------- sing-box
 
-# install_singbox [sing-box|sing-box-lx]
+# install_singbox [sing-box|sing-box-lx] [release-tag]
 install_singbox() {
 	_kind="${1:-sing-box}"
 	if [ "$_kind" = "sing-box-lx" ]; then
@@ -315,11 +314,16 @@ install_singbox() {
 		say_message "sing-box publishes no build for this router's processor."
 		return 1
 	}
-	_tag="$(latest_tag "$_repo")"
+	_tag="${2:-}"
+	[ -n "$_tag" ] || _tag="$(latest_tag "$_repo")"
 	[ -n "$_tag" ] || {
 		say_message "Could not reach GitHub to find out which sing-box is current. Connect the tunnel first, then try again."
 		return 1
 	}
+	case "$_tag" in
+		v[0-9]*) case "$_tag" in *[!A-Za-z0-9.-]*) return 1 ;; esac ;;
+		*) return 1 ;;
+	esac
 	_ver="${_tag#v}"
 	# The archive name carries the version, so unlike the others this one
 	# cannot be fetched from the /latest/download/ path without asking first.
@@ -859,6 +863,7 @@ ver_newer() {
 # marked: "<tag> <pre|stable>" a line. Read by the App Update page, which
 # offers them as a choice.
 XRAY_VERSIONS="$ZGZ_ETC/xray.versions"
+LX_VERSIONS="$ZGZ_ETC/singbox-lx.versions"
 
 # A release that can always be installed from the list, however old it has
 # become - the one this program is known to work well with.
@@ -866,10 +871,10 @@ XRAY_PINNED=v26.1.23
 
 xray_releases() {
 	curl -fsSL --connect-timeout 8 --max-time 25 \
-		"https://api.github.com/repos/$XRAY_REPO/releases?per_page=3" 2>/dev/null |
+		"https://api.github.com/repos/${1:-$XRAY_REPO}/releases?per_page=10" 2>/dev/null |
 		tr ',' '\n' | awk '
 			/"tag_name"[ \t]*:/ { t = $0; sub(/.*"tag_name"[ \t]*:[ \t]*"/, "", t); sub(/".*/, "", t) }
-			/"prerelease"[ \t]*:/ { if (t != "") { print t, ($0 ~ /true/ ? "pre" : "stable"); t = "" } }'
+			/"prerelease"[ \t]*:/ { if (t ~ /^v[0-9][A-Za-z0-9.-]*$/) { print t, ($0 ~ /true/ ? "pre" : "stable"); t = "" } }'
 	return 0
 }
 
@@ -938,6 +943,12 @@ cmd_latest() {
 		_old="$(latest_of xray)"
 		[ -n "$_old" ] && printf 'xray\t%s\n' "$_old" >> "$_tmp"
 	fi
+	fi
+	if [ -z "$_only" ] || [ "$_only" = sing-box-lx ]; then
+		_lr="$(xray_releases "$LX_REPO")"
+		if [ -n "$_lr" ]; then
+			printf '%s\n' "$_lr" > "$LX_VERSIONS.new" && mv -f "$LX_VERSIONS.new" "$LX_VERSIONS"
+		fi
 	fi
 	for _c in xray-patterniha sing-box sing-box-lx geoview warp-plus vwarp aether mihomo sslocal zirgozar; do
 		[ "$_cores_only" = 1 ] && [ "$_c" = zirgozar ] && continue
@@ -1074,6 +1085,11 @@ cmd_list() {
 	' "$( [ -s "$XRAY_VERSIONS" ] && echo "$XRAY_VERSIONS" || echo "$ZGZ_RUN/xray.versions.none" )"
 	rm -f "$ZGZ_RUN/xray.versions.none"
 	printf ']'
+	printf ',"singbox_lx_versions":['
+	if [ -s "$LX_VERSIONS" ]; then
+		awk 'NF == 2 && $1 ~ /^v[0-9][A-Za-z0-9.-]*$/ { printf "%s{\"tag\":\"%s\",\"pre\":%s}", (n++ ? "," : ""), $1, ($2 == "pre" ? "true" : "false") }' "$LX_VERSIONS"
+	fi
+	printf ']'
 	_mine="$(zgz_version)"
 	_pub="$(latest_of zirgozar)"
 	printf ',"app":{"version":"%s","latest":"%s","update":%s}}\n' \
@@ -1094,7 +1110,7 @@ cmd_list_cached() {
 	_cpaths="$(printf '%s\n' "$_cset" | sed -n "s/.*option core_[a-z_]* '\(\/[^']*\)'.*/\1/p")"
 	_key="$( { printf '%s\n' "$_cset"
 		ls -lLi "$ZGZ_OWN_DIR" "$DIR" "$DIR/aether" /usr/bin/xray /usr/local/bin/xray /usr/sbin/openvpn /usr/sbin/haproxy \
-			$_cpaths "$LATEST_CACHE" "$XRAY_VERSIONS" "$ZGZ_VERSION_FILE" 2>/dev/null; } | md5sum)"
+			$_cpaths "$LATEST_CACHE" "$XRAY_VERSIONS" "$LX_VERSIONS" "$ZGZ_VERSION_FILE" 2>/dev/null; } | md5sum)"
 	_key="${_key%% *}"
 	if [ -n "$_key" ] && [ "$(head -1 "$_lc" 2>/dev/null)" = "$_key" ]; then
 		sed -n "2{s/\"free\":[0-9]*/\"free\":$(free_bytes "$DIR")/;p}" "$_lc"
@@ -1401,7 +1417,7 @@ case "${1:-list}" in
 		_rc=0
 		case "${2:-}" in
 			xray)     install_xray "${3:-}" || _rc=$? ;;
-			sing-box|sing-box-lx) install_singbox "$2" || _rc=$? ;;
+			sing-box|sing-box-lx) install_singbox "$2" "${3:-}" || _rc=$? ;;
 			geoview)  install_geoview || _rc=$? ;;
 			warp-plus|vwarp) install_warpplus "$2" || _rc=$? ;;
 			xray-patterniha) install_xray_patterniha || _rc=$? ;;

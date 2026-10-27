@@ -497,6 +497,8 @@ function emit(label, proto, payload,   key, tag) {
 	# subscription - went on into the core's configuration and the page's
 	# list unescaped, and the one bad node took the whole list down with it.
 	if (HOST !~ /^[A-Za-z0-9._:-]+$/) return
+	if (SBNATIVE != "" && proto ~ /^(vless|vmess|trojan|shadowsocks|socks|http|masque)$/)
+		payload = jset(payload, "sbNative", SBNATIVE)
 	if (NXN > 0) payload = node_extras(payload)
 	payload = xdrive_mux(payload)
 	if (label == "") label = HOST ":" PORT
@@ -2247,7 +2249,12 @@ function from_singbox(it,   t, lab, peer, aw, ak, ai, nk, sbp, hyo) {
 	}
 
 	XEXTRA = ""
-	if (t == "vless")            emit(lab, "vless", mk_vless(jstr(it, "uuid"), "none", jstr(it, "flow"), sb_stream(it)))
+	if (t == "masque") {
+		sbp = mk_masque(jstr(it, "private_key"), jstr(it, "public_key"), (jraw(it, "ip") == "" ? "" : jraw(it, "ip")) (jraw(it, "ipv6") != "" ? "," jraw(it, "ipv6") : ""), jstr(it, "vhttp") == "h3")
+		emit(lab, "masque", sbp)
+		return
+	}
+	if (t == "vless")            emit(lab, "vless", mk_vless(jstr(it, "uuid"), jstr(it, "encryption"), jstr(it, "flow"), sb_stream(it)))
 	else if (t == "vmess")       emit(lab, "vmess", mk_vmess(jstr(it, "uuid"), jnum(it, "alter_id"), jstr(it, "security"), sb_stream(it)))
 	else if (t == "trojan")      emit(lab, "trojan", mk_trojan(jstr(it, "password"), sb_stream(it)))
 	else if (t == "shadowsocks") emit(lab, "shadowsocks", mk_ss(jstr(it, "method"), jstr(it, "password")))
@@ -2372,7 +2379,7 @@ function json_item(it, src, depth,   c, lnk, lab) {
 
 	if (src == "auto" || src == "") src = json_guess(it)
 	if (src == "xray")         from_xray(it)
-	else if (src == "singbox") from_singbox(it)
+	else if (src == "singbox") { SBNATIVE = it; gsub(/[\n\r\t]/, " ", SBNATIVE); from_singbox(it); SBNATIVE = "" }
 	else if (src == "clash")   from_clash(it)
 	else                       from_xray(it)
 }
