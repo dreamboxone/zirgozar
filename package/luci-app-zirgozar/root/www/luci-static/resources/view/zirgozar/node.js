@@ -163,6 +163,13 @@ function aetherExitNodes(sections, sid) {
 
 function parseLink(link) {
 	var s = String(link || '').trim();
+	/* Pasted Aether links may have spaces beside query separators. Keep
+	   multiline input in the text editor, where it can contain several links. */
+	if (/^aether:\/\//i.test(s) && !/[\r\n]/.test(s)) {
+		var fragment = s.indexOf('#');
+		var queryEnd = fragment < 0 ? s.length : fragment;
+		s = s.slice(0, queryEnd).replace(/[ \t]*([?&=])[ \t]*/g, '$1') + s.slice(queryEnd);
+	}
 	if (/\s/.test(s)) return null;
 	var m = s.match(/^([a-z0-9+.-]+):\/\/(.*)$/i);
 	if (!m || !SCHEMES[m[1].toLowerCase()]) return null;
@@ -466,6 +473,42 @@ function blankNode() {
 		warp_mode: 'warp', warp_country: 'AT', warp_scan: '1', warp_noize: 'off', warp_mt: 'h2',
 		snell_version: '4', oc_flavor: 'anyconnect', naive_quic: '0'
 	};
+}
+
+/* Public links follow PattN's AetherFmt.ToUri. Core-only options stay local. */
+function buildAetherShare(f, name) {
+	function value(k) { return f['aether_' + k] || ''; }
+	var protocol = value('protocol') || 'wg', transport = value('transport') || 'h3';
+	var masque = /^(masque|mim|wg-over-masque)$/.test(protocol);
+	var hops = /^(gool|mim|wg-over-masque)$/.test(protocol);
+	var psiphon = value('psiphon'), tor = value('tor');
+	var q = { protocol: protocol, scan: value('scan') || 'balanced' };
+	function add(k) { if (value(k)) q[k] = value(k); }
+	if (value('noize') && value('noize') != 'auto' && !(masque && transport == 'h2')) add('noize');
+	q.ip = value('ip') || 'v4';
+	[ 'dns', 'exit_loc' ].forEach(add);
+	if (masque) {
+		q.transport = transport;
+		if (value('sni') != 'www.cloudflare.com') add('sni');
+		if (value('fragment') == '1') [ 'fragment', 'fragment_size', 'fragment_delay' ].forEach(add);
+		if (value('ech') == '1' && psiphon != 'only' && tor != 'only') [ 'ech', 'ech_dns', 'ech_domain' ].forEach(add);
+		if (value('fingerprint') != 'chrome') add('fingerprint');
+	}
+	if (hops) [ 'outer', 'inner' ].forEach(add);
+	if (psiphon && psiphon != 'off') {
+		q.psiphon = psiphon;
+		q.psiphon_mode = value('psiphon_mode') || 'auto';
+		[ 'cdn_ips', 'cdn_sni', 'cdn_sets', 'region' ].forEach(add);
+		if (value('psiphon_bundled') == '0') q.psiphon_bundled = '0';
+	}
+	if (tor && tor != 'off') {
+		q.tor = tor;
+		q.tor_bridges = value('tor_bridges') || 'auto';
+		q.tor_relays = value('tor_relays') || 'auto';
+		add('bridges');
+	}
+	[ 'fm', 'dialMode' ].forEach(function(k) { if ((f.rest || {})[k]) q[k] = f.rest[k]; });
+	return 'aether://' + (hops ? '' : (f.aether_endpoint || '')) + '?' + buildQuery(q) + '#' + enc(name || '');
 }
 
 /* And back together. */
@@ -1874,6 +1917,7 @@ return view.extend({
 		function currentLink(b) {
 			return m.parse().then(function() {
 				var l = String(uci.get('zirgozar', sid, 'link') || '').trim();
+				if (f && f.proto == 'aether') l = buildAetherShare(f, uci.get('zirgozar', sid, 'name') || f.name || '');
 				if (!l) pui.note(b, _('There is no link yet.'), 'warn');
 				return l;
 			}, function() {

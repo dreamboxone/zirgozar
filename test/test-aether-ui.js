@@ -11,6 +11,8 @@ const offset = source.indexOf('\nreturn view.extend(');
 assert.ok(offset > 0);
 const api = new Function('rpc', 'i18n', source.slice(0, offset) + '\nreturn { parseLink, buildLink };')(
 	{ declare: () => () => Promise.resolve({}) }, { tr: value => value });
+const share = new Function('rpc', 'i18n', source.slice(0, offset) + '\nreturn buildAetherShare;')(
+	{ declare: () => () => Promise.resolve({}) }, { tr: value => value });
 const exitNodes = new Function(source.slice(source.indexOf('function aetherExitNodes('), source.indexOf('\nfunction parseLink(')) + '\nreturn aetherExitNodes;')();
 assert.deepEqual(exitNodes([
 	{ '.name': 'v1', name: 'Saved VLESS', link: 'vless://id@example.com:443' },
@@ -37,6 +39,34 @@ for (const protocol of ['wg', 'masque', 'gool', 'mim', 'wg-over-masque']) {
 	assert.equal(roundtrip.rest.custom, 'value');
 }
 console.log('Aether form import and export passed, including unknown parameters and IPv6');
+
+const pasted = 'aether://?protocol=masque&transport=h2&scan=verified&ip=v4&sni=www.cloudflare.com &fingerprint=semi-python&api_ech=0&perf=low#Aether-H2';
+const imported = api.parseLink(pasted);
+assert.ok(imported, 'Pasted Aether link opens the structured editor');
+for (const [key, value] of Object.entries({ protocol: 'masque', transport: 'h2', scan: 'verified', ip: 'v4', sni: 'www.cloudflare.com', fingerprint: 'semi-python', api_ech: '0', perf: 'low' }))
+	assert.equal(imported['aether_' + key], value, key);
+assert.equal(imported.name, 'Aether-H2');
+assert.deepEqual(api.parseLink(api.buildLink(imported, imported.name)), imported);
+assert.equal(api.parseLink(pasted + '\n' + example), null, 'Several links remain in the text editor');
+assert.equal(api.parseLink(pasted.replace('www.cloudflare.com ', 'www.cloud flare.com')), null);
+console.log('Pasted Aether query spacing opens the form and preserves settings');
+assert.equal(share(imported, imported.name), 'aether://?protocol=masque&scan=verified&ip=v4&transport=h2&fingerprint=semi-python#Aether-H2');
+assert.equal(imported.aether_api_ech, '0', 'Core-only settings remain local');
+assert.equal(imported.aether_perf, 'low');
+// Fixtures from PattN AetherFmt tests, including chained hops and exit settings.
+for (const link of [
+	'aether://162.159.198.1:443?protocol=masque&scan=verified&ip=both&transport=h2&fingerprint=semi-python#Pinned',
+	'aether://?protocol=wg&scan=balanced&ip=v4#Scan',
+	'aether://?protocol=gool&scan=balanced&ip=v4&outer=162.159.192.1%3A2408&inner=162.159.192.5%3A894#Hops',
+	'aether://?protocol=masque&scan=verified&ip=v4&transport=h2&tor=chain&tor_bridges=auto&tor_relays=auto#Tor',
+	'aether://?protocol=masque&scan=verified&ip=v4&transport=h2&fm=%7B%22tcp%22%3A%5B%5D%7D&dialMode=code-1#Mask'
+]) {
+	const node = api.parseLink(link);
+	assert.ok(node, link);
+	assert.equal(share(node, node.name), link);
+}
+assert.match(source, /l = buildAetherShare\(f,/);
+console.log('PattN-compatible share links and QR payloads exclude local core options');
 
 const fields = source.match(/var AETHER_EXTRA = '([^']+)'/)[1].split(' ');
 const advanced = 'aether://?protocol=masque&scan=verified&' + fields.map((k, i) => k + '=' + encodeURIComponent('test:' + i)).join('&');
