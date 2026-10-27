@@ -834,7 +834,16 @@ tag_version() {
 # A version as a sortable key: 26.9.30 -> 000026000009000030000000.
 ver_key() {
 	echo "${1#v}" | awk '
-		{ version=$0; revision=""
+		{ version=$0; revision=""; lx=0; stage=3; pre=0
+          if (version ~ /-lx\.[0-9]+/) {
+            suffix=version; sub(/^.*-lx\./, "", suffix)
+            lx=suffix; sub(/[^0-9].*$/, "", lx)
+            if (suffix ~ /-rc\./) stage=2
+            else if (suffix ~ /-beta\./) stage=1
+            else if (suffix ~ /-alpha\./) stage=0
+            if (stage < 3) { pre=suffix; sub(/^.*-(rc|beta|alpha)\./, "", pre); sub(/[^0-9].*$/, "", pre) }
+            sub(/-lx\..*$/, "", version)
+          }
 		  if (version ~ /-r[0-9]+$/) {
 		    revision=version; sub(/^.*-r/, "", revision); sub(/-r[0-9]+$/, "", version)
 		  }
@@ -844,7 +853,7 @@ ver_key() {
 		    if (i==4 && revision!="") value=revision
 		    k=k sprintf("%06d", value)
 		  }
-		  print k
+		  print k sprintf("%06d%06d%06d", lx, stage, pre)
 		}'
 	return 0
 }

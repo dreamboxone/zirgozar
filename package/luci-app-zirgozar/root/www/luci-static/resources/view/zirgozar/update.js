@@ -520,8 +520,8 @@ function render(d, early) {
 					? (c.update && c.latest ? _('Update to %s').format(c.latest) : _('Reinstall'))
 					: _('Install'), 'primary mk-small', 'core:' + c.name, function() {
 					var target = c.name;
-					if (c.name == 'xray' && c.installed && !(c.update && c.latest))
-						target = 'xray@v' + String(c.version).replace(/^v/, '');
+					if ((c.name == 'xray' || c.name == 'sing-box-lx') && c.installed && !(c.update && c.latest))
+						target = c.name + '@v' + String(c.version).replace(/^v/, '');
 					return act('core:' + c.name, 'core_install', target, downloadText(c.name));
 				}, 'download', d));
 			}
@@ -530,8 +530,9 @@ function render(d, early) {
 			if (c.arch_ok && versions.length) {
 				var picked = c.name == 'sing-box-lx' ? lxPicked : xrayPicked;
 				if (!picked && c.name == 'sing-box-lx') {
+					var installed = versions.filter(function(v) { return c.installed && v.tag.replace(/^v/, '') == String(c.version).replace(/^v/, ''); })[0];
 					var stable = versions.filter(function(v) { return !v.pre; })[0];
-					if (stable) picked = stable.tag;
+					if (installed || stable) picked = (installed || stable).tag;
 				}
 				/* The row is drawn afresh every few seconds; the version picked
 				   here stays picked through that. */

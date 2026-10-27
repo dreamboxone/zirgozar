@@ -34,12 +34,12 @@ assert.equal(downloadText('Updating Zirgozar'), 'Downloading \u2066Zirgozar\u206
 console.log('Download labels passed: localized app name, normalized job prefixes and isolated core names');
 
 const selectorSource = source.slice(source.indexOf("var versions = c.name == 'sing-box-lx'"), source.indexOf("\n\t\t\tif (c.installed && c.ours"));
-function selector(name, versions, picked) {
+function selector(name, versions, picked, installedVersion) {
  const actions = [], calls = [];
  const E = (tag, attrs, children) => ({tag, ...attrs, children, value: children?.[0]?.value});
  const run = new Function('c','cores','E','_','actBtn','act','downloadText','actions','d','lxPicked','xrayPicked',
   selectorSource + '; return { actions, lxPicked, xrayPicked };');
- const result = run({name, arch_ok:true}, {singbox_lx_versions:versions}, E,
+ const result = run({name, arch_ok:true, installed:!!installedVersion, version:installedVersion}, {singbox_lx_versions:versions}, E,
   key => ({format:v => key.replace('%s',v)}),
   (label, style, key, click) => ({label,key,click}),
   (...args) => calls.push(args), name => name, actions, {}, picked, '');
@@ -47,6 +47,7 @@ function selector(name, versions, picked) {
 }
 const lxVersions = [{tag:'v1.14.3-lx.24-rc.1',pre:true},{tag:'v1.14.3-lx.23',pre:false}];
 assert.equal(selector('sing-box-lx',lxVersions,'').actions[0].value,lxVersions[1].tag);
+assert.equal(selector('sing-box-lx',lxVersions,'','1.14.3-lx.24-rc.1').actions[0].value,lxVersions[0].tag);
 const lx = selector('sing-box-lx', lxVersions, lxVersions[1].tag);
 assert.equal(lx.actions[0].children[0].children, '1.14.3-lx.24-rc.1 (pre-release)');
 assert.equal(lx.actions[0].value, lxVersions[1].tag);
@@ -58,3 +59,14 @@ assert.equal(lx.calls[1][2], 'sing-box-lx@v1.14.3-lx.24-rc.1');
 assert.equal(selector('sing-box',lxVersions,'').actions.length,0);
 assert.equal(selector('sing-box-lx',[],'').actions.length,0);
 console.log('LX versions: stable and prerelease selections target the matching core and survive redraws');
+
+const installSource = source.slice(source.indexOf('var target = c.name;'), source.indexOf("\n\t\t\t	}, 'download', d));",source.indexOf('var target = c.name;')));
+const installTarget = new Function('c','act','downloadText', installSource);
+for (const name of ['sing-box-lx','xray']) {
+ const version = name == 'sing-box-lx' ? '1.14.3-lx.24-rc.1' : '26.10.21';
+ const reinstall = installTarget({name,version,installed:true,update:false,latest:'v1.14.3-lx.23'}, (...args)=>args[2],()=> '');
+ assert.equal(reinstall,name+'@v'+version);
+ const update = installTarget({name,version,installed:true,update:true,latest:'newer'}, (...args)=>args[2],()=> '');
+ assert.equal(update,name);
+}
+console.log('Reinstall preserves the installed LX prerelease; explicit version selection remains available');

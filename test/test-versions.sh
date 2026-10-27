@@ -18,6 +18,12 @@ check "$?" 1 'a higher revision of an older date is not an update'
 ver_newer v26.9.9 26.3.27
 check "$?" 0 'ordinary core version ordering is preserved'
 
+for pair in 'v1.14.3-lx.23 1.14.3-lx.24-rc.1 1' 'v1.14.3-lx.24 1.14.3-lx.24-rc.1 0' 'v1.14.3-lx.24-rc.2 1.14.3-lx.24-rc.1 0' 'v1.14.3-lx.24-rc.1 1.14.3-lx.24 1' 'v1.14.3-lx.24-rc.1 1.14.3-lx.24-rc.1 1' 'v1.14.3-lx.23 1.14.3-lx.9 0' 'v1.14.4-lx.1 1.14.3-lx.24 0'; do
+ set -- $pair
+ ver_newer "$1" "$2"
+ check "$?" "$3" "LX ordering: $1 versus $2"
+done
+
 echo '== repository-managed core version checks'
 . "$RIG/lib/zgz-common.sh"
 sed -n '/^pkg_latest() {/,/^}/p; /^ovpn_latest() {/,/^}/p; /^cmd_latest() {/,/^}/p' "$RIG/lib/zgz-cores" > "$RIG/run/package-version-functions.sh"
