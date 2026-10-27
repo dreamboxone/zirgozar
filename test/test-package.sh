@@ -199,7 +199,7 @@ done
 MISSING=""
 for f in $LUCI_FILES; do
 	[ -f "$ROOT/package/luci-app-zirgozar/root/$f" ] || MISSING="$MISSING $f(not in the tree)"
-	grep -qw "$(basename "$f")" "$ROOT/package/luci-app-zirgozar/Makefile" || MISSING="$MISSING $f(Makefile)"
+	grep -qw "$(basename "$f")" "$ROOT/package/zirgozar/Makefile" || MISSING="$MISSING $f(Makefile)"
 	# Without the extension: the shell builder installs the three views from a
 	# loop over their names, so the file name never appears in it whole.
 	grep -qw "$(basename "$f" .js)" "$ROOT/build/packages.inc.sh" || MISSING="$MISSING $f(packages.inc.sh)"
@@ -215,10 +215,14 @@ echo "== the staged web package contains every application module"
 	_stage="$(mktemp -d)"
 	trap 'rm -rf "$_stage"' EXIT
 	. "$ROOT/build/packages.inc.sh"
+	printf 'exit 0\n' > "$_stage/zirgozar.postinst"
+	stage_luci_assets "$_stage" "$ROOT"
 	stage_luci "$_stage" "$ROOT"
+	[ ! -e "$_stage/luci-app-zirgozar/www" ] || exit 1
+	cmp -s "$ROOT/LICENSE" "$_stage/luci-app-zirgozar/usr/share/doc/luci-app-zirgozar/LICENSE" || exit 1
 	for _source in "$ROOT"/package/luci-app-zirgozar/root/www/luci-static/resources/zirgozar/*.js; do
 		_module="$(basename "$_source")"
-		cmp -s "$_source" "$_stage/luci-app-zirgozar/www/luci-static/resources/zirgozar/$_module" || exit 1
+		cmp -s "$_source" "$_stage/zirgozar/www/luci-static/resources/zirgozar/$_module" || exit 1
 	done
 ) && ok 'all application modules reach the staged package unchanged' || bad 'an application module is missing or changed in the staged package'
 
@@ -352,7 +356,7 @@ if [ -f "$LOGO" ]; then
 		bad "logo.png is $BYTES bytes - it goes into the flash of every router this is installed on"
 	fi
 	MISS=""
-	grep -q 'logo.png' "$ROOT/package/luci-app-zirgozar/Makefile" || MISS="$MISS Makefile"
+	grep -q 'logo.png' "$ROOT/package/zirgozar/Makefile" || MISS="$MISS Makefile"
 	grep -q 'logo.png' "$ROOT/build/packages.inc.sh" || MISS="$MISS packages.inc.sh"
 	if [ -z "$MISS" ]; then
 		ok "and both packaging paths install it"

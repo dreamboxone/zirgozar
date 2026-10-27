@@ -136,7 +136,9 @@ jobs:
           RIG_ROOT="$RUNNER_TEMP/zirgozar-core-check" sh test/test-core-check.sh
 
       - name: Test differential package downloads
-        run: python3 test/test-delta.py
+        run: |
+          python3 test/test-delta.py
+          python3 test/test-unified-update.py
 
       - name: Test IKEv2 bootstrap and service readiness
         run: sh test/test-ikev2.sh
@@ -529,14 +531,17 @@ jobs:
           [ "$want" = "$got" ] || { echo "::error::version is $got, expected $want"; exit 1; }
           echo "== the packaged version is $got"
 
-          # The web interface is a separate package and was once going out
-          # unchecked: a menu file that never reached the router looks exactly
-          # like a green build.
+          # The main package owns the complete UI. The old package name is
+          # kept only as a compatibility package without UI files.
           rm -rf verifyl && mkdir -p verifyl/apk verifyl/ipk
           "$APK_BIN" extract --destination verifyl/apk --allow-untrusted --no-chown dist/luci-app-zirgozar-*.apk
           tar -xzf dist/luci-app-zirgozar_*_all.ipk -C verifyl/ipk
           mkdir -p verifyl/ipk/data && tar -xzf verifyl/ipk/data.tar.gz -C verifyl/ipk/data
           for base in verifyl/apk verifyl/ipk/data; do
+            test ! -e "$base/www"
+            test ! -e "$base/usr/share/luci"
+          done
+          for base in verify/apk verify/ipk/data; do
             test -s "$base/usr/share/luci/menu.d/luci-app-zirgozar.json"
             test -s "$base/usr/share/rpcd/acl.d/luci-app-zirgozar.json"
             for module in package/luci-app-zirgozar/root/www/luci-static/resources/zirgozar/*.js; do
@@ -549,8 +554,8 @@ jobs:
           # every menu entry has to name a view the package actually ships
           # (an alias - the old address of a page that moved - names a menu
           # entry, not a view)
-          for view in $(grep -o '"path": *"[^"]*"' verifyl/apk/usr/share/luci/menu.d/luci-app-zirgozar.json | cut -d'"' -f4 | grep -v '^admin/'); do
-            test -s "verifyl/apk/www/luci-static/resources/view/$view.js"
+          for view in $(grep -o '"path": *"[^"]*"' verify/apk/usr/share/luci/menu.d/luci-app-zirgozar.json | cut -d'"' -f4 | grep -v '^admin/'); do
+            test -s "verify/apk/www/luci-static/resources/view/$view.js"
             echo "== menu entry $view.js is in the package"
           done
 
@@ -559,6 +564,11 @@ jobs:
           ( cd verify/ipk/data && find . -type f | sort ) > ipk.list
           diff apk.list ipk.list
           echo "== both formats ship $(wc -l < ipk.list) identical paths"
+
+      - name: Verify unified package migration
+        run: |
+          sudo python3 test/test-unified-packages.py \
+            --apk "$APK_BIN" --arch "${{ matrix.openwrt_arch }}" --dist dist
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
@@ -599,6 +609,7 @@ jobs:
           done
           ls -l release/
           python3 build/package-chunks.py release
+          printf 'unified-v1\n' > release/PACKAGE_LAYOUT
           (cd release && sha256sum * > SHA256SUMS)
 
       - name: Publish the release
@@ -617,13 +628,16 @@ jobs:
           test "$tag" = "$expected"
 
           cat > notes.md <<'NOTES'
-          Pick the pair that matches your router. OpenWrt changed package
+          Pick the package that matches your router. OpenWrt changed package
           manager in 25.12, so both formats are here.
 
           | Your OpenWrt | Files |
           |---|---|
-          | 25.12 and later | `zirgozar-<version>.<arch>.apk` and `luci-app-zirgozar-<version>.apk` |
-          | 24.10, 23.05 | `zirgozar_<version>_<arch>.ipk` and `luci-app-zirgozar_<version>_all.ipk` |
+          | 25.12 and later | `zirgozar-<version>.<arch>.apk` |
+          | 24.10, 23.05 | `zirgozar_<version>_<arch>.ipk` |
+
+          LuCI is included. The small `luci-app-zirgozar` compatibility package
+          is only for older automatic updaters; new installations need one file.
 
           Your architecture is `DISTRIB_ARCH` in `/etc/openwrt_release`.
 

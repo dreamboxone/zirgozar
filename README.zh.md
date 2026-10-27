@@ -53,16 +53,16 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 
 ## 📦 2. 安装
 
-| OpenWrt | 包管理器 | 需要安装的两个包 |
+| OpenWrt | 包管理器 | 需要安装的包 |
 |---|---|---|
-| 25.12 及更新 | `apk` | `zirgozar-<version>.<arch>.apk`、`luci-app-zirgozar-<version>.apk` |
-| 24.10、23.05 | `opkg` | `zirgozar_<version>_<arch>.ipk`、`luci-app-zirgozar_<version>_all.ipk` |
+| 25.12 及更新 | `apk` | `zirgozar-<version>.<arch>.apk` |
+| 24.10、23.05 | `opkg` | `zirgozar_<version>_<arch>.ipk` |
 
-从 `/etc/openwrt_release` 的 `DISTRIB_ARCH` 确认架构。主包必须匹配；LuCI 包与架构无关。发布覆盖 ARM、ARM64、MIPS、x86、RISC-V、LoongArch 共 29 种架构，例如 `arm_cortex-a7_neon-vfpv4`、`aarch64_cortex-a53`、`mipsel_24kc` 和 `x86_64`。
+从 `/etc/openwrt_release` 的 `DISTRIB_ARCH` 确认架构，安装包必须匹配。LuCI、翻译和菜单已包含在 `zirgozar` 中，新安装只需一个包。小型 `luci-app-zirgozar` 包仅为旧自动更新器保留，不含界面文件。发布覆盖 ARM、ARM64、MIPS、x86、RISC-V、LoongArch 共 29 种架构，例如 `arm_cortex-a7_neon-vfpv4`、`aarch64_cortex-a53`、`mipsel_24kc` 和 `x86_64`。
 
 ### 通过 LuCI 安装
 
-进入 **系统 → 软件包 → 上传软件包**，先装主包，再装 `luci-app-zirgozar`，然后按一次 **Ctrl+F5**。
+进入 **系统 → 软件包 → 上传软件包**，安装 `zirgozar` 包，然后按一次 **Ctrl+F5**。
 
 ### 通过 SSH 从 GitHub 安装
 
@@ -83,18 +83,14 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
   mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
     main="zirgozar-$version.$DISTRIB_ARCH.apk"
-    luci="luci-app-zirgozar-$version.apk"
     wget -O "$install_dir/$main" "$base/$main"
-    wget -O "$install_dir/$luci" "$base/$luci"
     apk update
-    apk add --allow-untrusted --upgrade "$install_dir/$main" "$install_dir/$luci"
+    apk add --allow-untrusted --upgrade "$install_dir/$main"
   elif command -v opkg >/dev/null 2>&1; then
     main="zirgozar_${version}_${DISTRIB_ARCH}.ipk"
-    luci="luci-app-zirgozar_${version}_all.ipk"
     wget -O "$install_dir/$main" "$base/$main"
-    wget -O "$install_dir/$luci" "$base/$luci"
     opkg update
-    opkg install "$install_dir/$main" "$install_dir/$luci"
+    opkg install "$install_dir/$main"
   else
     echo 'apk or opkg was not found.' >&2
     exit 1
@@ -104,40 +100,30 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 
 ### 安装已经下载到 `/tmp` 的包
 
-下载适合路由器架构且版本一致的两个安装包。使用 [MobaXterm](https://mobaxterm.mobatek.net/download.html) 连接路由器，通过文件传输面板将两个文件复制到路由器的 `/tmp` 文件夹。
+下载适合路由器架构的 `zirgozar` 包。使用 [MobaXterm](https://mobaxterm.mobatek.net/download.html) 连接路由器，通过文件传输面板将文件复制到路由器的 `/tmp` 文件夹。
 
 旧版 OpenWrt 改传 `.ipk`。`/tmp` 使用 RAM，重启后文件消失；先检查 `df -h /tmp`。安装仍需 `/overlay` 可写空间和下载缺失依赖的网络。
 
-在路由器上运行以下命令；`/tmp` 中应只保留同一版本的一对安装包：
+在路由器上运行以下命令；`/tmp` 中应只保留一个适合该架构的 `zirgozar` 包：
 
 ```sh
 (
   set -eu
   . /etc/openwrt_release
   if command -v apk >/dev/null 2>&1; then
-    set -- /tmp/luci-app-zirgozar-*.apk
+    set -- /tmp/zirgozar-*."$DISTRIB_ARCH".apk
     [ "$#" -eq 1 ] && [ -f "$1" ] || {
-      echo 'Keep exactly one release pair in /tmp.' >&2; exit 1;
+      echo 'Keep exactly one matching zirgozar package in /tmp.' >&2; exit 1;
     }
-    luci="$1"
-    version="${luci##*/luci-app-zirgozar-}"
-    version="${version%.apk}"
-    main="/tmp/zirgozar-$version.$DISTRIB_ARCH.apk"
-    [ -f "$main" ] || { echo "Missing package: $main" >&2; exit 1; }
     apk update
-    apk add --allow-untrusted --upgrade "$main" "$luci"
+    apk add --allow-untrusted --upgrade "$1"
   elif command -v opkg >/dev/null 2>&1; then
-    set -- /tmp/luci-app-zirgozar_*_all.ipk
+    set -- /tmp/zirgozar_*_"$DISTRIB_ARCH".ipk
     [ "$#" -eq 1 ] && [ -f "$1" ] || {
-      echo 'Keep exactly one release pair in /tmp.' >&2; exit 1;
+      echo 'Keep exactly one matching zirgozar package in /tmp.' >&2; exit 1;
     }
-    luci="$1"
-    version="${luci##*/luci-app-zirgozar_}"
-    version="${version%_all.ipk}"
-    main="/tmp/zirgozar_${version}_${DISTRIB_ARCH}.ipk"
-    [ -f "$main" ] || { echo "Missing package: $main" >&2; exit 1; }
     opkg update
-    opkg install "$main" "$luci"
+    opkg install "$1"
   else
     echo 'apk or opkg was not found.' >&2; exit 1
   fi

@@ -59,8 +59,13 @@ finalize() {
 
 	{
 		echo "Package: $name"
+		[ "$name" != zirgozar ] || echo 'Replaces: luci-app-zirgozar'
 		echo "Version: $PKGVER"
-		echo "Depends: $deps" | sed 's/ /, /g; s/Depends:, /Depends: /'
+		if [ "$name" = luci-app-zirgozar ]; then
+			echo "Depends: zirgozar (>= $PKGVER)"
+		else
+			echo "Depends: $deps" | sed 's/ /, /g; s/Depends:, /Depends: /'
+		fi
 		echo "Source: $URL"
 		echo "SourceName: $name"
 		echo "License: $LICENSE"
@@ -118,6 +123,7 @@ finalize() {
 }
 
 stage_zgz "$WORK" "$ROOT" "$CORE"
+stage_luci_assets "$WORK" "$ROOT"
 finalize zirgozar "$ARCH" "$ZGZ_DEPS" "$ZGZ_DESC"
 
 stage_luci "$WORK" "$ROOT"

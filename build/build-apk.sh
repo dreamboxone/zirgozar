@@ -65,6 +65,7 @@ sha256() {
 # finalize <name> <arch> <depends> <description>
 finalize() {
 	name="$1"; arch="$2"; deps="$3"; desc="$4"
+	[ "$name" != luci-app-zirgozar ] || deps="zirgozar>=$PKGVER"
 	idir="$WORK/$name"
 	adir="$WORK/admin-$name"
 	mkdir -p "$idir/lib/apk/packages" "$adir"
@@ -129,6 +130,8 @@ finalize() {
 
 	out="$DIST/$name-$PKGVER.apk"
 	rm -f "$out"
+	set --
+	[ "$name" != zirgozar ] || set -- --info "replaces:luci-app-zirgozar"
 
 	"$APK" mkpkg \
 		--info "name:$name" \
@@ -140,6 +143,7 @@ finalize() {
 		--info "url:$URL" \
 		--info "maintainer:$MAINTAINER" \
 		--info "depends:$deps" \
+		"$@" \
 		--script "post-install:$adir/post-install" \
 		--script "pre-upgrade:$adir/pre-upgrade" \
 		--script "post-upgrade:$adir/post-upgrade" \
@@ -151,6 +155,7 @@ finalize() {
 }
 
 stage_zgz "$WORK" "$ROOT" "$CORE"
+stage_luci_assets "$WORK" "$ROOT"
 finalize zirgozar "$ARCH" "$ZGZ_DEPS" "$ZGZ_DESC"
 
 stage_luci "$WORK" "$ROOT"

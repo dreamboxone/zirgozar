@@ -10,7 +10,7 @@
 # Solar Hijri date in Asia/Tehran: year since 1400, month, day.
 # Keep VERSION for the whole day; increment RELEASE for same-day updates.
 VERSION=5.8.5
-RELEASE=1
+RELEASE=2
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -32,11 +32,11 @@ MAINTAINER="routekernel <https://t.me/routekernel1>"
 # another program pulled it in - needs nothing, and this finds it. Depending on it
 # would drag a second copy onto routers that do not need one, and refusing to
 # install alongside it would be worse still.
-ZGZ_DEPS="dnsmasq-full jshn libubox curl ca-bundle nftables kmod-nft-tproxy kmod-nft-socket ip-full unzip ucode ucode-mod-fs"
-LUCI_DEPS="zirgozar luci-base"
+ZGZ_DEPS="dnsmasq-full jshn libubox curl ca-bundle nftables kmod-nft-tproxy kmod-nft-socket ip-full unzip ucode ucode-mod-fs luci-base"
+LUCI_DEPS="zirgozar"
 
 ZGZ_DESC="Transparent proxy client for OpenWrt built on Xray, for Iran. Reads its server list every quarter of an hour, sifts a hundred servers with one handshake each and then measures only the ones that answered, ten at a time, until it finds one fast enough. Optional Iran routing split, per-day traffic accounting, and both nftables and iptables."
-LUCI_DESC="Web interface for Zirgozar: connect, servers and subscriptions, traffic, and settings."
+LUCI_DESC="Compatibility package for older updaters; the web interface is included in zirgozar."
 
 # Every quarter of an hour for the list, every five minutes for the counters.
 #
@@ -270,11 +270,11 @@ exit 0
 EOF
 }
 
-# stage_luci <staging-root> <source-root>
-stage_luci() {
+# stage_luci_assets <staging-root> <source-root>
+stage_luci_assets() {
 	work="$1"; root="$2"
 	l="$root/package/luci-app-zirgozar/root"
-	i="$work/luci-app-zirgozar"
+	i="$work/zirgozar"
 
 	install -d "$i/www/luci-static/resources/view/zirgozar" \
 	           "$i/www/luci-static/resources/zirgozar" \
@@ -332,7 +332,9 @@ stage_luci() {
 	install -m 0644 "$l/usr/share/rpcd/acl.d/luci-app-zirgozar.json" \
 		"$i/usr/share/rpcd/acl.d/luci-app-zirgozar.json"
 
-	cat > "$work/luci-app-zirgozar.postinst" <<'EOF'
+	# Refresh LuCI only after all service post-install steps have run.
+	sed -i '$d' "$work/zirgozar.postinst"
+	cat >> "$work/zirgozar.postinst" <<'EOF'
 rm -f /tmp/luci-indexcache* 2>/dev/null
 rm -rf /tmp/luci-modulecache 2>/dev/null
 # 'timeout' is not on every OpenWrt image - a stock 25.12 does not have it,
@@ -347,4 +349,11 @@ bounded 15 /etc/init.d/rpcd reload >/dev/null 2>&1 || true
 bounded 15 /etc/init.d/uhttpd restart >/dev/null 2>&1 || true
 exit 0
 EOF
+}
+
+# Old updaters require this filename and reject downloads below 1024 bytes.
+# Include the license rather than padding; it carries no application files.
+stage_luci() {
+	install -d "$1/luci-app-zirgozar/usr/share/doc/luci-app-zirgozar"
+	install -m 0644 "$2/LICENSE" "$1/luci-app-zirgozar/usr/share/doc/luci-app-zirgozar/LICENSE"
 }

@@ -53,20 +53,20 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 
 ## 📦 2. Установка
 
-| OpenWrt | Менеджер | Два нужных пакета |
+| OpenWrt | Менеджер | Нужный пакет |
 |---|---|---|
-| 25.12 и новее | `apk` | `zirgozar-<version>.<arch>.apk` и `luci-app-zirgozar-<version>.apk` |
-| 24.10, 23.05 | `opkg` | `zirgozar_<version>_<arch>.ipk` и `luci-app-zirgozar_<version>_all.ipk` |
+| 25.12 и новее | `apk` | `zirgozar-<version>.<arch>.apk` |
+| 24.10, 23.05 | `opkg` | `zirgozar_<version>_<arch>.ipk` |
 
-Архитектура указана в `DISTRIB_ARCH` файла `/etc/openwrt_release`. Основной пакет должен ей соответствовать; пакет LuCI универсален. Сборки охватывают 29 архитектур ARM, ARM64, MIPS, x86, RISC-V и LoongArch, включая `arm_cortex-a7_neon-vfpv4`, `aarch64_cortex-a53`, `mipsel_24kc`, `x86_64`.
+Архитектура указана в `DISTRIB_ARCH` файла `/etc/openwrt_release`, пакет должен ей соответствовать. LuCI, переводы и меню входят в `zirgozar`: для новой установки нужен один файл. Маленький `luci-app-zirgozar` оставлен для старых автообновлений и не содержит интерфейса. Сборки охватывают 29 архитектур ARM, ARM64, MIPS, x86, RISC-V и LoongArch, включая `arm_cortex-a7_neon-vfpv4`, `aarch64_cortex-a53`, `mipsel_24kc`, `x86_64`.
 
 ### Через LuCI
 
-Откройте **Система → Программное обеспечение → Загрузить пакет**, установите сначала основной пакет, затем `luci-app-zirgozar`. После этого нажмите **Ctrl+F5**.
+Откройте **Система → Программное обеспечение → Загрузить пакет**, установите `zirgozar`, затем нажмите **Ctrl+F5**.
 
 ### Через SSH прямо из GitHub
 
-Выполните на роутере следующую команду. Она использует `jsonfilter`, определяет последний опубликованный релиз и устанавливает либо обновляет подходящую пару пакетов:
+Выполните на роутере следующую команду. Она использует `jsonfilter`, определяет последний опубликованный релиз и устанавливает либо обновляет подходящий пакет:
 
 ```sh
 (
@@ -83,18 +83,14 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
   mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
     main="zirgozar-$version.$DISTRIB_ARCH.apk"
-    luci="luci-app-zirgozar-$version.apk"
     wget -O "$install_dir/$main" "$base/$main"
-    wget -O "$install_dir/$luci" "$base/$luci"
     apk update
-    apk add --allow-untrusted --upgrade "$install_dir/$main" "$install_dir/$luci"
+    apk add --allow-untrusted --upgrade "$install_dir/$main"
   elif command -v opkg >/dev/null 2>&1; then
     main="zirgozar_${version}_${DISTRIB_ARCH}.ipk"
-    luci="luci-app-zirgozar_${version}_all.ipk"
     wget -O "$install_dir/$main" "$base/$main"
-    wget -O "$install_dir/$luci" "$base/$luci"
     opkg update
-    opkg install "$install_dir/$main" "$install_dir/$luci"
+    opkg install "$install_dir/$main"
   else
     echo 'apk or opkg was not found.' >&2
     exit 1
@@ -104,40 +100,30 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 
 ### Установка файлов из `/tmp`
 
-Скачайте два пакета одной версии для архитектуры роутера. Подключитесь к роутеру через [MobaXterm](https://mobaxterm.mobatek.net/download.html) и перенесите оба файла в папку `/tmp` на роутере с помощью панели передачи файлов.
+Скачайте пакет `zirgozar` для архитектуры роутера. Подключитесь к роутеру через [MobaXterm](https://mobaxterm.mobatek.net/download.html) и перенесите файл в папку `/tmp` на роутере с помощью панели передачи файлов.
 
 Для старого OpenWrt перенесите `.ipk`. `/tmp` находится в RAM и очищается при перезагрузке; сначала проверьте `df -h /tmp`. Для установки всё равно нужно место на `/overlay` и доступ к репозиториям зависимостей.
 
-На роутере выполните команду ниже. В `/tmp` должна находиться ровно одна пара пакетов одной версии:
+На роутере выполните команду ниже. В `/tmp` должен находиться ровно один пакет `zirgozar` для его архитектуры:
 
 ```sh
 (
   set -eu
   . /etc/openwrt_release
   if command -v apk >/dev/null 2>&1; then
-    set -- /tmp/luci-app-zirgozar-*.apk
+    set -- /tmp/zirgozar-*."$DISTRIB_ARCH".apk
     [ "$#" -eq 1 ] && [ -f "$1" ] || {
-      echo 'Keep exactly one release pair in /tmp.' >&2; exit 1;
+      echo 'Keep exactly one matching zirgozar package in /tmp.' >&2; exit 1;
     }
-    luci="$1"
-    version="${luci##*/luci-app-zirgozar-}"
-    version="${version%.apk}"
-    main="/tmp/zirgozar-$version.$DISTRIB_ARCH.apk"
-    [ -f "$main" ] || { echo "Missing package: $main" >&2; exit 1; }
     apk update
-    apk add --allow-untrusted --upgrade "$main" "$luci"
+    apk add --allow-untrusted --upgrade "$1"
   elif command -v opkg >/dev/null 2>&1; then
-    set -- /tmp/luci-app-zirgozar_*_all.ipk
+    set -- /tmp/zirgozar_*_"$DISTRIB_ARCH".ipk
     [ "$#" -eq 1 ] && [ -f "$1" ] || {
-      echo 'Keep exactly one release pair in /tmp.' >&2; exit 1;
+      echo 'Keep exactly one matching zirgozar package in /tmp.' >&2; exit 1;
     }
-    luci="$1"
-    version="${luci##*/luci-app-zirgozar_}"
-    version="${version%_all.ipk}"
-    main="/tmp/zirgozar_${version}_${DISTRIB_ARCH}.ipk"
-    [ -f "$main" ] || { echo "Missing package: $main" >&2; exit 1; }
     opkg update
-    opkg install "$main" "$luci"
+    opkg install "$1"
   else
     echo 'apk or opkg was not found.' >&2; exit 1
   fi

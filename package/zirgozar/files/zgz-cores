@@ -1109,10 +1109,10 @@ cmd_list_cached() {
 # ---------------------------------------------------------- this program
 
 # The newest release of this program, put in the way it was put in the first
-# time: its two packages, handed to the router's own package manager. Only
+# time: its packages, handed to the router's own package manager. Only
 # the package manager can replace a package cleanly - it knows which files
 # are whose, keeps the settings file, and runs the steps that go with an
-# upgrade - so this does no more than fetch the right two files for this
+# upgrade - so this does no more than fetch the required packages for this
 # router, check them against the release's own list of checksums, and ask it.
 #
 # How it went is left in SELF_RESULT for the page: "ok <version>" or
@@ -1231,7 +1231,7 @@ $_b/$_n"
 	fi
 	_sums="$(printf '%s\n' "$_urls" | grep '/SHA256SUMS$' | head -1)"
 	[ -n "$_main" ] || { log "update: no package for $_arch in the latest release"; self_fail "The latest release has no package for this router."; return 1; }
-	[ -n "$_luci" ] && [ -n "$_sums" ] || { self_fail "The latest release is incomplete."; return 1; }
+	[ -n "$_sums" ] || { self_fail "The latest release is incomplete."; return 1; }
 
 	rm -rf "$SELF_DIR"
 	mkdir -p "$SELF_DIR"
@@ -1239,11 +1239,28 @@ $_b/$_n"
 	# plainly.
 	curl -fsSL --connect-timeout 15 --max-time 60 -o "$SELF_DIR/SHA256SUMS" "$_sums" 2>/dev/null ||
 		{ self_fail "Download failed."; return 1; }
+	# The checksummed layout distinguishes a complete unified release from
+	# an incomplete legacy release whose UI asset is missing.
+	_unified=0
+	_layout_hash="$(awk '$2 == "PACKAGE_LAYOUT" || $2 == "*PACKAGE_LAYOUT" { print $1; exit }' "$SELF_DIR/SHA256SUMS")"
+	if [ -n "$_layout_hash" ]; then
+		curl -fsSL --connect-timeout 15 --max-time 60 -o "$SELF_DIR/PACKAGE_LAYOUT" "${_sums%/*}/PACKAGE_LAYOUT" 2>/dev/null &&
+		[ "$(sha256sum "$SELF_DIR/PACKAGE_LAYOUT" | awk '{ print $1 }')" = "$_layout_hash" ] &&
+		[ "$(cat "$SELF_DIR/PACKAGE_LAYOUT")" = unified-v1 ] || {
+			self_fail "The latest release is incomplete."; return 1;
+		}
+		_unified=1
+	fi
+	[ "$_unified" = 1 ] || [ -n "$_luci" ] || { self_fail "The latest release is incomplete."; return 1; }
 	log "update: downloading $(basename "$_main")"
 	self_download_package "$_main" main || { self_fail "Download failed."; return 1; }
-	self_download_package "$_luci" luci || { self_fail "Download failed."; return 1; }
+	set -- "$SELF_DIR/$(basename "$_main")"
+	if [ "$_unified" != 1 ]; then
+		self_download_package "$_luci" luci || { self_fail "Download failed."; return 1; }
+		set -- "$@" "$SELF_DIR/$(basename "$_luci")"
+	fi
 
-	for _f in "$SELF_DIR/$(basename "$_main")" "$SELF_DIR/$(basename "$_luci")"; do
+	for _f in "$@"; do
 		_n="$(basename "$_f")"
 		_want="$(awk -v n="$_n" '$2 == n || $2 == "*" n { print $1; exit }' "$SELF_DIR/SHA256SUMS")"
 		_got="$(sha256sum "$_f" 2>/dev/null | awk '{ print $1 }')"
@@ -1256,7 +1273,8 @@ $_b/$_n"
 	# The packages are unpacked onto flash, not into /tmp where they were
 	# downloaded: room for them there too, with some over for what unpacks
 	# larger than it came.
-	_psize=$(( $(wc -c < "$SELF_DIR/$(basename "$_main")") + $(wc -c < "$SELF_DIR/$(basename "$_luci")") ))
+	_psize=0
+	for _f in "$@"; do _psize=$((_psize + $(wc -c < "$_f"))); done
 	# Cached downloads are expendable; they must never crowd out an install.
 	if [ "$(free_bytes /)" -lt "$((_psize * 3))" ]; then
 		rm -f /usr/libexec/zirgozar/.update-cache/main.package /usr/libexec/zirgozar/.update-cache/main.json \
@@ -1276,10 +1294,10 @@ $_b/$_n"
 	# before it could say why.
 	_rc=0
 	if [ "$_pm" = "apk" ]; then
-		apk add --allow-untrusted "$SELF_DIR/$(basename "$_main")" "$SELF_DIR/$(basename "$_luci")" \
+		apk add --allow-untrusted "$@" \
 			>"$SELF_DIR/log" 2>&1 || _rc=$?
 	else
-		opkg install "$SELF_DIR/$(basename "$_main")" "$SELF_DIR/$(basename "$_luci")" \
+		opkg install "$@" \
 			>"$SELF_DIR/log" 2>&1 || _rc=$?
 	fi
 	if [ "$_rc" != "0" ]; then
@@ -1309,7 +1327,11 @@ $_b/$_n"
 	# Do this after a successful install, so an optional cache cannot use
 	# the space needed by the package manager or delay restoring the tunnel.
 	self_seed_package "$_main" main
-	self_seed_package "$_luci" luci
+	if [ "$_unified" = 1 ]; then
+		rm -f /usr/libexec/zirgozar/.update-cache/luci.package /usr/libexec/zirgozar/.update-cache/luci.json
+	else
+		self_seed_package "$_luci" luci
+	fi
 	rm -rf "$SELF_DIR"
 	_now="$(zgz_version)"
 	printf 'ok %s\n' "$_now" > "$SELF_RESULT"
