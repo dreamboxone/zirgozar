@@ -104,11 +104,7 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 
 ### 安装已经下载到 `/tmp` 的包
 
-先在电脑上下载匹配的两个包，用 WinSCP 或 SCP 传到路由器。以下命令在电脑上运行；请改成实际地址，并保证当前目录只有所需架构的一对包：
-
-```sh
-scp -O zirgozar-*.apk luci-app-zirgozar-*.apk root@192.168.1.1:/tmp/
-```
+下载适合路由器架构且版本一致的两个安装包。使用 [MobaXterm](https://mobaxterm.mobatek.net/download.html) 连接路由器，通过文件传输面板将两个文件复制到路由器的 `/tmp` 文件夹。
 
 旧版 OpenWrt 改传 `.ipk`。`/tmp` 使用 RAM，重启后文件消失；先检查 `df -h /tmp`。安装仍需 `/overlay` 可写空间和下载缺失依赖的网络。
 

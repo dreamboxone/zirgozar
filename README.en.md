@@ -160,13 +160,9 @@ release from GitHub automatically and uses OpenWrt's `jsonfilter` utility.
 
 ### Install package files from `/tmp`
 
-Download both matching release packages for your router, then copy them to
-`/tmp` using WinSCP or SCP. Run this example on your computer, replacing the
-router address as needed. Run it from a directory containing only the matching release pair for your architecture:
-
-```sh
-scp -O zirgozar-*.apk luci-app-zirgozar-*.apk root@192.168.1.1:/tmp/
-```
+Download both release packages matching your router's architecture and version.
+Connect to the router with [MobaXterm](https://mobaxterm.mobatek.net/download.html)
+and use its file-transfer panel to copy both files to the router's `/tmp` folder.
 
 For older OpenWrt, transfer the two `.ipk` files instead. Connect to the router
 over SSH and run the matching package-manager commands below. `/tmp` uses RAM:
@@ -174,7 +170,7 @@ check `df -h /tmp` before copying. These files disappear after a reboot.
 Installation still needs writable storage on `/overlay`, and missing dependencies
 are downloaded from the router's package feeds.
 
-If you already copied the files to `/tmp` with WinSCP, install them directly.
+After transferring the files to `/tmp` with MobaXterm, install them in the router's terminal.
 Keep exactly one matching release pair in `/tmp`. This command detects its version and the router architecture automatically:
 
 ```sh
