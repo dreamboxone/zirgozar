@@ -19,11 +19,11 @@
 set -e
 
 TARGET="${1:-armv7}"
-XRAY_VERSION="${XRAY_VERSION:-v26.9.9}"
 SINGBOX_VERSION="${SINGBOX_VERSION:-v1.14.3}"
-BASE="https://github.com/XTLS/Xray-core/releases/download/$XRAY_VERSION"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+XRAY_VERSION="$(sh "$ROOT/build/xray-version.sh")"
+BASE="https://github.com/XTLS/Xray-core/releases/download/$XRAY_VERSION"
 
 # The names the build has always taken, for the OpenWrt architecture each
 # stood for.

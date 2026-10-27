@@ -31,6 +31,7 @@ WORK="${ZGZ_WORK:-${TMPDIR:-/tmp}/zirgozar-ipk-build}"
 DIST="$ROOT/dist"
 
 CORE="$ROOT/prebuilt/$ARCH/xray"
+ensure_xray "$ROOT" "$ARCH"
 [ -f "$CORE" ] || { echo "missing xray: $CORE (run build/build-core.sh)"; exit 1; }
 
 echo ">>> arch    : $ARCH"

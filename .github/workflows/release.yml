@@ -37,6 +37,8 @@ jobs:
   test:
     runs-on: ubuntu-24.04
     timeout-minutes: 12
+    outputs:
+      xray_version: ${{ steps.xray-version.outputs.version }}
     permissions:
       contents: read
       actions: write
@@ -55,6 +57,16 @@ jobs:
             done
       - name: Check out the repository
         uses: actions/checkout@v7
+
+      - name: Resolve the official Xray release
+        id: xray-version
+        run: |
+          set -eu
+          version="$(sh build/xray-version.sh)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Test automatic Xray version selection
+        run: python3 test/test-build-xray-version.py
 
       - name: Install firewall and DNS test tools
         run: sudo apt-get update -qq && sudo apt-get install -y nftables dnsmasq-base cmake pkg-config libjson-c-dev
@@ -79,6 +91,8 @@ jobs:
           RIG_XDRIVE_XRAY="$PWD/.test-tools/xdrive/xray" node test/test-xdrive.js
 
       - name: Fetch a core to check against
+        env:
+          XRAY_VERSION: ${{ steps.xray-version.outputs.version }}
         run: |
           set -euo pipefail
           sh ./build/build-core.sh x86_64
@@ -415,6 +429,8 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Fetch the Xray core for ${{ matrix.name }}
+        env:
+          XRAY_VERSION: ${{ needs.test.outputs.xray_version }}
         run: |
           set -euo pipefail
           sh ./build/build-core.sh ${{ matrix.name }}
@@ -483,6 +499,8 @@ jobs:
           "$PWD/sdk/staging_dir/host/bin/apk" --version
 
       - name: Package for ${{ matrix.openwrt_arch }}
+        env:
+          XRAY_VERSION: ${{ needs.test.outputs.xray_version }}
         run: |
           set -euo pipefail
           # as root so packaged files are owned by root:root

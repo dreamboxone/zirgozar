@@ -10,7 +10,7 @@
 # Solar Hijri date in Asia/Tehran: year since 1400, month, day.
 # Keep VERSION for the whole day; increment RELEASE for same-day updates.
 VERSION=5.8.5
-RELEASE=2
+RELEASE=3
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -49,6 +49,16 @@ CRON_LIST='*/15 * * * * /usr/libexec/zgz-refresh >/dev/null 2>&1'
 CRON_STATS='*/5 * * * * /usr/libexec/zgz-stats sample >/dev/null 2>&1'
 
 ZGZ_SCRIPTS="zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-dns-local zgz-stats zgz-led zgz-test zgz-geo zgz-cores zgz-delta zgz-delta-plan zgz-deps zgz-bridge zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-aether-scan zgz-aether-scan-result zgz-l2tp zgz-l2tpconfig zgz-pppvpn zgz-ikev2 zgz-ikev2config zgz-lb"
+
+# Direct package builds must not silently ship an old local prebuilt core.
+ensure_xray() {
+	local root="$1" arch="$2" expected have
+	expected="$(sh "$root/build/xray-version.sh")" || return 1
+	have="$(cat "$root/prebuilt/$arch/xray-version.txt" 2>/dev/null)" || have=''
+	if [ ! -s "$root/prebuilt/$arch/xray" ] || [ "$have" != "$expected" ]; then
+		XRAY_VERSION="$expected" sh "$root/build/build-core.sh" "$arch" || return 1
+	fi
+}
 
 # stage_zgz <staging-root> <source-root> <xray-binary>
 stage_zgz() {

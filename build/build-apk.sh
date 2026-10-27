@@ -45,6 +45,7 @@ fi
 }
 
 CORE="$ROOT/prebuilt/$ARCH/xray"
+ensure_xray "$ROOT" "$ARCH"
 [ -f "$CORE" ] || { echo "missing xray: $CORE (run build/build-core.sh)"; exit 1; }
 
 echo ">>> apk tool : $APK"

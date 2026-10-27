@@ -17,6 +17,7 @@
 cd "$(dirname "$0")/.."
 
 rc=0
+python3 test/test-build-xray-version.py || rc=1
 python3 test/test-unified-update.py || rc=1
 sh test/test-nodes-reload.sh || rc=1
 sh test/test-openconnect.sh || rc=1
