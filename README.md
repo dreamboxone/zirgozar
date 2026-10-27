@@ -108,8 +108,6 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 | ۲۴.۱۰ و ۲۳.۰۵ | `opkg` | `zirgozar_<نسخه>_<معماری>.ipk` |
 
 معماری روتر شما در `/etc/openwrt_release` جلوی `DISTRIB_ARCH` نوشته شده.
-رابط LuCI، ترجمه‌ها و منوها داخل بستهٔ `zirgozar` هستند؛ نصب جدید فقط همین یک فایل را لازم دارد.
-بستهٔ کوچک `luci-app-zirgozar` فقط برای سازگاری به‌روزرسان‌های قدیمی باقی می‌ماند و فایل رابط ندارد.
 
 بسته برای ۲۹ معماری از خانواده‌های ARM، ARM64، MIPS، x86، RISC-V و LoongArch
 ساخته می‌شود؛ از جمله `arm_cortex-a7_neon-vfpv4`، `aarch64_cortex-a53`،

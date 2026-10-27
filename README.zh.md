@@ -58,7 +58,7 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 | 25.12 及更新 | `apk` | `zirgozar-<version>.<arch>.apk` |
 | 24.10、23.05 | `opkg` | `zirgozar_<version>_<arch>.ipk` |
 
-从 `/etc/openwrt_release` 的 `DISTRIB_ARCH` 确认架构，安装包必须匹配。LuCI、翻译和菜单已包含在 `zirgozar` 中，新安装只需一个包。小型 `luci-app-zirgozar` 包仅为旧自动更新器保留，不含界面文件。发布覆盖 ARM、ARM64、MIPS、x86、RISC-V、LoongArch 共 29 种架构，例如 `arm_cortex-a7_neon-vfpv4`、`aarch64_cortex-a53`、`mipsel_24kc` 和 `x86_64`。
+从 `/etc/openwrt_release` 的 `DISTRIB_ARCH` 确认架构，安装包必须匹配。发布覆盖 ARM、ARM64、MIPS、x86、RISC-V、LoongArch 共 29 种架构，例如 `arm_cortex-a7_neon-vfpv4`、`aarch64_cortex-a53`、`mipsel_24kc` 和 `x86_64`。
 
 ### 通过 LuCI 安装
 

@@ -106,9 +106,6 @@ manager in 25.12. Take the package that matches your router:
 | 24.10, 23.05 | `opkg` | `zirgozar_<version>_<arch>.ipk` |
 
 Your architecture is on the `DISTRIB_ARCH` line of `/etc/openwrt_release`.
-LuCI, translations and menus are included in `zirgozar`; new installations need
-only this package. The small `luci-app-zirgozar` compatibility package remains
-for older automatic updaters and contains no interface files.
 
 Packages are built for 29 architectures across ARM, ARM64, MIPS, x86, RISC-V
 and LoongArch, including `arm_cortex-a7_neon-vfpv4`, `aarch64_cortex-a53`,

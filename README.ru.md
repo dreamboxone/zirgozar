@@ -58,7 +58,7 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 | 25.12 и новее | `apk` | `zirgozar-<version>.<arch>.apk` |
 | 24.10, 23.05 | `opkg` | `zirgozar_<version>_<arch>.ipk` |
 
-Архитектура указана в `DISTRIB_ARCH` файла `/etc/openwrt_release`, пакет должен ей соответствовать. LuCI, переводы и меню входят в `zirgozar`: для новой установки нужен один файл. Маленький `luci-app-zirgozar` оставлен для старых автообновлений и не содержит интерфейса. Сборки охватывают 29 архитектур ARM, ARM64, MIPS, x86, RISC-V и LoongArch, включая `arm_cortex-a7_neon-vfpv4`, `aarch64_cortex-a53`, `mipsel_24kc`, `x86_64`.
+Архитектура указана в `DISTRIB_ARCH` файла `/etc/openwrt_release`, пакет должен ей соответствовать. Сборки охватывают 29 архитектур ARM, ARM64, MIPS, x86, RISC-V и LoongArch, включая `arm_cortex-a7_neon-vfpv4`, `aarch64_cortex-a53`, `mipsel_24kc`, `x86_64`.
 
 ### Через LuCI
 

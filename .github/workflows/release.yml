@@ -636,9 +636,6 @@ jobs:
           | 25.12 and later | `zirgozar-<version>.<arch>.apk` |
           | 24.10, 23.05 | `zirgozar_<version>_<arch>.ipk` |
 
-          LuCI is included. The small `luci-app-zirgozar` compatibility package
-          is only for older automatic updaters; new installations need one file.
-
           Your architecture is `DISTRIB_ARCH` in `/etc/openwrt_release`.
 
           Then open LuCI, go to **Services -> Zirgozar**, turn on the Main switch and press **Save & Apply**.
