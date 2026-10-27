@@ -11,8 +11,6 @@ const offset = source.indexOf('\nreturn view.extend(');
 assert.ok(offset > 0);
 const api = new Function('rpc', 'i18n', source.slice(0, offset) + '\nreturn { parseLink, buildLink };')(
 	{ declare: () => () => Promise.resolve({}) }, { tr: value => value });
-const share = new Function('rpc', 'i18n', source.slice(0, offset) + '\nreturn buildAetherShare;')(
-	{ declare: () => () => Promise.resolve({}) }, { tr: value => value });
 const exitNodes = new Function(source.slice(source.indexOf('function aetherExitNodes('), source.indexOf('\nfunction parseLink(')) + '\nreturn aetherExitNodes;')();
 assert.deepEqual(exitNodes([
 	{ '.name': 'v1', name: 'Saved VLESS', link: 'vless://id@example.com:443' },
@@ -50,8 +48,10 @@ assert.deepEqual(api.parseLink(api.buildLink(imported, imported.name)), imported
 assert.equal(api.parseLink(pasted + '\n' + example), null, 'Several links remain in the text editor');
 assert.equal(api.parseLink(pasted.replace('www.cloudflare.com ', 'www.cloud flare.com')), null);
 console.log('Pasted Aether query spacing opens the form and preserves settings');
-assert.equal(share(imported, imported.name), 'aether://?protocol=masque&scan=verified&ip=v4&transport=h2&fingerprint=semi-python#Aether-H2');
-assert.equal(imported.aether_api_ech, '0', 'Core-only settings remain local');
+const shared = api.buildLink(imported, imported.name);
+assert.match(shared, /[?&]api_ech=0(?:&|#|$)/);
+assert.match(shared, /[?&]perf=low(?:&|#|$)/);
+assert.equal(imported.aether_api_ech, '0');
 assert.equal(imported.aether_perf, 'low');
 // Fixtures from PattN AetherFmt tests, including chained hops and exit settings.
 for (const link of [
@@ -63,10 +63,9 @@ for (const link of [
 ]) {
 	const node = api.parseLink(link);
 	assert.ok(node, link);
-	assert.equal(share(node, node.name), link);
+	assert.deepEqual(api.parseLink(api.buildLink(node, node.name)), node);
 }
-assert.match(source, /l = buildAetherShare\(f,/);
-console.log('PattN-compatible share links and QR payloads exclude local core options');
+console.log('PattN links round-trip, including preservation of perf and api_ech');
 
 const fields = source.match(/var AETHER_EXTRA = '([^']+)'/)[1].split(' ');
 const advanced = 'aether://?protocol=masque&scan=verified&' + fields.map((k, i) => k + '=' + encodeURIComponent('test:' + i)).join('&');
