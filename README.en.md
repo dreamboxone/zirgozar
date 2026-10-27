@@ -994,7 +994,8 @@ Support and contact: [t.me/routekernel1](https://t.me/routekernel1)
 ```sh
 /etc/init.d/zirgozar-server stop
 /etc/init.d/zirgozar stop
-apk del luci-app-zirgozar zirgozar
+apk del luci-app-zirgozar 2>/dev/null || true
+apk del zirgozar
 ```
 
 On 24.10 and 23.05 write `opkg remove` instead of `apk del`.

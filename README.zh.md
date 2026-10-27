@@ -528,7 +528,8 @@ cat /tmp/log/zirgozar.log
 ```sh
 /etc/init.d/zirgozar-server stop
 /etc/init.d/zirgozar stop
-apk del luci-app-zirgozar zirgozar
+apk del luci-app-zirgozar 2>/dev/null || true
+apk del zirgozar
 ```
 
 OpenWrt 24.10/23.05 用 `opkg remove` 代替 `apk del`。服务、核心、页面和计划任务删除，但保留设置。若也要永久删除设置、路由数据、订阅缓存和流量历史：
