@@ -16,6 +16,9 @@
 <p align="center">
   <a href="https://github.com/dreamboxone/zirgozar/releases/latest">⬇️ <b>Download the latest release</b></a> ·
   <a href="README.md">🇮🇷 <b>فارسی</b></a> ·
+  <a href="README.en.md">🇬🇧 <b>English</b></a> ·
+  <a href="README.zh.md"><b>简体中文</b></a> ·
+  <a href="README.ru.md"><b>Русский</b></a> ·
   <a href="https://t.me/routekernel1">💬 <b>Support on Telegram</b></a>
 </p>
 
