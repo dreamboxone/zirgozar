@@ -92,8 +92,12 @@ ir_servers() {
 		done
 	} | LC_ALL=C sort -u | awk -v target="$target" -v nftsets="$nftsets" '
 		/^[A-Za-z0-9][A-Za-z0-9.-]*$/ {
+			# Bound bytes, not domain count: dnsmasq reads a limited line.
+			# Reserve room for either directive and its upstream/set suffix.
+			if(n && length(zones) + length($0) + length(target) + 41 > 900) {
+				emit(); zones=""; n=0
+			}
 			zones=zones "/" tolower($0); n++
-			if(n == 100) { emit(); zones=""; n=0 }
 		}
 		function emit() {
 			print "server=" zones "/" target

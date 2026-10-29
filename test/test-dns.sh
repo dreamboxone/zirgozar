@@ -212,6 +212,19 @@ if grep -q 'cloudflare.com' "$splitfile"; then bad 'foreign zone entered direct 
 cp "$RIG/run/split.conf" "$RIG/run/split-first.conf"
 sh "$RIG/lib/zgz-dns-local" config > "$RIG/run/split.conf"
 cmp -s "$RIG/run/split-first.conf" "$RIG/run/split.conf" && ok 'unchanged split data does not restart DNS' || bad 'split file path changes without data changes'
+# Long valid domain names must not overflow dnsmasq configuration lines.
+awk 'BEGIN {
+ label=sprintf("%055d", 0); gsub(/0/, "a", label)
+ for(i=0;i<180;i++) printf "zone%d.%s.%s.%s.example.ir\n", i,label,label,label
+}' >> "$RIG/etc/ir-domains.list"
+sh "$RIG/lib/zgz-dns-local" config > "$RIG/run/split.conf"
+splitfile=$(sed -n 's/^conf-file=//p' "$RIG/run/split.conf")
+if awk 'length($0)>900 {exit 1}' "$splitfile"; then ok 'split DNS lines stay below parser limit'; else bad 'split DNS line overflow'; fi
+check "$(sed -n 's/^server=//p' "$splitfile" | tr '/' '\n' | grep -c '^zone[0-9]')" 180 'all long domains retain their direct DNS upstream'
+if [ -n "${RIG_DNSMASQ:-}" ] || command -v dnsmasq >/dev/null 2>&1; then
+ binary="${RIG_DNSMASQ:-$(command -v dnsmasq)}"
+ if "$binary" --test --conf-file="$splitfile" >"$RIG/split.err" 2>&1; then ok 'real dnsmasq accepts long split DNS list'; else bad "split DNS: $(cat "$RIG/split.err")"; fi
+fi
 reset_dns
 run_dns success || bad 'split DNS guard failed'
 grep -q 'meta skuid 32769 ip daddr 192.0.2.53' "$RIG/run/guard.nft" && ok 'only split resolver UID can use direct DNS' || bad 'direct DNS UID exception missing'
