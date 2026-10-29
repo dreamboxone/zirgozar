@@ -282,6 +282,11 @@ jobs:
             ZGZ_GEO_DIR="$PWD/geo" \
             PATH="$PATH" \
             timeout -k 5 90 sh test/test-config-modes.sh
+          sudo -E env \
+            RIG_XRAY="$PWD/prebuilt/x86_64/xray" \
+            RIG_SINGBOX="$PWD/.test-tools/sing-box" \
+            ZGZ_GEO_DIR="$PWD/geo" \
+            PATH="$PATH" \
             timeout -k 5 90 sh test/test-balancing.sh
 
       - name: Test aether
