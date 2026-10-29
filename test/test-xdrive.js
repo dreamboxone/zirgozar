@@ -42,8 +42,24 @@ const template = {
 		list: { url: 'https://example.com/list', namesPath: 'files', namePath: 'name' }
 	}
 };
-for (const settings of [drive, template, {service:'local', remoteFolder:'/tmp/xdrive-test'}])
+const s3 = { service:'s3', remoteFolder:'xdrive/session', secrets:['access-key','secret-key'],
+	s3:{endpoint:'https://storage.example.com',region:'us-east-1',bucket:'tunnel',pathStyle:true} };
+const s3Variants = [s3,
+	{...s3, secrets:[...s3.secrets,'session-token'], s3:{...s3.s3,pathStyle:false}},
+	{...s3, remoteFolder:'xdrive/', s3:{endpoint:'http://127.0.0.1:9000/storage',bucket:'tunnel'}}];
+for (const settings of [drive, template, ...s3Variants, {service:'local', remoteFolder:'/tmp/xdrive-test'}])
 	assert.equal(links.validateXdrive(JSON.stringify(settings)), true);
+for (const settings of [
+	{...s3,s3:null}, {...s3,secrets:['access']}, {...s3,secrets:['access','']},
+	{...s3,secrets:['access','secret','token','extra']}, {...s3,secrets:['access','secret\r\ninjected']},
+	{...s3,secrets:['access/key','secret']},
+	...[ '/absolute', 'x/../y', 'x/./y', 'x//y', 'x\\y', 'x\ny' ].map(remoteFolder=>({...s3,remoteFolder})),
+	...[ 'ftp://storage.example.com', 'https://user:pass@storage.example.com', 'https://storage.example.com/?x=1', 'https://storage.example.com/#x' ].map(endpoint=>({...s3,s3:{...s3.s3,endpoint}})),
+	{...s3,s3:{...s3.s3,bucket:'bad/name'}}, {...s3,s3:{...s3.s3,bucket:'..'}},
+	{...s3,s3:{...s3.s3,region:'bad/region'}}, {...s3,s3:{...s3.s3,pathStyle:'false'}},
+	{...s3,s3:{...s3.s3,pathStyle:false,bucket:'Bad_bucket'}},
+	{...s3,s3:{...s3.s3,pathStyle:false,endpoint:'https://127.0.0.1'}}
+]) assert.notEqual(links.validateXdrive(JSON.stringify(settings)), true, 'invalid S3 configuration must be rejected');
 for (const settings of [null, [], {}, {service:'unknown', remoteFolder:'x'},
 	{service:'google-drive', remoteFolder:'x', secrets:['one']},
 	{service:'template', remoteFolder:'x', template:[]},
@@ -76,7 +92,14 @@ for (const protocol of ['vless']) {
 	assert.ok(!decodeURIComponent(link).includes(decryption),'the server decryption key must stay out of share links');
 	inputs.push(link);
 }
-console.log('XDRIVE forms: nested settings, XMUX, two-step templates and client/server share links passed');
+for (const settings of s3Variants) {
+	const link=api.buildLink({proto:'vless',address:'example.com',port:'443',uuid:id,type:'xdrive',security:'none',encryption,xdrive_settings:JSON.stringify(settings)},'s3');
+	assert.deepEqual(JSON.parse(api.parseLink(link).xdrive_settings),settings);
+	serverValues.xdrive_settings=JSON.stringify(settings);
+	assert.deepEqual(JSON.parse(api.parseLink(share('test')).xdrive_settings),settings);
+}
+serverValues.xdrive_settings=JSON.stringify(template);
+console.log('XDRIVE forms: S3 validation, nested settings, XMUX, two-step templates and client/server share links passed');
 
 if (process.platform === 'win32') {
 	console.log('XDRIVE shell checks: run this suite on Linux or WSL');
@@ -234,6 +257,18 @@ try {
 	const h3=JSON.parse(serverConfig({...base,security:'tls',alpn:'h3',xdrive_settings:JSON.stringify(drive)}).stdout);
 	assert.deepEqual(h3.inbounds[0].streamSettings.tlsSettings,{alpn:['h3']},'XDRIVE storage TLS does not need a local server certificate');
 	checkCore(h3,'server-xdrive-h3');
+	for (const [index, settings] of s3Variants.entries()) {
+		const link=api.buildLink({proto:'vless',address:'unused.invalid',port:'443',uuid:id,type:'xdrive',security:'none',encryption,xdrive_settings:JSON.stringify(settings)},'s3');
+		const outbound=parse(link)[0];
+		assert.deepEqual(outbound.streamSettings.xdriveSettings,settings);
+		assert.deepEqual(parse(JSON.stringify({outbounds:[{...native,streamSettings:{...native.streamSettings,xdriveSettings:settings}}]}))[0].streamSettings.xdriveSettings,settings);
+		checkCore({outbounds:[outbound]},'s3-client-'+index);
+		const result=serverConfig({...base,xdrive_settings:JSON.stringify(settings)});
+		assert.equal(result.status,0,result.stderr);
+		const inbound=JSON.parse(result.stdout);
+		assert.deepEqual(inbound.inbounds[0].streamSettings.xdriveSettings,settings);
+		checkCore(inbound,'s3-server-'+index);
+	}
 	for (const changes of [{xdrive_settings:'not-json'},{xdrive_settings:'[]'},{security:'reality'},{protocol:'vmess'},{vless_decryption:'none'}])
 		assert.notEqual(serverConfig({...base,...changes}).status,0,'invalid server settings must fail the whole config');
 	console.log('XDRIVE backend: link/JSON imports, global Mux exclusion, inbound filters and invalid server settings passed');

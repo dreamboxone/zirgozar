@@ -181,14 +181,37 @@ function validateXdrive(value) {
 	if (!object(config)) return _('Must be a JSON object.');
 	if (typeof config.remoteFolder !== 'string' || !config.remoteFolder.trim())
 		return _('XDRIVE needs a remoteFolder.');
-	if ([ 'local', 'google-drive', 'template' ].indexOf(config.service) < 0)
-		return _('XDRIVE service must be local, google-drive or template.');
+	if ([ 'local', 'google-drive', 'template', 's3' ].indexOf(config.service) < 0)
+		return _('XDRIVE service must be local, google-drive, template or s3.');
 	if (config.secrets != null && (!Array.isArray(config.secrets) || config.secrets.some(function(v) { return typeof v !== 'string'; })))
 		return _('XDRIVE secrets must be an array of strings.');
 	if (config.service === 'google-drive' && (!config.secrets || config.secrets.length !== 3 || config.secrets.some(function(v) { return !v.trim(); })))
 		return _('Google Drive needs ClientID, ClientSecret and RefreshToken in secrets.');
 	if (config.service === 'template' && !object(config.template))
 		return _('XDRIVE template must be a JSON object.');
+	if (config.service === 's3') {
+		var s3 = config.s3, endpoint;
+		if (!object(s3)) return _('XDRIVE S3 needs an s3 object.');
+		try { endpoint = new URL(s3.endpoint); } catch (e) { return _('S3 endpoint must be an HTTP or HTTPS URL without credentials, query or fragment.'); }
+		if (typeof s3.endpoint !== 'string' || !/^https?:\/\//.test(s3.endpoint) || !/^https?:$/.test(endpoint.protocol) ||
+			!endpoint.hostname || endpoint.username || endpoint.password || /[?#]/.test(s3.endpoint))
+			return _('S3 endpoint must be an HTTP or HTTPS URL without credentials, query or fragment.');
+		if (typeof s3.bucket !== 'string' || !s3.bucket || /[\/\\\x00-\x1f\x7f]/.test(s3.bucket) || s3.bucket === '.' || s3.bucket === '..')
+			return _('S3 needs a bucket name without path separators.');
+		if (s3.region != null && (typeof s3.region !== 'string' || /[\/, \x00-\x20\x7f]/.test(s3.region)))
+			return _('Invalid S3 signing region.');
+		if (s3.pathStyle != null && typeof s3.pathStyle !== 'boolean')
+			return _('S3 pathStyle must be true or false.');
+		if (s3.pathStyle === false && (!/^[a-z0-9.-]+$/.test(s3.bucket) || /\.\.|^\.|\.$/.test(s3.bucket) ||
+			/^\[|^[0-9.]+$/.test(endpoint.hostname)))
+			return _('S3 virtual-hosted addressing needs a DNS endpoint and a DNS-compatible bucket name.');
+		var prefix = config.remoteFolder.replace(/\/$/, '');
+		if (!prefix || prefix.split('/').some(function(part) { return !part || part === '.' || part === '..'; }) || /[\\\x00-\x1f\x7f]/.test(prefix))
+			return _('S3 remoteFolder must be a relative prefix without empty, dot or parent components.');
+		if (!config.secrets || config.secrets.length < 2 || config.secrets.length > 3 || !config.secrets[0] || !config.secrets[1] ||
+			config.secrets.some(function(v) { return /[\x00-\x08\x0a-\x1f\x7f]/.test(v); }) || /[\/ ,\t]/.test(config.secrets[0]))
+			return _('S3 needs AccessKeyID, SecretAccessKey and optionally SessionToken in secrets.');
+	}
 	if (config.xmux != null && !object(config.xmux)) return _('XMUX must be a JSON object.');
 	if (config.xmux && config.xmux.maxConnections && config.xmux.maxConcurrency)
 		return _('Set either XMUX maxConnections or maxConcurrency.');

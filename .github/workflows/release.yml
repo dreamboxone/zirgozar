@@ -81,11 +81,13 @@ jobs:
         run: node test/test-subs-ui.js
 
       - name: Check XDRIVE and inbound source filters
+        env:
+          XRAY_VERSION: ${{ steps.xray-version.outputs.version }}
         run: |
           set -euo pipefail
           mkdir -p .test-tools/xdrive
           curl -fsSL --retry 3 -o .test-tools/xdrive/core.zip \
-            https://github.com/patterniha/Xray-core/releases/download/v26.10.22/Xray-linux-64.zip
+            "https://github.com/XTLS/Xray-core/releases/download/$XRAY_VERSION/Xray-linux-64.zip"
           unzip -q .test-tools/xdrive/core.zip xray -d .test-tools/xdrive
           chmod +x .test-tools/xdrive/xray
           RIG_XDRIVE_XRAY="$PWD/.test-tools/xdrive/xray" node test/test-xdrive.js

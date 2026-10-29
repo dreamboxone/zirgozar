@@ -1813,7 +1813,8 @@ return view.extend({
 			}
 
 			o = field(form.TextValue, 'xdrive_settings', _('XDRIVE settings (JSON)'),
-				_('Set service, remoteFolder and secrets here. Optional xmux and template settings are preserved, including hrefPath. For HTTP/3, select TLS and set ALPN to h3 only. Requires Xray 26.10.22 or newer.'));
+				_('Set service, remoteFolder and secrets here. Optional xmux and template settings are preserved, including hrefPath. For HTTP/3, select TLS and set ALPN to h3 only. Requires Xray 26.10.22 or newer.') + ' ' +
+				_('S3 requires Xray 26.10.29 or newer: set service to s3, secrets to [AccessKeyID, SecretAccessKey, optional SessionToken], and s3 to {endpoint, region, bucket, pathStyle}. Google Drive slot mode requires compatible cores on both ends.'));
 			o.rows = 10; o.monospace = true; o.rmempty = false;
 			o.placeholder = '{"service":"google-drive","remoteFolder":"folder-id","secrets":["ClientID","ClientSecret","RefreshToken"]}';
 			o.validate = function(section_id, value) { return nodelink.validateXdrive(value); };
