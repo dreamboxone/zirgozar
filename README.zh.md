@@ -34,20 +34,20 @@
 
 | 资源 | 最低要求 | 建议 |
 |---|---|---|
-| 基础安装可用存储 | 约 120 MiB | 至少 160 MiB |
+| 基础安装可用存储 | 约 120 MB | 至少 160 MB |
 | RAM | 128 MB | 256 MB 或更多 |
 | CPU | 有对应 Xray 构建的架构 | 双核或更多 |
 
-主包同时包含 Xray 和 sing-box。在 `arm_cortex-a7_neon-vfpv4` 参考路由器上，主包安装后约占 105 MiB，界面不足 1 MiB。已安装其他 `xray-core` 不会省去主包自带副本；压缩包大小也不等于安装占用。
+主包同时包含 Xray 和 sing-box。在 `arm_cortex-a7_neon-vfpv4` 参考路由器上，主包安装后约占 105 MB，界面不足 1 MB。已安装其他 `xray-core` 不会省去主包自带副本；压缩包大小也不等于安装占用。
 
-安装全部列出的核心、工具和完整路由数据约需 400 MiB，建议至少准备 1 GiB 可用存储。此测量包含 Xray、patterniha Xray、sing-box、sing-box-lx、Geoview、warp-plus、Vwarp、Aether 及其辅助文件、Mihomo、shadowsocks-rust、OpenVPN 和 HAProxy。更新缓存另约 38 MiB；完整路由数据约 24 MiB，精简版两文件约 2 MiB。订阅、历史、后续版本和临时解压还会增加占用；完整安装适合 USB 或 extroot。
+安装全部列出的核心、工具和完整路由数据约需 400 MB，建议至少准备 1 GB 可用存储。此测量包含 Xray、patterniha Xray、sing-box、sing-box-lx、Geoview、warp-plus、Vwarp、Aether 及其辅助文件、Mihomo、shadowsocks-rust、OpenVPN 和 HAProxy。更新缓存另约 38 MB；完整路由数据约 24 MB，精简版两文件约 2 MB。订阅、历史、后续版本和临时解压还会增加占用；完整安装适合 USB 或 extroot。
 
 ```sh
 df -h /overlay /tmp
 du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 ```
 
-32/64 MB 总闪存装不下当前基础包；128 MB 总闪存也不代表有 120 MiB 可写空间。仅把下载目录改为 USB，不会移动初始包自带的两个核心。
+32/64 MB 总闪存装不下当前基础包；128 MB 总闪存也不代表有 120 MB 可写空间。仅把下载目录改为 USB，不会移动初始包自带的两个核心。
 
 运行核心通常占用 40–80 MB RAM。小内存设备可将配置页的 **Checked at once** 从 30 降到 10，降低并行握手压力。参考设备为四核 Cortex-A7、717 MHz，实测隧道约 1.6 MB/s，98 个配置的选择约 8.8 秒；这些不是所有设备的性能保证。
 
@@ -138,6 +138,12 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 安装后主开关保持关闭，程序不会自行启用隧道。
 
 **DNS 前置条件：** 现在依赖 `dnsmasq-full`。已有安装的依赖安装器会保留 DNS/DHCP 配置并替换普通 dnsmasq：apk 在一次事务中完成；opkg 先下载所需文件和离线回滚包，失败时恢复普通 dnsmasq。全新 opkg 安装可能需先手动替换，命令和回滚步骤见[波斯语安装示例](README.md#-۲-نصب)。应用内更新会自动准备。
+
+**依赖与软件源错误。** Router requirements 检查只报告状态；安装软件包或替换 DNS 需要执行安装操作。L2TP、PPTP、SSTP、IKEv2 和 OpenVPN 可能需要额外软件包或内核模块。在 APK 路由器上，如果健康索引可用且没有过期索引、签名或证书错误，单个软件源不可用不会阻止安装其他可用软件包。包管理器仍检查签名、依赖和兼容性。此行为也适用于 OpenVPN、HAProxy、xz 和更新应用时准备 DNS。
+
+内核模块必须与固件和确切的内核 ABI 匹配。HTTP 错误或 `unexpected end of file` 本身不能证明固件不兼容；应先检查软件源地址和网络。安装日志位于 `/var/run/zirgozar/deps-install.log`。如果所需模块不存在，需要固件提供者的匹配软件源，或包含模块的兼容固件。OpenVPN/HAProxy 软件源错误不会中断 **Check all** 对 Xray 等独立核心的版本检查。
+
+只需安装一个 `zirgozar` 软件包；应用和完整 LuCI 界面包含在同一包内并一起更新。
 
 ## 🚀 3. 第一次连接
 
@@ -391,7 +397,7 @@ Add 中选 WARP，通过 [warp-plus](https://github.com/bepass-org/warp-plus) �
 
 ### ⬆️ 4.5 App Update：更新
 
-应用更新可复用旧包未变区段，只下载缺少部分，最后以 `SHA256SUMS` 验证完整发布包并由 apk/opkg 安装。首次完整下载；缓存位于 `/usr/libexec/zirgozar/.update-cache`，每组件最多保留一个不超过 64 MiB 的包，并预留至少 8 MiB 空间。缓存缺失、不兼容、复用少或 Range 失败时改为完整下载。删除缓存不影响安装；打开页面可能刷新版本元数据，但下载包需要明确更新操作。
+应用更新可复用旧包未变区段，只下载缺少部分，最后以 `SHA256SUMS` 验证完整发布包并由 apk/opkg 安装。首次完整下载；缓存位于 `/usr/libexec/zirgozar/.update-cache`，每组件最多保留一个不超过 64 MB 的包，并预留至少 8 MB 空间。缓存缺失、不兼容、复用少或 Range 失败时改为完整下载。删除缓存不影响安装；打开页面可能刷新版本元数据，但下载包需要明确更新操作。
 
 - **App Update：** 检查、下载、验证、安装；保留设置，原来开启的隧道恢复，页面刷新。
 - **Cores：** 版本、发布状态、路径及 Check/Install/Reinstall/Update/Remove。Check 仅本行，Check all 只检查全部核心。Xray 可选预发布，但自动升级仅提示较新稳定版；Reinstall 可重装相同 Xray 版本。其他核心未必支持精确版本重装，OpenVPN/HAProxy 使用包管理器索引。

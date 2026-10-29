@@ -45,27 +45,29 @@
 
 | | Minimum | Comfortable |
 |---|---|---|
-| **Free storage for base install** | about 120 MiB | at least 160 MiB |
+| **Free storage for base install** | about 120 MB | at least 160 MB |
 | **RAM** | 128 MB | 256 MB or more |
 | **CPU** | any architecture Xray publishes a build for | two cores or more |
 
+**Packaging.** Install one `zirgozar` package for your router architecture. The application and complete LuCI interface are installed and updated together; no separate interface package is needed.
+
 **Storage.** The main package now includes both Xray and sing-box. On the
 `arm_cortex-a7_neon-vfpv4` reference router, the installed main package uses
-about **105 MiB**, plus less than **1 MiB** for the web interface. Budget about
-**120 MiB free for the base installation**, preferably **160 MiB or more** for
+about **105 MB**, plus less than **1 MB** for the web interface. Budget about
+**120 MB free for the base installation**, preferably **160 MB or more** for
 missing dependencies and installation headroom. An existing `xray-core` package
 does not remove Zirgozar's bundled copy. Compressed download size is not installed
 size. Figures vary with architecture, core versions, filesystem and dependencies.
 
 | Installation | Reference router footprint | Storage budget |
 |---|---|---|
-| Application and UI, including Xray and sing-box | about 106 MiB before extra dependencies | at least 160 MiB free before installation |
-| All listed cores and tools, plus full routing data | about 400 MiB before update cache and temporary files | at least 1 GiB usable storage |
+| Application and UI, including Xray and sing-box | about 106 MB before extra dependencies | at least 160 MB free before installation |
+| All listed cores and tools, plus full routing data | about 400 MB before update cache and temporary files | at least 1 GB usable storage |
 
 The full measurement includes Xray, patterniha's Xray, sing-box, sing-box-lx,
 Geoview, warp-plus, Vwarp, Aether and its supporting files, Mihomo,
 shadowsocks-rust, OpenVPN and HAProxy. The current update cache adds about
-38 MiB. Full routing data adds about 24 MiB; the lite pair is about 2 MiB.
+38 MB. Full routing data adds about 24 MB; the lite pair is about 2 MB.
 There is no fixed maximum: subscriptions, traffic history, optional protocol
 packages, caches and later releases can increase usage. Downloads and extraction
 also need temporary space. USB storage or extroot is suitable for a full install.
@@ -78,7 +80,7 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 ```
 
 > Routers with 32 or 64 MB of total flash cannot hold the current base package.
-> Even 128 MB total flash does not mean 120 MiB free: check the writable filesystem.
+> Even 128 MB total flash does not mean 120 MB free: check the writable filesystem.
 > Changing only the core download folder to USB does not relocate the two cores
 > bundled in the initial package; arrange extroot or enough installation space first.
 
@@ -202,8 +204,20 @@ If that step went wrong, or you installed the file by hand, open the **App
 Update** page and look at **Router requirements**. It puts
 three questions to the running system — can it redirect traffic, can it do
 policy routing, can it fetch over HTTPS — and installs whatever is missing at
-The press of a button. It never touches `xray-core`, so other programs on
-The router are left alone.
+the press of a button. It never touches `xray-core`, so other programs on
+the router are left alone.
+
+**Dependency installation and repository errors.** The requirements check only reports status. Installing packages or replacing DNS requires the install action. Requirements follow the saved configs: L2TP, PPTP, SSTP, IKEv2 and OpenVPN may need additional router packages or kernel modules.
+
+On APK routers, a failed repository does not block packages available from healthy indexes when no stale indexes, signature errors or certificate errors are reported. The package manager still checks signatures, dependencies and compatibility. Missing packages remain errors in the logs. This also applies to installing OpenVPN, HAProxy for load balancing, xz for shadowsocks-rust, and preparing DNS for an application update.
+
+**Kernel repository errors.** An HTTP error or `unexpected end of file` alone does not prove incompatible firmware. Check the repository URL and connectivity first. Kernel modules must match the firmware and exact kernel ABI. If the firmware vendor does not provide them, use that vendor's matching repository or compatible firmware that includes the required modules. Useful diagnostics:
+
+```sh
+cat /etc/openwrt_release
+uname -r
+tail -n 60 /var/run/zirgozar/deps-install.log
+```
 
 > [!TIP]
 > Nothing runs by itself after installation. The tunnel stays off until you turn
@@ -533,7 +547,11 @@ empty by design. **Check all** runs the handshake for the whole list
 without disturbing a tunnel that is carrying traffic; **Use** beside a row
 connects through that config.
 
-**XDRIVE (VLESS).** Select this transport for a VLESS config and paste its `xdriveSettings` object into **XDRIVE settings (JSON)**. `service` can be `google-drive`, `template` or `local`; set `remoteFolder` and the service credentials in `secrets`. Nested `template` operations, including `hrefPath`/`hrefMethod`, and `xmux` settings are preserved. For HTTP/3 select TLS with ALPN set to `h3` only. Use Xray 26.10.22 or newer.
+**XDRIVE (VLESS).** Select this transport for a VLESS config and paste its `xdriveSettings` object into **XDRIVE settings (JSON)**. `service` can be `google-drive`, `template`, `local` or `s3`; set `remoteFolder` and the service credentials in `secrets`. Nested `template` operations, including `hrefPath`/`hrefMethod`, and `xmux` settings are preserved. For HTTP/3 select TLS with ALPN set to `h3` only. Use Xray 26.10.22 or newer; S3 requires official Xray 26.10.29 or newer.
+
+For S3, `remoteFolder` is a relative prefix inside the bucket. Put `AccessKeyID`, `SecretAccessKey` and an optional `SessionToken` in the `secrets` array. The `s3` object holds `endpoint`, `region`, `bucket` and `pathStyle`. The default `pathStyle` is true; false requires a DNS endpoint and a DNS-compatible bucket name. Client and server settings and share links preserve these fields. The [Persian guide](README.md) includes a complete S3 JSON example.
+
+Google Drive's new slot transport in Xray 26.10.29 runs inside the core without another application setting. Both client and server must have compatible cores. Local and template storage retain segment transfer.
 
 XDRIVE requires VLESS encryption and no `flow`. Generate a matching pair with `xray vlessenc`: put `decryption` on the server and `encryption` in the client. The required client Mux is enabled automatically; `xmux` separately controls connections to storage. Imported Xray JSON and the app's VLESS share links keep the transport settings. Automatic selection skips the TCP prefilter for XDRIVE and measures the actual proxy path instead.
 
@@ -676,8 +694,8 @@ Application updates can reuse unchanged ranges of previously downloaded packages
 Only missing ranges are transferred, then the exact release package is verified
 against `SHA256SUMS` and installed with `apk` or `opkg` as usual. The first update
 downloads the complete packages to establish a baseline. An optional cache keeps
-one package per component (at most 64 MiB each) under
-`/usr/libexec/zirgozar/.update-cache`, with at least 8 MiB of free space reserved.
+one package per component (at most 64 MB each) under
+`/usr/libexec/zirgozar/.update-cache`, with at least 8 MB of free space reserved.
 Missing cache, incompatible releases, little reusable data or failed range requests
 fall back to a complete download. Deleting this cache only disables reuse until
 the next successful download. This runs only when an update is requested; opening
@@ -693,6 +711,7 @@ a page can refresh stale release metadata automatically, but package downloads r
 **Check all** examines every core, without checking the application itself.
 **Up to date** means no newer version was found in the checked source.
 HAProxy and OpenVPN use the router package manager's available index.
+If that repository fails, **Check all** still checks Xray and the other independent cores. The repository error remains visible, and a stale package version is not presented as a fresh result. The question mark beside **Cores** explains each core and helper.
 For Xray, **Reinstall** downloads the installed version again, while
 **Install this version** installs the selected release. Other installers use
 their project's release or the router package feed; exact-version reinstall
@@ -704,6 +723,8 @@ and HAProxy. sing-box can run the entire tunnel as the active core.
 patterniha's build disables the check that rejects VLESS and Trojan without
 transport security to public destinations. Official Xray exempts private
 destinations and VLESS with its own encryption.
+
+**LX connection test details.** When a compatible config is tested with sing-box-lx and its connection-test API is available, **ⓘ** beside the URL Test result opens the DNS, connection, TLS and HTTP stages and the cause of failure. Older cores use the normal test. The test runs in a temporary instance and does not change the active tunnel configuration.
 
 **App Path**
 
