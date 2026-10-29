@@ -4,9 +4,9 @@
 . "$(dirname "$0")/rig.sh"
 rig_setup
 mkdir -p "$RIG/work"
-printf '%s\n' 'vless://11111111-2222-3333-4444-555555555555@203.0.113.7:443?security=none&type=tcp#DNS' |
+printf '%s\n' 'vless://11111111-2222-3333-4444-555555555555@127.0.0.1:443?security=none&type=tcp#DNS' |
  LC_ALL=C awk -f "$RIG/lib/zgz-parse" | head -1 | cut -f6 > "$RIG/etc/best.json"
-printf 'tag=dns-test\nprotocol=vless\nhost=203.0.113.7\nport=443\n' > "$RIG/etc/best.meta"
+printf 'tag=dns-test\nprotocol=vless\nhost=127.0.0.1\nport=443\n' > "$RIG/etc/best.meta"
 cat >> "$RIG/lib/zgz-common.sh" <<'STUB'
 resolve_direct() { echo unexpected >> "$ZGZ_RUN/direct.calls"; echo 9.9.9.9; }
 STUB
