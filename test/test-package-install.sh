@@ -30,8 +30,9 @@ apk() {
  case "$1" in
  list) echo 'kernel-6.12.112~abcdef-r1 arm {kernel} [installed]' ;;
  verify) return "$verify_code" ;;
- update) [ "$update_code" = 0 ] || { echo 'DNS lookup failed'; return "$update_code"; } ;;
- add) echo 'kmod-tun: no such package'; return "$install_code" ;;
+ update) if [ "$update_code" = 2 ]; then echo '1 unavailable, 0 stale; 11418 distinct packages available'; return 1; fi
+         [ "$update_code" = 0 ] || { echo 'DNS lookup failed'; return "$update_code"; } ;;
+ add) echo add >> "$audit_root/add-calls"; echo 'kmod-tun: no such package'; return "$install_code" ;;
  esac
 }
 curl() {
@@ -75,6 +76,11 @@ verify_code=0; curl_code=6
 rc=0; ensure_kmods_feed || rc=$?
 check "$rc" 1 'repository DNS failure is reported'
 check "$(grep -ic DNS "$audit_root/message")" 1 'repository DNS diagnostic is actionable'
+curl_code=22; update_code=2
+rm -f "$audit_root/add-calls"
+rc=0; install_openvpn || rc=$?
+check "$rc" 1 'OpenVPN still fails if its required module is unavailable'
+check "$(cat "$audit_root/add-calls" 2>/dev/null)" add 'missing kernel feed does not prevent trying the available OpenVPN package'
 if command -v pkg_lock >/dev/null 2>&1; then
  pkg_lock
  printf '. "%s"\npkg_lock\n' "$audit_root/common" > "$audit_root/contender"

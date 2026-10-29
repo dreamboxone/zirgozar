@@ -674,6 +674,7 @@ var FA = {
 		'فایل‌های کامل حدود ۱۷ و ۸ مگابایت هستند. اگر جا نمی‌شوند، همان پروژه ‎geoip-lite.dat‎ (۳۸ کیلوبایت) و ‎geosite-lite.dat‎ (۲ مگابایت) را هم منتشر می‌کند که فقط دسته‌های ایرانی را دارند — آدرس آن‌ها را در کادرهای بالا بگذارید. دانلودی که جا نشود رد می‌شود، نه اینکه نصفه نوشته شود.',
 
 	'Cores': 'هسته‌ها',
+	'Required kernel modules are unavailable. Use the repository matching this firmware and its exact kernel ABI, or a matching firmware image with these modules included. See Runtime Logs.': 'ماژول‌های کرنل موردنیاز در دسترس نیستند. مخزن سازگار با همین فریمور و شناسه دقیق کرنل، یا فریمور سازگار با ماژول‌های آماده لازم است. گزارش‌های اجرا را بررسی کنید.',
 	'XDRIVE service must be local, google-drive, template or s3.': 'گزینه service در XDRIVE باید local، google-drive، template یا s3 باشد.',
 	'XDRIVE S3 needs an s3 object.': 'برای XDRIVE نوع S3، شیء s3 را وارد کنید.',
 	'S3 endpoint must be an HTTP or HTTPS URL without credentials, query or fragment.': 'آدرس endpoint در S3 باید HTTP یا HTTPS و بدون نام کاربری، گذرواژه، query یا fragment باشد.',

@@ -73,4 +73,23 @@ for manager in apk opkg; do
 	check "$(latest_of openvpn)" 2.7.7 "$manager retry recovers the version"
 	if [ ! -e "$CORE_RESULT" ]; then ok "$manager retry clears the previous error"; else bad "$manager retry leaves a stale error"; fi
 done
+XRAY_REPO=XTLS/Xray-core
+LX_REPO=Leadaxe/sing-box-lx
+XRAY_VERSIONS="$RIG/run/xray-versions"
+LX_VERSIONS="$RIG/run/lx-versions"
+xray_releases() { printf 'v26.10.29 stable\n'; }
+latest_tag() { echo v26.10.29; }
+tag_version() { echo "${1#v}"; }
+repo_of() { echo "test/$1"; }
+manager=apk
+printf 'openvpn\t2.7.6\nhaproxy\t3.0\nxray\t26.10.21\n' > "$LATEST_CACHE"
+export ZGZ_TEST_REFRESH_FAIL=1
+cmd_latest force all-cores >/dev/null 2>&1
+check "$?" 1 'all-core check preserves the package repository failure'
+check "$(latest_of xray)" 26.10.29 'failed package feed does not stop independent Xray release check'
+check "$(latest_of sing-box)" 26.10.29 'failed package feed does not stop independent sing-box release check'
+check "$(latest_of openvpn)" '' 'all-core check does not reuse stale OpenVPN version'
+check "$(latest_of haproxy)" '' 'all-core check does not reuse stale HAProxy version'
+case "$(cat "$CORE_RESULT")" in openvpn\ error\ *) ok 'package failure remains visible after independent checks';; *) bad 'package error lost';; esac
+unset ZGZ_TEST_REFRESH_FAIL
 rig_report

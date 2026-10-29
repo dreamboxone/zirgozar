@@ -560,6 +560,7 @@ return baseclass.extend({ strings: {
 	"Free space": "可用空间",
 	"The full files are about 17 MB and 8 MB. If they will not fit, the same project publishes geoip-lite.dat (38 KB) and geosite-lite.dat (2 MB), which carry the Iranian categories and nothing else — put those addresses in the boxes above. A download that will not fit is refused rather than half written.": "完整的文件大约是17个MB和8个MB. 如果它们不适合,同一项目会发布geip-lite.dat(38个KB)和geosite-lite.dat(2个MB),它们载有伊朗的类别,没有其他东西——将这些地址放上方的框中,一个不会适合的下载被拒绝而不是半写.",
 	"Cores": "核心项目",
+	"Required kernel modules are unavailable. Use the repository matching this firmware and its exact kernel ABI, or a matching firmware image with these modules included. See Runtime Logs.": "所需内核模块不可用。请使用与此固件和确切内核 ABI 匹配的软件源，或包含这些模块的兼容固件。请查看运行日志。",
 	"XDRIVE service must be local, google-drive, template or s3.": "XDRIVE service 必须是 local、google-drive、template 或 s3。",
 	"XDRIVE S3 needs an s3 object.": "XDRIVE S3 需要 s3 对象。",
 	"S3 endpoint must be an HTTP or HTTPS URL without credentials, query or fragment.": "S3 endpoint 必须是没有凭据、查询或片段的 HTTP 或 HTTPS URL。",

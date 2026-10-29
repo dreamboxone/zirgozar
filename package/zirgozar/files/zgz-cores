@@ -438,7 +438,7 @@ install_sslocal() {
 		_xlog="$ZGZ_RUN/xz-install.log"
 		: > "$_xlog"
 		[ "$_xpm" != none ] || { say_message "xz is needed to unpack shadowsocks-rust and could not be installed from the router's packages."; return 1; }
-		pkg_refresh "$_xpm" "$_xlog" || return 1
+		pkg_refresh "$_xpm" "$_xlog" partial || return 1
 		case "$_xpm" in
 			apk) bounded 180 apk add xz >>"$_xlog" 2>&1 || { pkg_failure "$_xlog"; return 1; } ;;
 			opkg) bounded 180 opkg install xz >>"$_xlog" 2>&1 || { pkg_failure "$_xlog"; return 1; } ;;
@@ -725,8 +725,10 @@ install_openvpn() {
 	manager="$(ovpn_pkg_manager)"; file="$ZGZ_RUN/ovpn-install.log"
 	: > "$file"
 	[ "$manager" != none ] || { say_message "This router has neither opkg nor apk, so OpenVPN cannot be installed automatically."; return 1; }
-	if [ "$manager" = apk ]; then ensure_kmods_feed >>"$file" 2>&1 || return 1; fi
-	pkg_refresh "$manager" "$file" || return 1
+	if [ "$manager" = apk ]; then
+		ensure_kmods_feed >>"$file" 2>&1 || warn "Matching kernel feed is unavailable; trying the signed OpenVPN package and its installed dependencies."
+	fi
+	pkg_refresh "$manager" "$file" partial || return 1
 	case "$manager" in
 		apk) if [ -n "$_had" ]; then bounded 180 apk add -u "$_op" >>"$file" 2>&1 || rc=$?
 		     else bounded 180 apk add "$_op" >>"$file" 2>&1 || rc=$?; fi ;;
@@ -738,6 +740,7 @@ install_openvpn() {
 		say_message "OpenVPN was installed but its executable did not pass verification. See the installation log."
 		return 1
 	fi
+	clear_message
 	log "OpenVPN $(core_version /usr/sbin/openvpn) installed ($_op)"
 	return 0
 }
@@ -753,7 +756,7 @@ install_haproxy() {
 	manager="$(ovpn_pkg_manager)"
 	: > "$file"
 	[ "$manager" != none ] || { say_message "This router has neither opkg nor apk, so HAProxy cannot be installed automatically."; return 1; }
-	pkg_refresh "$manager" "$file" || return 1
+	pkg_refresh "$manager" "$file" partial || return 1
 	case "$manager" in
 		apk) bounded 180 apk add -u haproxy >>"$file" 2>&1 || rc=$? ;;
 		opkg) if [ -n "$(haproxy_path)" ]; then bounded 180 opkg upgrade haproxy >>"$file" 2>&1 || rc=$?
@@ -889,6 +892,7 @@ xray_releases() {
 
 cmd_latest() {
 	local _only="${2:-}"
+	local _package_index_failed=0
 	local _cores_only=0
 	if [ "$_only" = all-cores ]; then _cores_only=1; _only=''; fi
 	# Explicit checks of repository-managed cores need a fresh package index.
@@ -905,10 +909,11 @@ cmd_latest() {
 							"$LATEST_CACHE" > "$LATEST_CACHE.failed" 2>/dev/null || true
 						mv -f "$LATEST_CACHE.failed" "$LATEST_CACHE"
 						printf '%s error %s\n' "${_only:-openvpn}" "$(head -1 "$ZGZ_MESSAGE")" > "$CORE_RESULT"
-						return 1
+						[ -z "$_only" ] || return 1
+						_package_index_failed=1
 					fi
-					case "$(cat "$CORE_RESULT" 2>/dev/null)" in
-						openvpn\ error\ *|haproxy\ error\ *) rm -f "$CORE_RESULT" ;;
+					case "$_package_index_failed:$(cat "$CORE_RESULT" 2>/dev/null)" in
+						0:openvpn\ error\ *|0:haproxy\ error\ *) rm -f "$CORE_RESULT" ;;
 					esac
 				fi
 				;;
@@ -974,12 +979,12 @@ cmd_latest() {
 			[ -n "$_old" ] && printf '%s\t%s\n' "$_c" "$_old" >> "$_tmp"
 		fi
 	done
-	if [ -z "$_only" ] || [ "$_only" = haproxy ]; then
+	if [ "$_package_index_failed" = 0 ] && { [ -z "$_only" ] || [ "$_only" = haproxy ]; }; then
 	_hl="$(pkg_latest haproxy)"
 	[ -n "$_hl" ] || _hl="$(latest_of haproxy)"
 	[ -n "$_hl" ] && printf 'haproxy\t%s\n' "$_hl" >> "$_tmp"
 	fi
-	if [ -z "$_only" ] || [ "$_only" = openvpn ]; then
+	if [ "$_package_index_failed" = 0 ] && { [ -z "$_only" ] || [ "$_only" = openvpn ]; }; then
 	_ol="$(ovpn_latest)"
 	[ -n "$_ol" ] && printf 'openvpn	%s
 ' "$_ol" >> "$_tmp"
@@ -989,7 +994,7 @@ cmd_latest() {
 	else
 		rm -f "$_tmp"
 	fi
-	return 0
+	[ "$_package_index_failed" = 0 ]
 }
 
 # This program's newest release alone, when the last asking is an hour old.
@@ -1309,7 +1314,7 @@ $_b/$_n"
 
 	log "update: installing with $_pm"
 	if ! { case "$_pm" in apk) apk info -e dnsmasq-full ;; *) opkg list-installed dnsmasq-full ;; esac; } 2>/dev/null | grep -q .; then
-		pkg_refresh "$_pm" "$SELF_DIR/log" && install_dnsmasq_full "$_pm" >>"$SELF_DIR/log" 2>&1 || {
+		pkg_refresh "$_pm" "$SELF_DIR/log" partial && install_dnsmasq_full "$_pm" >>"$SELF_DIR/log" 2>&1 || {
 			self_fail "Could not install dnsmasq-full. See the dependency installation log."; return 1;
 		}
 	fi

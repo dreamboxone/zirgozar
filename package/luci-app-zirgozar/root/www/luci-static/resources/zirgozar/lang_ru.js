@@ -560,6 +560,7 @@ return baseclass.extend({ strings: {
 	"Free space": "Свободное место",
 	"The full files are about 17 MB and 8 MB. If they will not fit, the same project publishes geoip-lite.dat (38 KB) and geosite-lite.dat (2 MB), which carry the Iranian categories and nothing else — put those addresses in the boxes above. A download that will not fit is refused rather than half written.": "Полные файлы составляют около 17 MB и 8 MB. Если они не подойдут, тот же проект публикует geoip-lite.dat (38 KB) и geosite-lite.dat (2 MB), которые несут иранские категории и ничего больше — поместите эти адреса в ящики выше.",
 	"Cores": "ядра",
+	"Required kernel modules are unavailable. Use the repository matching this firmware and its exact kernel ABI, or a matching firmware image with these modules included. See Runtime Logs.": "Необходимые модули ядра недоступны. Нужен репозиторий для этой прошивки и точного ABI ядра либо совместимая прошивка с включёнными модулями. См. журнал выполнения.",
 	"XDRIVE service must be local, google-drive, template or s3.": "Сервис XDRIVE: local, google-drive, template или s3.",
 	"XDRIVE S3 needs an s3 object.": "Для XDRIVE S3 нужен объект s3.",
 	"S3 endpoint must be an HTTP or HTTPS URL without credentials, query or fragment.": "Endpoint S3 должен быть URL HTTP или HTTPS без учётных данных, запроса и фрагмента.",

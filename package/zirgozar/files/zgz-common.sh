@@ -2224,6 +2224,8 @@ pkg_failure() {
 		message='Package repository DNS lookup failed. Check router DNS.'
 	elif grep -qiE 'signature|untrusted|BAD signature' "$file"; then
 		message='Package signature verification failed. Check the repository and its trusted signing keys.'
+	elif grep -qi 'kmod' "$file" && grep -qiE '404|not found|no such package|cannot satisfy' "$file"; then
+		message='Required kernel modules are unavailable. Use the repository matching this firmware and its exact kernel ABI, or a matching firmware image with these modules included. See Runtime Logs.'
 	elif grep -qiE 'timed? out|timeout|connection|network unreachable|temporary error' "$file"; then
 		message='Package repositories could not be reached. Check connectivity and try again.'
 	elif grep -qiE '404|not found|no such package|cannot satisfy|incompatible|conflict|breaks:' "$file"; then
@@ -2238,9 +2240,18 @@ pkg_failure() {
 }
 
 pkg_refresh() {
-	local manager="$1" file="$2" attempt
+	local manager="$1" file="$2" attempt partial="${3:-}"
 	for attempt in 1 2; do
 		if bounded 180 "$manager" update >>"$file" 2>&1; then return 0; fi
+		# A missing optional feed must not block signed packages from healthy
+		# feeds. Only the dependency installer opts in; core updates stay strict.
+		if [ "$manager" = apk ] && [ "$partial" = partial ] &&
+		   grep -qE '[1-9][0-9]* unavailable, 0 stale;' "$file" &&
+		   grep -qE '[1-9][0-9]* distinct packages available' "$file" &&
+		   ! grep -qiE 'signature|untrusted|certificate|SSL.*error|TLS.*error' "$file"; then
+			warn "Some package indexes are unavailable; trying required packages from the available signed indexes."
+			return 0
+		fi
 		[ "$attempt" = 1 ] && grep -qiE 'timed? out|timeout|connection|temporary error|name resolution|DNS|resolve' "$file" || break
 		sleep 1
 	done

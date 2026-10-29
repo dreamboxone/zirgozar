@@ -174,10 +174,6 @@ cmd_check() {
 		"$(pkg_manager)" "$(firewall_backend)"
 	_first=1
 	for _p in $_missing; do
-		if [ "$_p" = dnsmasq-full ]; then
-			install_dnsmasq_full "$_m" >>"$ZGZ_RUN/deps-install.log" 2>&1 || _failed="$_failed $_p"
-			continue
-		fi
 		[ "$_first" = "1" ] || printf ','
 		printf '"%s"' "$_p"
 		_first=0
@@ -233,15 +229,24 @@ cmd_install() {
 	# reporting as "install failed".
 	case "$_m" in
 		apk)
-			case " $_missing " in *" kmod-"*|*" openvpn-"*) ensure_kmods_feed >>"$ZGZ_RUN/deps-install.log" 2>&1 || return 1 ;; esac
+			case " $_missing " in
+				*" kmod-"*|*" openvpn-"*|*" ppp-mod-"*|*" xl2tpd "*|*" strongswan-"*)
+					ensure_kmods_feed >>"$ZGZ_RUN/deps-install.log" 2>&1 ||
+						warn "Matching kernel feed is unavailable; checking which required packages can still be installed."
+					;;
+			esac
 			;;
 	esac
-	pkg_refresh "$_m" "$ZGZ_RUN/deps-install.log" || return 1
+	pkg_refresh "$_m" "$ZGZ_RUN/deps-install.log" partial || return 1
 
 	# One at a time, so that a name this OpenWrt happens not to have does not
 	# take the rest of the list down with it.
 	_failed=""
 	for _p in $_missing; do
+		if [ "$_p" = dnsmasq-full ]; then
+			install_dnsmasq_full "$_m" >>"$ZGZ_RUN/deps-install.log" 2>&1 || _failed="$_failed $_p"
+			continue
+		fi
 		# sstp-client carries an example /etc/ppp/chap-secrets that ppp
 		# already owns. Refused, apk leaves it half installed and reports an
 		# error on every install after it, whatever is being installed; so it
@@ -287,6 +292,7 @@ cmd_install() {
 		say_message "The package manager finished but required packages are still missing. See the installation log."
 		return 1
 	fi
+	clear_message
 	log "dependencies installed"
 	return 0
 }
