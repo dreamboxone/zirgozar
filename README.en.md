@@ -724,8 +724,6 @@ patterniha's build disables the check that rejects VLESS and Trojan without
 transport security to public destinations. Official Xray exempts private
 destinations and VLESS with its own encryption.
 
-**LX connection test details.** When a compatible config is tested with sing-box-lx and its connection-test API is available, **ⓘ** beside the URL Test result opens the DNS, connection, TLS and HTTP stages and the cause of failure. Older cores use the normal test. The test runs in a temporary instance and does not change the active tunnel configuration.
-
 **App Path**
 
 | Option | In the file | Default | What it does |

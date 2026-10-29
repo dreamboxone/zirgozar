@@ -571,8 +571,6 @@ return baseclass.extend({ strings: {
 	"S3 remoteFolder must be a relative prefix without empty, dot or parent components.": "S3 remoteFolder 必须是相对前缀，不能包含空段、单点或双点。",
 	"S3 needs AccessKeyID, SecretAccessKey and optionally SessionToken in secrets.": "S3 的 secrets 需要 AccessKeyID、SecretAccessKey 和可选的 SessionToken。",
 	"S3 requires Xray 26.10.29 or newer: set service to s3, secrets to [AccessKeyID, SecretAccessKey, optional SessionToken], and s3 to {endpoint, region, bucket, pathStyle}. Google Drive slot mode requires compatible cores on both ends.": "S3 需要 Xray 26.10.29 或更新版本：service 设为 s3，secrets 设为 [AccessKeyID, SecretAccessKey, 可选 SessionToken]，s3 设为 {endpoint, region, bucket, pathStyle}。Google Drive 槽模式需要两端使用兼容核心。",
-	"Connection test details": "连接测试详情",
-	"Stages reported by the core for this config.": "核心为此配置报告的各个阶段。",
 	"Xray is the primary core. sing-box is only needed for configs that Xray does not support and runs alongside it.": "优先使用 Xray 核心。仅当配置不受 Xray 支持时才需要 sing-box，并与其一起运行。",
 	"Geoview identifies the country of a domain or address. sing-box cannot split traffic without it.": "Geoview 识别域名或地址所属的国家。没有它，sing-box 无法分流。",
 	"warp-plus is only needed for WARP configs: Cloudflare WARP, WARP in WARP, Psiphon behind WARP, and WireGuard configs over WARP.": "warp-plus 仅用于 WARP 配置：Cloudflare WARP、WARP 套 WARP、通过 WARP 的 Psiphon，以及通过 WARP 的 WireGuard 配置。",

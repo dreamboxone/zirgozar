@@ -571,8 +571,6 @@ return baseclass.extend({ strings: {
 	"S3 remoteFolder must be a relative prefix without empty, dot or parent components.": "S3 remoteFolder должен быть относительным префиксом без пустых частей, точки и двух точек.",
 	"S3 needs AccessKeyID, SecretAccessKey and optionally SessionToken in secrets.": "S3 требует AccessKeyID, SecretAccessKey и необязательный SessionToken в secrets.",
 	"S3 requires Xray 26.10.29 or newer: set service to s3, secrets to [AccessKeyID, SecretAccessKey, optional SessionToken], and s3 to {endpoint, region, bucket, pathStyle}. Google Drive slot mode requires compatible cores on both ends.": "S3 требует Xray 26.10.29 или новее: service — s3, secrets — [AccessKeyID, SecretAccessKey, необязательный SessionToken], s3 — {endpoint, region, bucket, pathStyle}. Режим слотов Google Drive требует совместимых ядер на обоих концах.",
-	"Connection test details": "Подробности проверки соединения",
-	"Stages reported by the core for this config.": "Этапы, сообщённые ядром для этой конфигурации.",
 	"Xray is the primary core. sing-box is only needed for configs that Xray does not support and runs alongside it.": "Основное ядро — Xray. sing-box нужен только для конфигураций, которые Xray не поддерживает, и работает вместе с ним.",
 	"Geoview identifies the country of a domain or address. sing-box cannot split traffic without it.": "Geoview определяет страну домена или адреса. Без него sing-box не разделяет трафик.",
 	"warp-plus is only needed for WARP configs: Cloudflare WARP, WARP in WARP, Psiphon behind WARP, and WireGuard configs over WARP.": "warp-plus нужен только для Cloudflare WARP, WARP в WARP, Psiphon через WARP и конфигураций WireGuard через WARP.",

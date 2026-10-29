@@ -685,8 +685,6 @@ var FA = {
 	'S3 remoteFolder must be a relative prefix without empty, dot or parent components.': 'remoteFolder در S3 باید مسیر نسبی باشد و بخش خالی، نقطه یا دو نقطه نداشته باشد.',
 	'S3 needs AccessKeyID, SecretAccessKey and optionally SessionToken in secrets.': 'در secrets برای S3، ابتدا AccessKeyID و SecretAccessKey و در صورت نیاز SessionToken را وارد کنید.',
 	'S3 requires Xray 26.10.29 or newer: set service to s3, secrets to [AccessKeyID, SecretAccessKey, optional SessionToken], and s3 to {endpoint, region, bucket, pathStyle}. Google Drive slot mode requires compatible cores on both ends.': 'S3 به Xray نسخه 26.10.29 یا جدیدتر نیاز دارد: service را s3، آرایه secrets را [AccessKeyID, SecretAccessKey, SessionToken اختیاری] و شیء s3 را شامل endpoint، region، bucket و pathStyle قرار دهید. حالت اسلات Google Drive به هسته سازگار در هر دو سمت نیاز دارد.',
-	'Connection test details': 'جزئیات تست اتصال',
-	'Stages reported by the core for this config.': 'مراحل گزارش‌شده توسط هسته برای این کانفیگ.',
 	'Xray is the primary core. sing-box is only needed for configs that Xray does not support and runs alongside it.': 'اولویت با هسته ایکس‌ری است. سینگ‌باکس فقط برای کانفیگ‌هایی لازم است که ایکس‌ری پشتیبانی نمی‌کند و در کنار آن اجرا می‌شود.',
 	'Geoview identifies the country of a domain or address. sing-box cannot split traffic without it.': 'موقعیت‌یاب نشان می‌دهد یک دامنه یا آدرس به کدام کشور تعلق دارد. سینگ‌باکس بدون آن تفکیک ترافیک نمی‌کند.',
 	'warp-plus is only needed for WARP configs: Cloudflare WARP, WARP in WARP, Psiphon behind WARP, and WireGuard configs over WARP.': 'وارپ‌پلاس فقط برای کانفیگ‌های از نوع وارپ شامل: وارپ کلودفلر، وارپ در وارپ، سایفون پشت وارپ، و کانفیگ‌های وایرگارد روی وارپ لازم است.',
