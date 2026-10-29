@@ -146,13 +146,51 @@ do_tcp() {
 # honest-looking "no answer" - would be about this program and not about the
 # node. Waiting a few seconds for the other one to finish is the only answer
 # that is true.
+lx_url_ms() (
+	# A private daemon exposes the trace API without touching the live tunnel.
+	core="$1"; config="$2"; pid=''
+	"$core" api connection-test --help >/dev/null 2>&1 || exit 2
+	work="$(mktemp -d "$ZGZ_RUN/lx-test.XXXXXX")" || exit 2
+	chmod 700 "$work"
+	secret="$(cat /proc/sys/kernel/random/uuid)" || exit 2
+	trap 'if [ -n "$pid" ]; then kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; fi; rm -rf "$work"' EXIT
+	trap 'exit 2' HUP INT TERM
+	printf '{"listen":"127.0.0.1:24902","secret":"%s","log_file":"%s/daemon.log"}\n' "$secret" "$work" > "$work/daemon.json"
+	"$core" lxd --state-dir "$work" --config-force "$config" --run > "$work/start.log" 2>&1 &
+	pid=$!
+	ready=0
+	for attempt in 1 2 3 4 5; do
+		kill -0 "$pid" 2>/dev/null || break
+		if curl -fsS --max-time 1 -H "Authorization: Bearer $secret" http://127.0.0.1:24902/admin/status > "$work/status" 2>/dev/null &&
+		   grep -qi 'started' "$work/status"; then ready=1; break; fi
+		sleep 1
+	done
+	[ "$ready" = 1 ] || exit 2
+	rc=0
+	bounded 20 "$core" api connection-test "$(cfg test_url 'http://www.gstatic.com/generate_204')" \
+		--url http://127.0.0.1:24902 --secret "$secret" --outbound out --fresh --depth http --timeout 15000 --max-bytes 1024 \
+		> "$work/trace" 2>&1 || rc=$?
+	# An API failure is not a measurement of the node; retain the old test.
+	grep -qE 'root cause:|[✓✗].*(dial|lookup|tcp_connect|http|tls|transport)' "$work/trace" || exit 2
+	if [ -n "${URL_DETAIL:-}" ]; then
+		head -c 32768 "$work/trace" > "$URL_DETAIL.tmp"
+		mv -f "$URL_DETAIL.tmp" "$URL_DETAIL"
+	fi
+	ms=0
+	if [ "$rc" = 0 ] && grep -q '^root cause: none' "$work/trace" && grep -q '^http: [1-5][0-9][0-9]' "$work/trace"; then
+		ms="$(sed -n 's/^elapsed: \([0-9]*\) ms$/\1/p' "$work/trace" | tail -1)"
+		[ "${ms:-0}" -gt 0 ] || ms=1
+	fi
+	echo "${ms:-0}"
+)
+
 url_ms() {
 	_payload="$1"
 
 	_waited=0
 	while ! mkdir "$DIR/.url-lock" 2>/dev/null; do
 		_waited=$((_waited + 1))
-		if [ "$_waited" -gt 15 ]; then
+		if [ "$_waited" -gt 45 ]; then
 			# Something died holding it. Take it rather than wedging for good.
 			rm -rf "$DIR/.url-lock" 2>/dev/null || true
 			mkdir "$DIR/.url-lock" 2>/dev/null || true
@@ -189,6 +227,13 @@ url_ms() {
 		return 1
 	fi
 	_eng="${_x%% *}"; _x="${_x#* }"
+	if [ "$_eng" = singbox ] && [ -n "${URL_DETAIL:-}" ] && _lx_ms="$(lx_url_ms "$_x" "$_cfg")"; then
+		rm -f "$_cfg"
+		rmdir "$DIR/.url-lock" 2>/dev/null || true
+		echo "$_lx_ms"
+		[ "$_lx_ms" -gt 0 ]
+		return $?
+	fi
 
 	_geo="$(geo_dir)" || _geo=""
 	if [ -n "$_geo" ]; then
@@ -276,6 +321,8 @@ endpoint_url_ms() (
 
 do_url() {
 	_out="$DIR/$1.url"
+	URL_DETAIL="$DIR/$1.url.trace"
+	rm -f "$URL_DETAIL"
 	_proto="$2"; _payload2="$3"
 	echo -1 > "$_out"
 
@@ -425,6 +472,7 @@ cmd_json() {
 	_first=1
 	for _f in "$DIR"/*; do
 		[ -f "$_f" ] || continue
+		case "$_f" in *.trace|*.tmp) continue ;; esac
 		_k="$(basename "$_f")"
 		_v="$(cat "$_f" 2>/dev/null)"
 		# Anything that is not one of the two markers or a plain number is a
@@ -436,6 +484,16 @@ cmd_json() {
 		esac
 		[ "$_first" = "1" ] || printf ','
 		printf '"%s":%s' "$(json_escape "$_k")" "${_v:-0}"
+		_first=0
+	done
+	printf '},"details":{'
+	_first=1
+	for _f in "$DIR"/*.trace; do
+		[ -f "$_f" ] || continue
+		[ "$_first" = 1 ] || printf ','
+		_k="$(basename "$_f" .trace)"
+		printf '"%s":' "$(json_escape "$_k")"
+		ucode -e 'import { readfile } from "fs"; print(sprintf("%J", substr(readfile(ARGV[0]) ?? "", 0, 32768)));' "$_f"
 		_first=0
 	done
 	printf '}}\n'

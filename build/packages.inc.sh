@@ -7,10 +7,10 @@
 # packages.inc.sh - what goes into a package, shared by the .apk and .ipk
 # builders so the two formats can never drift apart.
 
-# Solar Hijri date in Asia/Tehran: year since 1400, month, day.
-# Keep VERSION for the whole day; increment RELEASE for same-day updates.
+# VERSION is the application version; increment RELEASE for package updates.
+# The main zirgozar package always includes the complete LuCI interface.
 VERSION=5.8.7
-RELEASE=1
+RELEASE=2
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"

@@ -64,6 +64,7 @@ function pill(text, colour) {
    arrives with the next poll. */
 var TESTS = [ 'ping', 'tcp', 'url' ];
 var results = {};
+var testDetails = {};
 
 /* Tests asked for and not answered yet, by cell: what the cell said when it
    was pressed, and when. The list of every node is drawn again every few
@@ -130,11 +131,29 @@ function testCell(sid, kind) {
 			callAction('node_test', kind + ':' + sid).catch(function() {});
 		}
 	}, testText(results[key]));
-	return out;
+	var detail = E('button', {
+		'class': 'btn pwp-test-detail', 'data-detail-key': key,
+		'type': 'button', 'title': _('Connection test details'),
+		'style': testDetails[key] ? '' : 'display:none',
+		'click': function(ev) {
+			ev.preventDefault(); ev.stopPropagation();
+			ui.showModal(_('Connection test details'), [
+				E('p', {}, _('Stages reported by the core for this config.')),
+				E('pre', { 'dir': 'ltr', 'style': 'white-space:pre-wrap;overflow-wrap:anywhere;max-height:60vh;overflow:auto;text-align:left' }, testDetails[key] || ''),
+				E('div', { 'class': 'right' }, E('button', { 'class': 'btn', 'click': ui.hideModal }, _('Close window')))
+			]);
+		}
+	}, 'ⓘ');
+	return E('span', {}, [out, detail]);
 }
 
 function renderTests(d) {
 	results = (d && d.tests) || {};
+	testDetails = (d && d.details) || {};
+	document.querySelectorAll('.pwp-test-detail').forEach(function(button) {
+		var key = button.getAttribute('data-detail-key');
+		button.style.display = testDetails[key] && !pending[key] && results[key] != -1 ? '' : 'none';
+	});
 	var cells = document.querySelectorAll('.pwp-test-value');
 	for (var i = 0; i < cells.length; i++) {
 		var k = cells[i].getAttribute('data-key');
@@ -426,18 +445,18 @@ function showAddresses(on) {
    as the cells of the nodes added by hand do; until then it shows what the
    last measurement found, or "Test" when nothing has measured it yet. */
 function listTestCell(tag, kind, measured) {
-	var c = testCell(tag, kind), key = tag + '.' + kind;
+	var cell = testCell(tag, kind), c = cell.querySelector('.pwp-test-value'), key = tag + '.' + kind;
 	if (isPending(key)) {
 		c.textContent = '…';
 		c.setAttribute('style', 'cursor:pointer;user-select:none;white-space:nowrap');
-		return c;
+		return cell;
 	}
 	if (!(key in results) && measured > 0) {
 		c.setAttribute('data-measured', measured);
 		c.textContent = testText(measured);
 		c.setAttribute('style', 'cursor:pointer;user-select:none;white-space:nowrap;' + testColour(measured));
 	}
-	return c;
+	return cell;
 }
 
 function renderNodes(d) {

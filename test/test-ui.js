@@ -6,6 +6,7 @@
 require('./test-status-ui.js');
 require('./test-home-ui.js');
 require('./test-nodes-ui.js');
+require('./test-lx-trace.js');
 require('./test-balancing-ui.js');
 require('./test-node-picker.js');
 require('./test-i18n.js');

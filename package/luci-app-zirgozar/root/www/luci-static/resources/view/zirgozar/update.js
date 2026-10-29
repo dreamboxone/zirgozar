@@ -560,16 +560,6 @@ function render(d, early) {
 			[ E('span', {}, cores.unknown ? '…' : bytes(cores.free)), verState(), E('code', { 'title': cores.dir || '', 'style': 'font-size:11.5px;color:var(--muted)' }, cores.dir || '') ]);
 		freeRow.classList.add('pwp-core-update-row');
 		cbox.appendChild(freeRow);
-		cbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:8px 0 0' },
-			_('Xray carries the traffic. sing-box is only needed for nodes that speak what Xray does not — it is then run as a local helper for that one node, and everything else works exactly as before.')));
-		cbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:6px 0 0' },
-			_('Geoview shows where a name or an address belongs, on the Geoview page. sing-box cannot read the routing data without it: when sing-box carries the tunnel with the Iran split or ad blocking on, Geoview is installed by itself if it is missing.')));
-		cbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:6px 0 0' },
-			_('warp-plus is only needed for WARP nodes: Cloudflare WARP, WARP in WARP, Psiphon behind WARP, and WireGuard nodes set to be carried by it.')));
-		cbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:6px 0 0' },
-			_('Vwarp is warp-plus with WARP over MASQUE and noize; WARP nodes that use either need it. Xray (patterniha) is Xray that also carries VLESS and Trojan without TLS to public addresses - configs over Cloudflare’s plain-HTTP ports - which the official Xray refuses; installed beside it, it is used for those configs.')));
-		cbox.appendChild(E('p', { 'style': 'font-size:12px;color:var(--muted);margin:6px 0 0' },
-			_('OpenVPN is the official client, from the router’s own packages: every OpenVPN config is carried by it and by nothing else. Install, update and remove go through the package manager.')));
 	}
 }
 
@@ -647,7 +637,17 @@ return view.extend({
 		return m.render().then(function(mapEl) {
 			var content = [
 				pui.card(_('App Update'), 'download', '#1e88e5', E('div', { 'id': 'pwp-app' })),
-				pui.card(_('Cores'), 'cpu', '#8b5cf6', E('div', { 'id': 'pwp-cores' })),
+				pui.card(_('Cores'), 'cpu', '#8b5cf6', E('div', {}, [
+					E('div', { 'class': 'cbi-value-description zgz-card-help' }, [
+						E('p', {}, _('Xray is the primary core. sing-box is only needed for configs that Xray does not support and runs alongside it.')),
+						E('p', {}, _('Geoview identifies the country of a domain or address. sing-box cannot split traffic without it.')),
+						E('p', {}, _('warp-plus is only needed for WARP configs: Cloudflare WARP, WARP in WARP, Psiphon behind WARP, and WireGuard configs over WARP.')),
+						E('p', {}, _('Vwarp is warp-plus with MASQUE and camouflage or noise. WARP configs using these features need it.')),
+						E('p', {}, _('The Patterniha core is a version of Xray that does not reject VLESS and Trojan without TLS.')),
+						E('p', {}, _('The OpenVPN core is official and is installed from the router packages. OpenVPN configs only run with it.'))
+					]),
+					E('div', { 'id': 'pwp-cores' })
+				])),
 				pui.card(_('Router requirements'), 'shield', '#f59e0b', E('div', { 'id': 'zgz-deps' })),
 				mapEl
 			];
