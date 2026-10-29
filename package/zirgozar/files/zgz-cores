@@ -1154,6 +1154,7 @@ CORE_RESULT="$ZGZ_RUN/core-result"
 SELF_DIR=/tmp/zirgozar-update
 
 self_fail() {
+	rm -f "$ZGZ_RUN/self-update-phase"
 	# Short of room, the page is told how short rather than only that it
 	# failed: "error room <needed> <free>", in bytes.
 	if [ -s "$ZGZ_RUN/no-room" ]; then
@@ -1193,6 +1194,7 @@ self_seed_package() {
 
 install_self() {
 	rm -f "$SELF_RESULT" "$ZGZ_RUN/no-room"
+	echo downloading > "$ZGZ_RUN/self-update-phase"
 	_arch="$(openwrt_arch)"
 	[ -n "$_arch" ] || { self_fail "This router does not say what processor it has."; return 1; }
 	if command -v apk >/dev/null 2>&1; then
@@ -1248,6 +1250,7 @@ $_b/$_n"
 	case "$_new" in ''|*-r[0-9]*) : ;; *) _new="$_new-r1" ;; esac
 	if [ -n "$_have" ] && [ "$_have" = "$_new" ]; then
 		printf 'same\n' > "$SELF_RESULT"
+		rm -f "$ZGZ_RUN/self-update-phase"
 		log "update: $_have is already the latest release - nothing to do"
 		return 0
 	fi
@@ -1313,6 +1316,7 @@ $_b/$_n"
 	space_for $((_psize * 3)) / || { self_fail "Not enough room."; return 1; }
 
 	log "update: installing with $_pm"
+	echo installing > "$ZGZ_RUN/self-update-phase"
 	if ! { case "$_pm" in apk) apk info -e dnsmasq-full ;; *) opkg list-installed dnsmasq-full ;; esac; } 2>/dev/null | grep -q .; then
 		pkg_refresh "$_pm" "$SELF_DIR/log" partial && install_dnsmasq_full "$_pm" >>"$SELF_DIR/log" 2>&1 || {
 			self_fail "Could not install dnsmasq-full. See the dependency installation log."; return 1;
@@ -1352,10 +1356,12 @@ $_b/$_n"
 
 	# An upgrade may stop the tunnel on its way through. The main switch
 	# decides whether it comes back, as it does at boot.
+	echo restarting > "$ZGZ_RUN/self-update-phase"
 	/etc/init.d/zirgozar enable >/dev/null 2>&1 || true
 	/etc/init.d/zirgozar restart >/dev/null 2>&1 || true
 	# Do this after a successful install, so an optional cache cannot use
 	# the space needed by the package manager or delay restoring the tunnel.
+	echo finalizing > "$ZGZ_RUN/self-update-phase"
 	self_seed_package "$_main" main
 	if [ "$_unified" = 1 ]; then
 		rm -f /usr/libexec/zirgozar/.update-cache/luci.package /usr/libexec/zirgozar/.update-cache/luci.json
@@ -1365,6 +1371,7 @@ $_b/$_n"
 	rm -rf "$SELF_DIR"
 	_now="$(zgz_version)"
 	printf 'ok %s\n' "$_now" > "$SELF_RESULT"
+	rm -f "$ZGZ_RUN/self-update-phase"
 	log "update: now version $_now"
 	return 0
 }

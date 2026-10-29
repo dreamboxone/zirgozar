@@ -604,7 +604,7 @@ method_system() {
 		[ "$_pct" -le 100 ] || _pct=100
 	fi
 
-	printf '{"geo":%s,"cores":%s,"deps":%s,"interfaces":%s,"job":"%s","progress":%s,"self":"%s","core_result":"%s","deps_result":"%s"}\n' \
+	printf '{"geo":%s,"cores":%s,"deps":%s,"interfaces":%s,"job":"%s","progress":%s,"self":"%s","core_result":"%s","deps_result":"%s","self_phase":"%s"}\n' \
 		"$("$GEO" status 2>/dev/null || echo '{}')" \
 		"$("$CORES" list 2>/dev/null || echo '{}')" \
 		"${_deps:-{\}}" \
@@ -613,7 +613,8 @@ method_system() {
 		"$_pct" \
 		"$(json_escape "$(cat "$ZGZ_RUN/self-update" 2>/dev/null)")" \
 		"$(json_escape "$(cat "$ZGZ_RUN/core-result" 2>/dev/null)")" \
-		"$(json_escape "$(cat "$ZGZ_RUN/deps-result" 2>/dev/null)")"
+		"$(json_escape "$(cat "$ZGZ_RUN/deps-result" 2>/dev/null)")" \
+		"$(json_escape "$(cat "$ZGZ_RUN/self-update-phase" 2>/dev/null)")"
 }
 
 # -------------------------------------------------------------------- action
@@ -889,7 +890,7 @@ method_action() {
 			# This program itself, from its latest release. Detached like any
 			# long job, and more so than most: the install restarts rpcd and
 			# the web server, which are what would otherwise be waiting on it.
-			rm -f "$ZGZ_RUN/self-update"
+			rm -f "$ZGZ_RUN/self-update" "$ZGZ_RUN/self-update-phase"
 			run_job "Updating Zirgozar" "$CORES install zirgozar"
 			;;
 		core_remove)

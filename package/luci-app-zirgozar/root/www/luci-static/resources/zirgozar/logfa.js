@@ -162,7 +162,7 @@ var T = [
 	[ "SOCKS port {}: node '{}' cannot be used - it goes the tunnel's way instead", "پورت SOCKS {1}: کانفیگ '{2}' قابل استفاده نیست - به‌جایش از راه تونل می‌رود" ],
 	[ "shunt rule {}: node '{}' cannot be used - it goes through the tunnel's node instead", "قانون عبور {1}: کانفیگ '{2}' قابل استفاده نیست - به‌جایش از کانفیگ تونل می‌رود" ],
 	[ "shunt rule '{}' is inverted, which only sing-box can do - left out while Xray carries the tunnel", "قانون عبور '{1}' معکوس است که فقط sing-box از پسش برمی‌آید - تا وقتی Xray تونل را می‌برد کنار گذاشته شد" ],
-	[ "balancing node '{}' has no usable Xray members", "کانفیگ توزیع بار '{1}' هیچ عضو قابل استفاده‌ای برای Xray ندارد" ],
+	[ "balancing node '{}' has no usable Xray members", "کانفیگ بالانسینگ '{1}' هیچ عضو قابل استفاده‌ای برای Xray ندارد" ],
 	[ "the pre-proxy '{}' could not be read - it has been deleted, or Xray cannot speak it", "پیش‌پروکسی '{1}' خوانده نشد - حذف شده یا Xray آن را نمی‌شناسد" ],
 	[ "WARP node '{}' has no MASQUE account yet - press Register on its page", "کانفیگ وارپ '{1}' هنوز حساب MASQUE ندارد - در صفحه‌اش «ثبت» را بزنید" ],
 	[ "WARP node '{}' has no account yet - press Register on its page, or connect through it once", "کانفیگ وارپ '{1}' هنوز حساب ندارد - در صفحه‌اش «ثبت» را بزنید یا یک بار از طریق آن وصل شوید" ],

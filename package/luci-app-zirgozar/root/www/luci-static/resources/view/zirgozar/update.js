@@ -78,11 +78,20 @@ function downloadText(name) {
 	return text.format(name === 'Zirgozar' && i18n.get() === 'fa' ? 'زیرگذر' : ltr(name));
 }
 
+function appProgressText(phase) {
+	if (phase == 'downloading') return downloadText('Zirgozar');
+	if (phase == 'installing') return jobName('Updating Zirgozar');
+	if (phase == 'restarting') return _('Restarting services…');
+	if (phase == 'finalizing') return _('Finishing update…');
+	return _('Updating Zirgozar');
+}
+
 function noteFor(key) {
 	var n = key && notes[key];
 	var active = key && key == progressKey && progressJob;
 	if (active && (!n || n.kind == 'info'))
-		n = { text: progressPhase == 'installing' ? jobName(progressJob) : downloadText(progressJob.replace(/^Installing /, '')), kind: 'info' };
+		n = { text: key == 'app' ? appProgressText(progressPhase) :
+			(progressPhase == 'installing' ? jobName(progressJob) : downloadText(progressJob.replace(/^Installing /, ''))), kind: 'info' };
 	var going = key && key == progressKey && progressPct >= 0;
 	/* A download keeps its note while it runs, however long it takes. */
 	if (n && going && n.until) n.until = Date.now() + 15000;
@@ -390,6 +399,8 @@ function render(d, early) {
 	   version from the one this page was opened with - reloads the page, whose
 	   own files have just been replaced. */
 	var app0 = early ? {} : ((d.cores || {}).app || {});
+	if (!early && !d.job && progressKey == 'app' && notes.app && notes.app.kind == 'info')
+		delete notes.app;
 	if (app0.version && !firstVersion) firstVersion = app0.version;
 	var res = early ? lastSelf : String(d.self || '');
 	if (res.indexOf('error ') == 0 && res != lastSelf) {
@@ -400,6 +411,8 @@ function render(d, early) {
 	if (res.trim() == 'same' && res != lastSelf)
 		say('app', _('This is already the latest version. Nothing was downloaded.'), 'info');
 	lastSelf = res;
+	if (!early && !d.job && progressKey == 'app' && /^ok\s+/.test(res) && res.slice(3).trim() == app0.version)
+		say('app', _('Updated to %s.').format(app0.version), 'ok');
 
 	var cres = early ? lastCore : String(d.core_result || '');
 	if (cres && cres != lastCore) {
@@ -440,6 +453,12 @@ function render(d, early) {
 		if (progressPct >= 0) progressPhase = 'downloading';
 		else if (progressPct < 0 && progressPhase == 'downloading') progressPhase = 'installing';
 		if (progressPhase == 'installing') progressPct = -1;
+		if (progressKey == 'app') {
+			var phase = String(d.self_phase || '');
+			if (/^(downloading|installing|restarting|finalizing)$/.test(phase))
+				progressPhase = phase;
+			if (progressPhase != 'downloading') progressPct = -1;
+		}
 	}
 	/* The job is the router's word now; the press no longer stands for it. */
 	if (!early && d.job && d.job.indexOf(CHECK_JOB) !== 0) actAsked = 0;

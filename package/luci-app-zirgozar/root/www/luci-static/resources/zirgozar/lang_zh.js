@@ -830,6 +830,8 @@ return baseclass.extend({ strings: {
 	"A downloaded file does not match the release's checksum - nothing was installed.": "下载的文件与发行的校验和不符 - 没有安装 。",
 	"The package manager refused the new version. The Log page has the details.": "软件包管理器拒绝了新版本。 Log 页面有细节 。",
 	"Updating Zirgozar": "更新 Zirgozar",
+	"Restarting services…": "正在重启服务…",
+	"Finishing update…": "正在完成更新…",
 	"Checking for new versions": "正在检查新版本",
 	"Checking which servers answer": "检查哪个服务器的答案",
 	"Downloading routing data": "下载路由数据",

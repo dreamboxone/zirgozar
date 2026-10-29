@@ -33,6 +33,26 @@ language = 'en';
 assert.equal(downloadText('Updating Zirgozar'), 'Downloading \u2066Zirgozar\u2069:');
 console.log('Download labels passed: localized app name, normalized job prefixes and isolated core names');
 
+const appTextSource = source.slice(source.indexOf('function appProgressText('), source.indexOf('\nfunction noteFor('));
+const appText = new Function('_','downloadText','jobName',appTextSource+'\nreturn appProgressText;')(
+	v=>v,()=> 'Downloading',()=> 'Installing');
+assert.equal(appText('finalizing'),'Finishing update…','a new login must not label cache preparation as downloading');
+assert.equal(appText('restarting'),'Restarting services…');
+assert.equal(appText('installing'),'Installing');
+assert.equal(appText('downloading'),'Downloading');
+assert.equal(appText(''),'Updating Zirgozar','an older backend with no phase must use a neutral update label');
+const resultSource = source.slice(source.indexOf('function render(d, early)'), source.indexOf('\n\tvar cres =',source.indexOf('function render(d, early)')));
+function completedNote(self) {
+	const render = new Function('keep','_',
+		'var answered=false, firstVersion="", lastSelf="", progressKey="app", notes={app:{kind:"info",text:"Downloading"}}; '+
+		'function say(k,text,kind) { notes[k]={text,kind}; }\n'+resultSource+
+		'\nreturn notes.app; }\nreturn render;')(()=>{},v=>({format:x=>v.replace('%s',x)}));
+	return render({cores:{app:{version:'5.8.7-r4'}},job:'',self});
+}
+assert.equal(completedNote(''),undefined);
+assert.deepEqual(completedNote('ok 5.8.7-r4'),{text:'Updated to 5.8.7-r4.',kind:'ok'});
+console.log('App update: reconnect phase labels and stale download note cleanup passed');
+
 const selectorSource = source.slice(source.indexOf("var versions = c.name == 'sing-box-lx'"), source.indexOf("\n\t\t\tif (c.installed && c.ours"));
 function selector(name, versions, picked, installedVersion) {
  const actions = [], calls = [];

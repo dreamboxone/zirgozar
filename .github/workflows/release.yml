@@ -143,7 +143,9 @@ jobs:
             timeout -k 5 90 sh test/test-package.sh
 
       - name: Test package installation
-        run: sh test/test-package-install.sh
+        run: |
+          sh test/test-package-install.sh
+          python3 test/test-rpcd-reload.py
 
       - name: Test OpenConnect measurement and DNS package replacement
         run: |

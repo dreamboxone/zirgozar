@@ -10,7 +10,7 @@
 # VERSION is the application version; increment RELEASE for package updates.
 # The main zirgozar package always includes the complete LuCI interface.
 VERSION=5.8.7
-RELEASE=4
+RELEASE=5
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -210,6 +210,12 @@ bounded 15 /etc/init.d/cron reload >/dev/null 2>&1 || true
 # failure this package can have, because nothing anywhere says a word.
 # So ask afterwards, and restart if the answer is no.
 bounded 15 /etc/init.d/rpcd reload >/dev/null 2>&1 || true
+# Reload preserves login sessions; allow registration to finish before the
+# restart fallback, which would discard those sessions.
+for rpc_wait in 1 2 3 4 5; do
+	ubus list 2>/dev/null | grep -q '^luci.zirgozar\$' && break
+	sleep 1
+done
 if ! ubus list 2>/dev/null | grep -q '^luci.zirgozar\$'; then
 	bounded 20 /etc/init.d/rpcd restart >/dev/null 2>&1 || true
 fi

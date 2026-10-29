@@ -61,6 +61,7 @@ curl() {
   else cat "$RELEASE/${url##*/}"; fi
 }
 transaction() {
+  cat "$ZGZ_RUN/self-update-phase" > "$WORK/install-phase"
   printf '%s\\n' "$@" > "$WORK/transaction"
   echo 5.8.5-r2 > "$ZGZ_ETC/version"
 }
@@ -72,7 +73,7 @@ transaction() {
             # No real services or persistent cache paths are touched by tests.
             safe = functions.replace('/etc/init.d/zirgozar', '/bin/true').replace(
                 '/usr/libexec/zirgozar/.update-cache/', str(work / 'cache') + '/')
-            script.write_text(prelude + safe + '\ninstall_self\n')
+            script.write_text(prelude + safe + '\nself_seed_package() { cat "$ZGZ_RUN/self-update-phase" >> "$WORK/cache-phase"; }\ninstall_self\n')
             env = dict(os.environ, WORK=str(work), RELEASE=str(release), SELF_DIR=str(work / 'download'),
                        SELF_REPO='test/repo', SELF_RESULT=str(run / 'result'), ZGZ_RUN=str(run),
                        ZGZ_ETC=str(etc), ZGZ_VERSION_FILE=str(etc / 'version'), ZGZ_LIB=str(work / 'no-delta'))
@@ -81,7 +82,10 @@ transaction() {
             assert (result.returncode == 0) == success, (manager, layout, result.stdout, result.stderr)
             transaction = work / 'transaction'
             assert transaction.exists() == success, (manager, layout)
+            assert not (run / 'self-update-phase').exists(), 'Completed or failed update must clear its phase'
             if success:
+                assert (work / 'install-phase').read_text().strip() == 'installing'
+                assert set((work / 'cache-phase').read_text().split()) == {'finalizing'}
                 args = transaction.read_text()
                 assert main in args
                 assert (ui in args) == (layout == 'legacy')

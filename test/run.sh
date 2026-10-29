@@ -23,6 +23,7 @@ if command -v ucode >/dev/null 2>&1; then
 	python3 test/test-lx-config.py || rc=1
 fi
 python3 test/test-unified-update.py || rc=1
+python3 test/test-rpcd-reload.py || rc=1
 sh test/test-nodes-reload.sh || rc=1
 sh test/test-inuse.sh || rc=1
 sh test/test-openconnect.sh || rc=1

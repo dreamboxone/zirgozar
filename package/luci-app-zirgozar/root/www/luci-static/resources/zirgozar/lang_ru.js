@@ -830,6 +830,8 @@ return baseclass.extend({ strings: {
 	"A downloaded file does not match the release's checksum - nothing was installed.": "Загруженный файл не соответствует контрольной сумме релиза — ничего не было установлено.",
 	"The package manager refused the new version. The Log page has the details.": "Менеджер пакетов отказался от новой версии. На странице журнала есть подробности.",
 	"Updating Zirgozar": "Обновление Zirgozar",
+	"Restarting services…": "Перезапуск служб…",
+	"Finishing update…": "Завершение обновления…",
 	"Checking for new versions": "Проверка новых версий",
 	"Checking which servers answer": "Проверьте, какие серверы отвечают",
 	"Downloading routing data": "Загрузка данных маршрутизации",

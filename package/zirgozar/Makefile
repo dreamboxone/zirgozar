@@ -6,7 +6,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zirgozar
 PKG_VERSION:=5.8.7
-PKG_RELEASE:=4
+PKG_RELEASE:=5
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
 PKG_LICENSE:=AGPL-3.0-or-later
@@ -252,6 +252,10 @@ bounded 15 /usr/libexec/zgz-router schedule sync >/dev/null 2>&1 || true
 # failure this package can have, because nothing anywhere says a word.
 # So ask afterwards, and restart if the answer is no.
 /etc/init.d/rpcd reload >/dev/null 2>&1
+for rpc_wait in 1 2 3 4 5; do
+	ubus list 2>/dev/null | grep -q '^luci.zirgozar$$' && break
+	sleep 1
+done
 if ! ubus list 2>/dev/null | grep -q '^luci.zirgozar$$'; then
 	/etc/init.d/rpcd restart >/dev/null 2>&1
 fi
@@ -268,7 +272,7 @@ fi
 /usr/libexec/zgz-rules ks apply >/dev/null 2>&1
 rm -f /tmp/luci-indexcache* 2>/dev/null
 rm -rf /tmp/luci-modulecache 2>/dev/null
-/etc/init.d/uhttpd restart >/dev/null 2>&1
+# Static LuCI assets and caches do not require restarting the web server.
 exit 0
 endef
 
