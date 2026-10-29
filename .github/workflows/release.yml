@@ -69,7 +69,7 @@ jobs:
         run: python3 test/test-build-xray-version.py
 
       - name: Install firewall and DNS test tools
-        run: sudo apt-get update -qq && sudo apt-get install -y nftables dnsmasq-base cmake pkg-config libjson-c-dev
+        run: sudo apt-get update -qq && sudo apt-get install -y nftables dnsmasq-base openvpn cmake pkg-config libjson-c-dev
 
       - name: Check dependency installation outcomes
         run: python3 test/test-deps-install.py
@@ -150,6 +150,8 @@ jobs:
       - name: Test OpenConnect measurement and DNS package replacement
         run: |
           RIG_ROOT="$RUNNER_TEMP/zirgozar-openconnect" sh test/test-openconnect.sh
+          RIG_ROOT="$RUNNER_TEMP/zirgozar-openvpn-test" sh test/test-openvpn-test.sh
+          sudo -E env RIG_ROOT="$RUNNER_TEMP/zirgozar-openvpn-live" RIG_XRAY="$PWD/prebuilt/x86_64/xray" sh test/test-openvpn-live.sh
           RIG_ROOT="$RUNNER_TEMP/zirgozar-dnsmasq-install" sh test/test-dnsmasq-install.sh
           RIG_ROOT="$RUNNER_TEMP/zirgozar-core-check" sh test/test-core-check.sh
 

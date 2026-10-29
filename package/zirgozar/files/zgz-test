@@ -329,6 +329,10 @@ do_url() {
 	# Protocol helpers keep their temporary processes separate from the live
 	# bridge. Unsupported protocols must not be reported as failed accounts.
 	case "$_proto" in
+		openvpn)
+			_ovpn_ms="$(printf '%s\n' "$_payload2" | ZGZ_TEST_TRACE="$URL_DETAIL" "$ZGZ_LIB/zgz-openvpn" test 2>/dev/null)" || _ovpn_ms="${_ovpn_ms:-0}"
+			printf '%s\n' "$_ovpn_ms" > "$_out"
+			return 0 ;;
 		openconnect|hysteria2)
 			endpoint_url_ms "$_payload2" "$_proto" > "$_out" 2>/dev/null || true
 			return 0 ;;
@@ -340,7 +344,7 @@ do_url() {
 			_aether_ms="$(printf '%s\n' "$_payload2" | "$ZGZ_LIB/zgz-aether" test "$1" 2>/dev/null)" || _aether_ms=0
 			printf '%s\n' "$_aether_ms" > "$_out"
 			return 0 ;;
-		hysteria|tuic|anytls|snell|naive|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg) echo -2 > "$_out"; return 0 ;;
+		hysteria|tuic|anytls|snell|naive|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|amneziawg) echo -2 > "$_out"; return 0 ;;
 		# WARP is the exception: warp-plus is one small program and is stood
 		# up for the test, because without it the column could only ever
 		# say that it cannot say.

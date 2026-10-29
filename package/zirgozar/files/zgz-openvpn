@@ -1,0 +1,90 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+# An independent OpenVPN URL probe. No service restarts or shared bridge state.
+set -e
+. "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
+[ "${1:-}" = test ] || { echo 'usage: zgz-openvpn test' >&2; exit 1; }
+mkdir "$ZGZ_RUN/.openvpn-test-lock" 2>/dev/null || { echo -2; exit 1; }
+work=''; vpn=''; proxy=''; routes=0; dev=zgzovpnt; table=19015
+cleanup() {
+	trap - EXIT INT TERM
+	for pid in "$proxy" "$vpn"; do
+		[ -z "$pid" ] || { kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; }
+	done
+	if [ "$routes" = 1 ]; then
+		ip -4 rule del pref "$table" oif "$dev" lookup "$table" 2>/dev/null || true
+		ip -4 route flush table "$table" 2>/dev/null || true
+	fi
+	if [ -n "$work" ] && [ -n "${ZGZ_TEST_TRACE:-}" ]; then
+		cat "$work/render.log" "$work/vpn.log" "$work/proxy.log" > "$ZGZ_TEST_TRACE" 2>/dev/null || true
+		chmod 600 "$ZGZ_TEST_TRACE" 2>/dev/null || true
+	fi
+	[ -z "$work" ] || { rm -f "$work"/*; rmdir "$work" 2>/dev/null || true; }
+	rmdir "$ZGZ_RUN/.openvpn-test-lock" 2>/dev/null || true
+}
+trap cleanup EXIT
+trap 'exit 1' INT TERM
+umask 077
+work="$(mktemp -d "$ZGZ_RUN/openvpn-test.XXXXXX")"
+cat > "$work/bridge.json"
+core="$(find_xray)" || { echo -2; exit 1; }
+client="$(command -v openvpn)" || { echo -2; exit 1; }
+command -v ip >/dev/null && command -v curl >/dev/null || { echo -2; exit 1; }
+# A chained profile must not be silently measured as a direct connection.
+if grep -q '"via":"' "$work/bridge.json"; then echo -2; exit 1; fi
+if [ -n "$(ip -4 route show table "$table" 2>/dev/null)" ] ||
+   ip -4 rule show | grep -q "^$table:"; then echo -2; exit 1; fi
+
+# Reuse the same connected account: a second login could evict the live one.
+if cmp -s "$work/bridge.json" "$ZGZ_ETC/bridge.json" &&
+   ip -4 addr show dev "$ZGZ_OVPN_DEV" 2>/dev/null | grep -q 'inet '; then
+	dev="$ZGZ_OVPN_DEV"
+else
+	if ip link show dev "$dev" >/dev/null 2>&1; then echo -2; exit 1; fi
+	# Reuse the production profile renderer, including legacy cipher support,
+	# with all output, credentials and diagnostic messages in a private folder.
+	ZGZ_ETC="$work" ZGZ_RUN="$work" ZGZ_BRIDGE_JSON="$work/client" \
+		ZGZ_CONFIG_JSON="$work/unused.json" ZGZ_OVPN_DEV="$dev" \
+		"$ZGZ_LIB/zgz-bridge" config > "$work/config-path" 2> "$work/render.log" || { echo -2; exit 1; }
+	"$client" --config "$work/client.ovpn" > "$work/vpn.log" 2>&1 &
+	vpn=$!
+	waited=0
+	while :; do
+		kill -0 "$vpn" 2>/dev/null || { echo 0; exit 1; }
+		if grep -q 'Initialization Sequence Completed' "$work/vpn.log" &&
+		   ip -4 addr show dev "$dev" 2>/dev/null | grep -q 'inet '; then break; fi
+		if grep -qE 'AUTH_FAILED|Exiting due to fatal error' "$work/vpn.log"; then echo 0; exit 1; fi
+		waited=$((waited + 1)); [ "$waited" -le 45 ] || { echo 0; exit 1; }
+		sleep 1
+	done
+fi
+# Bind only the probe's sockets to the device; no main/default route changes.
+# An unreachable fallback prevents the probe from succeeding over the WAN.
+routes=1
+ip -4 route add unreachable default metric 32767 table "$table"
+ip -4 rule add pref "$table" oif "$dev" lookup "$table"
+ip -4 route replace default dev "$dev" metric 10 table "$table"
+printf '{"log":{"loglevel":"none"},"inbounds":[{"listen":"127.0.0.1","port":24902,"protocol":"socks","settings":{"udp":false}}],"outbounds":[{"protocol":"freedom","settings":{"domainStrategy":"UseIPv4"},"streamSettings":{"sockopt":{"interface":"%s","mark":255}}}]}' "$dev" > "$work/proxy.json"
+"$core" run -c "$work/proxy.json" > "$work/proxy.log" 2>&1 &
+proxy=$!
+sleep 1
+kill -0 "$proxy" 2>/dev/null || { echo -2; exit 1; }
+measure() {
+	local url="$1" authority host port default address elapsed
+	case "$url" in http://*) default=80 ;; https://*) default=443 ;; *) return 1 ;; esac
+	authority="${url#*://}"; authority="${authority%%/*}"
+	host="${authority%%:*}"; port="${authority##*:}"
+	[ "$port" != "$authority" ] || port="$default"
+	address="$(resolve_direct "$host" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
+	[ -n "$address" ] || return 1
+	elapsed="$(curl -4 -fsS --noproxy '' --socks5 127.0.0.1:24902 \
+		--resolve "$host:$port:$address" --connect-timeout 8 --max-time 15 \
+		-o /dev/null -w '%{time_total}' "$url" 2>/dev/null)" || return 1
+	awk -v t="$elapsed" 'BEGIN { print (t > 0 ? (t*1000 < 1 ? 1 : int(t*1000+0.5)) : 0) }'
+}
+url="$(cfg test_url 'http://www.gstatic.com/generate_204')"
+if measure "$url"; then exit 0; fi
+if [ "$url" = 'http://www.gstatic.com/generate_204' ] && measure https://www.google.com/generate_204; then exit 0; fi
+echo 0
+exit 1

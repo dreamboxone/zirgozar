@@ -27,6 +27,7 @@ python3 test/test-rpcd-reload.py || rc=1
 sh test/test-nodes-reload.sh || rc=1
 sh test/test-inuse.sh || rc=1
 sh test/test-openconnect.sh || rc=1
+sh test/test-openvpn-test.sh || rc=1
 sh test/test-dnsmasq-install.sh || rc=1
 sh test/test-core-check.sh || rc=1
 sh test/test-balancing.sh || rc=1
