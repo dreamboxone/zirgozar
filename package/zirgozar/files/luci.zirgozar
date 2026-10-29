@@ -750,11 +750,19 @@ method_action() {
 			;;
 		node_dup)
 			# The node added by hand that a link or file already is, for the
-			# node page before a new one is saved. "<id>;<link>": the id is
-			# the node being saved, which is not compared with itself.
-			_skip="${arg%%;*}"
+			# node page before a new one is saved. "<id>|<visible ids>;<link>"
+			# excludes pending deletions and the node being saved.
+			_meta="${arg%%;*}"
+			_skip="${_meta%%|*}"
 			case "$_skip" in *[!A-Za-z0-9_]*) _skip="" ;; esac
-			_d="$(printf '%s\n' "${arg#*;}" | SKIP="$_skip" "$NODES" dupof 2>/dev/null)" || _d=""
+			case "$_meta" in
+				*'|'*)
+					_scope="${_meta#*|}"
+					case "$_scope" in *[!A-Za-z0-9_,]*) fail "unknown node"; return ;; esac
+					_d="$(printf '%s\n' "${arg#*;}" | SKIP="$_skip" DUP_SCOPE="$_scope" "$NODES" dupof 2>/dev/null)" || _d=""
+					;;
+				*) _d="$(printf '%s\n' "${arg#*;}" | SKIP="$_skip" "$NODES" dupof 2>/dev/null)" || _d="" ;;
+			esac
 			json_init
 			json_add_boolean "ok" 1
 			json_add_string "dup_id" "$(printf '%s' "$_d" | cut -f1)"

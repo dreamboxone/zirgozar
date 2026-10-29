@@ -50,6 +50,37 @@ printf 'n0\n' > "$RIG/run/rejected"
 sections 1 0
 build_check own '' 1 'candidate list becomes empty'
 if [ ! -e "$RIG/run/rejected" ]; then ok 'empty list clears rejected tags'; else bad 'empty list clears rejected tags'; fi
+printf '#!/bin/sh\nexit 0\n' > "$RIG/bin/pgrep"
+chmod +x "$RIG/bin/pgrep"
+printf 'ready\n' > "$RIG/run/status"
+build_check own '' 1 'empty future list while connected'
+check "$(cat "$RIG/run/message" 2>/dev/null)" '' 'active tunnel clears stale empty-list warning'
+printf 'A different warning\n' > "$RIG/run/message"
+build_check own '' 1 'empty future list preserves other warnings'
+check "$(cat "$RIG/run/message")" 'A different warning' 'unrelated warning remains visible'
+rm -f "$RIG/bin/pgrep" "$RIG/run/status" "$RIG/run/message"
+
+rig_set old.link "$manual"
+rig_set old.name original
+check "$(printf '%s\n' "$manual" | sh "$RIG/lib/zgz-nodes" dupof)" "$(printf 'old\toriginal')" 'existing node is a duplicate'
+check "$(printf '%s\n' "$manual" | DUP_SCOPE=new sh "$RIG/lib/zgz-nodes" dupof)" '' 'pending deletion excluded from duplicates'
+check "$(printf '%s\n' "$manual" | DUP_SCOPE='' sh "$RIG/lib/zgz-nodes" dupof)" '' 'empty staged list excludes committed nodes'
+check "$(printf '%s\n' "$manual" | DUP_SCOPE=old,new sh "$RIG/lib/zgz-nodes" dupof)" "$(printf 'old\toriginal')" 'visible existing duplicate still rejected'
+printf 'client\nproto udp\nremote vpn.example 1194\n' > "$RIG/profile.ovpn"
+mv "$RIG/bin/uci" "$RIG/bin/uci-original"
+cat > "$RIG/bin/uci" <<'UCI'
+#!/bin/sh
+case "$*" in
+  *' get zirgozar.vpn.link') cat "$ZGZ_RUN/../profile.ovpn" ;;
+  *' get zirgozar.vpn.name') echo Office ;;
+  *' show zirgozar') echo 'zirgozar.vpn=node' ;;
+  *) exec "$(dirname "$0")/uci-original" "$@" ;;
+esac
+UCI
+chmod +x "$RIG/bin/uci"
+check "$(sh "$RIG/lib/zgz-nodes" dupof < "$RIG/profile.ovpn")" "$(printf 'vpn\tOffice')" 'OpenVPN profile duplicate detected'
+check "$(DUP_SCOPE=old,new sh "$RIG/lib/zgz-nodes" dupof < "$RIG/profile.ovpn")" '' 'deleted OpenVPN profile can be imported again'
+mv "$RIG/bin/uci-original" "$RIG/bin/uci"
 echo '== subscription choices from links and parsed JSON records'
 sections 1 1
 rm -f "$RIG/run/subs/s.tsv"

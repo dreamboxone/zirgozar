@@ -22,7 +22,7 @@ function element(tag, attrs, children) {
 }
 let language = 'fa', requests = 0, finish;
 const storage = new Map();
-const api = new Function('rpc', 'i18n', 'pui', 'E', 'document', 'Node', 'window', 'uci', source.slice(0, source.indexOf('\nreturn baseclass.extend(')) + '\nreturn {badge, bindMainSwitch, mainSwitchChanged, syncMainSwitch, savedUsagePeriod, usageTotals, usageCard, socialCheck, check, setEnabled: function(value) {usageEnabled=value;renderUsage();}, setScope: function(nodes) {scope=nodes;}, setTraffic: function(data) {usageData=data;renderUsage();}};')(
+const api = new Function('rpc', 'i18n', 'pui', 'E', 'document', 'Node', 'window', 'uci', source.slice(0, source.indexOf('\nreturn baseclass.extend(')) + '\nreturn {statusMessage, badge, bindMainSwitch, mainSwitchChanged, syncMainSwitch, savedUsagePeriod, usageTotals, usageCard, socialCheck, check, setEnabled: function(value) {usageEnabled=value;renderUsage();}, setScope: function(nodes) {scope=nodes;}, setTraffic: function(data) {usageData=data;renderUsage();}};')(
 	{ declare: spec => spec.method === 'check' ? () => { requests++; return new Promise(resolve => { finish = resolve; }); } : () => Promise.resolve({}) },
 	{ tr: value => value, get: () => language }, { ms: value => value + ' ms' }, element, { getElementById: () => null, createTextNode: text => ({textContent:text}) }, class Node {},
 	{ localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) } }, { get: () => '0' }
@@ -79,3 +79,9 @@ api.syncMainSwitch({enabled:true}); assert.equal(switchValue,'1','untouched swit
 api.syncMainSwitch({}); assert.equal(switchValue,'1');
 assert.equal(api.badge({}).textContent,'Status unavailable');
 console.log('Main switch: pending changes, applied state, external changes and unavailable status passed');
+const emptyList = 'No enabled configs are available. Add or enable a manual config or a subscription.';
+assert.equal(api.statusMessage({connected:true,message:emptyList}), '');
+assert.equal(api.statusMessage({connected:false,message:emptyList}), emptyList);
+assert.equal(api.statusMessage({connected:true,message:'There is no node list yet: empty'}), '');
+assert.equal(api.statusMessage({connected:true,message:'DNS protection failed'}), 'DNS protection failed');
+console.log('Connected status hides only obsolete list warnings');

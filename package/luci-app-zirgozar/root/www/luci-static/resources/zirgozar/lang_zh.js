@@ -962,7 +962,7 @@ return baseclass.extend({ strings: {
 	"Delete All Subscribe Node": "删除所有订阅节点",
 	"Delete the nodes of every subscription? They come back the next time the subscriptions are read.": "删除每次订阅的节点吗 ? 下次订阅读取时会回来 。",
 	"Deleted.": "删除。",
-	"When each subscription is read is set in its own edit window. Xray, sing-box, Hysteria, Clash and WireGuard files are accepted, as are a plain list of links and a single base64 block. When adding a new subscription, save and apply first, then update it manually.": "当每次订阅被读取时,都会设置在自己的编辑窗口中. Xray, sing-box- 歇斯底里、克莱什和 WireGuard  文件被接受,链接的普通列表和单一的基数64块也是如此。在添加新订阅时,先保存并应用,然后手动更新。",
+	"Set the automatic update schedule in the edit window for each subscription. Supported formats: Xray and sing-box JSON, Hysteria and Clash YAML, WireGuard conf, OpenVPN ovpn, plain share links and base64-encoded link lists. After adding a subscription, press Save and Apply, then Update manually.": "在每个订阅的编辑窗口中设置自动更新计划。支持 Xray 和 sing-box JSON、Hysteria 和 Clash YAML、WireGuard conf、OpenVPN ovpn、分享链接和 Base64 编码的链接列表。添加订阅后，先点击“保存并应用”，再手动更新。",
 	"Remark cannot be empty.": "标记不能为空 。",
 	"This remark already exists, please change a new remark.": "这一评论已经存在,请修改新的评论。",
 	"Subscribe Info": "订阅信息",

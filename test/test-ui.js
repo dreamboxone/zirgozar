@@ -8,6 +8,7 @@ require('./test-home-ui.js');
 require('./test-nodes-ui.js');
 require('./test-balancing-ui.js');
 require('./test-node-picker.js');
+require('./test-node-save.js');
 require('./test-i18n.js');
 require('./test-update-check.js');
 require('./test-presets.js');

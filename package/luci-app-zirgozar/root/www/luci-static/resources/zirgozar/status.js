@@ -304,6 +304,19 @@ function coreTile(id, word, name, version, running) {
 	}
 }
 
+function statusMessage(st) {
+	var message = st.message || '';
+	var listMessages = [
+		'Nothing in the list could be read as a node',
+		'No enabled manual configs are available. Add or enable a config on the Configs page.',
+		'No configs are available from the enabled subscriptions. Update them or select manual configs.',
+		'No enabled configs are available. Add or enable a manual config or a subscription.'
+	];
+	if (st.connected && (listMessages.indexOf(message) >= 0 || message.indexOf('There is no node list yet:') === 0))
+		return '';
+	return message ? _(message) : '';
+}
+
 function renderState(st) {
 	if (st && st.stats_enabled != null) {
 		usageEnabled = st.stats_enabled !== false;
@@ -339,7 +352,7 @@ function renderState(st) {
 	   remembered as dismissed so it does not come straight back. */
 	var msg = byId('pwp-msg');
 	if (msg) {
-		var text = st.message ? _(st.message) : '';
+		var text = statusMessage(st);
 		if (!text && st.passwall)
 			text = _('PassWall2 is also redirecting traffic — turn one of them off.');
 		if (text && text === dismissed) text = '';

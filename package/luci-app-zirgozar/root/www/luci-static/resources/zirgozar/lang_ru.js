@@ -962,7 +962,7 @@ return baseclass.extend({ strings: {
 	"Delete All Subscribe Node": "Удалить все Subscribe Node",
 	"Delete the nodes of every subscription? They come back the next time the subscriptions are read.": "Удалите узлы каждой подписки? Они возвращаются в следующий раз, когда подписки будут прочитаны.",
 	"Deleted.": "Удален.",
-	"When each subscription is read is set in its own edit window. Xray, sing-box, Hysteria, Clash and WireGuard files are accepted, as are a plain list of links and a single base64 block. When adding a new subscription, save and apply first, then update it manually.": "При чтении каждой подписки устанавливается собственное окно редактирования. Принимаются файлы Xray, sing-box, Hysteria, Clash и WireGuard, а также простой список ссылок и один блок base64. При добавлении новой подписки сначала сохраняйте и применяйте, затем обновляйте ее вручную.",
+	"Set the automatic update schedule in the edit window for each subscription. Supported formats: Xray and sing-box JSON, Hysteria and Clash YAML, WireGuard conf, OpenVPN ovpn, plain share links and base64-encoded link lists. After adding a subscription, press Save and Apply, then Update manually.": "Расписание автоматического обновления задаётся в окне редактирования каждой подписки. Поддерживаются JSON Xray и sing-box, YAML Hysteria и Clash, conf WireGuard, ovpn OpenVPN, ссылки и списки ссылок в Base64. После добавления подписки нажмите «Сохранить и применить», затем обновите её вручную.",
 	"Remark cannot be empty.": "Замечание не может быть пустым.",
 	"This remark already exists, please change a new remark.": "Это замечание уже существует, пожалуйста, измените новое замечание.",
 	"Subscribe Info": "Подписаться на Info",

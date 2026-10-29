@@ -836,6 +836,12 @@ cmd_build() {
 		# list. The running selected config has its own independent state.
 		mv -f "$ZGZ_CANDIDATES.new" "$ZGZ_CANDIDATES"
 		mv -f "$CHAINS.new" "$CHAINS"
+		# Editing the next candidate list does not invalidate the live tunnel.
+		if [ "$(cat "$ZGZ_STATUS" 2>/dev/null)" = ready ] && tunnel_running; then
+			clear_list_message
+			warn "no candidates for a future connection; the current tunnel remains active"
+			return 1
+		fi
 		if [ "$_had" = "1" ]; then
 			say_message "Nothing in the list could be read as a node"
 		else
@@ -1027,6 +1033,9 @@ cmd_dupof() {
 	[ -n "$_dk" ] || return 1
 	for _ds in $(uci -q -X show zirgozar | sed -n 's/^zirgozar\.\([A-Za-z0-9_]*\)=node$/\1/p'); do
 		[ "$_ds" = "${SKIP:-}" ] && continue
+		if [ "${DUP_SCOPE+x}" = x ]; then
+			case ",${DUP_SCOPE}," in *",$_ds,"*) : ;; *) continue ;; esac
+		fi
 		_dl="$(uci -q get "zirgozar.$_ds.link")" || continue
 		[ "$(node_key "$_dl")" = "$_dk" ] || continue
 		printf '%s\t%s\n' "$_ds" "$(uci -q get "zirgozar.$_ds.name")"

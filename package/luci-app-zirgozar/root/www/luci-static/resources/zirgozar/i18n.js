@@ -1173,8 +1173,8 @@ var FA = {
 	'Delete the nodes of every subscription? They come back the next time the subscriptions are read.':
 		'کانفیگ‌های همه اشتراک‌ها حذف شوند؟ دفعه بعد که اشتراک‌ها خوانده شوند دوباره برمی‌گردند.',
 	'Deleted.': 'حذف شد.',
-	'When each subscription is read is set in its own edit window. Xray, sing-box, Hysteria, Clash and WireGuard files are accepted, as are a plain list of links and a single base64 block. When adding a new subscription, save and apply first, then update it manually.':
-		'زمان خواندن هر اشتراک در پنجره ویرایش آن تعیین می‌شود. فایل‌های Xray، sing-box، Hysteria، Clash و WireGuard، فهرست ساده لینک‌ها و base64 پذیرفته می‌شوند. بعد از افزودن اشتراک تازه، اول «ذخیره و اعمال» را بزنید و بعد به‌روزرسانی دستی.',
+	'Set the automatic update schedule in the edit window for each subscription. Supported formats: Xray and sing-box JSON, Hysteria and Clash YAML, WireGuard conf, OpenVPN ovpn, plain share links and base64-encoded link lists. After adding a subscription, press Save and Apply, then Update manually.':
+		'زمان‌بندی به‌روزرسانی خودکار هر اشتراک را در پنجرهٔ ویرایش آن تنظیم کنید. قالب‌های پشتیبانی‌شده: فایل JSON ایکس‌ری و سینگ‌باکس، فایل YAML هیستریا و کلش، فایل conf وایرگارد، فایل ovpn اوپن‌وی‌پی‌ان، لینک‌های اشتراک‌گذاری و فهرست لینک با کدگذاری Base64. پس از افزودن اشتراک، «ذخیره و اعمال» و سپس «به‌روزرسانی» را بزنید.',
 	'Remark cannot be empty.': 'نام نمی‌تواند خالی باشد.',
 	'This remark already exists, please change a new remark.': 'این نام قبلا استفاده شده است. نام دیگری انتخاب کنید.',
 	'Subscribe Info': 'اطلاعات اشتراک',

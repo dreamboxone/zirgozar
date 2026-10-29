@@ -931,6 +931,13 @@ return view.extend({
 		var structured = !!f;
 
 		var m = new form.Map('zirgozar');
+		var formNotice = E('div', { 'class': 'pwp-note', 'role': 'status', 'style': 'display:none;margin:12px 0' });
+		function showFormNotice(content, kind) {
+			formNotice.className = 'pwp-note ' + (kind || 'info');
+			formNotice.textContent = '';
+			formNotice.appendChild(content);
+			formNotice.style.display = 'block';
+		}
 		var s = m.section(form.NamedSection, sid, 'node', isFile ? _('Add file') : (isNew ? _('New Config') : _('Node Config')));
 		s.anonymous = true;
 		s.addremove = false;
@@ -1324,7 +1331,7 @@ return view.extend({
 			o.inputtitle = _('Clear Psiphon data');
 			o.onclick = function() {
 				return callAction('aether_clear_psiphon', sid).then(function(r) {
-					ui.addNotification(null, E('p', {}, r.ok ? _('Psiphon data cleared.') : (r.error || _('Could not clear Psiphon data.'))));
+					showFormNotice(E('p', {}, r.ok ? _('Psiphon data cleared.') : _(r.error || 'Could not clear Psiphon data.')), r.ok ? 'ok' : 'error');
 				});
 			};
 
@@ -2022,11 +2029,16 @@ return view.extend({
 				var needs = '', pkgs = '';
 				return m.parse().then(function() {
 					var l = String(uci.get('zirgozar', sid, 'link') || '').trim();
-					return l ? callAction('node_dup', sid + ';' + l) : {};
+					var scope = uci.sections('zirgozar', 'node').map(function(n) { return n['.name']; }).join(',');
+					return l ? callAction('node_dup', sid + '|' + scope + ';' + l) : {};
 				}).then(function(d) {
+					if (d && d.error) {
+						showFormNotice(E('p', {}, _(d.error)), 'error');
+						return Promise.reject(new Error(d.error));
+					}
 					if (d && d.dup_id) {
 						var msg = _('This config is already in the list: %s').format(d.dup_name || d.dup_id);
-						ui.addNotification(null, E('p', {}, msg), 'danger');
+						showFormNotice(E('p', {}, msg), 'error');
 						return Promise.reject(new Error(msg));
 					}
 					needs = (d && d.needs) || '';
@@ -2037,7 +2049,7 @@ return view.extend({
 					/* Said with the buttons that install what is missing. */
 					var cores = pui.listOf(needs), packages = pui.listOf(pkgs);
 					if (cores.length || packages.length)
-						ui.addNotification(null, pui.installNotice(pui.needsText(cores, packages), cores, packages), 'warning');
+						showFormNotice(pui.installNotice(pui.needsText(cores, packages), cores, packages), 'warn');
 					return r;
 				});
 			};
@@ -2157,6 +2169,7 @@ return view.extend({
 			var head = mapEl.querySelector('.cbi-section > h3, .cbi-section > legend');
 			if (head) head.parentNode.insertBefore(tools, head.nextSibling);
 			else mapEl.insertBefore(tools, mapEl.firstChild);
+			tools.parentNode.insertBefore(formNotice, tools.nextSibling);
 			return pui.page([
 				E('div', { 'style': 'margin-bottom:12px' }, [
 					E('a', { 'class': 'btn cbi-button', 'href': back }, _('Back to configs'))
