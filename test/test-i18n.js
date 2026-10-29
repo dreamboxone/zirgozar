@@ -8,7 +8,7 @@ const path = require('node:path');
 const root = path.join(__dirname, '../package/luci-app-zirgozar/root/www/luci-static/resources/zirgozar');
 const read = name => fs.readFileSync(path.join(root, name + '.js'), 'utf8');
 assert.match(read('i18n'), /'Sweden': 'سوئد'/u, 'Preserve the requested spelling of Sweden');
-assert.doesNotMatch(read('i18n').replace("'Sweden': 'سوئد'", "'Sweden': ''"), /[\u064b-\u065f\u0670\u0621\u0623\u0624\u0625\u0626\u06c0]/u, 'Persian interface text must not contain hamza or vowel marks, except Sweden');
+assert.doesNotMatch(read('i18n').replaceAll('سوئد', ''), /[\u064b-\u065f\u0670\u0621\u0623\u0624\u0625\u0626\u06c0]/u, 'Persian interface text must not contain hamza or vowel marks, except Sweden');
 const baseclass = { extend: value => value };
 for (const language of ['zh', 'ru']) {
 	const keys = [...read('lang_' + language).matchAll(/^\t("(?:[^"\\]|\\.)*")\s*:/gm)].map(match => JSON.parse(match[1]));
