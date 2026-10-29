@@ -445,6 +445,7 @@ body.pwp-fa #modal_overlay:where(body.pwp-active *)>.modal textarea,body.pwp-fa 
 :is(.mk,#modal_overlay:where(body.pwp-active *)>.modal,.cbi-page-actions:where(body.pwp-active *)) :is(.cbi-button-neutral,.cbi-button-edit){background:#e8f0ff!important;color:#2458d6!important;box-shadow:none!important;border:1px solid #cddcff!important}
 .mk-dark :is(.cbi-button-neutral,.cbi-button-edit){background:#1e3a8a55!important;color:#93b4ff!important;border-color:#2c4c9c!important}
 .mk .cbi-section-table .cbi-button{padding:6px 11px!important;min-height:32px;font-size:12px}
+.mk button.zgz-sub-action,.mk .zgz-sub-actions :is(.cbi-button,.btn){height:40px!important;min-height:40px!important;box-sizing:border-box!important;padding:0 14px!important;margin-block:0!important;line-height:1.2;font-size:13.5px;white-space:nowrap}
 /* Close and Save under a dialog, apart. LuCI separates them with a space,
    which an inline-flex button does not keep. */
 #modal_overlay:where(body.pwp-active *)>.modal :is(.button-row,.right){display:flex!important;gap:10px;flex-wrap:wrap;justify-content:flex-end;align-items:center}

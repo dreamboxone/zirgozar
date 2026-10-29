@@ -293,6 +293,7 @@ return view.extend({
 		   the column's only what it brought. Each says which. */
 		s.renderRowActions = function(section_id) {
 			var td = form.GridSection.prototype.renderRowActions.apply(this, [ section_id ]);
+			td.classList.add('zgz-sub-actions');
 			var del = td.querySelector('.cbi-button-remove');
 			if (del) del.textContent = _('Delete subscription');
 			return td;
@@ -511,7 +512,7 @@ return view.extend({
 		manual.forEach(function(n) { o.value(n['.name'], n.name || n['.name']); });
 
 		column(s, '_remove', _('Delete Nodes'), function(sid) {
-			return pui.btn(_('Delete Nodes'), 'danger mk-small', function(ev) {
+			return pui.btn(_('Delete Nodes'), 'danger zgz-sub-action', function(ev) {
 				var b = ev.currentTarget;
 				return callAction('forget_nodes', sid).then(function(r) {
 					done(b, r, _('Deleted.'));
@@ -521,7 +522,7 @@ return view.extend({
 		});
 
 		column(s, '_update', _('Update'), function(sid) {
-			return pui.btn(_('Update'), 'primary mk-small', function(ev) {
+			return pui.btn(_('Update'), 'primary zgz-sub-action', function(ev) {
 				var b = ev.currentTarget;
 				return callAction('refresh_nodes', sid).then(function(r) {
 					if (r && r.error) pui.note(b, _(r.error), 'error');
