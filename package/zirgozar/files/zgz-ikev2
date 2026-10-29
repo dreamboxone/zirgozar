@@ -20,8 +20,8 @@ set -e
 . "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
 MODE="${1:-check}"
 NODE="${ZGZ_IKEV2_NODE:-$ZGZ_ETC/bridge.json}"
-DEV=zgzikev2
-TABLE=19016
+DEV="${ZGZ_TUNNEL_DEV:-zgzikev2}"
+TABLE="${ZGZ_TUNNEL_TABLE:-19016}"
 STATE="$ZGZ_RUN/ikev2"
 
 fail() {

@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.8.5-r5';
+var BUILD = '5.8.7-r1';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -92,7 +92,7 @@ function logoImg(file, height, cls) {
    removed. When the router says another version than the one these pages
    were built for, each file is fetched again past the cache and the page
    reloaded, once. */
-var OWN_FILES = [ 'zirgozar/ui', 'zirgozar/i18n', 'zirgozar/status', 'zirgozar/qr', 'zirgozar/logfa', 'zirgozar/nodelink', 'zirgozar/presets', 'zirgozar/aetherscan',
+var OWN_FILES = [ 'zirgozar/ui', 'zirgozar/i18n', 'zirgozar/lang_ru', 'zirgozar/lang_zh', 'zirgozar/status', 'zirgozar/qr', 'zirgozar/logfa', 'zirgozar/nodelink', 'zirgozar/presets', 'zirgozar/aetherscan',
 	'view/zirgozar/settings', 'view/zirgozar/nodes', 'view/zirgozar/node', 'view/zirgozar/server', 'view/zirgozar/subscribe', 'view/zirgozar/other',
 	'view/zirgozar/shunt_rule',
 	'view/zirgozar/update', 'view/zirgozar/traffic', 'view/zirgozar/geoview', 'view/zirgozar/acl',
@@ -104,17 +104,16 @@ var OWN_FILES = [ 'zirgozar/ui', 'zirgozar/i18n', 'zirgozar/status', 'zirgozar/q
    are, and a fingerprint this browser has not seen is a reason to fetch them
    again too.
 
-   Only another version reloads the page: these very pages are then older than
-   the router, and have to be replaced before they are used. A fingerprint not
-   seen before - a first visit, another browser, a file put in by hand - is
-   fetched quietly, and the next page opened is the new one; reloading for it
-   reloaded the page on the first visit of every new browser. */
+   A known fingerprint changing also reloads once after fetching the files:
+   otherwise LuCI keeps already-loaded classes from the previous patch and
+   mixes them with newly loaded views. A first visit only primes the cache. */
 function freshen(installed, stamp) {
 	var have = String(BUILD).replace(/-(?:r)?(\d+)$/, '-r$1');
 	var want = String(installed || '').replace(/-(?:r)?(\d+)$/, '-r$1');
 	var seen = null;
 	try { seen = window.localStorage.getItem('zirgozar-ui'); } catch (e) {}
 	var older = !!(want && have != want);
+	var changed = !!(stamp && seen && seen != stamp);
 	if (!older && !(stamp && seen != stamp)) return;
 	var key = 'zirgozar-freshened-' + want + '-' + (stamp || '');
 	try {
@@ -126,7 +125,7 @@ function freshen(installed, stamp) {
 	Promise.all(OWN_FILES.map(function(f) {
 		return fetch(L.env.base_url + '/' + f + '.js' + v, { cache: 'reload' }).catch(function() {});
 	}).concat([ fetch(L.resource('zirgozar/theme.css') + '?v=' + BUILD, { cache: 'reload' }).catch(function() {}) ])).then(function() {
-		if (older) location.reload();
+		if (older || changed) location.reload();
 	});
 }
 
@@ -840,6 +839,10 @@ function checkboxes(o) {
 	return o;
 }
 
+/* Older cached node views called this shared entry point. Keep them usable
+   while the current view owns its picker and no longer needs a new UI API. */
+function nodePicker(o) { return checkboxes(o); }
+
 /* What a config needs that the router lacks, said with the buttons that
    install it right there, rather than "go to App Update". The core names are
    the ones the router says, mapped to what it installs them by; the router
@@ -958,6 +961,7 @@ return baseclass.extend({
 	listOf: listOf,
 	spinWhileBusy: spinWhileBusy,
 	checkboxes: checkboxes,
+	nodePicker: nodePicker,
 	icon: icon,
 	btn: btn,
 	copyBtn: copyBtn,

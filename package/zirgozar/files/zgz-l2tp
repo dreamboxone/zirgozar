@@ -7,8 +7,8 @@ set -e
 . "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
 MODE="${1:-check}"
 NODE="${ZGZ_L2TP_NODE:-$ZGZ_ETC/bridge.json}"
-DEV=zgzl2tp
-TABLE=19010
+DEV="${ZGZ_TUNNEL_DEV:-zgzl2tp}"
+TABLE="${ZGZ_TUNNEL_TABLE:-19010}"
 STATE="$ZGZ_RUN/l2tp"
 fail() {
 	[ "$MODE" = test ] || say_message "$1"

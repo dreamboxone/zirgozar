@@ -1,0 +1,146 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+# Part of Zirgozar - https://github.com/dreamboxone/zirgozar
+
+# Helpers belonging to a balancer have private config/state directories,
+# loopback ports, tunnel devices and routing tables. No global UCI writes or
+# firewall changes are made here. procd owns the worker and its children.
+set -e
+. "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
+
+list_nodes() {
+	for section in $(uci -q -X show zirgozar | sed -n 's/^zirgozar\.\([A-Za-z0-9_]*\)=node$/\1/p'); do
+		[ "$(uci -q get "zirgozar.$section.enabled")" != 0 ] || continue
+		row="$(node_records "$section" 1 1 2>/dev/null | head -1)"
+		[ -n "$row" ] || continue
+		printf '%s\t%s\t%s\n' "$section" "$(printf '%s' "$row" | cut -f2)" "$(printf '%s' "$row" | cut -f3)"
+	done
+}
+
+prepare() {
+	slot="$1"
+	case "$slot" in ''|*[!0-9]*) return 1 ;; esac
+	[ "$slot" -ge 1 ] && [ "$slot" -le 1000 ] || return 1
+	row="$(cat)"
+	proto="$(printf '%s' "$row" | cut -f3)"
+	case "$proto" in ''|balancing|shunt) return 1 ;; esac
+	root="$ZGZ_RUN/balancing"
+	umask 077
+	mkdir -p "$root"
+	snapshot="$(uci export zirgozar)"
+	digest="$(printf '%s\n%s\n' "$row" "$snapshot" | sha256sum | cut -c1-20)"
+	work="$root/$slot-$digest"
+	port=$((26000 + slot * 4))
+	if [ ! -s "$work/ready" ]; then
+		mkdir -p "$work/config" "$work/etc" "$work/run" "$work/bin" "$work/delta"
+		printf '%s\n' "$snapshot" > "$work/config/zirgozar"
+		printf '%s\n' "$row" > "$work/record"
+		printf '%s\n' "${2:-}" > "$work/reference"
+		printf '#!/bin/sh\nexec "%s" -c "%s/config" -t "%s/delta" "$@"\n' "$(command -v uci)" "$work" "$work" > "$work/bin/uci"
+		chmod 700 "$work/bin/uci"
+		# Keep registrations across service restarts without sharing writable
+		# state with the primary tunnel or another member of this group.
+		state_key="$(printf '%s\n%s\n' "$slot" "$row" | sha256sum | cut -c1-20)"
+		state_root="$ZGZ_ETC/balancing-state/$state_key"
+		id="$(printf '%s' "$row" | cut -f6- | sed -n 's/.*"id":"\([A-Za-z0-9_]*\)".*/\1/p')"
+		for state in aether warp; do
+			mkdir -p "$state_root/$state"
+			if [ -n "$id" ] && [ -d "$ZGZ_ETC/$state/$id" ] && [ ! -d "$state_root/$state/$id" ]; then
+				cp -R "$ZGZ_ETC/$state/$id" "$state_root/$state/$id"
+			fi
+			ln -snf "$state_root/$state" "$work/etc/$state"
+		done
+		printf '%s\n' "$slot" > "$work/ready"
+	fi
+	printf '%s\n' "$work" >> "$ZGZ_RUN/balancing.instances"
+	printf '{"protocol":"socks","settings":{"servers":[{"address":"127.0.0.1","port":%s}]},"streamSettings":{"sockopt":{"mark":255}}}\n' "$port"
+}
+
+run_member() {
+	work="$1"
+	case "$work" in "$ZGZ_RUN"/balancing/[0-9]*-[0-9a-f]*) : ;; *) exit 1 ;; esac
+	[ -s "$work/ready" ] || exit 1
+	slot="$(cat "$work/ready")"
+	case "$slot" in ''|*[!0-9]*) exit 1 ;; esac
+	[ "$slot" -ge 1 ] && [ "$slot" -le 1000 ] || exit 1
+	port=$((26000 + slot * 4))
+	row="$(cat "$work/record")"
+	proto="$(printf '%s' "$row" | cut -f3)"
+	payload="$(printf '%s' "$row" | cut -f6-)"
+	# The children inherit these, including the device used by the core and
+	# by the PPP/XFRM helper. Tables are outside the main/test tunnel range.
+	export PATH="$work/bin:$PATH" ZGZ_ETC="$work/etc" ZGZ_RUN="$work/run"
+	export ZGZ_CONFIG_JSON="$work/member.json" ZGZ_BRIDGE_JSON="$work/bridge.json"
+	export ZGZ_TUNNEL_DEV="zgzb$slot" ZGZ_TUNNEL_TABLE="$((20000 + slot))"
+	export ZGZ_OVPN_DEV="$ZGZ_TUNNEL_DEV" ZGZ_BALANCING_CHILD=1
+	. "$ZGZ_LIB/zgz-common.sh"
+	umask 077
+	# This is an isolated snapshot: suppress transparent listeners and the
+	# global routing policy, which has already run in the parent core.
+	for key in acl_enable socks_enabled shunt_fakedns remote_fakedns route_ir block_ads block_torrent; do
+		uci set "zirgozar.config.$key=0"
+	done
+	uci set "zirgozar.config.bridge_port=$((port + 1))"
+	uci set "zirgozar.config.aether_upstream_port=$((port + 2))"
+	uci set "zirgozar.config.aether_aux_port=$((port + 3))"
+	uci set "zirgozar.config.node_socks_port=$port"
+	uci set "zirgozar.config.node=$(cat "$work/reference")"
+	uci set zirgozar.config.node_socks_bind_local=1
+	uci set zirgozar.config.node_http_port=0
+	uci commit zirgozar
+	printf '%s\n' "$payload" > "$ZGZ_ETC/bridge.json"
+	printf 'protocol=%s\nhost=%s\nport=%s\n' "$proto" "$(printf '%s' "$row" | cut -f4)" "$(printf '%s' "$row" | cut -f5)" > "$ZGZ_BEST_META"
+	case "$proto" in
+		openvpn|l2tp|pptp|sstp|ikev2)
+			printf '{"protocol":"freedom","settings":{},"streamSettings":{"sockopt":{"interface":"%s","mark":255,"domainStrategy":"UseIP"}}}\n' "$ZGZ_TUNNEL_DEV" > "$ZGZ_BEST" ;;
+		*) printf '{"protocol":"socks","settings":{"servers":[{"address":"127.0.0.1","port":%s}]}}\n' "$((port + 1))" > "$ZGZ_BEST" ;;
+	esac
+	"$ZGZ_LIB/zgz-mkconfig" nogeo > "$work/full.json"
+	ucode -e '
+		import { readfile } from "fs";
+		let x = json(readfile(ARGV[0]));
+		x.inbounds = filter(x.inbounds, i => i.tag == "socks-in" || i.tag == "aether-via" || i.tag == "ovpn-via");
+		x.routing.rules = filter(x.routing.rules, r => length(r.inboundTag ?? []) &&
+			length(filter(r.inboundTag, t => t == "aether-via" || t == "ovpn-via" || substr(t, 0, 4) == "dns-")) && r.outboundTag != "dns-out");
+		push(x.routing.rules, { type: "field", inboundTag: ["socks-in"], outboundTag: "proxy" });
+		delete x.api;
+		printf("%J\n", x);
+	' "$work/full.json" > "$ZGZ_CONFIG_JSON"
+	core="$(find_xray "$ZGZ_CONFIG_JSON")" || { warn "Balancing member $slot: Xray rejected its configuration"; exit 1; }
+	if [ "${2:-}" = build ]; then printf '%s\n' "$ZGZ_CONFIG_JSON"; return 0; fi
+	command="$("$ZGZ_LIB/zgz-bridge" command)" || { warn "Balancing member $slot: helper unavailable ($proto)"; exit 1; }
+	bridge_pid=''; core_pid=''
+	cleanup() {
+		trap - EXIT INT TERM
+		[ -z "$bridge_pid" ] || kill "$bridge_pid" 2>/dev/null || true
+		[ -z "$core_pid" ] || kill "$core_pid" 2>/dev/null || true
+		tries=0
+		while [ -n "$bridge_pid" ] && kill -0 "$bridge_pid" 2>/dev/null && [ "$tries" -lt 10 ]; do
+			sleep 1; tries=$((tries + 1))
+		done
+		[ -z "$bridge_pid" ] || kill -KILL "$bridge_pid" 2>/dev/null || true
+		[ -z "$bridge_pid" ] || wait "$bridge_pid" 2>/dev/null || true
+		[ -z "$core_pid" ] || wait "$core_pid" 2>/dev/null || true
+	}
+	trap cleanup EXIT
+	trap 'exit 0' INT TERM
+	# The upstream for Aether/OpenVPN must exist before its helper connects.
+	"$core" run -config "$ZGZ_CONFIG_JSON" >> "$work/core.log" 2>&1 &
+	core_pid=$!
+	# The command is produced by the installed bridge helper, with its paths
+	# and numeric ports; it is never evaluated as shell source.
+	$command >> "$work/bridge.log" 2>&1 &
+	bridge_pid=$!
+	while kill -0 "$core_pid" 2>/dev/null && kill -0 "$bridge_pid" 2>/dev/null; do sleep 2; done
+	warn "Balancing member $slot stopped ($proto); see $work/bridge.log"
+	exit 1
+}
+
+case "${1:-}" in
+	list) list_nodes ;;
+	prepare) prepare "${2:-}" "${3:-}" ;;
+	build) run_member "${2:-}" build ;;
+	run) run_member "${2:-}" ;;
+	*) echo 'usage: zgz-balancing list|prepare SLOT|run DIRECTORY' >&2; exit 1 ;;
+esac

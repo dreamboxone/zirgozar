@@ -19,8 +19,10 @@ if (node.type != 'l2tp' || !match(node.server ?? '', /^[A-Za-z0-9_.-]+$/) ||
 	int(node.mtu) < 576 || int(node.mtu) > 1460 || (node.ipsec && !node.psk))
 	fail('Invalid L2TP account. Check server, username, password and IPsec PSK.');
 quote(node.username); quote(node.password); quote(node.psk ?? '');
-if (!match(dev ?? '', /^zgzl2tp(t)?$/)) fail('Invalid L2TP device.');
-let localport = dev == 'zgzl2tpt' ? 11702 : 11701;
+if (!match(dev ?? '', /^(zgzl2tp(t)?|zgzb[1-9][0-9]{0,3})$/)) fail('Invalid L2TP device.');
+let member = match(dev, /^zgzb([1-9][0-9]{0,3})$/);
+if (member && int(member[1]) > 1000) fail('Invalid L2TP device.');
+let localport = member ? 30000 + int(member[1]) : (dev == 'zgzl2tpt' ? 11702 : 11701);
 let name = 'zirgozar-' + dev;
 
 if (mode == 'config') {

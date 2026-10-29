@@ -22,6 +22,21 @@
 .mk h2,.mk h3{color:inherit;margin:0 0 14px;background:transparent!important;padding:0!important;border:0!important;box-shadow:none!important}
 .mk p{line-height:1.9;margin:8px 0}
 .mk small{color:var(--muted);display:block;line-height:1.8}
+.mk .zgz-node-picker{width:100%;max-width:620px;min-width:0;text-align:start}
+.mk .zgz-node-picker input.zgz-node-search{width:100%;max-width:none!important;margin:0}
+.mk .zgz-node-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0}
+.mk .zgz-node-count{flex:1 0 100%;font-size:13px;color:var(--muted)}
+.mk .zgz-node-toolbar button{font-size:12px;white-space:normal;margin:0}
+.mk .zgz-node-list{max-height:280px;overflow-y:auto;overscroll-behavior:contain;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.mk .zgz-node-row{display:grid;grid-template-columns:20px minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px;margin:0;cursor:pointer;border-bottom:1px solid var(--line);text-align:start}
+.mk .zgz-node-row:last-of-type{border-bottom:0}
+.mk .zgz-node-row.is-selected{background:var(--soft)}
+.mk .zgz-node-row[hidden],.mk .zgz-node-empty[hidden]{display:none!important}
+.mk .zgz-node-name{overflow-wrap:anywhere;min-width:0}
+.mk[dir=rtl] .zgz-node-name{text-align:right}
+.mk[dir=rtl] input.zgz-node-search{direction:rtl;text-align:right}
+.mk .zgz-node-protocol{font-size:11px;color:var(--muted);font-family:ui-monospace,monospace!important}
+.mk .zgz-node-empty{padding:18px;color:var(--muted);text-align:center}
 .mk-muted{color:var(--muted)}
 /* Numbers with units stay left-to-right inside Persian text */
 .mk bdi{unicode-bidi:isolate;direction:ltr}

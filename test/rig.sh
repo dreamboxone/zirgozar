@@ -35,9 +35,11 @@ rig_setup() {
 # added by hand, named as a pre-proxy - as "section.key=value". A get of a
 # section that has nothing exits 1, as the real one does: that is how the
 # scripts tell a node that is there from one that is not.
-_get=""; _key=""
+_get=""; _key=""; _delimiter=""; _next_delimiter=0
 for a in "$@"; do
+	if [ "$_next_delimiter" = 1 ]; then _delimiter="$a"; _next_delimiter=0; continue; fi
 	case "$a" in
+		-d) _next_delimiter=1 ;;
 		get) _get=1 ;;
 		zirgozar.config.*) _key="${a#zirgozar.config.}" ;;
 		zirgozar.*.*) _key="${a#zirgozar.}" ;;
@@ -52,6 +54,9 @@ esac
 if [ -n "$_get" ] && [ -n "$_key" ]; then
 	_v="$(awk -v k="$_key" 'index($0, k "=") == 1 { print substr($0, length(k) + 2); exit }' "${ZGZ_TEST_UCI:-/dev/null}" 2>/dev/null)"
 	[ -n "$_v" ] || exit 1
+	if [ -n "$_delimiter" ]; then
+		case "$_key" in *.balancing_node) printf '%s\n' "$_v" | tr ' ' "$_delimiter"; exit 0 ;; esac
+	fi
 	printf '%s\n' "$_v"
 fi
 exit 0

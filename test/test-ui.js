@@ -6,6 +6,8 @@
 require('./test-status-ui.js');
 require('./test-home-ui.js');
 require('./test-nodes-ui.js');
+require('./test-balancing-ui.js');
+require('./test-node-picker.js');
 require('./test-i18n.js');
 require('./test-update-check.js');
 require('./test-presets.js');
@@ -195,11 +197,11 @@ async function cacheCase(installed, stamp, seen, repeats = 1) {
 	assert.deepEqual(await cacheCase('5.7.19-r3', 'same', 'same'), { fetched: 0, reloaded: 0 });
 	assert.deepEqual(await cacheCase('5.7.19-3', 'same', 'same'), { fetched: 0, reloaded: 0 });
 	assert.deepEqual(await cacheCase('5.7.19-r4', 'same', 'same'), { fetched: 2, reloaded: 1 });
-	assert.deepEqual(await cacheCase('5.7.19-r3', 'new', 'old', 2), { fetched: 2, reloaded: 0 });
+	assert.deepEqual(await cacheCase('5.7.19-r3', 'new', 'old', 2), { fetched: 2, reloaded: 1 });
 	assert.deepEqual(await cacheCase('5.7.19-r3', 'first', null), { fetched: 2, reloaded: 0 });
 	assert.deepEqual(await cacheCase('5.7.19-r4', 'first', null, 2), { fetched: 2, reloaded: 1 });
 	assert.deepEqual(await cacheCase('', '', null), { fetched: 0, reloaded: 0 });
-	console.log('UI cache refresh passed: current revision, package suffix, update reloads once, hotpatch and first visit refresh without reloading, unknown version');
+	console.log('UI cache refresh passed: current revision, package suffix, update and hotpatch reload once, first visit stays open, unknown version');
 	let now = 0, tick, reads = 0, removed = false;
 	const uptimeNode = { isConnected: true, textContent: '' };
 	const sync = ui.uptimeTicker(uptimeNode,

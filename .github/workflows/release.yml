@@ -282,6 +282,7 @@ jobs:
             ZGZ_GEO_DIR="$PWD/geo" \
             PATH="$PATH" \
             timeout -k 5 90 sh test/test-config-modes.sh
+            timeout -k 5 90 sh test/test-balancing.sh
 
       - name: Test aether
         run: |

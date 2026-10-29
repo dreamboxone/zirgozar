@@ -264,6 +264,16 @@ method_nodes() {
 	' "$ZGZ_CANDIDATES" 2>/dev/null
 }
 
+method_balancingnodes() {
+	"$ZGZ_LIB/zgz-balancing" list 2>/dev/null | awk -F'\t' '
+		BEGIN { printf "{\"nodes\":[" }
+		NF >= 3 {
+			for (i=1; i<=3; i++) { gsub(/\\/, "\\\\", $i); gsub(/"/, "\\\"", $i) }
+			printf "%s{\"tag\":\"%s\",\"label\":\"%s\",\"protocol\":\"%s\"}", (n++ ? "," : ""), $1, $2, $3
+		}
+		END { printf "]}\n" }'
+}
+
 method_nodeorigins() {
 	local input tags tag origin
 	read -r input
@@ -1002,6 +1012,7 @@ case "$1" in
 		json_add_object "nodes";   json_close_object
 		json_add_object "subs";    json_close_object
 		json_add_object "subnodes"; json_close_object
+		json_add_object "balancingnodes"; json_close_object
 		json_add_object "tests";   json_close_object
 		json_add_object "inuse";   json_close_object
 		json_add_object "log";     json_close_object
@@ -1035,6 +1046,7 @@ case "$1" in
 			traffic) method_traffic ;;
 			nodes)   method_nodes ;;
 			nodeorigins) method_nodeorigins ;;
+			balancingnodes) method_balancingnodes ;;
 			subs)    method_subs ;;
 			subnodes) method_subnodes ;;
 			tests)   method_tests ;;

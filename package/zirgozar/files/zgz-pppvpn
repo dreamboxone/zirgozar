@@ -46,6 +46,8 @@ setup() {
 	else
 		DEV="zgz$TYPE"; STATE="$ZGZ_RUN/$TYPE"
 		[ "$TYPE" = pptp ] && TABLE=19012 || TABLE=19013
+		DEV="${ZGZ_TUNNEL_DEV:-$DEV}"
+		TABLE="${ZGZ_TUNNEL_TABLE:-$TABLE}"
 	fi
 }
 

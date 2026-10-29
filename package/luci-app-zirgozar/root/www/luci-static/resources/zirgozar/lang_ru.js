@@ -5,6 +5,15 @@
 'require baseclass';
 
 return baseclass.extend({ strings: {
+	"Random": "Случайный",
+	"Round robin": "По очереди",
+	"Lowest latency": "Минимальная задержка",
+	"Least load": "Минимальная нагрузка",
+	"Search configs by name or protocol": "Поиск по имени или протоколу",
+	"%s of %s configs selected": "Выбрано конфигураций: %s из %s",
+	"No matching configs.": "Подходящих конфигураций нет.",
+	"Select search results": "Выбрать результаты поиска",
+	"Deselect search results": "Снять выбор результатов поиска",
 	"FinalMask preset": "Шаблон FinalMask",
 	"Custom": "Свой вариант",
 	"Replace the custom FinalMask with this preset?": "Заменить собственный FinalMask этим шаблоном?",

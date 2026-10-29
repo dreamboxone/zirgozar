@@ -37,6 +37,8 @@ var _ = i18n.tr;
 var callNodeConfig = rpc.declare({ object: 'luci.zirgozar', method: 'nodeconfig',
                                    params: [ 'sid' ], expect: { '': {} } });
 var callNodes = rpc.declare({ object: 'luci.zirgozar', method: 'nodes', expect: { '': {} } });
+var callSubNodes = rpc.declare({ object: 'luci.zirgozar', method: 'subnodes', expect: { '': {} } });
+var callBalancingNodes = rpc.declare({ object: 'luci.zirgozar', method: 'balancingnodes', expect: { '': {} } });
 var callLan = rpc.declare({ object: 'luci.zirgozar', method: 'lan', expect: { '': {} } });
 var callNodeOrigins = rpc.declare({ object: 'luci.zirgozar', method: 'nodeorigins',
 	params: [ 'tags' ], expect: { '': {} } });
@@ -765,6 +767,117 @@ function warpAccount(sid) {
 	]);
 }
 
+/* A bounded, searchable picker for lists of nodes. Filtering only changes
+   visibility: selections outside the current search remain selected. */
+function nodePicker(o, nodes) {
+	pui.checkboxes(o);
+	o.renderWidget = function(section_id, option_index, cfgvalue) {
+		var selected = L.toArray(cfgvalue != null ? cfgvalue : this.default);
+		var keys = this.keylist || [], labels = this.vallist || [], metadata = {};
+		(nodes || []).forEach(function(n) { metadata[n.tag] = n; });
+		var box = E('details', { 'id': this.cbid(section_id), 'class': 'zgz-node-picker',
+			'style': 'position:relative;width:100%;max-width:520px;min-width:0' });
+		var caption = E('span', { 'style': 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' });
+		var summary = E('summary', { 'class': 'zgz-node-summary', 'aria-expanded': 'false',
+			'style': 'display:flex;align-items:center;gap:12px;cursor:pointer;list-style:none;padding:12px 16px;border:1px solid var(--line,#dce2ec);border-radius:12px;background:var(--panel,#fff);color:var(--text,inherit)' },
+			[ caption, E('span', { 'aria-hidden': 'true' }, '▾') ]);
+		var panel = E('div', { 'class': 'zgz-node-menu',
+			'style': 'position:absolute;inset-inline-start:0;top:calc(100% + 6px);width:100%;z-index:100;padding:12px;box-sizing:border-box;border:1px solid var(--line,#dce2ec);border-radius:12px;background:var(--panel,#fff);color:var(--text,inherit);box-shadow:0 12px 28px #0003;text-align:start' });
+		var search = E('input', { 'type': 'search', 'class': 'zgz-node-search',
+			'placeholder': _('Search configs by name or protocol'),
+			'aria-label': _('Search configs by name or protocol'), 'autocomplete': 'off',
+			'style': 'width:100%;max-width:none;box-sizing:border-box;direction:' + (i18n.get() == 'fa' ? 'rtl;text-align:right' : 'ltr;text-align:left') });
+		var count = E('span', { 'class': 'zgz-node-count', 'aria-live': 'polite', 'role': 'status',
+			'style': 'flex:1 0 100%;font-size:13px;color:var(--muted,#66728c)' });
+		var list = E('div', { 'class': 'zgz-node-list', 'style': 'max-height:240px;overflow-y:auto;overscroll-behavior:contain' });
+		var empty = E('div', { 'class': 'zgz-node-empty' }, _('No matching configs.'));
+		var rows = [], choosing = false;
+		function refresh() {
+			if (choosing) return;
+			var query = String(search.value || '').trim().toLocaleLowerCase();
+			var checked = 0, visible = 0;
+			rows.forEach(function(row) {
+				row.visible = !query || row.text.indexOf(query) >= 0;
+				row.element.hidden = !row.visible;
+				row.element.style.display = row.visible ? 'grid' : 'none';
+				row.element.classList.toggle('is-selected', row.input.checked);
+				if (row.input.checked) checked++;
+				if (row.visible) visible++;
+			});
+			var locale = i18n.get() == 'fa' ? 'fa-IR' : i18n.get();
+			count.textContent = _('%s of %s configs selected').format(
+				checked.toLocaleString(locale), rows.length.toLocaleString(locale));
+			var names = rows.filter(function(row) { return row.input.checked; }).map(function(row) { return row.name; });
+			caption.textContent = !checked ? _('Choose node') : (checked <= 2 ? names.join(i18n.get() == 'fa' ? '، ' : ', ') : count.textContent);
+			empty.hidden = visible > 0;
+			select.disabled = clear.disabled = visible == 0;
+		}
+		function choose(checked) {
+			choosing = true;
+			rows.forEach(function(row) {
+				if (!row.visible || row.input.checked == checked) return;
+				row.input.checked = checked;
+				row.input.dispatchEvent(new Event('change', { bubbles: true }));
+			});
+			choosing = false;
+			refresh();
+		}
+		var select = E('button', { 'type': 'button', 'class': 'cbi-button cbi-button-positive',
+			'style': 'color:#fff!important',
+			'click': function() { choose(true); } }, _('Select search results'));
+		var clear = E('button', { 'type': 'button', 'class': 'cbi-button cbi-button-negative',
+			'style': 'color:#fff!important',
+			'click': function() { choose(false); } }, _('Deselect search results'));
+		for (var i = 0; i < keys.length; i++) {
+			var key = keys[i], name = String(labels[i] == null ? key : labels[i]);
+			var protocol = String((metadata[key] || {}).protocol || '');
+			var input = E('input', { 'type': 'checkbox', 'class': 'zgz-tick', 'value': key,
+				'checked': selected.indexOf(key) >= 0 ? '' : null, 'change': refresh });
+			var row = E('label', { 'class': 'zgz-node-row',
+				'style': 'display:grid;grid-template-columns:20px minmax(0,1fr) auto;align-items:center;gap:12px;padding:10px;margin:0;cursor:pointer;border-bottom:1px solid var(--line,#e5e7eb)' }, [ input,
+				E('span', { 'class': 'zgz-node-name', 'dir': 'auto', 'style': 'overflow-wrap:anywhere;text-align:' + (i18n.get() == 'fa' ? 'right' : 'left') }, name),
+				E('span', { 'class': 'zgz-node-protocol', 'dir': 'ltr', 'style': 'font-size:11px;color:var(--muted,#66728c)' }, protocol)
+			]);
+			rows.push({ element: row, input: input, name: name, text: (name + ' ' + protocol).toLocaleLowerCase(), visible: true });
+			list.appendChild(row);
+		}
+		search.addEventListener('input', refresh);
+		// Search is a filter, so Enter must not submit the surrounding form.
+		search.addEventListener('keydown', function(event) { if (event.key == 'Enter') event.preventDefault(); });
+		function outside(event) {
+			if (!box.contains(event.target)) {
+				box.open = false;
+				document.removeEventListener('pointerdown', outside);
+			}
+		}
+		box.addEventListener('toggle', function() {
+			summary.setAttribute('aria-expanded', String(box.open));
+			if (box.open) {
+				var bounds = summary.getBoundingClientRect();
+				var below = window.innerHeight - bounds.bottom;
+				var above = below < (panel.offsetHeight || 360) && bounds.top > below;
+				panel.style.top = above ? 'auto' : 'calc(100% + 6px)';
+				panel.style.bottom = above ? 'calc(100% + 6px)' : 'auto';
+				document.addEventListener('pointerdown', outside);
+			}
+			else document.removeEventListener('pointerdown', outside);
+		});
+		box.addEventListener('keydown', function(event) {
+			if (event.key == 'Escape') { box.open = false; summary.focus(); }
+		});
+		box.appendChild(summary);
+		panel.appendChild(search);
+		panel.appendChild(E('div', { 'class': 'zgz-node-toolbar',
+			'style': 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0' }, [ count, select, clear ]));
+		list.appendChild(empty);
+		panel.appendChild(list);
+		box.appendChild(panel);
+		refresh();
+		return box;
+	};
+	return o;
+}
+
 /* --------------------------------------------------------------- the page */
 
 return view.extend({
@@ -775,9 +888,12 @@ return view.extend({
 			callLan().catch(function() { return {}; })
 		]).then(function(data) {
 			var nodes = (data[1] && data[1].nodes) || [];
-			return callNodeOrigins(nodes.map(function(n) { return n.tag; }).join(' '))
-			.catch(function() { return {}; }).then(function(origins) {
-				data.push((origins && origins.origins) || {});
+			return Promise.all([
+				callNodeOrigins(nodes.map(function(n) { return n.tag; }).join(' ')).catch(function() { return {}; }),
+				callSubNodes().catch(function() { return {}; }),
+				callBalancingNodes().catch(function() { return {}; })
+			]).then(function(results) {
+				data.push(results[0].origins || {}, results[1].nodes || [], results[2].nodes || []);
 				return data;
 			});
 		});
@@ -899,11 +1015,32 @@ return view.extend({
 			var candidates = (data && data[1] && data[1].nodes) || [];
 			var origins = (data && data[3]) || {};
 			var nodes = candidates.filter(function(n) {
-				return !/^(hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|ikev2|balancing|shunt|interface|aether)$/.test(n.protocol);
+				return !/^(balancing|shunt)$/.test(n.protocol);
 			}).map(function(n) {
 				var origin = origins[n.tag];
-				return origin ? { tag: origin, label: n.label || n.tag } : null;
+				return origin ? { tag: origin, label: n.label || n.tag, protocol: n.protocol } : null;
 			}).filter(Boolean);
+			var seenNodes = {};
+			nodes.forEach(function(n) { seenNodes[n.tag] = true; });
+			function addBalancingNode(tag, label, protocol) {
+				if (!tag || tag == sid || seenNodes[tag] ||
+					/^(balancing|shunt|_balancing|_shunt)$/.test(protocol)) return;
+				seenNodes[tag] = true;
+				nodes.push({ tag: tag, label: label || tag, protocol: protocol.replace(/^_/, '') });
+			}
+			uci.sections('zirgozar', 'node').forEach(function(n) {
+				if (n.enabled == '0') return;
+				var parsed = parseLink(n.link);
+				if (parsed) addBalancingNode(n['.name'], n.name || parsed.name, parsed.proto);
+			});
+			((data && data[4]) || []).forEach(function(n) {
+				var ref = 'sub:' + n.sub + ':' + n.protocol + '|' + n.host + '|' + n.port + '|' + n.label;
+				if (n.fp) ref += '|#' + n.fp;
+				addBalancingNode(ref, n.label, n.protocol);
+			});
+			((data && data[5]) || []).forEach(function(n) {
+				addBalancingNode(n.tag, n.label, n.protocol);
+			});
 			var interfaces = (data && data[2] && data[2].interfaces) || [];
 			o = s.option(form.MultiValue, 'balancing_node', _('Load balancing node list'));
 			o.depends('_proto', '_balancing');
@@ -916,11 +1053,13 @@ return view.extend({
 				return value == null || value === '' ? [] : (Array.isArray(value) ? value : [ value ]);
 			};
 			nodes.forEach(function(n) { o.value(n.tag, n.label || n.tag); });
-			pui.checkboxes(o);
+			nodePicker(o, nodes);
 
 			o = s.option(form.ListValue, 'balancingStrategy', _('Balancing Strategy'));
 			o.depends('_proto', '_balancing');
-			[ 'random', 'roundRobin', 'leastPing', 'leastLoad' ].forEach(function(v) { o.value(v); });
+			[ [ 'random', 'Random' ], [ 'roundRobin', 'Round robin' ],
+			  [ 'leastPing', 'Lowest latency' ], [ 'leastLoad', 'Least load' ] ]
+				.forEach(function(v) { o.value(v[0], _(v[1])); });
 			o.default = 'random';
 
 			o = s.option(form.ListValue, 'fallback_node', _('Fallback Node'));
@@ -932,6 +1071,34 @@ return view.extend({
 			o = s.option(form.Value, 'probeInterval', _('Probe Interval'));
 			o.depends('_proto', '_balancing');
 			o.default = '1m';
+			if (i18n.get() == 'fa') {
+				var intervalWidget = o.renderWidget;
+				if (typeof intervalWidget == 'function') o.renderWidget = function() {
+					function rtl(widget) {
+						var input = widget.matches('input') ? widget : widget.querySelector('input');
+						if (input) {
+							input.dir = 'rtl';
+							input.style.setProperty('direction', 'rtl', 'important');
+							input.style.setProperty('text-align', 'right', 'important');
+						}
+						return widget;
+					}
+					var widget = intervalWidget.apply(this, arguments);
+					return widget && typeof widget.then == 'function' ? widget.then(rtl) : rtl(widget);
+				};
+				function intervalValue(value) {
+					return String(value || '').replace(/[۰-۹]/g, function(d) { return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d); })
+						.replace(/\s*ثانیه\s*$/, 's').replace(/\s*دقیقه\s*$/, 'm').replace(/\s*ساعت\s*$/, 'h').trim();
+				}
+				o.cfgvalue = function(section_id) {
+					var value = uci.get('zirgozar', section_id, 'probeInterval') || '1m';
+					return value.replace(/^([0-9]+)(s|m|h)$/, function(all, number, unit) {
+						return number.replace(/[0-9]/g, function(d) { return '۰۱۲۳۴۵۶۷۸۹'[Number(d)]; }) + ' ' + ({ s: 'ثانیه', m: 'دقیقه', h: 'ساعت' })[unit];
+					});
+				};
+				o.validate = function(section_id, value) { return /^[1-9][0-9]*(s|m|h)$/.test(intervalValue(value)) || 'فاصله را مانند «۱ دقیقه» وارد کنید.'; };
+				o.write = function(section_id, value) { uci.set('zirgozar', section_id, 'probeInterval', intervalValue(value)); };
+			}
 
 			o = s.option(form.Value, 'probeUrl', _('Probe URL'));
 			o.depends('_proto', '_balancing');

@@ -24,9 +24,11 @@ if command -v ucode >/dev/null 2>&1; then
 fi
 python3 test/test-unified-update.py || rc=1
 sh test/test-nodes-reload.sh || rc=1
+sh test/test-inuse.sh || rc=1
 sh test/test-openconnect.sh || rc=1
 sh test/test-dnsmasq-install.sh || rc=1
 sh test/test-core-check.sh || rc=1
+sh test/test-balancing.sh || rc=1
 for t in test/test-package.sh test/test-led.sh test/test-package-install.sh test/test-sources.sh test/test-schedule.sh test/test-backup.sh test/test-connectivity.sh test/test-health.sh test/test-dns.sh test/test-versions.sh test/test-stats.sh test/test-rules.sh test/test-acl.sh test/test-config.sh test/test-encrypted-dns.sh test/test-config-modes.sh test/test-aether.sh test/test-l2tp.sh test/test-ikev2.sh test/test-exit-cache.sh test/test-probe.sh; do
 	echo
 	echo "######## $t"

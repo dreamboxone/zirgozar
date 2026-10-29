@@ -475,6 +475,9 @@ bridge_is_ikev2() {
 
 # The device a PPP or IKEv2 account is carried on, by its protocol.
 ppp_dev() {
+	case "$1" in l2tp|pptp|sstp|ikev2)
+		[ -z "${ZGZ_TUNNEL_DEV:-}" ] || { echo "$ZGZ_TUNNEL_DEV"; return 0; } ;;
+	esac
 	case "$1" in
 		l2tp) echo zgzl2tp ;;
 		pptp) echo zgzpptp ;;
@@ -1923,32 +1926,41 @@ section_links() {
 # Either way the record keeps this node's own address, because that is the
 # hop the router actually reaches. A chain naming the node itself, a node
 # that is gone, or one Xray cannot speak is ignored rather than guessed at.
+balancing_members() {
+	# UCI's default separator loses spaces inside subscription references.
+	uci -q -d '
+' get "zirgozar.$1.balancing_node" 2>/dev/null
+}
+
 node_records() {
 	_nd_link="$(uci -q get "zirgozar.$1.link" 2>/dev/null)" || _nd_link=""
 	_nd_label="$(uci -q get "zirgozar.$1.name" 2>/dev/null)" || _nd_label="$1"
 	# Composite members must be real outbound nodes. Reject another virtual
 	# node before resolving it, including references back to this node.
 	case "$_nd_link" in
-		balancing://*|shunt://*|interface://*)
+		balancing://*|shunt://*)
 			[ "${3:-0}" = "1" ] && return 1
 			;;
 	esac
 	case "$_nd_link" in
 		balancing://*)
-			_nd_members="$(uci -q get "zirgozar.$1.balancing_node" 2>/dev/null)" || _nd_members=""
+			_nd_members="$(balancing_members "$1")" || _nd_members=""
 			_nd_first=""
-			for _nd_member in $_nd_members; do
+			while IFS= read -r _nd_member; do
+				[ -n "$_nd_member" ] || continue
 				case "$_nd_member" in
 					sub:*) _nd_r="$("$ZGZ_LIB/zgz-nodes" resolve "$_nd_member" 2>/dev/null | head -1)" ;;
 					*) _nd_r="$(node_records "$_nd_member" 1 1 2>/dev/null | head -1)" ;;
 				esac
 				[ -n "$_nd_r" ] || continue
 				case "$(printf '%s' "$_nd_r" | cut -f3)" in
-					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|ikev2|aether|balancing|shunt|interface) continue ;;
+					balancing|shunt) continue ;;
 				esac
 				_nd_first="$_nd_r"
 				break
-			done
+			done <<EOF
+$_nd_members
+EOF
 			[ -n "$_nd_first" ] || return 1
 			_nd_host="$(printf '%s' "$_nd_first" | cut -f4)"
 			_nd_port="$(printf '%s' "$_nd_first" | cut -f5)"

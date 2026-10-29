@@ -865,38 +865,31 @@ cmd_status() {
 
 # Which hand-added section, if any, is the node the tunnel is on.
 #
-# The candidate list does not carry where a node came from - it is one flat
-# file of everything, and the tag in it is a position in that file rather than
-# a name. So the question is answered the other way round: take the address
-# the tunnel actually settled on, and ask each hand-added section whether it
-# parses to that address.
+# The chosen node's stable section name is saved with the runtime metadata.
+# Addresses and display names can be shared by otherwise different configs.
+# Older bridge configurations also carry the section in their payload.
 #
 # Not cheap enough to poll, and it is not polled. The web interface asks this
 # once, at the moment somebody presses Delete, because between opening the
 # page and pressing it the router may well have moved to a different node.
-inuse_one() {
-	_sec="$1"
-	local link
-	if [ -n "$INUSE_FOUND" ]; then
-		return 0
-	fi
-	config_get link "$_sec" link ""
-	[ -n "$link" ] || return 0
-	if printf '%s\n' "$link" | LC_ALL=C awk -f "$PARSE" 2>/dev/null |
-	   awk -F'\t' -v h="$INUSE_HOST" -v p="$INUSE_PORT" \
-	       '$4 == h && $5 + 0 == p + 0 { f = 1 } END { exit f ? 0 : 1 }'; then
-		INUSE_FOUND="$_sec"
-	fi
-	return 0
-}
-
 cmd_inuse() {
 	INUSE_HOST="$(sed -n 's/^host=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)"
 	INUSE_PORT="$(sed -n 's/^port=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)"
 	INUSE_FOUND=""
-	if [ -n "$INUSE_HOST" ] && [ -n "$INUSE_PORT" ]; then
+	if [ -s "$ZGZ_BEST_META" ]; then
 		config_load zirgozar
-		config_foreach inuse_one node
+		local _inuse_proto _bridge_id _bridge_type
+		_bridge_id="$(sed -n 's/^section=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)"
+		case "$_bridge_id" in ''|*[!A-Za-z0-9_]*) _bridge_id='' ;; esac
+		_inuse_proto="$(sed -n 's/^protocol=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)"
+		if ! grep -q '^section=' "$ZGZ_BEST_META" &&
+		   [ -n "$_inuse_proto" ] && [ "$_inuse_proto" = "$(bridge_type)" ]; then
+			_bridge_id="$(sed -n 's/.*"id":"\([A-Za-z0-9_]*\)".*/\1/p' "$ZGZ_ETC/bridge.json" 2>/dev/null | head -1)"
+		fi
+		if [ -n "$_bridge_id" ]; then
+			config_get _bridge_type "$_bridge_id" TYPE ""
+			[ "$_bridge_type" != node ] || INUSE_FOUND="$_bridge_id"
+		fi
 	fi
 	# active, and not merely chosen. A node picked last week and disconnected
 	# since is not one anybody needs protecting from deleting.

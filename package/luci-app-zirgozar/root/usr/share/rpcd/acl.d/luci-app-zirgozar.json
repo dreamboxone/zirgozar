@@ -3,7 +3,7 @@
 		"description": "Grant access to Zirgozar",
 		"read": {
 			"ubus": {
-				"luci.zirgozar": [ "led", "state", "traffic", "nodes", "nodeorigins", "subs", "subnodes", "system", "tests", "inuse", "log", "lan", "check", "geo", "geoview", "nodeconfig", "server", "warp" ],
+				"luci.zirgozar": [ "led", "state", "traffic", "nodes", "nodeorigins", "balancingnodes", "subs", "subnodes", "system", "tests", "inuse", "log", "lan", "check", "geo", "geoview", "nodeconfig", "server", "warp" ],
 				"luci-rpc": [ "getHostHints" ]
 			},
 			"file": {

@@ -961,24 +961,38 @@ balancing_fallback="direct"
 observatory=""
 burst_observatory=""
 active_balancing=""
+if [ "${ZGZ_BALANCING_CHILD:-0}" != 1 ]; then
+	: > "$ZGZ_RUN/balancing.instances"
+fi
+balancing_payload() {
+	local row="$2" payload
+	payload="$(printf '%s' "$row" | cut -f6-)"
+	# Native outbounds stay in the routing core; all other protocols get a
+	# supervised helper with a loopback SOCKS outbound of its own.
+	if printf '%s' "$payload" | grep -q '^{"type":'; then
+		printf '%s\n' "$row" | "$ZGZ_LIB/zgz-balancing" prepare "$1" "${3:-}"
+	else
+		printf '%s\n' "$row" | decorate "${preproxy:+chain-$preproxy}" "$pre_hp" | cut -f6-
+	fi
+}
 if [ "$(sed -n 's/^protocol=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)" = "balancing" ]; then
 	active_balancing="$(sed -n 's/^tag=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)"
 	if [ -z "$(uci -q get "zirgozar.$active_balancing.link" 2>/dev/null)" ]; then
 		active_balancing="$("$ZGZ_LIB/zgz-nodes" origin "$active_balancing" 2>/dev/null)" || active_balancing=""
 	fi
-	_bal_members="$(uci -q get "zirgozar.$active_balancing.balancing_node" 2>/dev/null)" || _bal_members=""
+	_bal_members="$(balancing_members "$active_balancing")" || _bal_members=""
 	_bal_i=0
-	for _bal_member in $_bal_members; do
+	while IFS= read -r _bal_member; do
+		[ -n "$_bal_member" ] || continue
 		case "$_bal_member" in
 			sub:*) _bal_row="$("$ZGZ_LIB/zgz-nodes" resolve "$_bal_member" 2>/dev/null | head -1)" ;;
 			*) _bal_row="$(node_records "$_bal_member" 1 2>/dev/null | head -1)" ;;
 		esac
 		[ -n "$_bal_row" ] || continue
 		case "$(printf '%s' "$_bal_row" | cut -f3)" in
-			hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|ikev2|aether|balancing|shunt|interface) continue ;;
+			balancing|shunt) continue ;;
 		esac
-		_bal_payload="$(printf '%s\n' "$_bal_row" | warp_natives |
-			decorate "${preproxy:+chain-$preproxy}" "$pre_hp" | cut -f6-)" || continue
+		_bal_payload="$(balancing_payload "$((_bal_i + 1))" "$_bal_row" "$_bal_member")" || continue
 		[ -n "$_bal_payload" ] || continue
 		_bal_i=$((_bal_i + 1))
 		_bal_tag="bal-$active_balancing-$_bal_i"
@@ -986,7 +1000,9 @@ if [ "$(sed -n 's/^protocol=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)" = "bal
 		balancing_outbounds="$balancing_outbounds
 $_bal_item,"
 		balancing_selector="${balancing_selector:+$balancing_selector,}\"$_bal_tag\""
-	done
+	done <<EOF
+$_bal_members
+EOF
 	if [ "$_bal_i" -gt 0 ]; then
 		_bal_strategy="$(uci -q get "zirgozar.$active_balancing.balancingStrategy" 2>/dev/null)" || _bal_strategy="random"
 		case "$_bal_strategy" in random|roundRobin|leastPing|leastLoad) : ;; *) _bal_strategy=random ;; esac
@@ -999,11 +1015,10 @@ $_bal_item,"
 					*) _bal_fb_row="$(node_records "$_bal_fallback" 1 2>/dev/null | head -1)" ;;
 				esac
 				case "$(printf '%s' "$_bal_fb_row" | cut -f3)" in
-					hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|ikev2|aether|balancing|shunt|interface) _bal_fb_row="" ;;
+					balancing|shunt) _bal_fb_row="" ;;
 				esac
 				if [ -n "$_bal_fb_row" ]; then
-					_bal_fb="$(printf '%s\n' "$_bal_fb_row" | warp_natives |
-						decorate "${preproxy:+chain-$preproxy}" "$pre_hp" | cut -f6-)" || _bal_fb=""
+					_bal_fb="$(balancing_payload "$((_bal_i + 1))" "$_bal_fb_row" "$_bal_fallback")" || _bal_fb=""
 					if [ -n "$_bal_fb" ]; then
 						balancing_fallback="bal-$active_balancing-fallback"
 						balancing_outbounds="$balancing_outbounds
@@ -1028,8 +1043,8 @@ $(printf '%s\n' "$_bal_fb" | sed -e 's/^[[:space:]]*//' -e "s/^{/{\"tag\":\"$bal
 		balancing_entries="{\"tag\":\"balancer-$active_balancing\",\"selector\":[$balancing_selector],\"fallbackTag\":\"$balancing_fallback\",\"strategy\":{\"type\":\"$_bal_strategy\"}}"
 		balancing_rule="{\"type\":\"field\",\"inboundTag\":[\"balance-$active_balancing\"],\"balancerTag\":\"balancer-$active_balancing\"}"
 	else
-		warn "balancing node '$active_balancing' has no usable Xray members"
-		proxy_out='{"tag":"proxy","protocol":"freedom","settings":{"domainStrategy":"UseIP"},"streamSettings":{"sockopt":{"mark":255}}}'
+		warn "balancing node '$active_balancing' has no usable members"
+		proxy_out='{"tag":"proxy","protocol":"blackhole","settings":{}}'
 	fi
 fi
 if [ -n "$balancing_rule" ]; then

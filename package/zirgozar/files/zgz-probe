@@ -544,7 +544,8 @@ select_tag() {
 
 	_row="$(awk -F'\t' -v t="$_tag" '$1 == t { print; exit }' "$ZGZ_CANDIDATES")"
 	[ -n "$_row" ] || { warn "chosen server is not in the list any more"; return 1; }
-	select_row "$_row" "$_ms"
+	_origin="$("$ZGZ_LIB/zgz-nodes" origin "$_tag" 2>/dev/null)" || _origin=""
+	select_row "$_row" "$_ms" "$_origin"
 }
 
 # The Node setting: one hand-added node, used as it is, with nothing
@@ -564,18 +565,21 @@ cmd_use() {
 	# shows. Zero - no answer - is shown as a dash, as before. WARP has no TCP
 	# port to knock on, and which address it uses is warp-plus's choice.
 	case "$(printf '%s' "$_row" | cut -f3)" in
-		balancing|shunt|interface) select_row "$_row" 0; return $? ;;
-		warp|aether|l2tp|pptp|sstp|ikev2) select_row "$_row" 0; return $? ;;
+		balancing|shunt|interface) select_row "$_row" 0 "$1"; return $? ;;
+		warp|aether|l2tp|pptp|sstp|ikev2) select_row "$_row" 0 "$1"; return $? ;;
 	esac
 	if printf '%s' "$_row" | cut -f6- | grep -qE '"network"[[:space:]]*:[[:space:]]*"xdrive"'; then
-		select_row "$_row" 0; return $?
+		select_row "$_row" 0 "$1"; return $?
 	fi
-	select_row "$_row" "$(tcp_ms "$(printf '%s' "$_row" | cut -f4)" "$(printf '%s' "$_row" | cut -f5)")"
+	select_row "$_row" "$(tcp_ms "$(printf '%s' "$_row" | cut -f4)" "$(printf '%s' "$_row" | cut -f5)")" "$1"
 }
 
 select_row() {
 	_row="$1"
 	_ms="${2:-0}"
+	local _selected_section
+	_selected_section="${3:-}"
+	case "$_selected_section" in ''|*[!A-Za-z0-9_]*) _selected_section='' ;; esac
 	# WARP over MASQUE with no noize, on a router whose Xray speaks MASQUE:
 	# Xray's own outbound, and no Vwarp - see masque_native.
 	if [ "$(printf '%s' "$_row" | cut -f3)" = "warp" ] && masque_native "$(printf '%s' "$_row" | cut -f6-)"; then
@@ -634,6 +638,7 @@ select_row() {
 	printf 'tag=%s\nlabel=%s\nprotocol=%s\nhost=%s\nport=%s\nlatency_ms=%s\ntested=%s\ntotal=%s\nalive=%s\nsub=%s\n' \
 		"$_tag" "$_label" "$_proto" "$_host" "$_port" "$_ms" "$(date -u +%s)" \
 		"$(count "$ZGZ_CANDIDATES")" "$(count "$ALIVE")" "$_msub" > "$ZGZ_RUN/meta.new"
+	printf 'section=%s\n' "$_selected_section" >> "$ZGZ_RUN/meta.new"
 	write_if_changed "$ZGZ_RUN/meta.new" "$ZGZ_BEST_META" || true
 	rm -f "$ZGZ_RUN/meta.new"
 	return 0

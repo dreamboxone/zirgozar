@@ -5,6 +5,15 @@
 'require baseclass';
 
 return baseclass.extend({ strings: {
+	"Random": "随机",
+	"Round robin": "轮询",
+	"Lowest latency": "最低延迟",
+	"Least load": "最低负载",
+	"Search configs by name or protocol": "按名称或协议搜索配置",
+	"%s of %s configs selected": "已选择 %s 个配置，共 %s 个",
+	"No matching configs.": "没有匹配的配置。",
+	"Select search results": "选择搜索结果",
+	"Deselect search results": "取消选择搜索结果",
 	"FinalMask preset": "FinalMask 预设",
 	"Custom": "自定义",
 	"Replace the custom FinalMask with this preset?": "用此预设替换自定义 FinalMask？",
