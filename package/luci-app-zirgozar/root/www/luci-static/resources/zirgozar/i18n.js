@@ -759,7 +759,7 @@ var FA = {
 	'Sing-Box-LX App Path': 'مسیر Sing-Box-LX',
 	'The sing-box build that speaks xhttp. Empty means this program’s own copy in the folder above.': 'نسخه‌ای از sing-box که xhttp را می‌فهمد. خالی یعنی نسخه خود این برنامه در پوشه بالا.',
 	'Active core': 'هسته فعال',
-	'Main routing core': 'هستهٔ اصلی مسیریابی',
+	'Routing core': 'هسته مسیریابی',
 	'Auto measures the nodes and uses the fastest. A node chosen here - added by hand or from a subscription - is used as it is, and nothing is measured. A subscription’s node is found again each time its list is read.': 'خودکار: سریع‌ترین کانفیگ.',
 	'Nodes to use was set to manually added configs only, so the subscriptions could not be used. It is now set to all configs.': 'گزینه «کانفیگ‌هایی که استفاده شوند» روی «فقط کانفیگ‌های دستی» بود و اشتراک‌ها استفاده نمی‌شدند. حالا روی «همه کانفیگ‌ها» گذاشته شد.',
 	'Traffic statistics': 'آمار ترافیک',

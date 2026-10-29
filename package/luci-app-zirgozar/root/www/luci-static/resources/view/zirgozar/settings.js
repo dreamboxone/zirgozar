@@ -317,7 +317,7 @@ return view.extend({
 			if (status.mainSwitchChanged) status.mainSwitchChanged(value);
 		};
 
-		o = s.taboption('main', form.ListValue, 'core_engine', _('Main routing core'),
+		o = s.taboption('main', form.ListValue, 'core_engine', _('Routing core'),
 			_('Auto: Xray, and sing-box for a config Xray cannot run. Xray (patterniha): his build first, with QUIC refused as PattN does. sing-box or sing-box-lx: every config through it; if it cannot start, Xray takes over. An OpenVPN config is always carried by OpenVPN itself, beside whichever is chosen here; install it on the App Update page.'));
 		o.value('xray', _('Auto'));
 		o.value('xray-patterniha', 'Xray (patterniha)');
