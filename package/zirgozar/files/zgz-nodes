@@ -513,7 +513,41 @@ status_all() {
 #                               added by hand are in use
 # zgz-nodes fetch all        every subscription that is switched on
 # zgz-nodes fetch <section>  that one only
-cmd_fetch() {
+nodes_locked() (
+	# Fetch, Apply and measurement jobs share intermediate files. Only one
+	# writer may use them; interrupted jobs must not leave a permanent lock.
+	_nl_lock="$ZGZ_RUN/nodes-write.lock"
+	_nl_wait=0
+	while ! mkdir "$_nl_lock" 2>/dev/null; do
+		_nl_inode="$(ls -di "$_nl_lock" 2>/dev/null | awk '{print $1}')"
+		_nl_owner="$(cat "$_nl_lock/pid" 2>/dev/null)" || _nl_owner=''
+		case "$_nl_owner" in
+			''|*[!0-9]*) _nl_dead=0; [ "$_nl_wait" -lt 5 ] || _nl_dead=1 ;;
+			*) _nl_dead=0; kill -0 "$_nl_owner" 2>/dev/null || _nl_dead=1 ;;
+		esac
+		if [ "$_nl_dead" = 1 ] && mkdir "$_nl_lock/reap" 2>/dev/null; then
+			if [ "$(ls -di "$_nl_lock" 2>/dev/null | awk '{print $1}')" = "$_nl_inode" ] &&
+			   [ "$(cat "$_nl_lock/pid" 2>/dev/null)" = "$_nl_owner" ]; then
+				rm -f "$_nl_lock/pid"
+				rmdir "$_nl_lock/reap" "$_nl_lock" 2>/dev/null || true
+			else
+				rmdir "$_nl_lock/reap" 2>/dev/null || true
+			fi
+			continue
+		fi
+		_nl_wait=$((_nl_wait + 1))
+		[ "$_nl_wait" -lt 300 ] || { warn 'node list is busy; keeping the previous list'; exit 1; }
+		sleep 1
+	done
+	printf '%s\n' "$$" > "$_nl_lock/pid"
+	trap 'rm -f "$_nl_lock/pid"; rmdir "$_nl_lock" 2>/dev/null || true' EXIT
+	trap 'exit 1' INT TERM
+	"$@"
+)
+
+cmd_fetch() { nodes_locked fetch_sources "$@"; }
+
+fetch_sources() {
 	ONLY=""
 	DUE_ONLY=0
 	case "${1:-}" in
@@ -735,7 +769,9 @@ clear_list_message() {
 	esac
 }
 
-cmd_build() {
+cmd_build() { nodes_locked build_candidates "$@"; }
+
+build_candidates() {
 	# both / own / subs. Which servers are allowed into the running, before
 	# anything is measured. A server added by hand does not replace the list,
 	# it joins it.
@@ -1332,7 +1368,10 @@ case "${1:-update}" in
 	subnodes) cmd_subnodes ;;
 	origin) cmd_origin "${2:-}" ;;
 	resolve) cmd_resolve "${2:-}" ;;
-	fetch)  cmd_fetch "${2:-}" ;;
+	fetch)
+		cmd_fetch "${2:-}"
+		cmd_build
+		;;
 	build)  cmd_build ;;
 	update)
 		cmd_fetch "${2:-}" || true

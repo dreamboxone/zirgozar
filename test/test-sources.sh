@@ -101,4 +101,37 @@ sh "$RIG/lib/zgz-nodes" subnodes > "$RIG/choices.tsv"
 check "$(cut -f4 "$RIG/choices.tsv")" json.example 'JSON choices work without a links file'
 sections 0 1
 check "$(sh "$RIG/lib/zgz-nodes" subnodes | wc -l | tr -d ' ')" 0 'disabled JSON subscription is excluded'
+echo '== concurrent list writers'
+sections 1 1
+rig_set sources both
+rm -f "$RIG/run/subs/s.tsv"
+printf '%s\n' "$subscription" > "$RIG/run/subs/s.links"
+real_awk=$(command -v awk)
+export real_awk RIG
+cat > "$RIG/bin/awk" <<'AWK'
+#!/bin/sh
+case "$*" in *'/zgz-parse'*) sleep 0.2 ;; esac
+exec "$real_awk" "$@"
+AWK
+chmod +x "$RIG/bin/awk"
+pids=''
+for n in 1 2 3 4 5 6; do
+ sh "$RIG/lib/zgz-nodes" build > "$RIG/build-$n.log" 2>&1 &
+ pids="$pids $!"
+done
+writers_ok=1
+for pid in $pids; do wait "$pid" || writers_ok=0; done
+check "$writers_ok" 1 'all simultaneous builds finish successfully'
+check "$(cut -f4 "$RIG/run/candidates.tsv" | paste -sd, -)" manual.example,sub.example 'simultaneous builds preserve the full list'
+rm -f "$RIG/bin/awk"
+mkdir "$RIG/run/nodes-write.lock"
+echo 999999999 > "$RIG/run/nodes-write.lock/pid"
+build_check both manual.example,sub.example 0 'recover interrupted writer lock'
+if [ ! -d "$RIG/run/nodes-write.lock" ]; then ok 'writer lock released'; else bad 'writer lock leaked'; fi
+printf 's\tsubscription\ns\t.enabled\t1\ns\t.content\t%s\n' "$subscription" > "$ZGZ_TEST_SECTIONS"
+printf '\nconfig_list_foreach() { :; }\n' >> "$RIG/lib/zgz-common.sh"
+: > "$RIG/run/candidates.tsv"
+sh "$RIG/lib/zgz-nodes" fetch all > "$RIG/fetch.log" 2>&1
+check "$?" 0 'subscription fetch succeeds'
+check "$(cut -f4 "$RIG/run/candidates.tsv")" sub.example 'subscription fetch publishes its nodes without reconnecting'
 rig_report
