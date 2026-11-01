@@ -72,5 +72,5 @@ case "$result" in ''|*[!0-9]*|0) echo "invalid live measurement: $result"; exit 
 echo "live: real OpenVPN TLS tunnel and HTTP request measured in $result ms"
 [ ! -d "$RIG/run/.openvpn-test-lock" ]
 if ip link show dev zgzovpnt >/dev/null 2>&1; then echo 'temporary tunnel leaked'; exit 1; fi
-[ -z "$(ip -4 route show table 19015 2>/dev/null)" ]
+[ -z "$(ip -4 route show table 19016 2>/dev/null)" ]
 echo 'live: temporary tunnel, routes and lock cleaned up'

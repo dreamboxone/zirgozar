@@ -75,7 +75,7 @@ check() {
 	fi
 	SERVER="$(field server)"; PORT="$(field port)"; USER="$(field username)"; PASS="$(field password)"
 	MTU="$(field mtu)"; MPPE="$(field mppe)"
-	case "$SERVER" in ''|*[!A-Za-z0-9_.-]*) fail "Invalid $NAME account. Check server, username and password." ;; esac
+	case "$SERVER" in ''|*[!A-Za-z0-9_.:-]*) fail "Invalid $NAME account. Check server, username and password." ;; esac
 	case "$PORT" in ''|*[!0-9]*) fail "Invalid $NAME account. Check server, username and password." ;; esac
 	case "$MTU" in ''|*[!0-9]*) MTU=1400 ;; esac
 	[ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ] && [ "$MTU" -ge 576 ] && [ "$MTU" -le 1460 ] &&
@@ -86,6 +86,7 @@ check() {
 cleanup() {
 	trap - EXIT INT TERM
 	[ -z "${PID:-}" ] || { kill "$PID" 2>/dev/null || true; wait "$PID" 2>/dev/null || true; }
+	tunnel_relay_stop
 	# The PPP pid is owned by our linkname, not by other PPP connections.
 	_ppp="$(cat "/var/run/ppp-$DEV.pid" 2>/dev/null)" || _ppp=''
 	case "$_ppp" in ''|*[!0-9]*) : ;; *)
@@ -142,6 +143,17 @@ connect() {
 	mkdir -p "$STATE"
 	# Looked up outside the tunnel: this account is the way into it.
 	_ip="$(resolve_direct "$SERVER" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
+	_endpoint="$_ip:$PORT"
+	if [ -z "$_ip" ] && [ "$TYPE" = sstp ]; then
+		_ip="$(resolve_direct_all "$SERVER" | grep : | head -1)"
+		[ -n "$_ip" ] || fail 'The tunnel server has no usable IPv4 or IPv6 address.'
+		_src="$(ip -6 route get "$_ip" mark 255 | sed -n 's/.* src \([^ ]*\).*/\1/p' | head -1)"
+		[ -n "$_src" ] || fail 'The router has no direct route to the tunnel server. Check WAN IPv4 or IPv6 connectivity.'
+		_relay_port=$((TABLE + 10000))
+		tunnel_relay_start "$STATE" tcp "$_ip" "$PORT" "$_relay_port" "$_src" ||
+			fail 'The IPv6 tunnel transport could not start. Check Runtime Logs.'
+		_endpoint="127.0.0.1:$_relay_port"
+	fi
 	[ -n "$_ip" ] || fail "The $NAME server has no reachable IPv4 address."
 
 	# What both have in common. The address, the routes and the name servers
@@ -152,14 +164,16 @@ connect() {
 		echo 'nodefaultroute'
 		echo 'noproxyarp'
 		echo 'refuse-eap'
-		# Header compression and IPv6 are not asked for: servers that do
-		# not offer them - SoftEther's SSTP for one - reject the request and
-		# then drop the link.
+		# Header compression is not asked for: servers that do not offer
+		# it reject the request and then drop the link.
 		echo 'novj'
 		echo 'novjccomp'
 		echo 'nobsdcomp'
 		echo 'nodeflate'
-		echo 'noipv6'
+		# IPv6 inside the tunnel is off by default: some servers
+		# (SoftEther's SSTP for one) drop the link when IPv6CP is
+		# negotiated. The account's ipv6 field turns it on.
+		if [ "$(field ipv6)" = true ]; then echo '+ipv6'; else echo 'noipv6'; fi
 		echo 'ipcp-accept-local'
 		echo 'ipcp-accept-remote'
 		echo 'lcp-echo-interval 5'
@@ -199,7 +213,7 @@ connect() {
 		# the password is accepted.
 		sstpc --cert-warn --log-stderr --log-level 1 \
 			--user "$USER" --password "$PASS" \
-			"$_ip:$PORT" file "$STATE/ppp.options" > "$STATE/log" 2>&1 &
+			"$_endpoint" file "$STATE/ppp.options" > "$STATE/log" 2>&1 &
 	fi
 	PID=$!
 	_n=0
@@ -213,6 +227,11 @@ connect() {
 			# drops a link that asks for any MRU of its own.
 			ip link set dev "$DEV" mtu "$MTU" 2>/dev/null || true
 			ip -4 route replace default dev "$DEV" metric 10 table "$TABLE"
+			# When the account asked for IPv6 and the server gave an address,
+			# route IPv6 through the tunnel too.
+			if [ "$(field ipv6)" = true ] && ip -6 addr show dev "$DEV" 2>/dev/null | grep 'inet6 ' | grep -qv 'scope link'; then
+				ip -6 route replace default dev "$DEV" metric 10 table "$TABLE" 2>/dev/null || true
+			fi
 			return 0
 		fi
 		sleep 1; _n=$((_n+1))
@@ -253,6 +272,7 @@ case "$MODE" in
 		# procd starts the whole connection again when the client exits or
 		# the link loses its address.
 		while kill -0 "$PID" 2>/dev/null; do
+			[ -z "${RELAY_PID:-}" ] || kill -0 "$RELAY_PID" 2>/dev/null || exit 1
 			ip -4 addr show dev "$DEV" 2>/dev/null | grep -q 'inet ' || exit 1
 			sleep 5
 		done

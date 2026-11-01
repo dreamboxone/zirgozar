@@ -1539,9 +1539,12 @@ direct_dns() {
 
 # One name, resolved through the direct resolver rather than the router's own
 # - see above for why. Prints the first IPv4 address, or nothing.
-resolve_direct() {
+resolve_direct_all() {
 	case "$1" in
-		*:*|'') return 1 ;;
+		'') return 1 ;;
+		*:*)
+			case "$1" in *[!0-9A-Fa-f:.]*) return 1 ;; esac
+			printf '%s\n' "$1"; return 0 ;;
 		*[!0-9.]*) : ;;
 		*) echo "$1"; return 0 ;;
 	esac
@@ -1557,8 +1560,36 @@ resolve_direct() {
 		/^Name:/ { named = 1; next }
 		named && /^Address/ {
 			for (i = 2; i <= NF; i++)
-				if ($i ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) { print $i; exit }
+				if ($i ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ ||
+				    ($i ~ /:/ && $i ~ /^[0-9A-Fa-f:.]+$/)) print $i
 		}'
+	return 0
+}
+
+resolve_direct() {
+	resolve_direct_all "$1" | awk '/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ { print; exit }'
+}
+
+# IPv4-only tunnel clients can carry their unchanged TCP/UDP exchange over
+# an IPv6 transport. The relay is loopback-only and bypasses interception.
+tunnel_relay_start() {
+	local dir="$1" network="$2" address="$3" port="$4" listen="$5" source="$6" core
+	case "$network" in tcp|udp) : ;; *) return 1 ;; esac
+	case "$address:$source" in *[!0-9A-Fa-f:.]*) return 1 ;; esac
+	case "$port:$listen" in *[!0-9:]*|:*|*:) return 1 ;; esac
+	[ "$port" -ge 1 ] && [ "$port" -le 65535 ] && [ "$listen" -ge 1024 ] && [ "$listen" -le 65535 ] || return 1
+	printf '{"log":{"loglevel":"warning"},"inbounds":[{"listen":"127.0.0.1","port":%s,"protocol":"dokodemo-door","settings":{"address":"%s","port":%s,"network":"%s"}}],"outbounds":[{"protocol":"freedom","sendThrough":"%s","streamSettings":{"sockopt":{"mark":255}}}]}' \
+		"$listen" "$address" "$port" "$network" "$source" > "$dir/transport.json"
+	core="$(find_xray "$dir/transport.json")" || return 1
+	"$core" run -c "$dir/transport.json" > "$dir/transport.log" 2>&1 &
+	RELAY_PID=$!
+	sleep 1
+	kill -0 "$RELAY_PID" 2>/dev/null
+}
+
+tunnel_relay_stop() {
+	[ -z "${RELAY_PID:-}" ] || { kill "$RELAY_PID" 2>/dev/null || true; wait "$RELAY_PID" 2>/dev/null || true; }
+	RELAY_PID=''
 	return 0
 }
 
@@ -1933,6 +1964,12 @@ balancing_members() {
 }
 
 node_records() {
+	local stored_record
+	stored_record="$(uci -q get "zirgozar.$1.record" 2>/dev/null)" || stored_record=''
+	if [ -n "$stored_record" ]; then
+		printf '%s\n' "$stored_record" | awk -F'\t' -v label="$(uci -q get "zirgozar.$1.name")" 'BEGIN {OFS="\t"} {if (label!="") $2=label; print}'
+		return 0
+	fi
 	_nd_link="$(uci -q get "zirgozar.$1.link" 2>/dev/null)" || _nd_link=""
 	_nd_label="$(uci -q get "zirgozar.$1.name" 2>/dev/null)" || _nd_label="$1"
 	# Composite members must be real outbound nodes. Reject another virtual
@@ -2226,6 +2263,8 @@ pkg_failure() {
 		message='Package signature verification failed. Check the repository and its trusted signing keys.'
 	elif grep -qi 'kmod' "$file" && grep -qiE '404|not found|no such package|cannot satisfy' "$file"; then
 		message='Required kernel modules are unavailable. Use the repository matching this firmware and its exact kernel ABI, or a matching firmware image with these modules included. See Runtime Logs.'
+	elif grep -qiE '(send request|connect|wget|fetch).*(operation not permitted|permission denied)' "$file"; then
+		message='Package repository access was blocked. Check router routing and firewall settings.'
 	elif grep -qiE 'timed? out|timeout|connection|network unreachable|temporary error' "$file"; then
 		message='Package repositories could not be reached. Check connectivity and try again.'
 	elif grep -qiE '404|not found|no such package|cannot satisfy|incompatible|conflict|breaks:' "$file"; then
@@ -2233,7 +2272,11 @@ pkg_failure() {
 	else
 		message='The package operation failed. See the installation log for the original error.'
 	fi
-	say_message "$message"
+	if [ -n "${ZGZ_PACKAGE_ERROR_FILE:-}" ]; then
+		(umask 077; printf '%s\n' "$message" > "$ZGZ_PACKAGE_ERROR_FILE")
+	else
+		say_message "$message"
+	fi
 	warn "$message Log: $file"
 	tail -n 8 "$file" 2>/dev/null | while IFS= read -r detail; do warn "packages: $detail"; done
 	return 0

@@ -134,4 +134,63 @@ printf '\nconfig_list_foreach() { :; }\n' >> "$RIG/lib/zgz-common.sh"
 sh "$RIG/lib/zgz-nodes" fetch all > "$RIG/fetch.log" 2>&1
 check "$?" 0 'subscription fetch succeeds'
 check "$(cut -f4 "$RIG/run/candidates.tsv")" sub.example 'subscription fetch publishes its nodes without reconnecting'
+echo '== subscription provenance and independent deletion'
+printf 'm\tnode\nm\t.link\t%s\nm\t.enabled\t1\ns\tsubscription\ns\t.enabled\t1\ns\t.name\tAlpha "one"\nt\tsubscription\nt\t.enabled\t1\nt\t.name\tBeta\n' "$manual" > "$ZGZ_TEST_SECTIONS"
+printf '%s\n' "$subscription" > "$RIG/run/subs/s.links"
+printf '%s\n%s\n' "$subscription" 'vless://11111111-2222-3333-4444-555555555555@third.example:443?security=tls#third' > "$RIG/run/subs/t.links"
+build_check both manual.example,sub.example,third.example 0 'multiple active subscriptions'
+. "$RIG/lib/zgz-common.sh"
+meta_get() { :; }
+eval "$(sed -n '/^method_nodes() {/,/^}/p' "$RIG_SRC/package/zirgozar/files/luci.zirgozar")"
+method_nodes > "$RIG/groups.json"
+python3 - "$RIG/groups.json" <<'PY'
+import json,sys
+d=json.load(open(sys.argv[1]));nodes={n['host']:n for n in d['nodes']}
+assert nodes['manual.example']['sources']==['manual']
+assert nodes['sub.example']['sources']==['sub:s','sub:t']
+assert nodes['third.example']['sources']==['sub:t']
+assert next(g for g in d['groups'] if g['id']=='sub:s')['name']=='Alpha "one"'
+PY
+check "$?" 0 'RPC keeps exact source membership and escaped subscription names'
+edit_tag="$(awk -F'\t' '$4=="sub.example" {print $1}' "$RIG/run/candidates.tsv")"
+printf 'n0\tEdited\tvless\tedited.example\t8443\t{"protocol":"vless","settings":{"vnext":[{"address":"edited.example","port":8443,"users":[]}]}}\n' | sh "$RIG/lib/zgz-nodes" save-record sub:s "$edit_tag" >/dev/null 2>&1
+check "$?" 0 'edit a node inside one subscription'
+method_nodes > "$RIG/edited.json"
+python3 - "$RIG/edited.json" <<'PY'
+import json,sys
+nodes={n['host']:n for n in json.load(open(sys.argv[1]))['nodes']}
+assert nodes['edited.example']['sources']==['sub:s']
+assert nodes['edited.example']['port']==8443
+assert nodes['sub.example']['sources']==['sub:t']
+assert nodes['manual.example']['sources']==['manual']
+PY
+check "$?" 0 'subscription edit leaves shared original and manual configs unchanged'
+edit_tag="$(awk -F'\t' '$4=="edited.example" {print $1}' "$RIG/run/candidates.tsv")"
+printf 'n0\tEdited again\tvless\tsecond.example\t443\t{}\n' | sh "$RIG/lib/zgz-nodes" save-record sub:s "$edit_tag" >/dev/null 2>&1
+check "$?" 0 'edit the same subscription node again'
+check "$(wc -l < "$RIG/etc/subs/s.edited" | tr -d ' ')" 1 'second edit replaces the first override'
+rm -f "$RIG/etc/subs/s.edited"
+sh "$RIG/lib/zgz-nodes" build >/dev/null 2>&1
+shared_tag="$(awk -F'\t' '$4=="sub.example" {print $1}' "$RIG/run/candidates.tsv")"
+sh "$RIG/lib/zgz-nodes" drop-sub-node s "$shared_tag" >/dev/null 2>&1
+check "$?" 0 'delete one subscription node'
+method_nodes > "$RIG/deleted-one.json"
+python3 - "$RIG/deleted-one.json" <<'PY'
+import json,sys
+nodes={n['host']:n for n in json.load(open(sys.argv[1]))['nodes']}
+assert nodes['sub.example']['sources']==['sub:t']
+assert nodes['third.example']['sources']==['sub:t']
+assert nodes['manual.example']['sources']==['manual']
+PY
+check "$?" 0 'individual deletion preserves other subscription membership and unrelated nodes'
+sh "$RIG/lib/zgz-nodes" forget s >/dev/null 2>&1
+method_nodes > "$RIG/groups-after.json"
+python3 - "$RIG/groups-after.json" <<'PY'
+import json,sys
+d=json.load(open(sys.argv[1]));nodes={n['host']:n for n in d['nodes']}
+assert len(nodes)==3
+assert nodes['sub.example']['sources']==['sub:t']
+assert nodes['manual.example']['sources']==['manual']
+PY
+check "$?" 0 'clearing one subscription keeps manual nodes and shared nodes from other subscriptions'
 rig_report

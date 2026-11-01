@@ -150,6 +150,10 @@ jobs:
       - name: Test OpenConnect measurement and DNS package replacement
         run: |
           RIG_ROOT="$RUNNER_TEMP/zirgozar-openconnect" sh test/test-openconnect.sh
+          RIG_ROOT="$RUNNER_TEMP/zirgozar-native-bootstrap" sh test/test-native-bootstrap.sh
+          RIG_ROOT="$RUNNER_TEMP/zirgozar-tunnel-endpoints" sh test/test-tunnel-endpoints.sh
+          RIG_ROOT="$RUNNER_TEMP/zirgozar-tunnel-connect" sh test/test-tunnel-connect.sh
+          sudo -E python3 test/test-ipv6-transport.py "$PWD/prebuilt/x86_64/xray"
           RIG_ROOT="$RUNNER_TEMP/zirgozar-openvpn-test" sh test/test-openvpn-test.sh
           sudo -E env RIG_ROOT="$RUNNER_TEMP/zirgozar-openvpn-live" RIG_XRAY="$PWD/prebuilt/x86_64/xray" sh test/test-openvpn-live.sh
           RIG_ROOT="$RUNNER_TEMP/zirgozar-dnsmasq-install" sh test/test-dnsmasq-install.sh

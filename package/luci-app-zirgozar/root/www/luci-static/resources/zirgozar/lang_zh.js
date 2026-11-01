@@ -5,6 +5,19 @@
 'require baseclass';
 
 return baseclass.extend({ strings: {
+	"Manual configs": "手动配置",
+	"Custom subscription node selection": "自定义订阅节点选择",
+	"Config sources": "配置来源",
+	"Other configs": "其他配置",
+	"Delete this subscription configs": "删除此订阅的配置",
+	"Delete fetched configs for %s? They will return on the next subscription update.": "删除从 %s 获取的配置？下次更新订阅时会重新获取。",
+	"Enter the server IPv4 or IPv6 address or domain name.": "请输入服务器的 IPv4、IPv6 地址或域名。",
+	"Update check failed. The installed core was not changed.": "更新检查失败。已安装的核心未被修改。",
+	"Package repository access was blocked. Check router routing and firewall settings.": "软件包仓库访问被阻止。请检查路由器路由和防火墙设置。",
+	"The tunnel server has no usable IPv4 or IPv6 address.": "隧道服务器没有可用的 IPv4 或 IPv6 地址。",
+	"The router has no direct route to the tunnel server. Check WAN IPv4 or IPv6 connectivity.": "路由器没有到隧道服务器的直接路由。请检查 WAN 的 IPv4 或 IPv6 连接。",
+	"The IPv6 tunnel transport could not start. Check Runtime Logs.": "IPv6 隧道传输无法启动。请查看运行日志。",
+
 	"Random": "随机",
 	"Round robin": "轮询",
 	"Lowest latency": "最低延迟",

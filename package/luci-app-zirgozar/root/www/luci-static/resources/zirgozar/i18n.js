@@ -45,6 +45,17 @@ var LANGUAGES = { en: 'English', fa: 'فارسی', zh: '简体中文', ru: 'Ру
 var CATALOGS = { zh: zh.strings, ru: ru.strings };
 
 var FA = {
+	'Config sources': 'بخش های کانفیگ',
+	'Other configs': 'سایر کانفیگ ها',
+	'Delete this subscription configs': 'حذف کانفیگ های این اشتراک',
+	'Delete fetched configs for %s? They will return on the next subscription update.': 'کانفیگ های دریافت شده از %s حذف شوند؟ با به روزرسانی بعدی اشتراک دوباره دریافت می شوند.',
+	'Enter the server IPv4 or IPv6 address or domain name.': 'آی پی IPv4 یا IPv6 یا دامنه سرور را وارد کنید.',
+	'Update check failed. The installed core was not changed.': 'بررسی به روزرسانی ناموفق بود. هسته نصب شده تغییری نکرده است.',
+	'Package repository access was blocked. Check router routing and firewall settings.': 'دسترسی به مخزن بسته ها مسدود شد. مسیریابی و فایروال روتر را بررسی کنید.',
+	'The tunnel server has no usable IPv4 or IPv6 address.': 'سرور تونل آدرس IPv4 یا IPv6 قابل استفاده ندارد.',
+	'The router has no direct route to the tunnel server. Check WAN IPv4 or IPv6 connectivity.': 'روتر مسیر مستقیم به سرور تونل ندارد. اتصال IPv4 یا IPv6 اینترنت روتر را بررسی کنید.',
+	'The IPv6 tunnel transport could not start. Check Runtime Logs.': 'مسیر انتقال IPv6 تونل اجرا نشد. گزارش اجرا را بررسی کنید.',
+
 	'FinalMask preset': "حالت آماده FinalMask",
 	'Custom': "دلخواه",
 	'Replace the custom FinalMask with this preset?': "FinalMask دلخواه با این حالت آماده جایگزین شود؟",
@@ -447,7 +458,7 @@ var FA = {
 	'Address': 'آدرس',
 	'Must start with http:// or https://': 'باید با ‎http://‎ یا ‎https://‎ شروع شود',
 	'On': 'فعال',
-	'Nodes added manually': 'ورود دستی کانفیگ‌ها',
+	'Nodes added manually': 'ورود دستی کانفیگ',
 	'Manage configs you add manually here. Use Add to enter a config, or import share links and supported configuration files with the import buttons. The source selection setting determines whether manual configs, subscriptions or both are used. Click a config’s Ping, TCPing or URL Test result to run that test: Ping measures the server response, TCPing tests a TCP connection, and URL Test sends a request through the config.':
 		'کانفیگ هایی که خودتان اضافه می کنید در این جدول قرار می گیرند. با دکمه افزودن، کانفیگ بسازید یا با دکمه های ورود لینک و فایل، کانفیگ وارد کنید. تنظیم منبع کانفیگ تعیین می کند از کانفیگ های دستی، اشتراک ها یا هر دو استفاده شود. برای اجرای تست، روی نتیجه ستون Ping، TCPing یا URL Test همان کانفیگ بزنید. Ping پاسخ سرور را بررسی می کند، TCPing اتصال TCP را می سنجد و URL Test یک درخواست از داخل کانفیگ ارسال می کند.',
 	'Share link': 'لینک اشتراک‌گذاری',
@@ -460,7 +471,9 @@ var FA = {
 	'Instead of an address: a configuration file — Xray, sing-box, Clash, a WireGuard .conf, or a plain list of links. Leave the address empty when you use this.':
 		'به‌جای آدرس: یک فایل کانفیگ — Xray، sing-box، Clash، یک فایل ‎.conf وایرگارد، یا فقط لیستی از لینک‌ها. وقتی از این استفاده می‌کنید آدرس را خالی بگذارید.',
 	'That file could not be read.': 'آن فایل خوانده نشد.',
-	'Import subscriptions from a file': 'افزودن اشتراک‌ها از فایل',
+	'Import subscriptions from a file': 'افزودن فایل اشتراک',
+	'Manual configs': 'کانفیگ‌های دستی',
+	'Custom subscription node selection': 'انتخاب سفارشی نود اشتراک',
 	'No subscription address was found in that file.': 'در آن فایل هیچ لینک اشتراکی پیدا نشد.',
 	'Every subscription in that file is already here.': 'همه اشتراک‌های آن فایل از قبل اضافه شده‌اند.',
 	'%d subscriptions added. Save and apply, then update them.': '%d اشتراک اضافه شد. ذخیره و اعمال کنید، سپس به‌روزرسانی کنید.',
@@ -587,7 +600,7 @@ var FA = {
 		'روش آزمایش سریع. «هندشیک TCP» اتصال به پورت واقعی کانفیگ است و دقیق‌تر است. «پینگ» سریع‌تر است ولی اشتباه زیاد دارد: کانفیگ‌های پشت CDN همیشه جواب می‌دهند و خیلی از کانفیگ‌های سالم به پینگ جواب نمی‌دهند.',
 	'TCP handshake (recommended)': 'هندشیک TCP (پیشنهادی)',
 	'Ping, then handshake': 'پینگ، بعد هندشیک',
-	'Good enough (ms)': 'به‌قدر کافی خوب (م‌ثانیه)',
+	'Good enough (ms)': 'حداقل پینگ مورد قبول',
 	'The first node measured faster than this is the one used. Lower means a better node and a longer wait.':
 		'اولین کانفیگی که زمانش کمتر از این عدد باشد انتخاب می‌شود. عدد کمتر یعنی کانفیگ سریع‌تر، ولی پیدا کردنش بیشتر طول می‌کشد.',
 	'Measured at a time': 'اندازه‌گیری همزمان کانفیگ',
@@ -1169,7 +1182,7 @@ var FA = {
 	'Nodes kept at most': 'حداکثر تعداد کانفیگ‌ها',
 	'From all the subscriptions together. A long list takes longer to measure and more memory to hold.':
 		'از مجموع همه اشتراک‌ها. فهرست طولانی‌تر، زمان بیشتری برای اندازه‌گیری و حافظه بیشتری لازم دارد.',
-	'Manual subscription All': 'به‌روزرسانی دستی همه اشتراک‌ها',
+	'Manual subscription All': 'به‌روزرسانی همه',
 	'Delete All Subscribe Node': 'حذف همه کانفیگ‌های اشتراک',
 	'Delete the nodes of every subscription? They come back the next time the subscriptions are read.':
 		'کانفیگ‌های همه اشتراک‌ها حذف شوند؟ دفعه بعد که اشتراک‌ها خوانده شوند دوباره برمی‌گردند.',
@@ -1268,7 +1281,7 @@ var FA = {
 		'همه کانفیگ‌های این اشتراک از طریق کانفیگی که اینجا انتخاب می‌شود وصل می‌شوند.',
 	'Traffic goes through a node of this subscription first and leaves from the one chosen here.':
 		'ترافیک اول از یک کانفیگ این اشتراک عبور می‌کند و از کانفیگی که اینجا انتخاب می‌شود خارج می‌شود.',
-	'Import share links': 'وارد کردن لینک کانفیگ',
+	'Import share links': 'وارد کردن لینک',
 	'This config is already in the list: %s': 'این کانفیگ از قبل در فهرست هست: %s',
 	'They are already in the list.': 'این‌ها از قبل در فهرست هستند.',
 	'This subscription is already in the list: %s': 'این اشتراک از قبل در فهرست هست: %s',
@@ -1390,9 +1403,9 @@ var FA = {
 	'Letters, digits, space, dot, dash and underscore only.': 'فقط حروف (فارسی یا انگلیسی)، عدد، فاصله، نقطه، خط تیره و زیرخط.',
 	'Select all': 'انتخاب همه',
 	'DeSelect all': 'لغو انتخاب همه',
-	'Delete select nodes': 'حذف کانفیگ‌های انتخاب‌شده',
+	'Delete select nodes': 'حذف انتخاب‌شده‌ها',
 	'Are you sure to delete select nodes?': 'کانفیگ‌های انتخاب‌شده حذف شوند؟',
-	'Clear all nodes': 'حذف همه کانفیگ‌ها',
+	'Clear all nodes': 'حذف همه',
 	'Are you sure to clear all nodes?': 'همه کانفیگ‌های دستی حذف شوند؟',
 	'Group Name': 'نام گروه',
 	'To Top': 'به بالا',

@@ -33,6 +33,8 @@
 - 🌐 **همه دستگاه‌های شبکه** — موبایل، لپ‌تاپ، تلویزیون، کنسول — بدون نصب هیچ برنامه‌ای از فیلترشکن رد می‌شوند
 - ⚡ **انتخاب خودکار سریع‌ترین کانفیگ** از بین فهرست، و رفتن سراغ کانفیگ بعدی وقتی یکی قطع شود
 - 🔗 **اشتراک‌ها** با زمان‌بندی جداگانه؛ فهرست رایگان پیش‌فرض هر ربع ساعت تازه می‌شود
+- **مدیریت نودهای اشتراک:** تب جدا برای هر اشتراک و کانفیگ های دستی، همراه با تب همه کانفیگ ها؛ ویرایش و حذف تکی نودها و کپی لینک بدون افزودن خودکار کانفیگ.
+- **تغییر فوری وضعیت اشتراک:** فعال و غیرفعال کردن اشتراک ذخیره شده به ذخیره و اعمال نیاز ندارد.
 - 🇮🇷 **عبور مستقیم ترافیک ایران** — سایت‌های ایرانی بدون فیلترشکن و بدون مصرف حجم کانفیگ
   با nftables و Geoview، مقصدهای IPv4 ایران پیش از ورود به هسته مستقیم می‌روند. در حالت dnsmasq، دامنه‌های ایران از DNS مستقیم UDP تنظیم‌شده، مستقل از هسته پاسخ می‌گیرند؛ تا وقتی سرویس فعال است DNS خارجی به مسیر مستقیم برنمی‌گردد. با dnsmasq-full و پشتیبانی nftset، IP پاسخ دامنه‌های ایرانی، حتی با میزبانی خارجی، هم وارد استثنای فایروال می‌شود. این نگاشت‌ها هنگام تعویض هسته حفظ و با توقف سرویس پاک می‌شوند. قوانین شانت و دستگاه سفارشی اولویت خود را دارند. برای تفکیک صرفا داخل هسته، `route_ir_pre` را روی `0` بگذارید.
 - 🧭 **قانون شانت**: هر سایت یا سرویس از کانفیگ دلخواه، مستقیم یا مسدود
@@ -123,9 +125,11 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 
 ### نصب مستقیم از GitHub با SSH
 
-به روتر SSH بزنید و دستور زیر را اجرا کنید. این دستور فایل‌های آخرین نسخه منتشر شده
-را برای معماری روتر دانلود می‌کند و با مدیر بسته موجود نصب یا ارتقا می‌دهد.
-نسخه به صورت خودکار از [آخرین ریلیز](https://github.com/dreamboxone/zirgozar/releases/latest) خوانده می شود؛ دستور به `jsonfilter` موجود در OpenWrt نیاز دارد.
+دستور متناسب با نسخه OpenWrt را در SSH روتر اجرا کنید. هر دستور آخرین ریلیز منتشر شده
+و معماری روتر را خودکار تشخیص می دهد و فقط بسته اصلی `zirgozar` را دانلود و نصب می کند.
+رابط LuCI داخل همان بسته است و نصب جداگانه لازم ندارد. دریافت شماره نسخه به `jsonfilter` موجود در OpenWrt نیاز دارد.
+
+#### OpenWrt ۲۵.۱۲ و جدیدتر: APK
 
 <div dir="ltr">
 
@@ -134,32 +138,44 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
   set -eu
   . /etc/openwrt_release
   tag="$(wget -qO- https://api.github.com/repos/dreamboxone/zirgozar/releases/latest | jsonfilter -e '@.tag_name')"
-  case "$tag" in
-    v[0-9]*) ;;
-    *) echo 'Could not determine the latest release.' >&2; exit 1 ;;
-  esac
+  case "$tag" in v[0-9]*) ;; *) echo 'Could not determine the latest release.' >&2; exit 1 ;; esac
   version="${tag#v}"
   base="https://github.com/dreamboxone/zirgozar/releases/download/$tag"
   install_dir="/tmp/zirgozar-install-$version"
   mkdir -p "$install_dir"
-  if command -v apk >/dev/null 2>&1; then
-    main="zirgozar-$version.$DISTRIB_ARCH.apk"
-    wget -O "$install_dir/$main" "$base/$main"
-    apk update
-    apk add --allow-untrusted --upgrade "$install_dir/$main"
-  elif command -v opkg >/dev/null 2>&1; then
-    main="zirgozar_${version}_${DISTRIB_ARCH}.ipk"
-    wget -O "$install_dir/$main" "$base/$main"
-    opkg update
-    opkg install "$install_dir/$main"
-  else
-    echo 'apk or opkg was not found.' >&2
-    exit 1
-  fi
+  main="zirgozar-$version.$DISTRIB_ARCH.apk"
+  wget -O "$install_dir/$main" "$base/$main"
+  apk update
+  apk add --allow-untrusted --upgrade "$install_dir/$main"
 )
 ```
 
 </div>
+
+#### OpenWrt ۲۴.۱۰ و ۲۳.۰۵: IPK
+
+<div dir="ltr">
+
+```sh
+(
+  set -eu
+  . /etc/openwrt_release
+  tag="$(wget -qO- https://api.github.com/repos/dreamboxone/zirgozar/releases/latest | jsonfilter -e '@.tag_name')"
+  case "$tag" in v[0-9]*) ;; *) echo 'Could not determine the latest release.' >&2; exit 1 ;; esac
+  version="${tag#v}"
+  base="https://github.com/dreamboxone/zirgozar/releases/download/$tag"
+  install_dir="/tmp/zirgozar-install-$version"
+  mkdir -p "$install_dir"
+  main="zirgozar_${version}_${DISTRIB_ARCH}.ipk"
+  wget -O "$install_dir/$main" "$base/$main"
+  opkg update
+  opkg install "$install_dir/$main"
+)
+```
+
+</div>
+
+پس از نصب، صفحه زیرگذر را با **Ctrl+F5** تازه کنید.
 
 ### نصب از فایل های داخل `/tmp`
 

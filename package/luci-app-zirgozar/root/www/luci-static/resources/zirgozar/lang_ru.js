@@ -5,6 +5,19 @@
 'require baseclass';
 
 return baseclass.extend({ strings: {
+	"Manual configs": "Ручные конфигурации",
+	"Custom subscription node selection": "Выбор узлов подписки вручную",
+	"Config sources": "Источники конфигураций",
+	"Other configs": "Другие конфигурации",
+	"Delete this subscription configs": "Удалить конфигурации этой подписки",
+	"Delete fetched configs for %s? They will return on the next subscription update.": "Удалить конфигурации подписки %s? Они появятся снова при следующем обновлении подписки.",
+	"Enter the server IPv4 or IPv6 address or domain name.": "Введите адрес IPv4, IPv6 или доменное имя сервера.",
+	"Update check failed. The installed core was not changed.": "Не удалось проверить обновление. Установленное ядро не изменено.",
+	"Package repository access was blocked. Check router routing and firewall settings.": "Доступ к репозиторию пакетов заблокирован. Проверьте маршрутизацию и межсетевой экран роутера.",
+	"The tunnel server has no usable IPv4 or IPv6 address.": "У сервера туннеля нет доступного адреса IPv4 или IPv6.",
+	"The router has no direct route to the tunnel server. Check WAN IPv4 or IPv6 connectivity.": "Нет прямого маршрута к серверу туннеля. Проверьте подключение WAN по IPv4 или IPv6.",
+	"The IPv6 tunnel transport could not start. Check Runtime Logs.": "Не удалось запустить транспорт IPv6. Проверьте журнал работы.",
+
 	"Random": "Случайный",
 	"Round robin": "По очереди",
 	"Lowest latency": "Минимальная задержка",

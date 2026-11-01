@@ -127,7 +127,8 @@ function splitHostPort(s) {
 
 /* The server name in what was typed for an L2TP server: no scheme, no path. */
 function l2tpServer(v) {
-	return String(v || '').trim().replace(/^[A-Za-z][A-Za-z0-9+.-]*:\/\//, '').replace(/[\/?#].*$/, '');
+	var host = String(v || '').trim().replace(/^[A-Za-z][A-Za-z0-9+.-]*:\/\//, '').replace(/[\/?#].*$/, '');
+	return /^\[[0-9A-Fa-f:.]+\]$/.test(host) ? host.slice(1, -1) : host;
 }
 
 function joinHostPort(h, p) {
@@ -980,7 +981,24 @@ return view.extend({
 			return x;
 		}
 
-		if (!structured && !isFile) {
+		if (uci.get('zirgozar', sid, 'record')) {
+			var storedRecord = uci.get('zirgozar', sid, 'record').split('\t');
+			o = s.option(form.TextValue, '_record', _('Node Config'));
+			o.rows = 20;
+			o.monospace = true;
+			o.cfgvalue = function() { return JSON.stringify({ protocol: storedRecord[2], host: storedRecord[3], port: +storedRecord[4], config: JSON.parse(storedRecord.slice(5).join('\t')) }, null, 2); };
+			o.validate = function(section_id, value) {
+				try {
+					var v = JSON.parse(value);
+					if (v && /^[a-z0-9-]+$/.test(v.protocol) && typeof v.host == 'string' && !/[\x00-\x20\x7f]/.test(v.host) && Number.isInteger(v.port) && v.port >= 0 && v.port <= 65535 && v.config && typeof v.config == 'object' && !Array.isArray(v.config)) return true;
+				} catch (e) {}
+				return _('Must be JSON text!');
+			};
+			o.write = function(section_id, value) {
+				var v = JSON.parse(value);
+				uci.set('zirgozar', section_id, 'record', ['n0', storedRecord[1], v.protocol, v.host, v.port, JSON.stringify(v.config)].join('\t'));
+			};
+		} else if (!structured && !isFile) {
 			/* A whole file, or several links: edited as text. */
 			o = s.option(form.TextValue, 'link', _('Share link'),
 				_('A share link, several of them one per line, a whole WireGuard .conf file or an OpenVPN .ovpn profile.'));
@@ -1341,7 +1359,10 @@ return view.extend({
 			o = field(form.Value, 'address', _('Address (Support Domain Name)'));
 			o.rmempty = false;
 			o.validate = function(section_id, value) {
-				return !PPP_PORT[this.section.formvalue(section_id, '_proto')] || /^[A-Za-z0-9_.-]+$/.test(l2tpServer(value)) ? true : _('Enter the server IPv4 address or domain name.');
+				var proto = this.section.formvalue(section_id, '_proto'), host = l2tpServer(value);
+				if (!PPP_PORT[proto] || /^[A-Za-z0-9_.-]+$/.test(host)) return true;
+				if ((proto == 'l2tp' || proto == 'sstp') && host.indexOf(':') >= 0 && /^[0-9A-Fa-f:.]+$/.test(host)) return true;
+				return proto == 'l2tp' || proto == 'sstp' ? _('Enter the server IPv4 or IPv6 address or domain name.') : _('Enter the server IPv4 address or domain name.');
 			};
 			/* An L2TP server is often handed out as a web address -
 			   "http://tp.example.com/" - and only the name in it is meant. */

@@ -477,6 +477,11 @@ body.pwp-fa #modal_overlay:where(body.pwp-active *)>.modal textarea,body.pwp-fa 
 :is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-title.zgz-has-help{display:flex!important;align-items:baseline;gap:4px}
 .mk .mk-card-title>.zgz-has-help{display:inline-flex;align-items:baseline;gap:4px}
 .mk .mk-card-title>.zgz-has-help>.zgz-help{font-size:14px}
+.mk .cbi-section>h3.zgz-has-help,.mk .cbi-section>legend.zgz-has-help{display:flex!important;align-items:center;gap:6px}
+.mk .cbi-section>h3.zgz-has-help>.zgz-help,.mk .cbi-section>legend.zgz-has-help>.zgz-help,.mk .mk-card-title>.zgz-has-help>.zgz-help{top:0;align-self:center;margin-block:0}
+.mk .zgz-source-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.mk .zgz-source-tabs{display:flex;gap:8px;flex-wrap:wrap}
+.mk .zgz-source-tabs>.mk-btn{min-height:38px;padding:8px 14px;white-space:nowrap}
 :is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .zgz-help-label{min-width:0;white-space:nowrap}
 
 :is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .zgz-has-help>.zgz-help{flex:0 0 auto;margin-inline-start:0;align-self:flex-start;top:-1.25em}

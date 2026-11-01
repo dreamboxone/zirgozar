@@ -514,6 +514,7 @@ status_all() {
 # zgz-nodes fetch all        every subscription that is switched on
 # zgz-nodes fetch <section>  that one only
 nodes_locked() (
+	umask 077
 	# Fetch, Apply and measurement jobs share intermediate files. Only one
 	# writer may use them; interrupted jobs must not leave a permanent lock.
 	_nl_lock="$ZGZ_RUN/nodes-write.lock"
@@ -618,6 +619,10 @@ add_node() {
 	config_get name "$_sec" name ""
 	config_get_bool enabled "$_sec" enabled 1
 	[ "$enabled" = "1" ] || return 0
+	if [ -n "$(uci -q get "zirgozar.$_sec.record" 2>/dev/null)" ]; then
+		node_records "$_sec" >> "$CHAIN_TSV"
+		return 0
+	fi
 	[ -n "$link" ] || return 0
 	case "$link" in
 		balancing://*|shunt://*|interface://*)
@@ -687,7 +692,40 @@ add_node() {
 # landing chain needs the node it goes through as an outbound of its own; the
 # parser writes each one to the chains file, under the name the landing node
 # dials, and chain_outbound finds it there.
+record_sources() {
+	LC_ALL=C awk -F'\t' -v source="$2" 'NF >= 6 { print $2 "|" $3 "|" $4 "|" $5 "|" $6 "\t" source }' "$1" >> "$ZGZ_RUN/candidate-sources.new"
+}
+
 sub_records() {
+	local destination="$SUB_TSV" section="$1" records="$ZGZ_RUN/source-$1.tsv"
+	SUB_TSV="$records"
+	: > "$records"
+	emit_sub_records "$section"
+	if [ -s "$SUBS_KEEP/$section.edited" ]; then
+		awk -F'\t' 'FILENAME==ARGV[1] { key=$1; sub(/^[^\t]*\t/, ""); edits[key]=$0; next }
+		{ key=$2 "|" $3 "|" $4 "|" $5 "|" $6; oldkey=$3 "|" $4 "|" $5 "|" $6; print (key in edits ? edits[key] : (oldkey in edits ? edits[oldkey] : $0)) }' "$SUBS_KEEP/$section.edited" "$records" > "$records.filtered"
+		mv -f "$records.filtered" "$records"
+	fi
+	if [ -s "$SUBS_KEEP/$section.deleted" ]; then
+		awk -F'\t' 'FILENAME==ARGV[1] { removed[$0]=1; next } !($2 "|" $3 "|" $4 "|" $5 "|" $6 in removed) && !($3 "|" $4 "|" $5 "|" $6 in removed)' "$SUBS_KEEP/$section.deleted" "$records" > "$records.filtered"
+		mv -f "$records.filtered" "$records"
+	fi
+	record_sources "$records" "sub:$section"
+	cat "$records" >> "$destination"
+	rm -f "$records"
+	SUB_TSV="$destination"
+}
+
+source_group() {
+	local enabled name
+	[ "$_sources" != own ] || return 0
+	config_get_bool enabled "$1" enabled 1
+	[ "$enabled" = 1 ] || return 0
+	config_get name "$1" name "$1"
+	printf 'sub:%s\t%s\n' "$1" "$(printf '%s' "$name" | tr '\t\r\n' '   ')" >> "$ZGZ_RUN/candidate-groups.new"
+}
+
+emit_sub_records() {
 	_sec="$1"
 	local enabled chain pre to
 	config_get_bool enabled "$_sec" enabled 1
@@ -778,6 +816,9 @@ build_candidates() {
 	_sources="$(cfg sources own)"
 	_limit="$(cfg max_nodes 300)"
 	config_load zirgozar
+	: > "$ZGZ_RUN/candidate-sources.new"
+	printf 'manual\t\n' > "$ZGZ_RUN/candidate-groups.new"
+	config_foreach source_group subscription
 	_subscriptions=0
 	_enabled_subscriptions=0
 	config_foreach count_subscription subscription
@@ -824,6 +865,8 @@ build_candidates() {
 			rm -f "$ZGZ_NODE_CACHE"
 		elif [ "$_subscriptions" -eq 0 ] && [ -s "$ZGZ_NODE_CACHE" ]; then
 			LC_ALL=C awk -v LIMIT="$_limit" -f "$PARSE" < "$ZGZ_NODE_CACHE" >> "$SUB_TSV" 2>/dev/null || true
+			record_sources "$SUB_TSV" legacy
+			printf 'legacy\t\n' >> "$ZGZ_RUN/candidate-groups.new"
 			SUB_HAD=1
 		fi
 	fi
@@ -847,12 +890,14 @@ build_candidates() {
 	# Hand-added first, then the subscriptions. Separate parser runs cannot
 	# know about each other, so the tags they hand out collide and the same
 	# server can be in two lists: this renumbers and keeps the first of each.
+	record_sources "$CHAIN_TSV" manual
+	record_sources "$ZGZ_RUN/links.tsv" manual
 	cat "$CHAIN_TSV" "$ZGZ_RUN/links.tsv" "$SUB_TSV" > "$ZGZ_RUN/merge.tsv" 2>/dev/null || true
 	rm -f "$CHAIN_TSV" "$ZGZ_RUN/links.tsv" "$SUB_TSV"
 
 	LC_ALL=C awk -F'\t' -v LIMIT="$_limit" '
 		NF >= 6 {
-			key = $3 "|" $4 "|" $5 "|" $6
+			key = $2 "|" $3 "|" $4 "|" $5 "|" $6
 			if (key in seen) next
 			seen[key] = 1
 			if (m >= LIMIT) next
@@ -860,6 +905,8 @@ build_candidates() {
 			m++
 		}' "$ZGZ_RUN/merge.tsv" > "$ZGZ_CANDIDATES.new" 2>/dev/null || true
 	rm -f "$ZGZ_RUN/merge.tsv"
+	mv -f "$ZGZ_RUN/candidate-sources.new" "$ZGZ_RUN/candidate-sources.tsv"
+	mv -f "$ZGZ_RUN/candidate-groups.new" "$ZGZ_RUN/candidate-groups.tsv"
 	# Tags are positions in this list, not permanent node identities. A
 	# changed list can assign a rejected tag to a different, working node,
 	# and a measured one's place - and time - to a node never measured.
@@ -1133,7 +1180,7 @@ cmd_copy() {
 	is_node "$1" || return 1
 	_new="$(new_name n)"
 	uci -q set "zirgozar.$_new=node" || return 1
-	for _o in name link enabled group chain_proxy preproxy_node to_node; do
+	for _o in name link record enabled group chain_proxy preproxy_node to_node; do
 		_v="$(uci -q get "zirgozar.$1.$_o")" || continue
 		uci -q set "zirgozar.$_new.$_o=$_v"
 	done
@@ -1364,7 +1411,78 @@ cmd_origin() {
 		END { if (!f && first != "") { printf "%s", first; f = 1 } exit !f }'
 }
 
+drop_subscription_node() {
+	local section="$1" tag="$2" key
+	case "$section" in ''|*[!A-Za-z0-9_]*) return 1 ;; esac
+	case "$tag" in ''|*[!A-Za-z0-9_]*) return 1 ;; esac
+	key="$(awk -F'\t' -v tag="$tag" '$1==tag { print $2 "|" $3 "|" $4 "|" $5 "|" $6; exit }' "$ZGZ_CANDIDATES")"
+	[ -n "$key" ] || return 1
+	printf '%s\tsub:%s\n' "$key" "$section" | grep -qxFf - "$ZGZ_RUN/candidate-sources.tsv" || return 1
+	mkdir -p "$SUBS_KEEP"
+	printf '%s\n' "$key" >> "$SUBS_KEEP/$section.deleted"
+}
+
+record_for_tag() {
+	case "$1" in ''|*[!A-Za-z0-9_]*) return 1 ;; esac
+	awk -F'\t' -v tag="$1" '$1==tag { print; exit }' "$ZGZ_CANDIDATES"
+}
+
+share_link() {
+	local rec expected file link parsed sid
+	rec="$(record_for_tag "$1")"
+	[ -n "$rec" ] || return 1
+	expected="$(printf '%s\n' "$rec" | cut -f2-)"
+	sid="$(cmd_origin "$1" 2>/dev/null)" || sid=''
+	case "$sid" in
+		sub:*) sid="${sid#sub:}"; sid="${sid%%:*}"; file="$SUBS_DIR/$sid.links" ;;
+		'' ) return 1 ;;
+		*) link="$(uci -q get "zirgozar.$sid.link")"; case "$link" in record://|'') return 1 ;; esac; printf '%s\n' "$link"; return 0 ;;
+	esac
+	[ -s "$file" ] || return 1
+	while IFS= read -r link || [ -n "$link" ]; do
+		parsed="$(printf '%s\n' "$link" | LC_ALL=C awk -f "$PARSE" 2>/dev/null | cut -f2-)"
+		if [ "$parsed" = "$expected" ]; then printf '%s\n' "$link"; return 0; fi
+	done < "$file"
+	return 1
+}
+
+save_record() {
+	local source="$1" tag="$2" old key original replacement sid
+	old="$(record_for_tag "$tag")"
+	[ -n "$old" ] || return 1
+	[ -z "${3:-}" ] || [ "$old" = "$3" ] || return 1
+	IFS= read -r replacement
+	[ "$(printf '%s\n' "$replacement" | awk -F'\t' '{print NF}')" = 6 ] || return 1
+	key="$(printf '%s\n' "$old" | cut -f2-)"
+	key="$(printf '%s\n' "$key" | tr '\t' '|')"
+	case "$source" in
+		manual)
+			sid="$(cmd_origin "$tag")"
+			is_node "$sid" || return 1
+			uci -q set "zirgozar.$sid.record=$replacement"
+			uci -q set "zirgozar.$sid.name=$(printf '%s' "$replacement" | cut -f2)"
+			uci -q commit zirgozar
+			;;
+		sub:*)
+			sid="${source#sub:}"
+			case "$sid" in ''|*[!A-Za-z0-9_]*) return 1 ;; esac
+			printf '%s\t%s\n' "$key" "$source" | grep -qxFf - "$ZGZ_RUN/candidate-sources.tsv" || return 1
+			mkdir -p "$SUBS_KEEP"
+			original="$(ZGZ_RECORD_KEY="$key" awk -F'\t' '$3 "|" $4 "|" $5 "|" $6 "|" $7==ENVIRON["ZGZ_RECORD_KEY"] {print $1;exit}' "$SUBS_KEEP/$sid.edited" 2>/dev/null)" || original=''
+			[ -n "$original" ] || original="$key"
+			ZGZ_RECORD_KEY="$original" awk -F'\t' '$1!=ENVIRON["ZGZ_RECORD_KEY"]' "$SUBS_KEEP/$sid.edited" 2>/dev/null > "$SUBS_KEEP/$sid.edited.new" || true
+			printf '%s\t%s\n' "$original" "$replacement" >> "$SUBS_KEEP/$sid.edited.new"
+			mv -f "$SUBS_KEEP/$sid.edited.new" "$SUBS_KEEP/$sid.edited"
+			;;
+		*) return 1 ;;
+	esac
+}
+
 case "${1:-update}" in
+	sharelink) share_link "${2:-}" ;;
+	record) record_for_tag "${2:-}" ;;
+	save-record) nodes_locked save_record "${2:-}" "${3:-}" "${4:-}" && cmd_build ;;
+	drop-sub-node) nodes_locked drop_subscription_node "${2:-}" "${3:-}" && cmd_build ;;
 	subnodes) cmd_subnodes ;;
 	origin) cmd_origin "${2:-}" ;;
 	resolve) cmd_resolve "${2:-}" ;;

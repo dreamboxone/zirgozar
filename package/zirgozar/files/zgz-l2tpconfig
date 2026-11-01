@@ -14,7 +14,15 @@ function quote(value) {
 	if (match(value, /[[:cntrl:]]/)) fail('Invalid control character in L2TP account.');
 	return '"' + replace(replace(value, /\\/g, '\\\\'), /"/g, '\\"') + '"';
 }
-if (node.type != 'l2tp' || !match(node.server ?? '', /^[A-Za-z0-9_.-]+$/) ||
+function endpoint(value) {
+	return match(value ?? '', /^[A-Za-z0-9_.-]+$/) ||
+		(index(value ?? '', ':') >= 0 && match(value, /^[0-9A-Fa-f:.]+$/));
+}
+function literal(value) {
+	return match(value ?? '', /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) ||
+		(index(value ?? '', ':') >= 0 && match(value, /^[0-9A-Fa-f:.]+$/));
+}
+if (node.type != 'l2tp' || !endpoint(node.server) ||
 	!node.username || !node.password || int(node.port) < 1 || int(node.port) > 65535 ||
 	int(node.mtu) < 576 || int(node.mtu) > 1460 || (node.ipsec && !node.psk))
 	fail('Invalid L2TP account. Check server, username, password and IPsec PSK.');
@@ -27,13 +35,15 @@ let name = 'zirgozar-' + dev;
 
 if (mode == 'config') {
 	if (ARGV[4]) {
-		if (!match(ARGV[4], /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/)) fail('Invalid L2TP server IPv4 address.');
+		if (!literal(ARGV[4])) fail('Invalid L2TP server address.');
 		node.server = ARGV[4];
 	}
 	if (ARGV[5]) {
-		if (!match(ARGV[5], /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/)) fail('Invalid L2TP local IPv4 address.');
+		if (!literal(ARGV[5])) fail('Invalid L2TP local address.');
 		node.local_address = ARGV[5];
 	}
+	node.relay = index(node.server, ':') >= 0;
+	if (node.relay) node.relay_port = localport + 10000;
 	writefile(dir + '/runtime.json', sprintf('%J', node));
 	let ppp = [ 'noauth', 'noipdefault', 'nodefaultroute', 'noproxyarp', 'refuse-eap',
 		'ipcp-accept-local', 'ipcp-accept-remote', 'lcp-echo-interval 5', 'lcp-echo-failure 3',
@@ -42,9 +52,13 @@ if (mode == 'config') {
 		'ip-up-script /bin/true', 'ip-down-script /bin/true',
 		'user ' + quote(node.username), 'password ' + quote(node.password) ];
 	if (node.ipsec) push(ppp, 'nomppe');
+	// IPv6 inside the tunnel is off by default: not every L2TP server
+	// supports IPv6CP. The account's ipv6 field turns it on.
+	if (node.ipv6) push(ppp, '+ipv6');
+	else push(ppp, 'noipv6');
 	if (writefile(dir + '/ppp.options', join('\n', ppp) + '\n') == null) fail('Cannot write L2TP options.');
 	let config = '[global]\nport = ' + localport + '\naccess control = no\n' +
-		'[lac zirgozar]\nlns = ' + node.server + ':' + node.port + '\n' +
+		'[lac zirgozar]\nlns = ' + (node.relay ? '127.0.0.1:' + node.relay_port : node.server + ':' + node.port) + '\n' +
 		'autodial = yes\nredial = yes\nredial timeout = 5\nmax redials = 9999\n' +
 		'length bit = yes\nppp debug = no\npppoptfile = ' + dir + '/ppp.options\n';
 	if (writefile(dir + '/xl2tpd.conf', config) == null) fail('Cannot write L2TP config.');
@@ -116,7 +130,7 @@ connection[name] = {
 	encap: 'yes', reauth_time: '0', dpd_delay: '20s',
 	local: { auth: 'psk' }, remote: { auth: 'psk', id: '%any' },
 	children: { l2tp: {
-		mode: 'transport', local_ts: [ 'dynamic[udp/' + localport + ']' ],
+		mode: 'transport', local_ts: [ node.relay ? 'dynamic[udp]' : 'dynamic[udp/' + localport + ']' ],
 		remote_ts: [ 'dynamic[udp/' + node.port + ']' ],
 		esp_proposals: [ 'aes256-sha256', 'aes256-sha1', 'aes128-sha1' ],
 		start_action: 'trap', dpd_action: 'trap', close_action: 'trap'

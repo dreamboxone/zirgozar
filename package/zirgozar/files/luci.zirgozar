@@ -234,8 +234,20 @@ method_nodes() {
 	fi
 	_cur="$(meta_get label)|$(meta_get protocol)|$(meta_get host)|$(meta_get port)"
 	awk -F'\t' -v cur="$_cur" \
-		-v ranked="$ZGZ_RANKED" -v alive="$ZGZ_RUN/alive.tsv" '
+		-v ranked="$ZGZ_RANKED" -v alive="$ZGZ_RUN/alive.tsv" \
+		-v sources="$ZGZ_RUN/candidate-sources.tsv" -v groups="$ZGZ_RUN/candidate-groups.tsv" '
 		BEGIN {
+			while ((getline line < sources) > 0) {
+				split(line, v, "\t"); pair=v[1] SUBSEP v[2]
+				if (!origin_seen[pair]++) origin[v[1]]=origin[v[1]] (origin[v[1]] ? "," : "") v[2]
+			}
+			close(sources)
+			while ((getline line < groups) > 0) {
+				split(line, v, "\t"); name=v[2]
+				gsub(/\\/, "\\\\", name); gsub(/"/, "\\\"", name)
+				group_json=group_json (group_json ? "," : "") "{\"id\":\"" v[1] "\",\"name\":\"" name "\"}"
+			}
+			close(groups)
 			while ((getline line < ranked) > 0) {
 				split(line, r, "\t")
 				ms[r[2]] = r[1]
@@ -254,13 +266,16 @@ method_nodes() {
 			lab = $2
 			gsub(/\\/, "\\\\", lab)
 			gsub(/"/, "\\\"", lab)
-			printf "{\"tag\":\"%s\",\"label\":\"%s\",\"protocol\":\"%s\",\"host\":\"%s\",\"port\":%d,\"ms\":%d,\"handshake\":%d,\"current\":%s}",
+			printf "{\"tag\":\"%s\",\"label\":\"%s\",\"protocol\":\"%s\",\"host\":\"%s\",\"port\":%d,\"ms\":%d,\"handshake\":%d,\"current\":%s,\"sources\":[",
 				$1, lab, $3, $4, $5,
 				(($1 in ms) ? ms[$1] : 0),
 				(($1 in hs) ? hs[$1] : 0),
 				((!found && $2 "|" $3 "|" $4 "|" $5 == cur && (found = 1)) ? "true" : "false")
+			c=split(origin[$2 "|" $3 "|" $4 "|" $5 "|" $6], owners, ",")
+			for (i=1;i<=c;i++) printf "%s\"%s\"", (i>1 ? "," : ""), owners[i]
+			printf "]}"
 		}
-		END { printf "],\"count\":%d}\n", n }
+		END { printf "],\"count\":%d,\"groups\":[%s]}\n", n, group_json }
 	' "$ZGZ_CANDIDATES" 2>/dev/null
 }
 
@@ -727,6 +742,83 @@ method_action() {
 				say_message "Nodes to use was set to manually added configs only, so the subscriptions could not be used. It is now set to all configs."
 			fi
 			run_job "Reading the subscriptions" "$NODES update $arg"
+			;;
+		subscription_enabled)
+			case "$arg" in *:*) ;; *) fail "unknown subscription"; return ;; esac
+			_toggle_sid="${arg%:*}"; _toggle_value="${arg##*:}"
+			case "$_toggle_sid" in ''|*[!A-Za-z0-9_]*) fail "unknown subscription"; return ;; esac
+			case "$_toggle_value" in 0|1) ;; *) fail "unknown subscription"; return ;; esac
+			_toggle_lock=/var/lock/zirgozar-sub-toggle
+			mkdir -p /var/lock
+			mkdir "$_toggle_lock" 2>/dev/null || { fail "Another install is still running. Try again when it is done."; return; }
+			trap 'rmdir "$_toggle_lock" 2>/dev/null || true' EXIT
+			_toggle_dir="$(mktemp -d /tmp/zgz-sub-toggle.XXXXXX)" || { fail "unreadable"; return; }
+			mkdir -p "$_toggle_dir/delta"
+			cp -p /etc/config/zirgozar "$_toggle_dir/toggle"
+			if [ "$(uci -q -c "$_toggle_dir" -t "$_toggle_dir/delta" get "toggle.$_toggle_sid")" != subscription ]; then
+				rm -rf "$_toggle_dir"
+				fail "unknown subscription"; return
+			fi
+			if uci -q -c "$_toggle_dir" -t "$_toggle_dir/delta" set "toggle.$_toggle_sid.enabled=$_toggle_value" &&
+			   uci -q -c "$_toggle_dir" -t "$_toggle_dir/delta" commit toggle &&
+			   cp -p "$_toggle_dir/toggle" "/etc/config/.zirgozar-toggle-$$" &&
+			   mv -f "/etc/config/.zirgozar-toggle-$$" /etc/config/zirgozar; then
+				uci -q revert "zirgozar.$_toggle_sid.enabled" 2>/dev/null || true
+			else
+				rm -rf "$_toggle_dir"
+				fail "unreadable"; return
+			fi
+			rm -rf "$_toggle_dir"
+			rmdir "$_toggle_lock" 2>/dev/null || true
+			"$NODES" build >/dev/null 2>&1
+			if [ "$(cfg_bool enabled 0)" = 1 ]; then detach /etc/init.d/zirgozar reload; fi
+			;;
+		delete_manual_list_node)
+			case "$arg" in ''|*[!A-Za-z0-9_]*) fail "unknown node"; return ;; esac
+			_list_sid="$("$NODES" origin "$arg" 2>/dev/null)" || _list_sid=''
+			case "$_list_sid" in ''|*[!A-Za-z0-9_]*) fail "unknown node"; return ;; esac
+			"$NODES" delete "$_list_sid" >/dev/null 2>&1 || { fail "unknown node"; return; }
+			;;
+		share_list_node)
+			case "$arg" in ''|*[!A-Za-z0-9_]*) fail "unknown node"; return ;; esac
+			_list_record="$("$NODES" record "$arg")"
+			json_init
+			json_add_string "record" "$_list_record"
+			json_add_string "link" "$("$NODES" sharelink "$arg" 2>/dev/null)"
+			json_dump
+			return
+			;;
+		get_list_node)
+			case "$arg" in ''|*[!A-Za-z0-9_]*) fail "unknown node"; return ;; esac
+			_list_record="$("$NODES" record "$arg")"
+			[ -n "$_list_record" ] || { fail "unknown node"; return; }
+			_list_sid="$("$NODES" origin "$arg" 2>/dev/null)" || _list_sid=''
+			case "$_list_sid" in ''|sub:*) _list_sid='' ;; esac
+			if [ -n "$_list_sid" ] && [ -n "$(uci -q get "zirgozar.$_list_sid.record")" ]; then _list_sid=''; fi
+			json_init
+			json_add_string "sid" "$_list_sid"
+			json_add_string "record" "$_list_record"
+			json_dump
+			return
+			;;
+		save_list_node)
+			_list_record="$(printf '%s' "$arg" | ucode -e '
+import { readfile } from "fs";
+let x=json(readfile("/dev/stdin"));
+if (type(x)!="object" || type(x.source)!="string" || !match(x.source,/^(manual|sub:[A-Za-z0-9_]+)$/) ||
+ type(x.tag)!="string" || !match(x.tag,/^[A-Za-z0-9_]+$/) || type(x.name)!="string" || !length(x.name) || match(x.name,/[[:cntrl:]]/) ||
+ type(x.protocol)!="string" || !match(x.protocol,/^[a-z0-9-]+$/) || type(x.host)!="string" || match(x.host,/[[:space:][:cntrl:]]/) ||
+ type(x.port)!="int" || x.port<0 || x.port>65535 || type(x.config)!="object" || type(x.original)!="string" || match(x.original,/[\r\n]/)) exit(1);
+printf("%s\n%s\n%s\nn0\t%s\t%s\t%s\t%d\t%J\n",x.source,x.tag,x.original,x.name,x.protocol,x.host,x.port,x.config);
+' 2>/dev/null)" || { fail "unreadable"; return; }
+			_list_source="$(printf '%s\n' "$_list_record" | sed -n '1p')"
+			_list_tag="$(printf '%s\n' "$_list_record" | sed -n '2p')"
+			_list_original="$(printf '%s\n' "$_list_record" | sed -n '3p')"
+			printf '%s\n' "$_list_record" | sed '1,3d' | "$NODES" save-record "$_list_source" "$_list_tag" "$_list_original" >/dev/null 2>&1 || { fail "unreadable"; return; }
+			;;
+		delete_subscription_node)
+			case "$arg" in ''|*[!A-Za-z0-9_:]*) fail "unknown node"; return ;; esac
+			"$NODES" drop-sub-node "${arg%%:*}" "${arg#*:}" >/dev/null 2>&1 || { fail "unknown node"; return; }
 			;;
 		forget_nodes)
 			# What one subscription brought, or all of them, deleted.

@@ -28,6 +28,7 @@ check() {
 cleanup() {
 	trap - EXIT INT TERM
 	[ -z "${PID:-}" ] || { kill "$PID" 2>/dev/null || true; wait "$PID" 2>/dev/null || true; }
+	tunnel_relay_stop
 	# The PPP pid is owned by our linkname, not by other PPP connections.
 	_ppp="$(cat "/var/run/ppp-$DEV.pid" 2>/dev/null)" || _ppp=''
 	case "$_ppp" in ''|*[!0-9]*) : ;; *)
@@ -84,12 +85,15 @@ connect() {
 	umask 077
 	mkdir -p "$STATE"
 	_host="$(sed -n 's/.*"server":"\([^"]*\)".*/\1/p' "$NODE" | head -1)"
-	_ip="$(resolve_direct "$_host" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
-	[ -n "$_ip" ] || fail 'The L2TP server has no reachable IPv4 address.'
+	_addresses="$(resolve_direct_all "$_host")"
+	_ip="$(printf '%s\n' "$_addresses" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
+	_af=4
+	if [ -z "$_ip" ]; then _ip="$(printf '%s\n' "$_addresses" | grep : | head -1)"; _af=6; fi
+	[ -n "$_ip" ] || fail 'The tunnel server has no usable IPv4 or IPv6 address.'
 	# Query the direct route before installing IPsec policies. Automatic IKE
 	# source selection can otherwise choose loopback on a router with TProxy.
-	_src="$(ip -4 route get "$_ip" mark 255 | sed -n 's/.* src \([^ ]*\).*/\1/p' | head -1)"
-	[ -n "$_src" ] || fail 'The L2TP server has no direct IPv4 route.'
+	_src="$(ip -"$_af" route get "$_ip" mark 255 | sed -n 's/.* src \([^ ]*\).*/\1/p' | head -1)"
+	[ -n "$_src" ] || fail 'The router has no direct route to the tunnel server. Check WAN IPv4 or IPv6 connectivity.'
 	ucode "$ZGZ_LIB/zgz-l2tpconfig" config "$NODE" "$STATE" "$DEV" "$_ip" "$_src"
 	if grep -q '"ipsec":true' "$NODE"; then
 		[ -S /var/run/charon.vici ] || /etc/init.d/swanctl start
@@ -98,6 +102,11 @@ connect() {
 		IPSEC=1
 		ucode "$ZGZ_LIB/zgz-l2tpconfig" ipsec "$STATE/runtime.json" "$STATE" "$DEV" ||
 			fail 'L2TP/IPsec negotiation failed. Check PSK and Runtime Logs.'
+	fi
+	if [ "$_af" = 6 ]; then
+		_relay_port="$(sed -n 's/.*"relay_port"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$STATE/runtime.json")"
+		tunnel_relay_start "$STATE" udp "$_ip" "$(sed -n 's/.*"port"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$NODE" | head -1)" "$_relay_port" "$_src" ||
+			fail 'The IPv6 tunnel transport could not start. Check Runtime Logs.'
 	fi
 	xl2tpd -D -c "$STATE/xl2tpd.conf" -C "$STATE/control" -p "$STATE/xl2tpd.pid" > "$STATE/log" 2>&1 &
 	PID=$!
@@ -109,6 +118,11 @@ connect() {
 		fi
 		if ip -4 addr show dev "$DEV" 2>/dev/null | grep -q 'inet '; then
 			ip -4 route replace default dev "$DEV" metric 10 table "$TABLE"
+			# When the account asked for IPv6 and the server gave an address,
+			# route IPv6 through the tunnel too.
+			if grep -q '"ipv6":true' "$NODE" && ip -6 addr show dev "$DEV" 2>/dev/null | grep 'inet6 ' | grep -qv 'scope link'; then
+				ip -6 route replace default dev "$DEV" metric 10 table "$TABLE" 2>/dev/null || true
+			fi
 			return 0
 		fi
 		sleep 1; _n=$((_n+1))
@@ -143,6 +157,7 @@ case "$MODE" in
 		connect
 		# procd respawns the complete handshake when xl2tpd exits or PPP disappears.
 		while kill -0 "$PID" 2>/dev/null; do
+			[ -z "${RELAY_PID:-}" ] || kill -0 "$RELAY_PID" 2>/dev/null || exit 1
 			ip -4 addr show dev "$DEV" 2>/dev/null | grep -q 'inet ' || exit 1
 			sleep 5
 		done

@@ -500,7 +500,7 @@ for m in nodes subs; do
 done
 printf 'n0\tOne\tvless\ta.example.com\t443\t{}\n' > "$ZGZ_RUN/candidates.tsv"
 case "$(sh "$RIG/ul/luci.zirgozar" call nodes 2>/dev/null)" in
-	'{"nodes":[{"tag":"n0","label":"One",'*'],"count":1}') ok "and nodes with a list is that list" ;;
+	'{"nodes":[{"tag":"n0","label":"One",'*'],"count":1,"groups":[]}') ok "and nodes with a list is that list" ;;
 	*) bad "and nodes with a list is that list" ;;
 esac
 

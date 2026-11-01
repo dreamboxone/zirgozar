@@ -64,14 +64,21 @@ for manager in apk opkg; do
 	cmd_latest '' ''
 	check "$(wc -l < "$RIG/run/package-calls" | tr -d ' ')" 0 "$manager background poll does not refresh repositories"
 	export ZGZ_TEST_REFRESH_FAIL=1
+	printf 'An unrelated tunnel warning\n' > "$ZGZ_MESSAGE"
 	cmd_latest force openvpn >/dev/null 2>&1
 	check "$?" 1 "$manager refresh failure is reported"
 	check "$(latest_of openvpn)" '' "$manager failed refresh clears stale latest version"
-	case "$(cat "$CORE_RESULT")" in openvpn\ error\ *) ok "$manager failure is available to the interface" ;; *) bad "$manager missing check error" ;; esac
+	check "$(cat "$ZGZ_MESSAGE")" 'An unrelated tunnel warning' "$manager check failure does not overwrite tunnel status"
+	[ -s "$RIG/run/package-check.error" ] && ok "$manager check error is scoped to the update page" || bad 'missing scoped package error'
+	case "$(cat "$CORE_RESULT")" in openvpn\ check-error\ *) ok "$manager failure is available to the interface" ;; *) bad "$manager missing check error" ;; esac
 	unset ZGZ_TEST_REFRESH_FAIL
 	cmd_latest force openvpn
 	check "$(latest_of openvpn)" 2.7.7 "$manager retry recovers the version"
 	if [ ! -e "$CORE_RESULT" ]; then ok "$manager retry clears the previous error"; else bad "$manager retry leaves a stale error"; fi
+	printf 'Legacy package error\n' > "$ZGZ_MESSAGE"
+	printf 'openvpn error Legacy package error\n' > "$CORE_RESULT"
+	cmd_latest force openvpn
+	if [ ! -e "$CORE_RESULT" ] && [ ! -s "$ZGZ_MESSAGE" ]; then ok "$manager successful check clears only the matching legacy warning"; else bad 'legacy package warning survived'; fi
 done
 XRAY_REPO=XTLS/Xray-core
 LX_REPO=Leadaxe/sing-box-lx
@@ -90,6 +97,9 @@ check "$(latest_of xray)" 26.10.29 'failed package feed does not stop independen
 check "$(latest_of sing-box)" 26.10.29 'failed package feed does not stop independent sing-box release check'
 check "$(latest_of openvpn)" '' 'all-core check does not reuse stale OpenVPN version'
 check "$(latest_of haproxy)" '' 'all-core check does not reuse stale HAProxy version'
-case "$(cat "$CORE_RESULT")" in openvpn\ error\ *) ok 'package failure remains visible after independent checks';; *) bad 'package error lost';; esac
+case "$(cat "$CORE_RESULT")" in openvpn\ check-error\ *) ok 'package failure remains visible after independent checks';; *) bad 'package error lost';; esac
 unset ZGZ_TEST_REFRESH_FAIL
+printf 'wgetFailed to send request: Operation not permitted\n' > "$RIG/run/blocked.log"
+ZGZ_PACKAGE_ERROR_FILE="$RIG/run/blocked.error" pkg_failure "$RIG/run/blocked.log"
+grep -q 'repository access was blocked' "$RIG/run/blocked.error" && ok 'blocked download has a precise network error' || bad 'generic blocked download error'
 rig_report

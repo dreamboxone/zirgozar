@@ -902,18 +902,27 @@ cmd_latest() {
 			openvpn|haproxy|'')
 				local _manager="$(ovpn_pkg_manager)" _check_log="$ZGZ_RUN/package-check.log"
 				if [ "$_manager" != none ]; then
+					local _old_result="$(cat "$CORE_RESULT" 2>/dev/null)" _old_reason
+					case "$_old_result" in
+						openvpn\ error\ *|haproxy\ error\ *)
+							_old_reason="${_old_result#* error }"
+							[ "$(cat "$ZGZ_MESSAGE" 2>/dev/null)" != "$_old_reason" ] || clear_message
+							;;
+					esac
 					: > "$_check_log"
-					if ! pkg_refresh "$_manager" "$_check_log"; then
+					local _check_error="$ZGZ_RUN/package-check.error"
+					rm -f "$_check_error"
+					if ! ZGZ_PACKAGE_ERROR_FILE="$_check_error" pkg_refresh "$_manager" "$_check_log"; then
 						# A failed refresh must not appear as an up-to-date result.
 						awk -F '\t' -v name="$_only" 'name != "" ? $1 != name : ($1 != "openvpn" && $1 != "haproxy")' \
 							"$LATEST_CACHE" > "$LATEST_CACHE.failed" 2>/dev/null || true
 						mv -f "$LATEST_CACHE.failed" "$LATEST_CACHE"
-						printf '%s error %s\n' "${_only:-openvpn}" "$(head -1 "$ZGZ_MESSAGE")" > "$CORE_RESULT"
+						printf '%s check-error %s\n' "${_only:-openvpn}" "$(head -1 "$_check_error")" > "$CORE_RESULT"
 						[ -z "$_only" ] || return 1
 						_package_index_failed=1
 					fi
 					case "$_package_index_failed:$(cat "$CORE_RESULT" 2>/dev/null)" in
-						0:openvpn\ error\ *|0:haproxy\ error\ *) rm -f "$CORE_RESULT" ;;
+						0:openvpn\ check-error\ *|0:haproxy\ check-error\ *|0:openvpn\ error\ *|0:haproxy\ error\ *) rm -f "$CORE_RESULT" ;;
 					esac
 				fi
 				;;
@@ -1434,7 +1443,7 @@ case "${1:-list}" in
 		# How a core's install went, for the page to say under that core:
 		# "<core> room <needed> <free>" when it was short of room, "<core>
 		# error <message>" when it failed for another reason it gave.
-		rm -f "$CORE_RESULT" "$ZGZ_RUN/no-room"
+		rm -f "$CORE_RESULT" "$ZGZ_RUN/no-room" "$ZGZ_RUN/core-package.error"
 		_rc=0
 		case "${2:-}" in
 			xray)     install_xray "${3:-}" || _rc=$? ;;
@@ -1445,9 +1454,9 @@ case "${1:-list}" in
 			aether) install_aether || _rc=$? ;;
 			mihomo) install_mihomo || _rc=$? ;;
 			sslocal) install_sslocal || _rc=$? ;;
-			haproxy) install_haproxy || _rc=$? ;;
+			haproxy) ZGZ_PACKAGE_ERROR_FILE="$ZGZ_RUN/core-package.error" install_haproxy || _rc=$? ;;
 			openvpn)
-				install_openvpn || _rc=$?
+				ZGZ_PACKAGE_ERROR_FILE="$ZGZ_RUN/core-package.error" install_openvpn || _rc=$?
 				if [ "$_rc" != 0 ] && grep -qi 'no space left' "$ZGZ_RUN/ovpn-install.log" 2>/dev/null; then
 					printf '0 %s\n' "$(free_bytes /)" > "$ZGZ_RUN/no-room"
 				fi
@@ -1459,8 +1468,10 @@ case "${1:-list}" in
 		esac
 		if [ "$_rc" != 0 ] && [ -s "$ZGZ_RUN/no-room" ]; then
 			printf '%s room %s\n' "$2" "$(cat "$ZGZ_RUN/no-room")" > "$CORE_RESULT"
-		elif [ "$_rc" != 0 ] && [ -s "$ZGZ_MESSAGE" ]; then
-			printf '%s error %s\n' "$2" "$(head -1 "$ZGZ_MESSAGE")" > "$CORE_RESULT"
+		elif [ "$_rc" != 0 ] && { [ -s "$ZGZ_MESSAGE" ] || [ -s "$ZGZ_RUN/core-package.error" ]; }; then
+			_core_error="$(head -1 "$ZGZ_RUN/core-package.error" 2>/dev/null)"
+			[ -n "$_core_error" ] || _core_error="$(head -1 "$ZGZ_MESSAGE" 2>/dev/null)"
+			printf '%s error %s\n' "$2" "$_core_error" > "$CORE_RESULT"
 		fi
 		exit "$_rc"
 		;;

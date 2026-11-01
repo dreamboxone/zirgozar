@@ -382,6 +382,21 @@ return view.extend({
 		o.default = '1';
 		o.rmempty = false;
 		o.editable = true;
+		o.onchange = function(ev, section_id, value) {
+			var option = this, widget = option.getUIElement(section_id);
+			var previous = uci.get('zirgozar', section_id, 'enabled') == '0' ? '0' : '1';
+			var next = value == '1' ? '1' : '0';
+			if (!info[section_id]) { uci.set('zirgozar', section_id, 'enabled', next); return Promise.resolve(); }
+			if (widget && widget.setDisabled) widget.setDisabled(true);
+			return callAction('subscription_enabled', section_id + ':' + next).then(function(r) {
+				if (r && r.error) throw new Error(_(r.error));
+				uci.set('zirgozar', section_id, 'enabled', next);
+				return callSubs().then(renderInfo).catch(function() {});
+			}).catch(function(error) {
+				if (widget) widget.setValue(previous);
+				pui.note(ev.target, String(error.message || error), 'error');
+			}).finally(function() { if (widget && widget.setDisabled) widget.setDisabled(false); });
+		};
 
 		o = s.taboption('main', form.ListValue, 'access_mode', _('Subscribe URL Access Method'),
 			_('Auto reads it the way the router’s own traffic goes when Localhost Proxy is on; otherwise through the tunnel when it is up, and straight out when it is not.'));
@@ -532,7 +547,7 @@ return view.extend({
 		});
 
 		/* ----------------------------------- for all of them, after the list */
-		s = m.section(form.NamedSection, 'config', 'zirgozar');
+		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Custom subscription node selection'));
 		s.anonymous = true;
 
 		o = s.option(form.ListValue, 'filter_keyword_mode', _('Keyword filter method inside the config'),
@@ -589,14 +604,15 @@ return view.extend({
 					reader.readAsText(f);
 				}
 			});
-			importBtn = pui.btn(_('Import subscriptions from a file'), 'soft-blue mk-small', function(ev) {
+			importBtn = pui.btn(_('Import subscriptions from a file'), 'success', function(ev) {
 				ev.preventDefault();
 				picker.click();
 			}, 'plus');
 			importBtn.id = 'zgz-import-subs';
 			return E('div', { 'class': 'cbi-value' }, [
 				E('label', { 'class': 'cbi-value-title' }, ''),
-				E('div', { 'class': 'cbi-value-field', 'style': 'display:flex;gap:10px;flex-wrap:wrap;align-items:center' }, [
+				E('div', { 'id': 'zgz-subscription-toolbar', 'class': 'cbi-value-field', 'style': 'display:flex;gap:10px;flex-wrap:wrap;align-items:center' }, [
+					importBtn,
 					pui.btn(_('Manual subscription All'), 'primary mk-small', function(ev) {
 						var b = ev.currentTarget;
 						return callAction('refresh_nodes', '').then(function(r) {
@@ -613,13 +629,27 @@ return view.extend({
 							return callSubs().then(renderInfo);
 						});
 					}, 'trash'),
-					importBtn,
 					picker
 				])
 			]);
 		};
 
 		return m.render().then(function(mapEl) {
+			var create = mapEl.querySelector('.cbi-section-create');
+			var toolbar = mapEl.querySelector('#zgz-subscription-toolbar');
+			var add = create && create.querySelector('.cbi-button-add');
+			if (add && toolbar) {
+				add.className = 'mk-btn success';
+				add.textContent = '';
+				add.appendChild(pui.icon('plus'));
+				add.appendChild(document.createTextNode(_('Add')));
+				var wrapper = toolbar.parentNode;
+				create.appendChild(toolbar);
+				create.style.cssText += ';display:flex;gap:10px;align-items:center;flex-wrap:wrap';
+				toolbar.style.margin = '0';
+				toolbar.style.width = 'auto';
+				wrapper.remove();
+			}
 			poll.add(function() {
 				return callSubs().then(renderInfo).catch(function() {});
 			}, 5);

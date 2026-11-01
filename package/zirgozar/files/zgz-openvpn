@@ -6,7 +6,7 @@ set -e
 . "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
 [ "${1:-}" = test ] || { echo 'usage: zgz-openvpn test' >&2; exit 1; }
 mkdir "$ZGZ_RUN/.openvpn-test-lock" 2>/dev/null || { echo -2; exit 1; }
-work=''; vpn=''; proxy=''; routes=0; dev=zgzovpnt; table=19015
+work=''; vpn=''; proxy=''; routes=0; dev=zgzovpnt; table=19016
 cleanup() {
 	trap - EXIT INT TERM
 	for pid in "$proxy" "$vpn"; do

@@ -218,7 +218,56 @@ function validateXdrive(value) {
 	return true;
 }
 
+function recordLink(record) {
+	if (!record) return '';
+	var r = record.split('\t'), p = r[2], c = JSON.parse(r.slice(5).join('\t'));
+	var s = c.settings || {}, stream = c.streamSettings || {}, q = {}, credential = '', scheme = p;
+	var endpoint = (s.vnext || s.servers || [])[0] || {}, user = (endpoint.users || [])[0] || {};
+	var encode = encodeURIComponent;
+	function b64(value) { return btoa(unescape(encodeURIComponent(value))); }
+	var security = stream.security || 'none', tls = stream[security + 'Settings'] || {};
+	q.security = security; q.type = stream.network || 'tcp';
+	q.sni = tls.serverName; q.fp = tls.fingerprint; q.alpn = (tls.alpn || []).join(',');
+	q.allowInsecure = tls.allowInsecure ? '1' : undefined;
+	if (security == 'reality') { q.pbk = tls.publicKey; q.sid = tls.shortId; q.spx = tls.spiderX; }
+	var transport = stream[q.type + 'Settings'] || {};
+	q.path = transport.path; q.host = transport.host || (transport.headers || {}).Host;
+	q.serviceName = transport.serviceName; q.mode = transport.mode;
+	if (q.type == 'xhttp' && transport.extra) q.extra = JSON.stringify(transport.extra);
+	if (transport.header) q.headerType = transport.header.type;
+	if (p == 'vless') { credential = encode(user.id || ''); q.encryption = user.encryption || 'none'; q.flow = user.flow; }
+	else if (p == 'trojan') credential = encode(endpoint.password || '');
+	else if (p == 'shadowsocks') { scheme = 'ss'; credential = b64((endpoint.method || '') + ':' + (endpoint.password || '')); }
+	else if (p == 'vmess') return 'vmess://' + b64(JSON.stringify({ v:'2', ps:r[1], add:r[3], port:r[4], id:user.id, aid:user.alterId || 0,
+		scy:user.security || 'auto', net:q.type, type:q.headerType || 'none', host:q.host || '', path:q.type == 'grpc' ? q.serviceName : q.path,
+		tls:security == 'none' ? '' : security, sni:q.sni, fp:q.fp, alpn:q.alpn }));
+	else if (p == 'socks' || p == 'http') credential = user.user ? encode(user.user) + ':' + encode(user.pass || '') : '';
+	else if (p == 'wireguard') {
+		var peer = (s.peers || [])[0] || {};
+		credential = encode(s.secretKey || '');
+		q = {address:(s.address || []).join(','), publickey:peer.publicKey, presharedkey:peer.preSharedKey,
+			reserved:(s.reserved || []).join(','), mtu:s.mtu, keepalive:peer.keepAlive};
+	}
+	else {
+		q = {};
+		if (['hysteria2','hysteria','tuic','anytls','ssh','l2tp','pptp','sstp','ikev2','snell','naive'].indexOf(p) < 0) return '';
+		credential = encode(c.password || c.auth || c.psk || '');
+		if (p == 'tuic') credential = encode(c.uuid || '') + ':' + encode(c.password || '');
+		if (c.username || c.user) credential = encode(c.username || c.user) + ':' + encode(c.password || '');
+		q.sni = c.sni || (c.tls || {}).server_name;
+		q.insecure = c.insecure || (c.tls || {}).insecure ? '1' : undefined;
+		q.alpn = Array.isArray(c.alpn) ? c.alpn.join(',') : c.alpn;
+		q.obfs = typeof c.obfs == 'object' ? c.obfs.type : c.obfs; q['obfs-password'] = c.obfs_password || (c.obfs || {}).password;
+		q.ipsec = c.ipsec == null ? undefined : (c.ipsec ? '1' : '0'); q.psk = c.psk;
+		if (p == 'naive') scheme = 'naive+https';
+	}
+	var query = Object.keys(q).filter(function(k) { return q[k] != null && q[k] !== ''; }).map(function(k) { return encode(k) + '=' + encode(q[k]); }).join('&');
+	var host = r[3].indexOf(':') >= 0 ? '[' + r[3] + ']' : r[3];
+	return scheme + '://' + (credential ? credential + '@' : '') + host + ':' + r[4] + (query ? '?' + query : '') + '#' + encode(r[1]);
+}
+
 return baseclass.extend({
+	recordLink: recordLink,
 	nameFromLink: nameFromLink,
 	withBrowse: withBrowse,
 	validateXdrive: validateXdrive

@@ -440,12 +440,163 @@ function listTestCell(tag, kind, measured) {
 	return c;
 }
 
+var nodeSnapshot = {}, selectedSource = '', sourceTabsSignature = '';
+
+function nodeSourceGroups(d) {
+	var nodes = (d && d.nodes) || [], groups = (d && d.groups) || [];
+	if (!groups.length) return [{ id: 'all', name: _('All configs'), count: nodes.length }];
+	var list = groups.filter(function(g) {
+		return g.id != 'manual' || nodes.some(function(n) { return (n.sources || []).indexOf('manual') >= 0; }) || (groups.length == 1 && !nodes.length);
+	}).map(function(g) {
+		return { id: g.id, name: g.name || (g.id == 'manual' ? _('Manual configs') : _('All configs')),
+			count: nodes.filter(function(n) { return (n.sources || []).indexOf(g.id) >= 0; }).length };
+	});
+	var missing = nodes.filter(function(n) { return !(n.sources || []).length; }).length;
+	if (missing) list.push({ id: 'other', name: _('Other configs'), count: missing });
+	list.unshift({ id: 'all', name: _('All configs'), count: nodes.length });
+	return list;
+}
+
+function sourceForNode(n) {
+	if (selectedSource != 'all' && selectedSource != 'other') return selectedSource;
+	return (n.sources || [])[0] || 'manual';
+}
+
+function nodeRecordForm(record) {
+	var r = record.split('\t'), config = JSON.parse(r.slice(5).join('\t')), readers = [];
+	var labels = { name:'Node Remarks', protocol:'Type', host:'Server address', address:'Address', server:'Server address', port:'Port', server_port:'Port',
+		password:'Password', username:'Username', user:'Username', pass:'Password', id:'UUID', security:'Security', network:'Transport', path:'Path',
+		serverName:'SNI', server_name:'SNI', fingerprint:'Fingerprint', publicKey:'Public Key', privateKey:'Private Key', settings:'Settings', streamSettings:'Transport',
+		tlsSettings:'Security', realitySettings:'Security', flow:'Flow', enabled:'Enabled' };
+	var optional = { streamSettings:{tlsSettings:{},realitySettings:{},wsSettings:{},grpcSettings:{},httpupgradeSettings:{}}, tlsSettings:{serverName:'',fingerprint:'',allowInsecure:false,alpn:[]}, realitySettings:{serverName:'',fingerprint:'',publicKey:'',shortId:'',spiderX:''},
+		wsSettings:{path:'',headers:{Host:''}}, grpcSettings:{serviceName:'',multiMode:false}, httpupgradeSettings:{host:'',path:''} };
+	function fields(object, extras) {
+		var rows = [], keys = Object.keys(object);
+		Object.keys(extras || {}).forEach(function(k) { if (keys.indexOf(k)<0) keys.push(k); });
+		keys.forEach(function(key) {
+			var present = Object.prototype.hasOwnProperty.call(object,key), value = present ? object[key] : extras[key];
+			var label = _(labels[key] || key);
+			if (value && typeof value == 'object' && !Array.isArray(value)) {
+				var copy = JSON.parse(JSON.stringify(value)), before = JSON.stringify(copy);
+				rows.push(E('fieldset', { 'style':'border:1px solid var(--line,#dde3ed);border-radius:12px;padding:12px;margin:10px 0' }, [E('legend', {}, label), fields(copy, optional[key])]));
+				readers.push(function() { if (present || JSON.stringify(copy)!=before) object[key]=copy; });
+				return;
+			}
+			if (Array.isArray(value) && value.some(function(x) { return x && typeof x == 'object'; })) {
+				rows.push(E('fieldset', {}, [E('legend', {}, label)].concat(value.map(function(item,index) { return E('div', {}, [E('strong', {}, String(index+1)), fields(item)]); }))));
+				return;
+			}
+			var array = Array.isArray(value), boolean = typeof value == 'boolean', number = typeof value == 'number';
+			var initial = array ? value.join('\n') : value == null ? '' : String(value);
+			var input = E(array || initial.indexOf('\n')>=0 ? 'textarea' : 'input', {
+				'type':boolean ? 'checkbox' : number ? 'number' : /password|secret|privateKey|psk/i.test(key) ? 'password' : 'text',
+				'class':'cbi-input-text', 'style':'width:100%;direction:ltr;text-align:left', 'rows':array ? 3 : 5
+			});
+			if (boolean) input.checked=value; else input.value=initial;
+			rows.push(E('div', { 'class':'cbi-value' }, [E('label', { 'class':'cbi-value-title' }, label), E('div', { 'class':'cbi-value-field' }, input)]));
+			readers.push(function() {
+				var current=boolean ? input.checked : input.value;
+				if (current === (boolean ? value : initial)) return;
+				if (number && (!isFinite(+current) || current==='')) throw new Error(_('Some fields are not filled in correctly.'));
+				object[key]=boolean ? !!current : number ? +current : array ? current.split(/\r?\n/).filter(function(x) {return x!=='';}).map(function(x) {return typeof value[0]=='number' ? +x : x;}) : current;
+			});
+		});
+		return E('div', {}, rows);
+	}
+	var metadata = { name:r[1], protocol:r[2], host:r[3], port:+r[4] };
+	var element=E('div', { 'class':'zgz-node-editor' }, [fields(metadata), fields(config)]);
+	return { element:element, read:function() {
+		readers.forEach(function(read) { read(); });
+		var settings=config.settings || {}, endpoint=(settings.vnext || settings.servers || [])[0];
+		if (metadata.host != r[3] || metadata.port != +r[4]) {
+			if (endpoint) {endpoint.address=metadata.host;endpoint.port=metadata.port;}
+			if (config.server!=null) {config.server=metadata.host; if(config.server_port!=null) config.server_port=metadata.port; else config.port=metadata.port;}
+			if (settings.peers && settings.peers[0] && settings.peers[0].endpoint) settings.peers[0].endpoint=(metadata.host.indexOf(':')>=0 ? '['+metadata.host+']' : metadata.host)+':'+metadata.port;
+		} else {
+			if (endpoint) {metadata.host=endpoint.address;metadata.port=endpoint.port;}
+			if (config.server!=null) {metadata.host=config.server;metadata.port=config.server_port || config.port || metadata.port;}
+			if (settings.peers && settings.peers[0] && settings.peers[0].endpoint) {
+				var peerAddress=settings.peers[0].endpoint.match(/^\[?(.+?)\]?:(\d+)$/);
+				if (peerAddress) {metadata.host=peerAddress[1];metadata.port=+peerAddress[2];}
+			}
+		}
+		metadata.config=config;return metadata;
+	} };
+}
+
+function editListNode(n) {
+	var source = sourceForNode(n);
+	return callAction('get_list_node', n.tag).then(function(r) {
+		if (!r || r.error || !r.record) return;
+		if (source == 'manual' && r.sid) {
+			window.location.href = L.url('admin', 'services', 'zirgozar', 'node') + '?sid=' + encodeURIComponent(r.sid);
+			return;
+		}
+		var editor = nodeRecordForm(r.record);
+		var note = E('div');
+		ui.showModal(_('Node Config'), [editor.element, note, E('div', { 'class': 'right' }, [
+			E('button', { 'class': 'btn', 'click': ui.hideModal }, _('Close window')),
+			E('button', { 'class': 'btn cbi-button-positive', 'click': function(ev) {
+				var value;
+				try { value = editor.read(); } catch (e) { pui.note(note, String(e.message || e), 'error'); return; }
+				value.source = source; value.tag = n.tag; value.original = r.record;
+				var b = ev.currentTarget; b.disabled = true;
+				return callAction('save_list_node', JSON.stringify(value)).then(function(result) {
+					if (result && result.error) { pui.note(note, _(result.error), 'error'); return; }
+					ui.hideModal(); return callNodes().then(renderNodes);
+				}).finally(function() { b.disabled = false; });
+			} }, _('Save'))
+		])]);
+	});
+}
+
+function renderSourceTabs(d) {
+	var tabs = document.getElementById('pwp-source-tabs');
+	if (!tabs) return (d && d.nodes) || [];
+	var groups = nodeSourceGroups(d), nodes = (d && d.nodes) || [];
+	if (!groups.some(function(g) { return g.id == selectedSource; })) selectedSource = groups.length ? groups[0].id : 'all';
+	var signature = JSON.stringify([selectedSource, groups]);
+	if (signature !== sourceTabsSignature) {
+		while (tabs.firstChild) tabs.removeChild(tabs.firstChild);
+		groups.forEach(function(g, index) {
+			tabs.appendChild(E('button', { 'type': 'button', 'role': 'tab', 'id': 'pwp-source-tab-' + index,
+				'class': 'mk-btn ' + (g.id == selectedSource ? 'primary' : 'soft-blue'),
+				'aria-selected': g.id == selectedSource ? 'true' : 'false', 'aria-controls': 'pwp-nodelist',
+				'click': function() { selectedSource = g.id; renderNodes(nodeSnapshot); }
+			}, g.name + ' (' + g.count + ')'));
+		});
+		sourceTabsSignature = signature;
+	}
+	var clear = document.getElementById('pwp-source-clear');
+	if (clear) {
+		clear.style.display = selectedSource.indexOf('sub:') === 0 ? '' : 'none';
+		clear.disabled = !nodes.some(function(n) { return (n.sources || []).indexOf(selectedSource) >= 0; });
+	}
+	var active = groups.findIndex(function(g) { return g.id == selectedSource; });
+	var panel = document.getElementById('pwp-nodelist');
+	if (panel && active >= 0) panel.setAttribute('aria-labelledby', 'pwp-source-tab-' + active);
+	return selectedSource == 'all' ? nodes : nodes.filter(function(n) {
+		return selectedSource == 'other' ? !(n.sources || []).length : (n.sources || []).indexOf(selectedSource) >= 0;
+	});
+}
+
+function clearSubscriptionNodes(ev) {
+	var source = selectedSource, group = nodeSourceGroups(nodeSnapshot).find(function(g) { return g.id == source; });
+	if (!group || source.indexOf('sub:') !== 0) return;
+	if (!window.confirm(_('Delete fetched configs for %s? They will return on the next subscription update.').format(group.name))) return;
+	return callAction('forget_nodes', source.slice(4)).then(function(r) {
+		if (r && r.error) { pui.note(ev.currentTarget, _(r.error), 'error'); return; }
+		return callNodes().then(renderNodes);
+	});
+}
+
 function renderNodes(d) {
 	var box = document.getElementById('pwp-nodelist');
 	if (!box) return;
 	while (box.firstChild) box.removeChild(box.firstChild);
 
-	var nodes = (d && d.nodes) || [];
+	nodeSnapshot = d || {};
+	var nodes = renderSourceTabs(nodeSnapshot);
 	var count = document.getElementById('pwp-nodecount');
 	if (count) count.textContent = _('%d nodes').format(nodes.length);
 	if (!nodes.length) {
@@ -487,11 +638,10 @@ function renderNodes(d) {
 			E('td', { 'class': 'td' }, n.protocol),
 			E('td', { 'class': 'td' }, listTestCell(n.tag, 'url', n.ms)),
 			E('td', { 'class': 'td' }, listTestCell(n.tag, 'tcp', n.handshake)),
-			E('td', { 'class': 'td' }, [
+			E('td', { 'class': 'td' }, E('div', { 'style': 'display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap' }, [
 				/* Not for the node already in use: there is nothing to switch to. */
 				E('button', {
-					'class': 'btn cbi-button cbi-button-apply',
-					'style': 'padding:2px 10px;font-size:12px',
+					'class': 'mk-btn success', 'type': 'button',
 					'disabled': n.current ? '' : null,
 					'title': n.current ? _('This is the node in use.') : null,
 					'click': function(ev) {
@@ -505,8 +655,30 @@ function renderNodes(d) {
 							}
 						}, function() { b.disabled = false; });
 					}
-				}, _('Use'))
-			])
+				}, _('Use')),
+				E('button', { 'class': 'mk-btn soft-blue', 'type': 'button', 'click': function() { return editListNode(n); } }, _('Edit')),
+				E('button', { 'class': 'mk-btn soft-blue', 'type': 'button', 'click': function(ev) {
+					var b = ev.currentTarget; b.disabled = true;
+					return callAction('share_list_node', n.tag).then(function(r) {
+						if (r && r.error) { pui.note(b, _(r.error), 'error'); return; }
+						var link = r && (r.link || nodelink.recordLink(r.record));
+						if (!link) { pui.note(b, _('There is no link yet.'), 'warn'); return; }
+						return pui.copyText(link);
+					}).finally(function() { b.disabled = false; });
+				} }, _('Copy')),
+				E('button', {
+					'class': 'mk-btn danger', 'type': 'button',
+					'click': function(ev) {
+						var b = ev.currentTarget;
+						b.disabled = true;
+						var source = sourceForNode(n);
+						return callAction(source.indexOf('sub:') === 0 ? 'delete_subscription_node' : 'delete_manual_list_node', source.indexOf('sub:') === 0 ? source.slice(4) + ':' + n.tag : n.tag).then(function(r) {
+							if (r && r.error) { pui.note(b, _(r.error), 'error'); return; }
+							return callNodes().then(renderNodes);
+						}).finally(function() { b.disabled = false; });
+					}
+				}, _('Delete'))
+			]))
 		]));
 	});
 
@@ -524,6 +696,7 @@ return view.extend({
 
 	render: function(data) {
 		i18n.setLang(uci.get('zirgozar', 'config', 'lang'));
+		sourceTabsSignature = '';
 
 		/* Before the form is built, not after. The cells are drawn by
 		   m.render() below, and a cell can only show a number it already has
@@ -589,7 +762,8 @@ return view.extend({
 		o = s.option(form.DummyValue, '_type', _('Type'));
 		o.modalonly = false;
 		o.textvalue = function(section_id) {
-			return linkType(uci.get('zirgozar', section_id, 'link'));
+			var record = uci.get('zirgozar', section_id, 'record');
+			return record ? record.split('\t')[2] : linkType(uci.get('zirgozar', section_id, 'link'));
 		};
 
 		o = s.option(form.Value, 'group', _('Group Name'));
@@ -867,9 +1041,14 @@ return view.extend({
 						});
 					}, 'refresh')
 				]),
-				E('p', { 'style': 'font-size:13px;color:var(--muted);margin:0 0 8px 0' },
+				E('div', { 'class': 'cbi-value-description zgz-card-help' },
 					_('“TCPing” is the handshake every node is checked with first, so it is filled in for all of them. “URL Test” is a complete request through the node, which is only run on the ones that answered and only until a fast enough one is found — so most of that column is empty by design. Both are the same measurements the buttons above take, done for the whole list at once.')),
-				E('div', { 'id': 'pwp-nodelist' }, [])
+				E('div', { 'class': 'zgz-source-toolbar' }, [
+					E('div', { 'id': 'pwp-source-tabs', 'class': 'zgz-source-tabs', 'role': 'tablist', 'aria-label': _('Config sources') }, []),
+					(function() { var b = pui.btn(_('Clear all nodes'), 'danger mk-small', clearSubscriptionNodes, 'trash');
+						b.id = 'pwp-source-clear'; b.style.display = 'none'; return b; })()
+				]),
+				E('div', { 'id': 'pwp-nodelist', 'role': 'tabpanel' }, [])
 			]));
 
 			poll.add(function() {

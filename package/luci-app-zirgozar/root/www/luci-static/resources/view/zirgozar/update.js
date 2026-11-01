@@ -415,11 +415,17 @@ function render(d, early) {
 		say('app', _('Updated to %s.').format(app0.version), 'ok');
 
 	var cres = early ? lastCore : String(d.core_result || '');
+	if (!cres && lastCore) {
+		var oldCore = /^(\S+) (?:error|check-error|room) /.exec(lastCore);
+		if (oldCore) delete notes['core:' + oldCore[1]];
+	}
 	if (cres && cres != lastCore) {
 		var lack = /^(\S+) room (\d+) (\d+)$/.exec(cres);
 		var fail = /^(\S+) error (.+)$/.exec(cres);
+		var checkFail = /^(\S+) check-error (.+)$/.exec(cres);
 		if (lack) say('core:' + lack[1], noRoom(lack[2], lack[3]), 'error');
 		else if (fail) say('core:' + fail[1], _(fail[2]), 'error');
+		else if (checkFail) say('core:' + checkFail[1], _('Update check failed. The installed core was not changed.') + ' ' + _(checkFail[2]), 'error');
 	}
 	lastCore = cres;
 	if (!d.job && app0.version && firstVersion && app0.version != firstVersion) {
@@ -503,6 +509,7 @@ function render(d, early) {
 		]));
 		(cores.cores || []).forEach(function(c) {
 			var coreBusy = checking(d, 'core:' + c.name);
+			var checkFailed = cres.indexOf(c.name + ' check-error ') === 0;
 			var value = [];
 			if (c.unknown) {
 				value.push(verChip('…'));
@@ -516,7 +523,7 @@ function render(d, early) {
 				   confidently wrong about which way round they go. */
 				if (!coreBusy && c.update && c.latest)
 					value.push(verState(chip((i18n.dir() === 'rtl' ? '← ' : '→ ') + ltr(c.latest), 'info')));
-				else if (!coreBusy && c.latest)
+				else if (!coreBusy && c.latest && !checkFailed)
 					value.push(verState(E('span', { 'style': 'color:var(--muted)' }, _('Up to date'))));
 				else
 					value.push(verState());

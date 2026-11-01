@@ -52,6 +52,10 @@ function completedNote(self) {
 assert.equal(completedNote(''),undefined);
 assert.deepEqual(completedNote('ok 5.8.7-r4'),{text:'Updated to 5.8.7-r4.',kind:'ok'});
 console.log('App update: reconnect phase labels and stale download note cleanup passed');
+const coreResultSource = source.slice(source.indexOf('\n\tvar cres ='), source.indexOf('\n\tif (!d.job && app0.version', source.indexOf('\n\tvar cres =')));
+const coreNotes = new Function('_', 'var notes={},lastCore=""; function say(k,text,kind){notes[k]={text,kind};} return function(result){var d={core_result:result},early=false;'+coreResultSource+';return notes;};')(text=>text);
+assert.match(coreNotes('openvpn check-error blocked')['core:openvpn'].text, /installed core was not changed/);
+assert.equal(coreNotes('')['core:openvpn'], undefined, 'successful check clears the old error note');
 
 const selectorSource = source.slice(source.indexOf("var versions = c.name == 'sing-box-lx'"), source.indexOf("\n\t\t\tif (c.installed && c.ours"));
 function selector(name, versions, picked, installedVersion) {

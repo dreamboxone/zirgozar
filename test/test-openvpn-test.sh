@@ -15,7 +15,7 @@ cat > "$RIG/bin/ip" <<'IP'
 #!/bin/sh
 echo "$*" >> "$RIG/ip.log"
 case "$*" in
- '-4 route show table 19015'|'-4 rule show') exit 0 ;;
+ '-4 route show table 19016'|'-4 rule show') exit 0 ;;
  'link show dev zgzovpnt') [ "$OVPN_CASE" = conflict ] ;;
  '-4 addr show dev zgzovpnt') [ -f "$RIG/vpn.started" ] && echo 'inet 10.8.0.2/24' ;;
  '-4 addr show dev zgzovpn') [ "$OVPN_CASE" = active ] && echo 'inet 10.8.0.2/24' ;;
@@ -51,8 +51,8 @@ run() {
  [ -z "$(find "$RIG/run" -maxdepth 1 -name 'openvpn-test.*' -print)" ] && ok "$1 removes credentials and scratch files" || bad "$1 credentials leaked"
 }
 run success 123
-grep -q 'oif zgzovpnt lookup 19015' "$RIG/ip.log" && ok 'probe uses an interface-specific routing rule' || bad 'missing independent rule'
-grep -q 'route flush table 19015' "$RIG/ip.log" && ok 'probe routes cleaned up' || bad 'routes leaked'
+grep -q 'oif zgzovpnt lookup 19016' "$RIG/ip.log" && ok 'probe uses an interface-specific routing rule' || bad 'missing independent rule'
+grep -q 'route flush table 19016' "$RIG/ip.log" && ok 'probe routes cleaned up' || bad 'routes leaked'
 grep -q '"interface":"zgzovpnt","mark":255' "$RIG/proxy.json" && ok 'probe sockets bind the tunnel and bypass interception' || bad 'probe may escape tunnel'
 grep -q -- '--socks5 127.0.0.1:24902 --resolve example.com:443:192.0.2.2' "$RIG/curl.args" && ok 'URL request uses tunnel proxy with explicit DNS and TLS hostname' || bad 'URL did not use tunnel'
 check "$(cat "$RIG/etc/bridge.json")" 'live bridge state' 'production state remains unchanged'
