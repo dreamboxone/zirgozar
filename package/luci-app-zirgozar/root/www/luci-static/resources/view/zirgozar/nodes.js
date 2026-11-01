@@ -169,6 +169,7 @@ function nodeAct(b, name, arg, reload, ok) {
 
 function selected() {
 	return Array.prototype.slice.call(document.querySelectorAll('.pwp-sel:checked'))
+		.filter(function(c) { return !c.closest('[hidden]'); })
 		.map(function(c) { return c.getAttribute('data-sid'); });
 }
 
@@ -358,7 +359,7 @@ function toolbar(s) {
 		}, 'code'),
 		pui.btn(_('Select all'), 'soft-blue mk-small', function(ev) {
 			all = !all;
-			document.querySelectorAll('.pwp-sel').forEach(function(c) { c.checked = all; });
+			document.querySelectorAll('.pwp-sel').forEach(function(c) { if (!c.closest('[hidden]')) c.checked = all; });
 			ev.currentTarget.querySelector('span:last-child').textContent = all ? _('DeSelect all') : _('Select all');
 		}, 'check'),
 		pui.btn(_('Delete select nodes'), 'danger mk-small', function(ev) {
@@ -688,8 +689,8 @@ function renderNodes(d) {
 return view.extend({
 	load: function() {
 		return Promise.all([
-			callNodes().catch(function() { return {}; }),
-			callTests().catch(function() { return {}; }),
+			Promise.resolve({}),
+			Promise.resolve({}),
 			uci.load('zirgozar').catch(function() { return null; })
 		]);
 	},
@@ -1027,9 +1028,46 @@ return view.extend({
 			/* The buttons, above the table of nodes added by hand. */
 			var grid = mapEl.querySelector('#cbi-zirgozar-node');
 			var table = grid && grid.querySelector('.cbi-section-table');
-			if (table) table.parentNode.insertBefore(toolbar(manual), table);
+			if (table) {
+				table.parentNode.insertBefore(toolbar(manual), table);
+				var groupTabs = E('div', { 'class': 'zgz-source-tabs zgz-manual-groups', 'role': 'tablist' });
+				var activeGroup = null;
+				function filterGroup(group) {
+					activeGroup = group;
+					table.querySelectorAll('.cbi-section-table-row[data-sid]').forEach(function(row) {
+						var name = uci.get('zirgozar', row.getAttribute('data-sid'), 'group') || '';
+						row.hidden = group !== null && name !== group;
+					});
+					groupTabs.querySelectorAll('[role=tab]').forEach(function(button) {
+						var selected = button._group === group;
+						button.setAttribute('aria-selected', String(selected));
+						button.classList.toggle('primary', selected);
+						button.classList.toggle('soft-blue', !selected);
+					});
+				}
+				var manualGroups = Array.from(new Set(uci.sections('zirgozar', 'node').map(function(n) { return n.group || ''; })));
+				[null].concat(manualGroups).forEach(function(group) {
+					var button = pui.btn(group === null ? _('All configs') : group || _('Default'), 'soft-blue', function() { filterGroup(group); });
+					button._group = group; button.setAttribute('role', 'tab'); groupTabs.appendChild(button);
+				});
+				groupTabs.appendChild(pui.btn(_('Test group'), 'primary', function(ev) {
+					var button = ev.currentTarget;
+					button.disabled = true;
+					var nodes = uci.sections('zirgozar', 'node').filter(function(n) { return activeGroup === null || (n.group || '') === activeGroup; });
+					return nodes.reduce(function(chain, n) {
+						return chain.then(function() {
+							var key = n['.name'] + '.url';
+							pending[key] = { prev: results[key], at: Date.now() };
+							renderTests({ tests: results });
+							return callAction('node_test', 'url:' + n['.name']).then(function(r) { if (r && r.error) { delete pending[key]; throw new Error(_(r.error)); } });
+						});
+					}, Promise.resolve()).catch(function(e) { pui.note(button, String(e), 'error'); }).then(function() { button.disabled = false; });
+				}, 'refresh'));
+				table.parentNode.insertBefore(groupTabs, table);
+				filterGroup(null);
+			}
 
-			var list = pui.card(_('All configs'), 'list', '#6366f1', E('div', {}, [
+			var list = pui.card(_('All configs list'), 'list', '#6366f1', E('div', {}, [
 				E('div', { 'class': 'mk-row', 'style': 'margin:0 0 10px;align-items:center' }, [
 					E('span', { 'id': 'pwp-nodecount', 'style': 'font-size:13px;color:var(--muted)' }, ''),
 					E('span', { 'style': 'flex:1 1 auto' }),
@@ -1063,7 +1101,8 @@ return view.extend({
 			   every node added by hand measured once, the way the setting
 			   says. */
 			window.setTimeout(function() {
-				renderNodes(data[0]);
+				callNodes().then(renderNodes).catch(function() {});
+				callTests().then(renderTests).catch(function() {});
 				var auto = uci.get('zirgozar', 'config', 'auto_detection_time');
 				if (auto == null) auto = 'tcping';
 				var kind = auto == 'icmp' ? 'ping' : auto == 'tcping' ? 'tcp' : '';

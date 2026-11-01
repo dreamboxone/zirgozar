@@ -40,6 +40,29 @@ var dismissed = '';
 var stateRequest = 0;
 var mainSwitch = null, lastState = null;
 
+var STATE_CACHE_KEY = 'zirgozar.dashboard.state.v1';
+var STATE_FIELDS = ['enabled', 'running', 'connected', 'status', 'server', 'protocol', 'host',
+	'core_name', 'core_version', 'core_running', 'exit_cc', 'exit_ip', 'latency_ms',
+	'route_ir', 'geo_ready', 'stats_enabled', 'version'];
+
+function cachedState() {
+	try {
+		var saved = JSON.parse(window.sessionStorage.getItem(STATE_CACHE_KEY) || 'null');
+		if (saved && saved.state && saved.state.enabled != null && Date.now() - saved.time < 86400000)
+			return saved.state;
+	} catch (e) {}
+	return null;
+}
+
+function rememberState(st) {
+	if (!st || st.enabled == null) return;
+	var snapshot = {};
+	STATE_FIELDS.forEach(function(key) {
+		if (['string', 'number', 'boolean'].indexOf(typeof st[key]) >= 0) snapshot[key] = st[key];
+	});
+	try { window.sessionStorage.setItem(STATE_CACHE_KEY, JSON.stringify({time: Date.now(), state: snapshot})); } catch (e) {}
+}
+
 function switchOn(value) {
 	return value === true || value === 1 || /^(1|on|true|yes|enabled)$/.test(String(value));
 }
@@ -64,7 +87,11 @@ function syncMainSwitch(st) {
 	binding.saved = saved;
 	if (binding.edited) return;
 	binding.intent = saved;
-	var field = binding.option.getUIElement(binding.section), value = binding.option.formvalue(binding.section);
+	var field, value;
+	try {
+		field = binding.option.getUIElement(binding.section);
+		value = binding.option.formvalue(binding.section);
+	} catch (e) { return; }
 	if (field && value != null && switchOn(value) !== saved) field.setValue(saved ? '1' : '0');
 }
 var refreshListeners = false;
@@ -186,29 +213,9 @@ function badge(st) {
    it (or, on a touch screen, until it is tapped) - a screenshot of this page
    is the usual way a server's address gets passed around, and nobody means to. */
 function protoLine() {
-	var host = E('span', { 'id': 'pwp-host', 'class': 'pwp-ip', 'dir': 'ltr', 'tabindex': '0' }, '');
-	return E('div', { 'class': 'pwp-detail-row', 'style': 'display:flex;gap:10px;padding:4px 0;align-items:baseline' }, [
-		E('span', { 'style': 'flex:0 0 130px;color:var(--muted);font-size:13px' }, _('Protocol')),
-		E('span', { 'class': 'pwp-ticker', 'style': 'flex:1 1 auto;font-weight:600' }, [
-			E('span', { 'class': 'pwp-ticker-track' }, [
-			E('span', { 'id': 'pwp-proto' }, '-'),
-			E('span', { 'id': 'pwp-hostwrap', 'style': 'display:none;gap:6px;align-items:center' }, [
-				E('span', { 'style': 'color:var(--muted)' }, '·'), host,
-				E('span', { 'id': 'pwp-exit', 'style': 'display:none;gap:6px;align-items:center' })
-			])
-			])
-		])
-	]);
+	return line(_('Protocol'), 'pwp-proto');
 }
 
-/* Where the tunnel comes out, beside the address: the country the rest of the
-   internet sees, as a flag and a name. Not hidden with the address - a
-   country gives nobody a server - and not the address's own country, which
-   for a server behind a CDN, or for WARP, is only where the CDN answered.
-
-   The flag is a picture rather than the flag emoji, which Windows draws as
-   two letters; if the picture cannot be had, the name says it alone. The
-   name is the browser's own for the code, in the page's language. */
 function countryName(cc) {
 	try {
 		var dn = new Intl.DisplayNames([ i18n.get() ], { type: 'region' });
@@ -219,24 +226,18 @@ function countryName(cc) {
 }
 
 function renderExit(st) {
-	var box = byId('pwp-exit');
-	if (!box) return;
+	var globe = byId('pwp-country-orb');
+	if (!globe) return;
 	var cc = /^[A-Z]{2}$/.test(st.exit_cc || '') ? st.exit_cc : '';
-	var key = cc + '|' + (st.exit_ip || '');
-	if (box.getAttribute('data-k') === key) return;
-	box.setAttribute('data-k', key);
-	while (box.firstChild) box.removeChild(box.firstChild);
-	box.style.display = cc ? 'inline-flex' : 'none';
-	if (!cc) return;
-	box.setAttribute('title', _('Where the tunnel comes out') + (st.exit_ip ? ': ' + st.exit_ip : ''));
-	var img = E('img', {
-		'src': 'https://flagcdn.com/w40/' + cc.toLowerCase() + '.png',
-		'alt': '', 'width': '22', 'height': '15',
-		'style': 'border-radius:3px;box-shadow:0 0 0 1px #0002;object-fit:cover'
-	});
-	img.addEventListener('error', function() { if (img.parentNode) img.parentNode.removeChild(img); });
-	box.appendChild(img);
-	box.appendChild(E('span', {}, countryName(cc)));
+	if (globe.getAttribute('data-cc') === cc) return;
+	globe.setAttribute('data-cc', cc);
+	globe.setAttribute('aria-label', cc ? countryName(cc) : _('Where the tunnel comes out'));
+	while (globe.firstChild) globe.removeChild(globe.firstChild);
+	if (cc) globe.appendChild(E('img', {
+		'src': 'https://flagcdn.com/w320/' + cc.toLowerCase() + '.png',
+		'alt': countryName(cc), 'error': function(ev) { ev.target.remove(); }
+	}));
+	else globe.appendChild(pui.icon('globe'));
 }
 
 function line(label, id) {
@@ -330,11 +331,11 @@ function renderState(st) {
 		if (versionNode && versionNode.textContent !== versionLabel) versionNode.textContent = versionLabel;
 	}
 	setNode('pwp-state', badge(st));
+	var statusCard = byId('pwp-status-card');
+	if (statusCard) statusCard.setAttribute('data-connected', String(!!st.connected));
 	setNode('pwp-node', st.server || '-');
 	setNode('pwp-proto', st.protocol ? st.protocol : '-');
 	setNode('pwp-host', st.host ? st.host : '');
-	var hw = byId('pwp-hostwrap');
-	if (hw) hw.style.display = st.host ? 'inline-flex' : 'none';
 	renderExit(st);
 	setNode('pwp-latency', st.latency_ms > 0 ? pui.ms(st.latency_ms) : '-');
 	setNode('pwp-route', st.route_ir
@@ -436,7 +437,7 @@ function renderTraffic(t) {
 function refreshState() {
 	var request = ++stateRequest;
 	return callState().then(function(st) {
-		if (request === stateRequest) renderState(st);
+		if (request === stateRequest && st && st.enabled != null) { rememberState(st); renderState(st); }
 	}).catch(function() {});
 }
 
@@ -471,13 +472,13 @@ return baseclass.extend({
 	   most of a second on a small one, and a page that sat blank for that long
 	   on every visit felt slow for no reason of its own. */
 	load: function() {
-		callAction('prepare', '').catch(function() {});
-		return Promise.resolve([ null, null ]);
+		return Promise.resolve([ cachedState(), null ]);
 	},
 
 	/* Everything for the top of the page, and the traffic for its foot. */
 	render: function(data) {
 		mainSwitch = null; lastState = null;
+		window.setTimeout(function() { callAction('prepare', '').catch(function() {}); }, 250);
 		usagePeriod = savedUsagePeriod(); usageData = null;
 		var st = (data && data[0]) || null;
 		var tr = (data && data[1]) || null;
@@ -521,6 +522,7 @@ return baseclass.extend({
 			]),
 			line(_('Node name'), 'pwp-node'),
 			protoLine(),
+			line(_('Server'), 'pwp-host'),
 			E('div', { 'class': 'mk-row', 'style': 'margin-top:14px' }, [
 				E('button', {
 					'id': 'pwp-reselect',
@@ -533,7 +535,17 @@ return baseclass.extend({
 			])
 		]));
 
-		status.classList.add('pwp-status-card');
+		status.classList.add('pwp-status-card', 'zgz-connection-card');
+		status.id = 'pwp-status-card';
+		var serverAddress = status.querySelector('#pwp-host');
+		serverAddress.classList.add('pwp-ip');
+		serverAddress.setAttribute('dir', 'ltr');
+		serverAddress.setAttribute('tabindex', '0');
+		var artwork = E('div', { 'class': 'zgz-connection-art', 'aria-hidden': 'true' }, [
+			E('div', { 'class': 'zgz-orbit zgz-orbit-one' }), E('div', { 'class': 'zgz-orbit zgz-orbit-two' }),
+			E('div', { 'id': 'pwp-country-orb', 'class': 'zgz-country-orb' }, [pui.icon('globe')])
+		]);
+		status.appendChild(artwork);
 		status.querySelector('.mk-card-title').appendChild(E('span', { 'id': 'pwp-state', 'style': 'font-size:13px;white-space:nowrap' }, '-'));
 		tiles.insertBefore(status, tiles.firstChild);
 
@@ -557,6 +569,8 @@ return baseclass.extend({
 			renderState(st);
 			renderTraffic(tr || {});
 			scope = null;
+			window.setTimeout(refreshState, 0);
+			if (statsOn) window.setTimeout(function() { callTraffic().then(renderTraffic).catch(function() {}); }, 0);
 		} else {
 			/* Asked for now; drawn once the pieces are in the document, where
 			   these find them - LuCI puts the page there a moment after this
@@ -566,7 +580,9 @@ return baseclass.extend({
 			var tries = 0;
 			(function whenShown() {
 				if (!byId('pwp-state') && tries++ < 100) { window.setTimeout(whenShown, 50); return; }
-				gotState.then(renderState);
+				gotState.then(function(fresh) {
+					if (fresh && fresh.enabled != null) { rememberState(fresh); renderState(fresh); }
+				});
 				if (gotTraffic) gotTraffic.then(renderTraffic);
 			})();
 		}

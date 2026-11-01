@@ -805,3 +805,52 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 	.pwp-usage-periods{width:36px}
 	.mk .pwp-usage-periods button{min-width:36px}
 }
+
+/* Subscription actions share one compact row in every router theme. */
+.mk .zgz-sub-create{display:block!important}
+.mk #zgz-subscription-toolbar{display:flex!important;gap:10px;width:100%!important;flex-wrap:wrap;align-items:center}
+.mk #zgz-subscription-toolbar .mk-btn{flex:0 0 auto!important;width:auto!important;min-width:0!important;height:46px!important;min-height:46px!important;margin:0!important;padding:0 16px!important;box-sizing:border-box;white-space:nowrap}
+.zgz-manual-groups{margin:0 0 14px;gap:8px;flex-wrap:wrap}
+.mk [hidden]{display:none!important}
+/* Connection card uses the active theme's surfaces and a shared accent. */
+.mk .zgz-connection-card{--connection-accent:#009b75;position:relative;overflow:hidden;border:1px solid var(--connection-accent);border-radius:26px;background:radial-gradient(ellipse at 15% 60%,#00bf8f18,transparent 65%),var(--panel);box-shadow:inset 0 0 0 4px #00aab510,0 8px 25px #008b7915;min-height:290px;padding-inline-end:42%;isolation:isolate}
+.mk.mk-dark .zgz-connection-card{--connection-accent:#00e7a5;background:radial-gradient(ellipse at 20% 60%,#00cb9250,transparent 60%),linear-gradient(145deg,#052c36,#02141f);color:#f0fff9}
+.zgz-connection-card::before{display:none!important}
+.zgz-connection-card .mk-card-title{position:relative;z-index:2;flex-wrap:wrap;gap:10px}
+.zgz-connection-card .pwp-detail-row>span:first-child{flex-basis:85px!important}
+.zgz-connection-card .pwp-detail-row{padding-block:9px!important}
+.zgz-connection-card #pwp-state .ok{background:#00b77820;color:var(--connection-accent);border:1px solid var(--connection-accent);box-shadow:0 0 18px #00d98b25}
+.zgz-connection-card #pwp-state .ok::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;margin-inline-end:6px}
+.zgz-connection-card #pwp-reselect{width:100%;justify-content:center;border:1px solid var(--connection-accent);background:linear-gradient(120deg,#00bc8c20,#00cfb509);color:var(--connection-accent);border-radius:18px;min-height:48px}
+.zgz-connection-art{position:absolute;inset-block:70px 35px;inset-inline-end:3%;width:35%;display:grid;place-items:center;z-index:-1;background-image:radial-gradient(circle,#00aab535 1px,transparent 2px);background-size:8px 8px;mask-image:radial-gradient(ellipse,black 45%,transparent 72%)}
+.zgz-country-orb{width:clamp(64px,9vw,135px);aspect-ratio:1;border-radius:50%;border:5px solid var(--panel);outline:2px solid var(--connection-accent);box-shadow:0 0 0 10px #00d69b18,0 0 28px #00cf9b50;overflow:hidden;display:grid;place-items:center;background:var(--soft);color:var(--connection-accent)}
+.zgz-country-orb img{width:100%;height:100%;object-fit:cover}
+.zgz-country-orb .mk-ico{width:45px;height:45px}
+.zgz-orbit{position:absolute;width:95%;height:45%;border:1px solid var(--connection-accent);border-radius:50%;transform:rotate(-35deg)}
+.zgz-orbit-two{transform:rotate(55deg);opacity:.45}
+.zgz-connection-card[data-connected="false"] .zgz-connection-art{opacity:.45}
+@media(max-width:1100px){.mk .zgz-connection-card{padding-inline-end:30%}.zgz-connection-art{width:24%}.zgz-country-orb{width:65px}}
+@media(max-width:600px){.mk .zgz-connection-card{padding-inline-end:22px;padding-top:25px}.zgz-connection-art{position:relative;inset:auto;width:100%;height:130px;margin-top:15px}.zgz-country-orb{width:90px}.zgz-orbit{width:150px}.mk #zgz-subscription-toolbar .mk-btn{font-size:12px;padding-inline:11px!important}}
+
+.mk .pwp-status-card>.zgz-connection-art{display:grid;flex:none;gap:0}
+
+.mk .zgz-connection-card>.mk-card-title{margin-inline-end:-65%;width:auto}
+.mk .zgz-connection-card .zgz-connection-art{mask-image:none;background-image:radial-gradient(circle,#00aab520 1px,transparent 2px);border-radius:50%}
+.zgz-country-orb{height:clamp(64px,9vw,135px);min-width:0;flex:none}
+@media(min-width:1101px){.mk-grid.pwp-status-row{grid-template-columns:minmax(0,3fr) minmax(0,1.2fr) minmax(0,1.6fr) minmax(180px,1.4fr)}}
+@media(max-width:1100px){.zgz-country-orb{height:65px}.mk .zgz-connection-card>.mk-card-title{margin-inline-end:-40%}}
+@media(max-width:600px){.mk .zgz-connection-card>.mk-card-title{margin-inline-end:0}.zgz-country-orb{height:90px}}
+
+/* The solid flag sits above both elliptical orbit paths. */
+.zgz-country-orb{position:relative;z-index:3;background:var(--panel)}
+.zgz-country-orb img{display:block;position:absolute;inset:0;width:100%;height:100%;max-height:none;object-fit:cover}
+.zgz-orbit{z-index:1;width:130%;height:40%;transform:rotate(-38deg);border-width:2px;border-color:var(--connection-accent);box-shadow:0 0 5px #00cba035}
+.zgz-orbit-two{width:80%;height:88%;transform:rotate(28deg);opacity:.65;border-width:1px}
+.zgz-connection-card #pwp-host{display:inline-block;max-width:100%;direction:ltr}
+.zgz-connection-card .pwp-detail-row{position:relative;z-index:4}
+
+.zgz-connection-card{--flag-ring:#8b9cad;--flag-glow:#8b9cad38}
+.zgz-connection-card[data-connected="true"]{--flag-ring:#00e78b;--flag-glow:#00e78b66}
+.zgz-connection-card[data-connected="false"]{--flag-ring:#ff354d;--flag-glow:#ff354d66}
+.mk .zgz-connection-card .zgz-country-orb{border:4px solid var(--panel);outline:3px solid var(--flag-ring);box-shadow:0 0 0 9px var(--flag-glow),0 0 18px var(--flag-ring),0 0 36px var(--flag-glow),inset 0 0 10px var(--flag-glow);transition:outline-color .3s,box-shadow .3s}
+.zgz-connection-card[data-connected="false"] .zgz-connection-art{opacity:1}

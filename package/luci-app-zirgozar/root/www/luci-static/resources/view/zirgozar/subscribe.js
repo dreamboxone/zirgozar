@@ -245,7 +245,7 @@ function done(b, r, ok) {
 return view.extend({
 	load: function() {
 		return Promise.all([
-			callSubs().catch(function() { return {}; }),
+			Promise.resolve({}),
 			uci.load('zirgozar').catch(function() { return null; })
 		]);
 	},
@@ -613,14 +613,14 @@ return view.extend({
 				E('label', { 'class': 'cbi-value-title' }, ''),
 				E('div', { 'id': 'zgz-subscription-toolbar', 'class': 'cbi-value-field', 'style': 'display:flex;gap:10px;flex-wrap:wrap;align-items:center' }, [
 					importBtn,
-					pui.btn(_('Manual subscription All'), 'primary mk-small', function(ev) {
+					pui.btn(_('Manual subscription All'), 'primary zgz-sub-toolbar-button', function(ev) {
 						var b = ev.currentTarget;
 						return callAction('refresh_nodes', '').then(function(r) {
 							if (r && r.error) pui.note(b, _(r.error), 'error');
 							else pui.spinWhileBusy(b, function() { return callSubs().then(renderInfo); });
 						});
 					}, 'refresh'),
-					pui.btn(_('Delete All Subscribe Node'), 'danger mk-small', function(ev) {
+					pui.btn(_('Delete All Subscribe Node'), 'danger zgz-sub-toolbar-button', function(ev) {
 						var b = ev.currentTarget;
 						if (!window.confirm(_('Delete the nodes of every subscription? They come back the next time the subscriptions are read.')))
 							return;
@@ -644,7 +644,9 @@ return view.extend({
 				add.appendChild(pui.icon('plus'));
 				add.appendChild(document.createTextNode(_('Add')));
 				var wrapper = toolbar.parentNode;
+				toolbar.insertBefore(add, toolbar.firstChild);
 				create.appendChild(toolbar);
+				create.classList.add('zgz-sub-create');
 				create.style.cssText += ';display:flex;gap:10px;align-items:center;flex-wrap:wrap';
 				toolbar.style.margin = '0';
 				toolbar.style.width = 'auto';
@@ -653,6 +655,7 @@ return view.extend({
 			poll.add(function() {
 				return callSubs().then(renderInfo).catch(function() {});
 			}, 5);
+			window.setTimeout(function() { callSubs().then(renderInfo).catch(function() {}); }, 0);
 			pui.sortable(mapEl, 'zirgozar');
 			return pui.page([ mapEl ]);
 		});

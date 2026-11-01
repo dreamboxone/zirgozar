@@ -85,3 +85,26 @@ assert.equal(api.statusMessage({connected:false,message:emptyList}), emptyList);
 assert.equal(api.statusMessage({connected:true,message:'There is no node list yet: empty'}), '');
 assert.equal(api.statusMessage({connected:true,message:'DNS protection failed'}), 'DNS protection failed');
 console.log('Connected status hides only obsolete list warnings');
+
+
+const stateStorage = new Map();
+const stateCache = new Function('rpc', 'i18n', 'window', source.slice(0, source.indexOf('\nreturn baseclass.extend(')) + '\nreturn { cachedState, rememberState };')(
+	{ declare: () => () => Promise.resolve({}) }, {tr: value => value},
+	{sessionStorage: {getItem: key => stateStorage.get(key), setItem: (key, value) => stateStorage.set(key, value)}}
+);
+assert.equal(stateCache.cachedState(), null);
+stateCache.rememberState({enabled:true, connected:true, server:'Home', core_name:'Xray', core_version:'26.10.31', message:'Old warning', password:'secret'});
+assert.deepEqual(stateCache.cachedState(), {enabled:true, connected:true, server:'Home', core_name:'Xray', core_version:'26.10.31'});
+stateCache.rememberState({});
+assert.equal(stateCache.cachedState().connected, true, 'empty responses preserve the last valid snapshot');
+stateCache.rememberState({enabled:false, connected:false, core_running:false});
+assert.equal(stateCache.cachedState().connected, false, 'disconnection replaces the previous connection');
+stateStorage.set('zirgozar.dashboard.state.v1', '{broken');
+assert.equal(stateCache.cachedState(), null);
+stateStorage.set('zirgozar.dashboard.state.v1', JSON.stringify({time:Date.now()-86400001,state:{enabled:true}}));
+assert.equal(stateCache.cachedState(), null, 'expired snapshots are ignored');
+console.log('Dashboard cache: connection, disconnection, invalid responses, private fields and expiry passed');
+
+api.bindMainSwitch({getUIElement() {throw new Error('form is still mounting');}}, 'config');
+assert.doesNotThrow(() => api.syncMainSwitch({enabled:true}));
+console.log('Dashboard state can refresh before the settings form finishes mounting');

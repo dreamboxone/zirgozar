@@ -362,6 +362,9 @@ var FA = {
 	'The configs chosen here are measured to find the fastest one.':
 		'کانفیگ‌های انتخابی در این بخش، برای سریع‌ترین کانفیگ سنجش می‌شوند.',
 	'All configs': 'همه کانفیگ‌ها',
+	'All configs list': 'لیست همه کانفیگ‌ها',
+	'Server': 'سرور',
+	'Test group': 'تست همه',
 	'Only manually added configs': 'فقط کانفیگ‌های دستی',
 	'Only the subscriptions': 'فقط اشتراک‌ها',
 	'Subscriptions': 'اشتراک‌ها',
@@ -861,7 +864,7 @@ var FA = {
 
 	/* ------------------------------------------ the frame, banner, footer */
 	'Light': 'روشن',
-	'Follow LuCI theme': 'پیروی از تم LuCI',
+	'Follow LuCI theme': 'پیروی از تم روتر',
 	'Dark': 'تیره',
 	'Display mode': 'حالت نمایش',
 	'Status': 'وضعیت',
