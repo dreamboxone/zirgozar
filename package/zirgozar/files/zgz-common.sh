@@ -1540,6 +1540,7 @@ direct_dns() {
 # One name, resolved through the direct resolver rather than the router's own
 # - see above for why. Prints the first IPv4 address, or nothing.
 resolve_direct_all() {
+	local _rd_s _rd_answer
 	case "$1" in
 		'') return 1 ;;
 		*:*)
@@ -1556,7 +1557,17 @@ resolve_direct_all() {
 	# over UDP, at the same address and port.
 	_rd_s="$3"
 	case "${4:-53}" in 53|'') : ;; *[!0-9]*) : ;; *) _rd_s="$3:$4" ;; esac
-	bounded 4 nslookup "$1" "$_rd_s" 2>/dev/null | awk '
+	_rd_answer="$(bounded 4 nslookup "$1" "$_rd_s" 2>/dev/null | awk '
+		/^Name:/ { named = 1; next }
+		named && /^Address/ {
+			for (i = 2; i <= NF; i++)
+				if ($i ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ ||
+				    ($i ~ /:/ && $i ~ /^[0-9A-Fa-f:.]+$/)) print $i
+		}')"
+	if [ -n "$_rd_answer" ]; then printf '%s\n' "$_rd_answer"; return 0; fi
+	# The router resolver remains reachable when DNS protection rejects an
+	# unmarked direct query. Do not disable that protection for bootstrap.
+	bounded 4 nslookup "$1" 127.0.0.1 2>/dev/null | awk '
 		/^Name:/ { named = 1; next }
 		named && /^Address/ {
 			for (i = 2; i <= NF; i++)
