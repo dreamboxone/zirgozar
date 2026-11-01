@@ -112,7 +112,7 @@ jobs:
             -DCMAKE_INSTALL_RPATH="$tools/ucode/lib" \
             -DUBUS_SUPPORT=OFF -DUCI_SUPPORT=OFF -DNL80211_SUPPORT=OFF \
             -DRTNL_SUPPORT=OFF -DRESOLV_SUPPORT=OFF -DULOOP_SUPPORT=OFF \
-            -DSOCKET_SUPPORT=OFF -DLOG_SUPPORT=OFF -DZLIB_SUPPORT=OFF
+            -DSOCKET_SUPPORT=ON -DLOG_SUPPORT=OFF -DZLIB_SUPPORT=OFF
           cmake --build "$tools/ucode-build" --parallel 2
           cmake --install "$tools/ucode-build"
           echo "$tools/ucode/bin" >> "$GITHUB_PATH"
