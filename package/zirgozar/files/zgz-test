@@ -462,6 +462,14 @@ cmd_exit() {
 	_cc="$(printf '%s\n' "$_tr" | sed -n 's/^loc=\([A-Z][A-Z]\)$/\1/p' | head -1)"
 	_ip="$(printf '%s\n' "$_tr" | sed -n 's/^ip=\([0-9A-Fa-f:.]*\)$/\1/p' | head -1)"
 	if [ "$(exit_identity)" = "$_identity" ]; then
+		# A failed country lookup does not erase the last verified exit of
+		# this same connection. Another connection never inherits it.
+		if [ -z "$_cc" ] && [ "$(sed -n 's/^identity=//p' "$EXIT" 2>/dev/null)" = "$_identity" ] &&
+		   grep -q '^cc=[A-Z][A-Z]$' "$EXIT" 2>/dev/null; then
+			touch "$EXIT"
+			rmdir "$EXIT.lock" 2>/dev/null || true
+			return 0
+		fi
 		printf 'identity=%s\ncc=%s\nip=%s\n' "$_identity" "$_cc" "$_ip" > "$EXIT.$$"
 		mv -f "$EXIT.$$" "$EXIT"
 	fi

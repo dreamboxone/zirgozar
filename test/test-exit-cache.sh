@@ -34,4 +34,13 @@ echo fail > "$ZGZ_RUN/scenario"
 "$ZGZ_LIB/zgz-test" exit
 check "$(wc -l < "$ZGZ_RUN/curl.calls" | tr -d ' ')" 3 'failed proxy query does not fall back to router egress'
 check "$(sed -n 's/^ip=//p' "$ZGZ_RUN/exit")" '' 'failed query does not invent an exit address'
+echo '' > "$ZGZ_RUN/scenario"
+"$ZGZ_LIB/zgz-test" exit
+echo fail > "$ZGZ_RUN/scenario"
+"$ZGZ_LIB/zgz-test" exit
+check "$(sed -n 's/^cc=//p' "$ZGZ_RUN/exit")" DE 'failed refresh preserves the verified country of the same connection'
+check "$(sed -n 's/^ip=//p' "$ZGZ_RUN/exit")" 192.0.2.10 'failed refresh preserves the verified exit address'
+echo next-connection > "$ZGZ_RUN/active.token"
+"$ZGZ_LIB/zgz-test" exit
+check "$(sed -n 's/^cc=//p' "$ZGZ_RUN/exit")" '' 'new connection cannot inherit an old country after a failed lookup'
 rig_report

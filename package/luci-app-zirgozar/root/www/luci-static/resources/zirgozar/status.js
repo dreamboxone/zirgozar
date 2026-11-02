@@ -41,7 +41,7 @@ var stateRequest = 0;
 var mainSwitch = null, lastState = null;
 
 var STATE_CACHE_KEY = 'zirgozar.dashboard.state.v1';
-var STATE_FIELDS = ['enabled', 'running', 'connected', 'status', 'server', 'protocol', 'host',
+var STATE_FIELDS = ['enabled', 'running', 'connected', 'connectivity', 'status', 'server', 'protocol', 'host',
 	'core_name', 'core_version', 'core_running', 'exit_cc', 'exit_ip', 'latency_ms',
 	'route_ir', 'geo_ready', 'stats_enabled', 'version'];
 
@@ -203,6 +203,8 @@ function badge(st) {
 	else if (st.status == 'starting')  { text = _('Starting…');    cls = 'warn'; }
 	else if (!switchOn(st.enabled))    { text = _('Main switch is off'); cls = ''; }
 	else if (st.status == 'failed')    { text = _('Could not connect'); cls = 'error'; }
+	else if (st.running && st.status == 'ready')
+	                                   { text = st.connectivity == 'failed' ? _('Connection check failed') : _('Checking connection…'); cls = 'warn'; }
 	else if (st.running)               { text = _('Connecting…');  cls = 'warn'; }
 	else                               { text = _('Disconnected'); cls = ''; }
 

@@ -744,6 +744,8 @@ return baseclass.extend({ strings: {
 	"Xray could not run this configuration, so sing-box is carrying it. See Runtime Logs for the rejection reason.": "Xray не смог запустить эту конфигурацию; подключение выполняется через sing-box. Причина отказа указана в журнале работы.",
 	"RUNNING": "РАБОТАЕТ",
 	"NOT RUNNING": "НЕ ЗАПУЩЕНО",
+	"Connection check failed": "Проверка соединения не удалась",
+	"Checking connection…": "Проверка соединения…",
 	"Checking…": "Проверить...",
 	"Problem detected!": "Проблема обнаружена!",
 	"Core": "Ядро",

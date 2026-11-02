@@ -882,6 +882,8 @@ var FA = {
 	'Xray could not run this configuration, so sing-box is carrying it. See Runtime Logs for the rejection reason.': 'Xray این کانفیگ را نپذیرفت؛ اتصال با sing-box برقرار می‌شود. علت رد شدن در گزارش اجرا آمده است.',
 	'RUNNING': 'در حال اجرا',
 	'NOT RUNNING': 'اجرا نمی‌شود',
+	"Connection check failed": "بررسی اتصال ناموفق بود",
+	"Checking connection…": "در حال بررسی اتصال…",
 	'Checking…': 'در حال بررسی…',
 	'Problem detected!': 'مشکل پیدا شد!',
 	'Core': 'هسته',

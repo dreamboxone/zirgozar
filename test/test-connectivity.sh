@@ -52,4 +52,19 @@ for tuple in "new $(date +%s) 1:true" "old $(date +%s) 1:false" "new 1 1:false" 
  actual="$(printf '%s' "$answer" | sed -n 's/.*"connected":\(true\|false\).*/\1/p')"
  check "$actual" "${tuple##*:}" "RPC validates identity, freshness and result ($tuple)"
 done
+exit_identity() { echo current-connection; }
+printf 'identity=current-connection\ncc=DE\nip=192.0.2.10\n' > "$ZGZ_RUN/exit"
+printf 'new 1 1\n' > "$ZGZ_RUN/connectivity"
+mkdir -p "$ZGZ_RUN/connectivity.lock"
+detach() { printf '%s\n' "$*" > "$ZGZ_RUN/detach.calls"; }
+answer="$(method_state)"
+case "$answer" in *'"connectivity":"checking"'*) ok 'expired success is checking rather than a fresh connection' ;; *) bad 'missing checking state' ;; esac
+case "$answer" in *'"exit_cc":"DE"'*) ok 'same-connection country remains visible while checking' ;; *) bad 'country vanished while checking' ;; esac
+case "$(cat "$ZGZ_RUN/detach.calls")" in *'connectivity'*) ok 'existing lock still schedules worker for stale-lock recovery' ;; *) bad 'lock prevents recovery' ;; esac
+printf 'new %s 0\n' "$(date +%s)" > "$ZGZ_RUN/connectivity"
+answer="$(method_state)"
+case "$answer" in *'"connectivity":"failed"'*) ok 'failed check is distinct from connection establishment' ;; *) bad 'missing failed-check state' ;; esac
+printf 'identity=previous-connection\ncc=FR\n' > "$ZGZ_RUN/exit"
+answer="$(method_state)"
+case "$answer" in *'"exit_cc":""'*) ok 'another connection country is hidden' ;; *) bad 'old connection country leaked' ;; esac
 rig_report

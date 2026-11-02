@@ -80,15 +80,21 @@ method_state() {
 
 	# Cache a real HTTPS response through this running node. RPC stays quick;
 	# missing, failed, expired or previous-instance results never mean connected.
-	local ci ct cr age now identity
+	local ci ct cr age now identity connectivity=unknown
 	identity="$(connectivity_identity)" || identity=""
 	if [ "$running" = 1 ] && [ "$active" = 1 ] && [ -s "$ZGZ_BEST" ] && [ -n "$identity" ]; then
 		read -r ci ct cr < "$ZGZ_RUN/connectivity" 2>/dev/null || true
 		now="$(date +%s)"
 		case "$ct" in ''|*[!0-9]*) age=999 ;; *) age=$((now - ct)) ;; esac
-		[ "$ci" = "$identity" ] && [ "$age" -ge 0 ] && [ "$age" -le 60 ] && [ "$cr" = 1 ] && connected=1
+		connectivity=checking
+		if [ "$ci" = "$identity" ] && [ "$age" -ge 0 ] && [ "$age" -le 60 ]; then
+			if [ "$cr" = 1 ]; then connected=1; connectivity=online
+			elif [ "$cr" = 0 ]; then connectivity=failed; fi
+		fi
 		if [ "$ci" != "$identity" ] || [ "$age" -lt 0 ] || [ "$age" -ge 30 ]; then
-			[ -d "$ZGZ_RUN/connectivity.lock" ] || detach "$TEST" connectivity
+			# The worker owns and reclaims its lock; checking it here would
+			# prevent a stale lock from ever reaching that recovery path.
+			detach "$TEST" connectivity
 		fi
 	fi
 
@@ -124,14 +130,15 @@ method_state() {
 	# Where the tunnel comes out, for the flag beside the address: asked again
 	# in the background when the node is not the one it was asked about, when
 	# the last answer was no answer, and every quarter of an hour - a node's
-	# way out can move. Only while connected, when there is a way out to ask.
+	# way out can move. Refresh only while connected, but retain the verified
+	# country of this same running connection while connectivity is rechecked.
 	_ex=""
 	_identity="$(exit_identity)" || _identity=""
-	if [ "$connected" = "1" ] && [ -n "$_identity" ]; then
+	if [ "$running" = 1 ] && [ "$active" = 1 ] && [ -n "$_identity" ]; then
 		_ex="$ZGZ_RUN/exit"
-		if [ "$(sed -n 's/^identity=//p' "$_ex" 2>/dev/null)" != "$_identity" ] ||
+		if [ "$connected" = 1 ] && { [ "$(sed -n 's/^identity=//p' "$_ex" 2>/dev/null)" != "$_identity" ] ||
 		   [ -n "$(find "$_ex" -mmin +15 2>/dev/null)" ] ||
-		   { ! grep -q '^cc=..$' "$_ex" 2>/dev/null && [ -n "$(find "$_ex" -mmin +1 2>/dev/null)" ]; }; then
+		   { ! grep -q '^cc=..$' "$_ex" 2>/dev/null && [ -n "$(find "$_ex" -mmin +1 2>/dev/null)" ]; }; }; then
 			[ -d "$_ex.lock" ] || detach "$TEST" exit
 		fi
 		# The answer about another node is not shown at all.
@@ -145,7 +152,7 @@ method_state() {
 
 	uci -q show zirgozar.config 2>/dev/null | LC_ALL=C awk \
 		-v exitf="$_ex" -v uistamp="$_ui" \
-		-v running="$running" -v connected="$connected" -v autostart="$autostart" \
+		-v running="$running" -v connected="$connected" -v connectivity="$connectivity" -v autostart="$autostart" \
 		-v backend="$backend" -v geo="$geo" -v pw="$pw" -v bridge_on="$bridge_on" -v cpath="$cpath" \
 		-v vfile="$ZGZ_VERSION_FILE" -v sfile="$ZGZ_STATUS" -v mfile="$ZGZ_MESSAGE" -v jfile="$JOB" \
 		-v meta="$ZGZ_BEST_META" -v prog="$ZGZ_PROGRESS" -v cinfo="$ZGZ_RUN/core.info" '
@@ -192,6 +199,7 @@ method_state() {
 			printf "{\"version\":\"%s\"", esc(ver)
 			getline uptime < "/proc/uptime"; close("/proc/uptime"); int_("uptime", int(uptime + 0))
 			bool("running", running); bool("connected", connected); bool("enabled", en); bool("autostart", autostart)
+			str("connectivity", connectivity)
 			str("status", whole(sfile)); str("message", whole(mfile)); str("job", whole(jfile))
 			str("server", M["label"]); str("protocol", M["protocol"]); str("host", M["host"]); int_("latency_ms", M["latency_ms"])
 			str("exit_cc", X["cc"]); str("exit_ip", X["ip"]); str("ui", uistamp)

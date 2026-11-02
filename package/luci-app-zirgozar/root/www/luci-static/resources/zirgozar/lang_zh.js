@@ -744,6 +744,8 @@ return baseclass.extend({ strings: {
 	"Xray could not run this configuration, so sing-box is carrying it. See Runtime Logs for the rejection reason.": "Xray 无法运行此配置，现由 sing-box 处理连接。请查看运行日志中的拒绝原因。",
 	"RUNNING": "运行中",
 	"NOT RUNNING": "未运行",
+	"Connection check failed": "连接检查失败",
+	"Checking connection…": "正在检查连接…",
 	"Checking…": "检查中...",
 	"Problem detected!": "发现问题了!",
 	"Core": "内核",
