@@ -36,25 +36,36 @@ if (node.type != 'ikev2' || !match(node.server ?? '', /^[A-Za-z0-9_.-]+$/) ||
 	fail('Invalid IKEv2 account. Check server, username, password and shared key.');
 
 // The server's certificate authority, when the account brings its own: PEM,
-// or DER, in base64. Otherwise the certificate must chain up to one of the
-// public authorities the router trusts for HTTPS.
+// or DER, in base64. Include the system roots too, so cross-signed
+// certificates can reach the public authority that signed them.
 let cacerts = [];
+function add_pem_bundle(bundle) {
+	let begin = '-----BEGIN CERTIFICATE-----', end = '-----END CERTIFICATE-----';
+	let count = 0;
+	for (let part in split(bundle, end)) {
+		let at = index(part, begin);
+		if (at >= 0) {
+			push(cacerts, substr(part, at) + end + '\n');
+			count++;
+		}
+	}
+	return count;
+}
 if (node.ca) {
 	let ca = b64dec(replace(replace(replace(node.ca, /[\r\n ]/g, ''), /-/g, '+'), /_/g, '/'));
 	if (!ca) fail('Invalid IKEv2 certificate authority.');
-	push(cacerts, ca);
-} else if (psk == '') {
+	if (index(ca, '-----BEGIN CERTIFICATE-----') >= 0) {
+		if (!add_pem_bundle(ca)) fail('Invalid IKEv2 certificate authority.');
+	} else push(cacerts, ca);
+}
+if (psk == '') {
 	let bundle = readfile('/etc/ssl/certs/ca-certificates.crt');
-	if (!bundle) fail('IKEv2 needs the router\'s certificate list. Install dependencies under Router requirements.');
+	if (!bundle && !length(cacerts)) fail('IKEv2 needs the router\'s certificate list. Install dependencies under Router requirements.');
 	// Cut at each END line rather than matched with one pattern: whether a
 	// pattern's class runs across the PEM's line breaks differs between
 	// builds of ucode - OpenWrt's does, a newer one does not unless told,
 	// and OpenWrt's own then refuses the flag that would tell it.
-	let end = '-----END CERTIFICATE-----';
-	for (let part in split(bundle, end)) {
-		let at = index(part, '-----BEGIN CERTIFICATE-----');
-		if (at >= 0) push(cacerts, substr(part, at) + end + '\n');
-	}
+	if (bundle) add_pem_bundle(bundle);
 	if (!length(cacerts)) fail('IKEv2 needs the router\'s certificate list. Install dependencies under Router requirements.');
 }
 if (mode == 'check') exit(0);

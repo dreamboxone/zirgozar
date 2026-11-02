@@ -5,6 +5,9 @@ RIG_ROOT="${RIG_ROOT:-$(mktemp -d /tmp/zgz-ikev2-test.XXXXXX)}"
 . "$(dirname "$0")/rig.sh"
 rig_setup
 node "$RIG_SRC/test/test-ikev2-form.js" || bad 'IKEv2 certificate import or authentication form failed'
+if command -v ucode >/dev/null 2>&1; then
+	python3 "$RIG_SRC/test/test-ikev2-ca.py" || bad 'IKEv2 CA chain loading failed'
+fi
 
 # Exercise the production helpers without starting IPsec or altering routes.
 sed '/^case "$MODE" in/,$d; s/^check() {/ikev2_check() {/' "$RIG/lib/zgz-ikev2" > "$RIG/ikev2-functions"
