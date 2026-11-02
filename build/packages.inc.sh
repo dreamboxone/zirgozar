@@ -10,7 +10,7 @@
 # VERSION is the application version; increment RELEASE for package updates.
 # The main zirgozar package always includes the complete LuCI interface.
 VERSION=5.8.11
-RELEASE=2
+RELEASE=3
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -316,6 +316,11 @@ stage_luci_assets() {
 		"$i/www/luci-static/resources/zirgozar/ui.js"
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/status.js" \
 		"$i/www/luci-static/resources/zirgozar/status.js"
+	install -m 0644 "$l/www/luci-static/resources/zirgozar/checksites.js" \
+		"$i/www/luci-static/resources/zirgozar/checksites.js"
+	mkdir -p "$i/www/luci-static/resources/zirgozar/site-icons"
+	install -m 0644 "$l/www/luci-static/resources/zirgozar/site-icons/"* \
+		"$i/www/luci-static/resources/zirgozar/site-icons/"
 	# The QR code of a node's link, drawn in the browser - no CDN to reach.
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/qr.js" \
 		"$i/www/luci-static/resources/zirgozar/qr.js"

@@ -5,6 +5,12 @@
 'require baseclass';
 
 return baseclass.extend({ strings: {
+	"Could not save settings.": "Не удалось сохранить настройки.",
+	"Select test sites in Other Settings.": "Выберите сайты для проверки в других настройках.",
+	"Select up to four sites. Changes are saved automatically.": "Выберите до четырёх сайтов. Изменения сохраняются автоматически.",
+	"Connection check settings": "Настройки проверки соединения",
+	"Test sites": "Сайты для проверки",
+	"Select up to four sites.": "Выберите не более четырёх сайтов.",
 	"Manual configs": "Ручные конфигурации",
 	"Custom subscription node selection": "Выбор узлов подписки вручную",
 	"Config sources": "Источники конфигураций",

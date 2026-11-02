@@ -711,17 +711,21 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 
 /* The three site checks share two former tile columns; usage takes the third. */
 .mk-grid.pwp-status-row{grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,2fr) minmax(220px,1fr)}
-.pwp-status-row .pwp-social-card{display:flex;flex-direction:column;gap:7px;justify-content:center}
+.pwp-status-row .pwp-social-card{display:flex;flex-direction:column;gap:7px;justify-content:flex-start}
+.mk .pwp-check-sites{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center}
+.mk .pwp-check-sites .cbi-checkbox{display:inline-flex;align-items:center;gap:5px;margin:0;padding:3px 6px;font-size:12px;white-space:nowrap;border-radius:6px;background:var(--soft)}
 .mk .pwp-social-check{display:grid;grid-template-columns:32px minmax(0,1fr) minmax(70px,auto);gap:9px;align-items:center;min-height:43px;width:100%;padding:7px 9px;border:0;border-radius:10px;color:var(--text);background:var(--soft);background:color-mix(in srgb,var(--site-colour) 10%,var(--panel));font:inherit;text-align:start;cursor:pointer}
 .mk .pwp-social-check:hover{background:color-mix(in srgb,var(--site-colour) 17%,var(--panel))}
 .mk .pwp-social-check:disabled{cursor:wait;opacity:.7}
 .mk .pwp-social-check:focus-visible,.mk .pwp-usage-periods button:focus-visible{outline:2px solid var(--zgz-accent,#3b82f6);outline-offset:2px}
 .pwp-social-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;color:var(--site-colour);background:color-mix(in srgb,var(--site-colour) 15%,var(--panel))}
 .pwp-social-icon .mk-ico{width:18px;height:18px}
-.pwp-social-name{font-size:14px;font-weight:600;min-width:0}
+.pwp-social-icon img{width:20px;height:20px;object-fit:contain}
+.pwp-social-name{font-size:13px;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pwp-check-value{font-size:13px;font-weight:600;text-align:end;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .pwp-status-row .pwp-usage-card{--usage-padding:16px;position:relative;overflow:hidden;padding-inline-end:46px;display:flex;flex-direction:column;gap:10px;background:var(--panel)}
-.pwp-usage-title{display:flex;justify-content:space-between;gap:6px;font-size:14px;font-weight:700;line-height:1.5;color:var(--muted)}
+.pwp-usage-title{display:flex;align-items:center;min-height:56px;gap:12px;font-size:14px;font-weight:700;line-height:1.5;color:var(--muted)}
+.pwp-usage-title>.mk-metric-ico{flex-shrink:0}
 
 .pwp-usage-body{display:flex;gap:10px;flex:1;align-items:stretch}
 .pwp-usage-values{display:flex;flex-direction:column;justify-content:center;gap:7px;flex:1;min-width:0}

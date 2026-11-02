@@ -21,6 +21,7 @@
 'require uci';
 'require zirgozar.i18n as i18n';
 'require zirgozar.ui as pui';
+'require zirgozar.checksites as checksites';
 
 var _ = i18n.tr;
 
@@ -293,6 +294,66 @@ return view.extend({
 		o.rmempty = false;
 
 		/* ----------------------------------------------- load balancing */
+		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Connection check settings'));
+		s.anonymous = true;
+		o = s.option(form.MultiValue, 'connection_check_sites', _('Test sites'), _('Select up to four sites. Changes are saved automatically.'));
+		o.widget = 'checkbox'; o.orientation = 'horizontal';
+		checksites.sites.forEach(function(site) { o.value(site.id, site.name); });
+		o.cfgvalue = function(section) { return checksites.selected(uci.get('zirgozar', section, this.option)).map(function(site) { return site.id; }); };
+		o.validate = function(section, value) { return !value || (Array.isArray(value) ? value : String(value).split(/\s+/)).length <= 4 || _('Select up to four sites.'); };
+		o.write = function(section, value) { uci.set('zirgozar', section, this.option, Array.isArray(value) && value.length ? value.join(' ') : 'none'); };
+		o.remove = function(section) { this.write(section, []); };
+		o.renderWidget = function(section, index, value) {
+			var readonly = this.readonly != null ? this.readonly : this.map.readonly;
+			var control = new ui.Select(value || [], this.transformChoices(), {
+				id: this.cbid(section), sort: this.keylist, multiple: true, widget: 'checkbox',
+				orientation: 'horizontal', optional: true, validate: this.getValidator(section), disabled: readonly
+			});
+			// LuCI Select reads radio buttons by default, even in checkbox mode.
+			control.getValue = function() {
+				return Array.from(this.node.querySelectorAll('input[type="checkbox"]')).filter(function(input) { return input.checked; }).map(function(input) { return input.value; });
+			};
+			control.setValue = function(values) {
+				values = Array.isArray(values) ? values : [];
+				Array.from(this.node.querySelectorAll('input[type="checkbox"]')).forEach(function(input) { input.checked = values.indexOf(input.value) >= 0; });
+			};
+			var widget = control.render();
+			Array.from(widget.querySelectorAll('input[type="checkbox"]')).forEach(function(input) {
+				control.setUpdateEvents(input, 'change', 'blur');
+				control.setChangeEvents(input, 'change');
+			});
+			widget.classList.add('pwp-check-sites');
+			function limit() {
+				var inputs = Array.from(widget.querySelectorAll('input[type="checkbox"]'));
+				var full = inputs.filter(function(input) { return input.checked; }).length >= 4;
+				inputs.forEach(function(input) { input.disabled = readonly || (full && !input.checked); });
+			}
+			widget.addEventListener('change', limit); limit();
+			var pending = Promise.resolve(), saved = control.getValue(), saving = 0;
+			document.addEventListener('click', function(event) {
+				var link = event.target.closest && event.target.closest('.mk-tabs a[href]');
+				if (!saving || !link || event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+				event.preventDefault();
+				var href = link.href;
+				pending.then(function() { window.location.href = href; });
+			}, true);
+			widget.addEventListener('change', function() {
+				var choices = control.getValue();
+				saving++;
+				pending = pending.then(function() {
+					return callAction('check_sites', choices.join(' ')).then(function(result) {
+						if (!result || !result.ok) throw new Error((result && result.error) || _('Could not save settings.'));
+						saved = choices;
+						uci.set('zirgozar', section, 'connection_check_sites', choices.length ? choices.join(' ') : 'none');
+					});
+				}).catch(function(error) {
+					if (control.getValue().join(' ') === choices.join(' ')) { control.setValue(saved); limit(); }
+					ui.addNotification(null, E('p', {}, error.message || _('Could not save settings.')), 'error');
+				}).finally(function() { saving--; });
+			});
+			return widget;
+		};
+
 		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Load Balancing'),
 			_('HAProxy, from App Update, spreads connections over the servers below and leaves out one that stops answering. Point a config at 127.0.0.1 and the port to use them.'));
 		s.anonymous = true;

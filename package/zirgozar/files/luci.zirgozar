@@ -401,7 +401,7 @@ method_check() {
 	code="${t%% *}"
 	json_init
 	case "$code" in
-		2??|3??) json_add_int "ms" "$(printf '%s' "$t" | awk '{ m = int($2 * 1000 + 0.5); print (m < 1 ? 1 : m) }')" ;;
+		[2-5][0-9][0-9]) json_add_int "ms" "$(printf '%s' "$t" | awk '{ m = int($2 * 1000 + 0.5); print (m < 1 ? 1 : m) }')" ;;
 		*) json_add_int "ms" 0 ;;
 	esac
 	case "$code" in [1-5][0-9][0-9]) json_add_int "http_code" "$code" ;; esac
@@ -656,6 +656,26 @@ method_action() {
 			if [ -s "$JOB" ]; then fail "Another install is still running. Try again when it is done."; return; fi ;;
 	esac
 	case "$name" in
+		check_sites)
+			local site count=0 choices=""
+			for site in $arg; do
+				[ "$site" != radiojavan ] || site=youtube
+				case "$site" in ig|reddit|x|youtube|arvancloud|soft98|cloudflare|nvidia|intel|steam) : ;; *) fail 'Invalid connection check sites.'; return ;; esac
+				case " $choices " in *" $site "*) fail 'Invalid connection check sites.'; return ;; esac
+				count=$((count + 1))
+				[ "$count" -le 4 ] || { fail 'Select up to four sites.'; return; }
+				choices="${choices:+$choices }$site"
+			done
+			# Isolate this immediate preference write from other staged UCI edits.
+			local savedir="$ZGZ_RUN/checksites-uci.$$"
+			mkdir -m 700 "$savedir" || { fail 'Could not save settings.'; return; }
+			if ! uci -t "$savedir" set "zirgozar.config.connection_check_sites=${choices:-none}" ||
+			   ! uci -t "$savedir" commit zirgozar; then
+				rm -f "$savedir/zirgozar"; rmdir "$savedir" 2>/dev/null || true
+				fail 'Could not save settings.'; return
+			fi
+			rmdir "$savedir" 2>/dev/null || true
+			;;
 		connect)
 			uci -q set zirgozar.config.enabled='1' && uci -q commit zirgozar
 			# The switch turned on by hand outranks a scheduled stop.

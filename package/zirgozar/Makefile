@@ -6,7 +6,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zirgozar
 PKG_VERSION:=5.8.11
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
 PKG_LICENSE:=AGPL-3.0-or-later
@@ -112,6 +112,11 @@ define Package/zirgozar/install
 		$(1)/www/luci-static/resources/zirgozar/ui.js
 	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/status.js \
 		$(1)/www/luci-static/resources/zirgozar/status.js
+	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/checksites.js \
+		$(1)/www/luci-static/resources/zirgozar/checksites.js
+	$(INSTALL_DIR) $(1)/www/luci-static/resources/zirgozar/site-icons
+	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/site-icons/* \
+		$(1)/www/luci-static/resources/zirgozar/site-icons/
 	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/qr.js \
 		$(1)/www/luci-static/resources/zirgozar/qr.js
 	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/nodelink.js \

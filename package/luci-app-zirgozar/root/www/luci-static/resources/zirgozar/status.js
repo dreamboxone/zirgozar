@@ -22,6 +22,7 @@
 'require uci';
 'require zirgozar.i18n as i18n';
 'require zirgozar.ui as pui';
+'require zirgozar.checksites as checksites';
 
 var _ = i18n.tr;
 
@@ -143,7 +144,7 @@ function renderUsage() {
 function usageCard() {
 	var fa = i18n.get() === 'fa';
 	return E('section', { 'id': 'pwp-usage-card', 'class': 'mk-card pwp-usage-card', 'aria-label': _('Usage (GB)') }, [
-		E('div', { 'class': 'pwp-usage-title' }, _('Usage (GB)')),
+		E('div', { 'class': 'pwp-usage-title' }, [E('span', { 'class': 'mk-metric-ico', 'style': '--accent:#3b82f6' }, pui.icon('chart')), E('span', {}, _('Usage (GB)'))]),
 		E('div', { 'class': 'pwp-usage-body' }, [
 			E('div', { 'id': 'pwp-usage-panel', 'role': 'tabpanel', 'aria-labelledby': 'pwp-period-' + usagePeriod, 'class': 'pwp-usage-values', 'aria-live': 'polite' }, ['up', 'down', 'total'].map(function(key) {
 				return E('div', { 'class': 'pwp-usage-value pwp-usage-' + key }, [ E('span', {}, _({ up: 'Upload', down: 'Download', total: 'Total' }[key])), E('strong', { 'id': 'pwp-usage-' + key, 'dir': 'ltr' }, '—') ]);
@@ -164,15 +165,16 @@ function usageCard() {
 	]);
 }
 
-function socialCheck(id, name, mark, colour, url) {
+function socialCheck(id, name, mark, colour, url, icon) {
 	return E('button', { 'type': 'button', 'id': id, 'class': 'pwp-social-check', 'style': '--site-colour:' + colour, 'click': function() { return check(id, url); } }, [
-		E('span', { 'class': 'pwp-social-icon' }, brand(mark)), E('span', { 'class': 'pwp-social-name' }, name), E('span', { 'class': 'pwp-check-value', 'id': id + '-v' }, i18n.get() === 'fa' ? _('Connection check') : _('Check'))
+		E('span', { 'class': 'pwp-social-icon' }, icon ? E('img', { 'src': '/luci-static/resources/zirgozar/site-icons/' + icon, 'alt': '', 'aria-hidden': 'true' }) : brand(mark)), E('span', { 'class': 'pwp-social-name' }, name), E('span', { 'class': 'pwp-check-value', 'id': id + '-v' }, i18n.get() === 'fa' ? _('Connection check') : _('Check'))
 	]);
 }
 
 /* The three sites' marks, drawn in one colour like every other icon on the
    page - white on the tile's own colour - rather than in their makers'. */
 var BRANDS = {
+	youtube: '<rect x="2" y="5" width="20" height="14" rx="4"/><path d="M10 9l6 3-6 3z" fill="var(--panel,#fff)"/>',
 	instagram:  '<path fill-rule="evenodd" d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5zm0 2a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3H7zm5 3.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9zm0 2a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/>' +
 	            '<circle cx="17.5" cy="6.5" r="1.2"/>',
 	reddit:     '<path fill-rule="evenodd" d="M4 14.5a8 5.5 0 1 0 16 0a8 5.5 0 1 0-16 0zm3.7-1a1.4 1.4 0 1 0 2.8 0a1.4 1.4 0 1 0-2.8 0zm5.8 0a1.4 1.4 0 1 0 2.8 0a1.4 1.4 0 1 0-2.8 0zM8.8 16.6q3.2 2.2 6.4 0q-3.2 1.1-6.4 0z"/>' +
@@ -457,7 +459,8 @@ function check(id, url) {
 		var ms = Number(r && r.ms) || 0;
 		if (!v) return;
 		v.className = 'pwp-check-value ' + (ms > 0 ? (ms < 1000 ? 'mk-on' : ms < 2000 ? 'mk-wait' : 'mk-bad') : 'mk-bad');
-		v.textContent = ms > 0 ? pui.ms(ms) : _('N/A');
+		if (r && Number(r.http_code) >= 400) v.className = 'pwp-check-value mk-wait';
+		v.textContent = ms > 0 ? pui.ms(ms) : r && /^[45][0-9]{2}$/.test(String(r.http_code)) ? 'HTTP ' + r.http_code : _('N/A');
 		v.title = r && r.http_code ? 'HTTP ' + r.http_code : '';
 	}).catch(function() {
 		if (v) { v.className = 'pwp-check-value mk-bad'; v.textContent = _('N/A'); v.title = ''; }
@@ -486,13 +489,15 @@ return baseclass.extend({
 		var tr = (data && data[1]) || null;
 		usageEnabled = st ? st.stats_enabled !== false : uci.get('zirgozar', 'config', 'stats_enabled') != '0';
 
+		var selectedChecks = checksites.selected(uci.get('zirgozar', 'config', 'connection_check_sites'));
 		var tiles = E('div', { 'class': 'mk-grid mk-metrics pwp-status-row', 'style': 'margin-bottom:18px' }, [
 			tile('pwp-core', pui.icon('cpu'), '#3b82f6', _('Core'), '-'),
-			E('section', { 'class': 'mk-card pwp-social-card', 'aria-label': _('Connection checks') }, [
-				socialCheck('pwp-chk-ig', _('Instagram'), 'instagram', '#df458e', 'https://www.instagram.com'),
-				socialCheck('pwp-chk-reddit', _('Reddit'), 'reddit', '#ec693c', 'https://www.reddit.com'),
-				socialCheck('pwp-chk-x', 'X', 'x', '#329dc2', 'https://x.com')
-			]),
+			E('section', { 'class': 'mk-card pwp-social-card', 'aria-label': _('Connection check') }, [
+				E('div', { 'class': 'pwp-usage-title' }, [E('span', { 'class': 'mk-metric-ico', 'style': '--accent:#3b82f6' }, pui.icon('globe')), E('span', {}, _('Connection check'))]),
+			].concat(selectedChecks.length ? selectedChecks.map(function(site) {
+				return socialCheck('pwp-chk-' + site.id, _(site.name), site.mark, site.colour, site.url,
+					site.mark ? null : site.id + (site.id == 'arvancloud' ? '.svg' : '.ico'));
+			}) : [E('a', { 'href': L.url('admin/services/zirgozar/other') }, _('Select test sites in Other Settings.'))])),
 			usageCard()
 		]);
 

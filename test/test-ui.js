@@ -3,6 +3,7 @@
  * Part of Zirgozar - https://github.com/dreamboxone/zirgozar
  */
 'use strict';
+require('./test-checksites.js');
 require('./test-status-ui.js');
 require('./test-home-ui.js');
 require('./test-nodes-ui.js');

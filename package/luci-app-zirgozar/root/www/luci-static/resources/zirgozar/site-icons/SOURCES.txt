@@ -1,0 +1,9 @@
+Site icons are used to identify their respective services. Brand names and logos belong to their respective owners.
+
+Sources:
+ArvanCloud: https://www.arvancloud.ir/images/v6/svg/logo-header-desktop-v6.svg (symbol viewport)
+Soft98: https://soft98.ir/favicon.ico
+Cloudflare: https://www.cloudflare.com/favicon.ico
+NVIDIA: https://www.nvidia.com/favicon.ico
+Intel: https://www.intel.com/favicon.ico
+Steam: https://store.steampowered.com/favicon.ico

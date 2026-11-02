@@ -24,7 +24,7 @@ let language = 'fa', requests = 0, finish;
 const storage = new Map();
 const api = new Function('rpc', 'i18n', 'pui', 'E', 'document', 'Node', 'window', 'uci', source.slice(0, source.indexOf('\nreturn baseclass.extend(')) + '\nreturn {statusMessage, badge, bindMainSwitch, mainSwitchChanged, syncMainSwitch, savedUsagePeriod, usageTotals, usageCard, socialCheck, check, setEnabled: function(value) {usageEnabled=value;renderUsage();}, setScope: function(nodes) {scope=nodes;}, setTraffic: function(data) {usageData=data;renderUsage();}};')(
 	{ declare: spec => spec.method === 'check' ? () => { requests++; return new Promise(resolve => { finish = resolve; }); } : () => Promise.resolve({}) },
-	{ tr: value => value, get: () => language }, { ms: value => value + ' ms' }, element, { getElementById: () => null, createTextNode: text => ({textContent:text}) }, class Node {},
+	{ tr: value => value, get: () => language }, { ms: value => value + ' ms', icon: name => element('span', {class:'mk-ico'}, '') }, element, { getElementById: () => null, createTextNode: text => ({textContent:text}) }, class Node {},
 	{ localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) } }, { get: () => '0' }
 );
 const traffic = { today: { up: 1e9, down: 2e9 }, week: { up: 4e9, down: 8e9 }, month: { up: 99e9, down: 99e9 }, days: [
@@ -58,7 +58,11 @@ finish({ms:321,http_code:200});
 pending.then(async () => {
 	assert.equal(social.querySelector('#site-v').textContent, '321 ms'); assert.equal(social.disabled, false);
 	const failed = social.attrs.click(); finish({ms:0,http_code:403}); await failed;
-	assert.equal(social.querySelector('#site-v').textContent, 'N/A');
+	assert.equal(social.querySelector('#site-v').textContent, 'HTTP 403');
+	const refused = social.attrs.click(); finish({ms:250,http_code:403}); await refused;
+	assert.equal(social.querySelector('#site-v').textContent, '250 ms');
+	assert.equal(social.querySelector('#site-v').title, 'HTTP 403');
+	assert.match(social.querySelector('#site-v').className, /mk-wait/);
 	console.log('Status cards passed: real URL results, duplicate prevention, GB totals, 7/30-day ranges and languages');
 }).catch(error => { console.error(error); process.exitCode=1; });
 
