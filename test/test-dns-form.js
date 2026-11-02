@@ -1,0 +1,40 @@
+const fs=require('fs'),assert=require('node:assert/strict'),net=require('net');
+const path=require('path');
+const file=path.join(__dirname,'../package/luci-app-zirgozar/root/www/luci-static/resources/view/zirgozar/settings.js');
+const source=fs.readFileSync(file,'utf8').split('\nreturn view.extend(')[0];
+async function run(){
+ let response=()=>Promise.resolve({ok:true,ip:'203.0.113.5'});
+ let data={remote_dns_doh:'https://8.8.8.8/dns-query'},requests=[];
+ const uci={get:(p,s,k)=>data[k],set:(p,s,k,v)=>data[k]=v,unset:(p,s,k)=>delete data[k]};
+ const rpc={declare:spec=>(action,url)=>{requests.push([action,url]);return response();}};
+ const api=new Function('rpc','i18n','uci','form','validation',source+'\nreturn {remoteDohFields,remoteTlsFields};')(rpc,{tr:v=>v},uci,{Value:1,ListValue:2},{parseIPv4:v=>net.isIP(v)===4,parseIPv6:v=>net.isIP(v)===6});
+ function section(){const fields={};const s={formvalue:(sid,k)=>fields[k].formvalue(sid),taboption:(tab,type,key)=>{const o={section:s,choices:[],value(v,l){this.choices.push([v,l]);},depends(){},cfgvalue:()=>data[key],formvalue(){return this.current===undefined?this.cfgvalue('config'):this.current;},getUIElement(){return {setValue:v=>{this.current=v;},triggerValidation(){}};},parse(){return this.validate?this.validate('config',this.formvalue('config')):true;},isActive:()=>true};fields[key]=o;return o;}};return s;}
+ let doh=api.remoteDohFields(section());
+ assert(doh.provider.choices.some(p=>p[0]==='https://dns.malw.link/dns-query'));
+ await doh.provider.onchange(null,'config','https://dns.malw.link/dns-query');
+ assert.equal(doh.bootstrap.formvalue(),'203.0.113.5');
+ assert.equal(doh.endpoint.validate('config',doh.endpoint.formvalue()),true);
+ doh.endpoint.write('config',doh.endpoint.formvalue());
+ assert.equal(data.remote_dns_doh,'https://dns.malw.link/dns-query,203.0.113.5');
+ assert.equal(doh.provider.cfgvalue('config'),'https://dns.malw.link/dns-query');
+ const count=requests.length;await doh.resolve('config');assert.equal(requests.length,count);
+ let tls=api.remoteTlsFields(section());assert(tls.provider.choices.some(p=>p[0]==='malw'));
+ await tls.provider.onchange(null,'config','malw');
+ assert.equal(tls.bootstrap.formvalue(),'203.0.113.5');assert.equal(tls.certificate.formvalue(),'dns.malw.link');
+ tls.address.write('config',tls.address.formvalue());assert.equal(data.remote_dns_tls_hostname,'dns.malw.link');
+ tls.bootstrap.current='192.0.2.7';tls.bootstrap.onchange(null,'config');await tls.resolve('config');assert.equal(tls.bootstrap.formvalue(),'192.0.2.7');
+ let complete;response=()=>new Promise(r=>{complete=r;});
+ doh.endpoint.current='https://other.example/dns-query';doh.bootstrap.current='';
+ const parsing=doh.endpoint.parse('config');assert.equal(typeof complete,'function');
+ complete({ok:true,ip:'192.0.2.9'});assert.equal(await parsing,true);
+ assert.equal(doh.bootstrap.formvalue(),'192.0.2.9');
+ doh.endpoint.current='https://third.example/dns-query';doh.bootstrap.current='';
+ const stale=doh.resolve('config');doh.bootstrap.current='192.0.2.10';doh.bootstrap.onchange(null,'config');
+ complete({ok:true,ip:'192.0.2.11'});await stale;assert.equal(doh.bootstrap.formvalue(),'192.0.2.10');
+ response=()=>Promise.resolve({ok:false,error:'Could not find the bootstrap IP. Enter it manually.'});
+ doh.endpoint.current='https://failed.example/dns-query';doh.bootstrap.current='';
+ await assert.rejects(doh.endpoint.parse('config'),/Could not find/);
+ assert(requests.every(r=>r[0]==='doh_bootstrap'));
+ console.log('Custom DNS: Malw DoH/DoT presets, automatic bootstrap, hostname preservation and manual IP passed');
+}
+run().catch(e=>{console.error(e);process.exitCode=1;});

@@ -224,3 +224,5 @@ async function cacheCase(installed, stamp, seen, repeats = 1) {
 	assert.equal(removed, true);
 	console.log('Live uptime passed: advances without page refresh, resyncs after reboot, survives RPC failure and stops on navigation');
 })().catch(error => { console.error(error); process.exitCode = 1; });
+
+require('./test-dns-form.js');

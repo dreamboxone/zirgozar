@@ -1,0 +1,56 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+set -eu
+. "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
+reply() {
+	ucode -e 'printf("%J\n", {ok:ARGV[0] == "1", ip:ARGV[1], error:ARGV[2]});' "$1" "${2:-}" "${3:-}"
+}
+host="$(ucode -e '
+let m=match(ARGV[0] ?? "", /^https:\/\/([A-Za-z0-9][A-Za-z0-9.-]*)(:[0-9]+)?(\/|$)/);
+if(!m || length(m[1])>253) exit(1);
+for(let label in split(m[1], ".")) if(!match(label,/^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$/) || length(label)>63) exit(1);
+print(m[1]);
+' "${1:-}" 2>/dev/null)" || { reply 0 '' 'Invalid HTTPS endpoint.'; exit 0; }
+if ! tunnel_running; then
+	reply 0 '' 'Connect the tunnel to find the bootstrap IP, or enter it manually.'; exit 0
+fi
+port="$(cfg node_socks_port 1070)"
+case "$port" in ''|0|*[!0-9]*) reply 0 '' 'Connect the tunnel to find the bootstrap IP, or enter it manually.'; exit 0 ;; esac
+[ "$port" -le 65535 ] || { reply 0 '' 'Could not find the bootstrap IP. Enter it manually.'; exit 0; }
+umask 077
+work="$(mktemp -d "$ZGZ_RUN/doh-bootstrap.XXXXXX")"
+cleanup() { rm -f "$work/answer"; rmdir "$work" 2>/dev/null || true; }
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+for record in A AAAA; do
+	# The fixed IP avoids resolving the bootstrap resolver itself. TLS still
+	# verifies dns.google, and the request uses only the live SOCKS listener.
+	if ! curl -fsS --noproxy '' --socks5-hostname "127.0.0.1:$port" \
+		--connect-to dns.google:443:8.8.8.8:443 --connect-timeout 5 --max-time 8 \
+		--max-filesize 65536 --proto '=https' \
+		"https://dns.google/resolve?name=$host&type=$record" > "$work/answer" 2>/dev/null; then continue; fi
+	ip="$(ucode -e '
+import {readfile} from "fs";
+let r=json(readfile(ARGV[0]));
+if(type(r)!="object" || r.Status!=0 || type(r.Answer)!="array") exit(1);
+for(let a in r.Answer) {
+ let s=a.data;
+ if(type(s)!="string") continue;
+ if(a.type==1 && match(s,/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/)) {
+  let valid=true; for(let n in split(s,".")) if(int(n)>255) valid=false;
+  if(valid) {print(s);exit(0);}
+ }
+ if(a.type==28 && match(s,/^[0-9a-fA-F:]+$/) && length(s)<=39) {
+  let groups=split(s,":"), count=0, valid=true;
+  for(let g in groups) if(g!="") {count++;if(length(g)>4)valid=false;}
+  let compressed=index(s,"::")>=0;
+  if((!compressed && (substr(s,0,1)==":" || substr(s,-1)==":")) || index(s,":::")>=0 || (compressed && length(split(s,"::"))!=2)) valid=false;
+  if(valid && ((compressed && count<8) || (!compressed && count==8))) {print(s);exit(0);}
+ }
+}
+exit(1);
+' "$work/answer" 2>/dev/null)" || ip=''
+	if [ -n "$ip" ]; then reply 1 "$ip"; exit 0; fi
+done
+reply 0 '' 'Could not find the bootstrap IP. Enter it manually.'

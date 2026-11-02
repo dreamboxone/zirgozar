@@ -218,6 +218,161 @@ function fillNodeChoices(widget, keys, labels) {
 	select.value = current;
 }
 
+var DOH_PRESETS = [
+	['https://1.1.1.1/dns-query','CloudFlare'],
+	['https://1.1.1.2/dns-query','CloudFlare-Security'],
+	['https://8.8.4.4/dns-query','Google 8844'],
+	['https://8.8.8.8/dns-query','Google 8888'],
+	['https://9.9.9.9/dns-query','Quad9-Recommended 9.9.9.9'],
+	['https://149.112.112.112/dns-query','Quad9-Recommended 149.112.112.112'],
+	['https://208.67.222.222/dns-query','OpenDNS'],
+	['https://dns.adguard.com/dns-query,94.140.14.14','AdGuard'],
+	['https://doh.libredns.gr/dns-query,116.202.176.26','LibreDNS'],
+	['https://dns.malw.link/dns-query','Malw DNS']
+];
+function dohParts(value) {
+	var parts=String(value || '').split(',');
+	return {url:parts[0].trim(), bootstrap:(parts[1] || '').trim()};
+}
+function dohHost(url) {
+	url=String(url || '').trim();
+	if (!url) throw new Error(_('A DoH endpoint is required.'));
+	var parsed;
+	try { parsed=new URL(url); } catch(e) { throw new Error(_('Invalid HTTPS endpoint.')); }
+	if (parsed.protocol != 'https:' || parsed.username || parsed.password || parsed.hash || /[\s,]/.test(url)) throw new Error(_('Invalid HTTPS endpoint.'));
+	return parsed.hostname.replace(/^\[|\]$/g,'');
+}
+function dohLiteral(ip) { return !!(validation.parseIPv4(ip) || validation.parseIPv6(ip)); }
+function dohValidate(url, bootstrap) {
+	var host;
+	try {host=dohHost(url);} catch(e) {return e.message;}
+	bootstrap=String(bootstrap || '').trim();
+	if (bootstrap && !dohLiteral(bootstrap)) return _('Enter one literal bootstrap IP.');
+	if (!dohLiteral(host) && !bootstrap) return _('For a hostname, enter the bootstrap IP in the field below.');
+	return true;
+}
+function dnsBootstrapControls(endpoint, bootstrap, storedParts, toURL, onHost, onLiteral) {
+	var pending={}, notices={}, buttons={}, baselines={}, setting=false;
+	toURL=toURL || function(v){return v;};
+	function value(option,sid){var v=option.formvalue(sid);return String(v==null?option.cfgvalue(sid):v).trim();}
+	function setIP(sid,ip){
+		var field=bootstrap.getUIElement(sid);if(!field)return;
+		setting=true;field.setValue(ip);
+		var input=field.node && field.node.querySelector('input');if(input)input.dispatchEvent(new Event('change',{bubbles:true}));
+		setting=false;var urlField=endpoint.getUIElement(sid);if(urlField)urlField.triggerValidation();
+	}
+	function resolve(sid,force){
+		var raw=value(endpoint,sid),url,host;
+		try{url=toURL(raw);host=dohHost(url);}catch(e){return Promise.reject(e);}
+		if(onHost)onHost(sid,host);
+		if(dohLiteral(host)){if(onLiteral)setIP(sid,host);return Promise.resolve(host);}
+		var ip=value(bootstrap,sid),old=storedParts(sid);
+		if(!baselines[sid]){var oldHost='';try{oldHost=dohHost(old.url);}catch(e){}baselines[sid]={host:oldHost,ip:old.bootstrap};}
+		var baseline=baselines[sid];
+		if(host!==baseline.host && ip && ip===baseline.ip){setIP(sid,'');ip='';}
+		baseline.host=host;
+		if(ip && !force)return Promise.resolve(ip);
+		if(pending[sid] && pending[sid].url===url)return pending[sid].promise;
+		var request={url:url,raw:raw,ip:ip};pending[sid]=request;
+		if(notices[sid])notices[sid].textContent=_('Finding the bootstrap IP through the tunnel…');
+		if(buttons[sid])buttons[sid].disabled=true;
+		request.promise=callAction('doh_bootstrap',new URL(url).href).then(function(result){
+			if(pending[sid]!==request || value(endpoint,sid)!==raw || value(bootstrap,sid)!==ip)return;
+			if(!result || !result.ok || !dohLiteral(result.ip || ''))throw new Error(_((result && result.error) || 'Could not find the bootstrap IP. Enter it manually.'));
+			setIP(sid,result.ip);baseline.ip=result.ip;
+			if(notices[sid])notices[sid].textContent=_('Bootstrap IP found: %s').replace('%s',result.ip);
+			return result.ip;
+		}).catch(function(error){if(pending[sid]===request && value(endpoint,sid)===raw && notices[sid])notices[sid].textContent=error.message;throw error;})
+		.finally(function(){if(pending[sid]===request){delete pending[sid];if(buttons[sid])buttons[sid].disabled=!!(bootstrap.readonly || (bootstrap.map && bootstrap.map.readonly));}});
+		return request.promise;
+	}
+	bootstrap.onchange=function(ev,sid){if(!setting && baselines[sid])baselines[sid].ip=undefined;var field=endpoint.getUIElement(sid);if(field)field.triggerValidation();};
+	endpoint.onchange=function(ev,sid){return resolve(sid,false).catch(function(){});};
+	[endpoint,bootstrap].forEach(function(option){var parse=option.parse;if(typeof parse==='function')option.parse=function(sid){var self=this,args=arguments;if(!self.isActive(sid))return parse.apply(self,args);return resolve(sid,false).then(function(){return parse.apply(self,args);});};});
+	var render=bootstrap.renderWidget;
+	if(typeof render==='function')bootstrap.renderWidget=function(sid){
+		var self=this,widget=render.apply(this,arguments);
+		function wrap(node){
+			notices[sid]=E('p',{'role':'status','class':'pwp-note','style':'display:block;margin-top:6px'});
+			buttons[sid]=E('button',{'type':'button','class':'btn cbi-button','disabled':(self.readonly || (self.map && self.map.readonly))?'':null,'click':function(){resolve(sid,true).catch(function(){});}},_('Find bootstrap IP'));
+			return E('div',{},[E('div',{'class':'pwp-doh-bootstrap'},[node,buttons[sid]]),notices[sid]]);
+		}
+		return widget && typeof widget.then==='function'?widget.then(wrap):wrap(widget);
+	};
+	return {resolve:resolve,setIP:setIP};
+}
+function remoteDohFields(s) {
+	function stored(sid){return uci.get('zirgozar',sid,'remote_dns_doh') || 'https://8.8.8.8/dns-query';}
+	function history(sid){var h=uci.get('zirgozar',sid,'remote_dns_doh_custom');return Array.isArray(h)?h:(h?[h]:[]);}
+	var dynamic=DOH_PRESETS.filter(function(p){return dohValidate(p[0],'')!==true;}).map(function(p){return p[0];});
+	var choices=DOH_PRESETS.map(function(p){return p[0];});
+	var provider=s.taboption('dns',form.ListValue,'_remote_dns_doh_provider',_('Remote DNS DoH'));
+	DOH_PRESETS.forEach(function(p){provider.value(p[0],p[1]);});
+	history('config').forEach(function(v){if(choices.indexOf(v)<0 && dynamic.indexOf(dohParts(v).url)<0){choices.push(v);provider.value(v,v);}});
+	provider.value('_custom',_('Custom'));
+	provider.depends('remote_dns_protocol','doh');provider.depends('remote_dns_protocol','http3');
+	provider.cfgvalue=function(sid){var v=stored(sid),url=dohParts(v).url;return dynamic.indexOf(url)>=0?url:choices.indexOf(v)>=0?v:'_custom';};
+	provider.write=function(sid,v){if(v!='_custom' && dynamic.indexOf(v)<0)uci.set('zirgozar',sid,'remote_dns_doh',v);};provider.remove=function(){};
+	var endpoint=s.taboption('dns',form.Value,'remote_dns_doh',_('Custom DoH URL'),_('Enter the HTTPS URL here. No Add button or Enter key is needed.'));
+	endpoint.placeholder='https://dns.example.com/dns-query';endpoint.rmempty=false;
+	endpoint.cfgvalue=function(sid){return dohParts(stored(sid)).url;};
+	var bootstrap=s.taboption('dns',form.Value,'_remote_dns_doh_bootstrap',_('DoH bootstrap IP'),_('Found automatically through the active tunnel. You can enter the provider IP manually or refresh it. No direct DNS lookup is used.'));
+	bootstrap.placeholder=_('Automatic');bootstrap.cfgvalue=function(sid){return dohParts(stored(sid)).bootstrap;};
+	['_custom'].concat(dynamic).forEach(function(choice){['doh','http3'].forEach(function(proto){var dep={remote_dns_protocol:proto,_remote_dns_doh_provider:choice};endpoint.depends(dep);bootstrap.depends(dep);});});
+	endpoint.validate=function(sid,v){var ip=this.section.formvalue(sid,'_remote_dns_doh_bootstrap');return dohValidate(v,ip==null?dohParts(stored(sid)).bootstrap:ip);};
+	endpoint.write=function(sid,v){
+		var ip=String(this.section.formvalue(sid,'_remote_dns_doh_bootstrap') || '').trim(),combined=String(v).trim()+(ip?','+ip:'');
+		uci.set('zirgozar',sid,'remote_dns_doh',combined);
+		if(choices.indexOf(combined)<0){var saved=history(sid).slice();if(saved.indexOf(combined)<0)uci.set('zirgozar',sid,'remote_dns_doh_custom',saved.concat([combined]));}
+	};
+	bootstrap.validate=function(sid,v){return !v || dohLiteral(String(v).trim())?true:_('Enter one literal bootstrap IP.');};bootstrap.write=function(){};bootstrap.remove=function(){};
+	var controller=dnsBootstrapControls(endpoint,bootstrap,function(sid){return dohParts(stored(sid));});
+	provider.onchange=function(ev,sid,v){
+		v=v==null?provider.formvalue(sid):v;
+		if(dynamic.indexOf(v)<0)return;
+		var field=endpoint.getUIElement(sid);if(field)field.setValue(v);
+		controller.setIP(sid,dohParts(stored(sid)).url===v?dohParts(stored(sid)).bootstrap:'');
+		return controller.resolve(sid,false).catch(function(){});
+	};
+	var changeEndpoint=endpoint.onchange;
+	endpoint.onchange=function(ev,sid){var selected=provider.formvalue(sid);if(dynamic.indexOf(selected)>=0 && endpoint.formvalue(sid)!==selected){var field=provider.getUIElement(sid);if(field)field.setValue('_custom');}return changeEndpoint.call(this,ev,sid);};
+	return {provider:provider,endpoint:endpoint,bootstrap:bootstrap,resolve:controller.resolve};
+}
+var TLS_PRESETS=[
+	['cloudflare','CloudFlare','1.1.1.1','cloudflare-dns.com'],
+	['google','Google','8.8.8.8','dns.google'],
+	['malw','Malw DNS','dns.malw.link','dns.malw.link']
+];
+function tlsURL(value){var v=String(value || '').trim();if(!dohLiteral(v) && !/^[A-Za-z0-9.-]+$/.test(v))throw new Error(_('Enter a DNS hostname or IP address.'));return 'https://'+(v.indexOf(':')>=0?'['+v+']':v)+'/';}
+function remoteTlsFields(s){
+	var manualCertificate=false,settingCertificate=false;
+	function ip(sid){return uci.get('zirgozar',sid,'remote_dns_tls') || '1.1.1.1';}
+	function name(sid){return uci.get('zirgozar',sid,'remote_dns_tls_server_name') || 'cloudflare-dns.com';}
+	function host(sid){return uci.get('zirgozar',sid,'remote_dns_tls_hostname') || ip(sid);}
+	function depends(option){option.depends('remote_dns_protocol','tls');option.depends('remote_dns_protocol','quic');}
+	var provider=s.taboption('dns',form.ListValue,'_remote_dns_tls_provider',_('DoT provider'));
+	TLS_PRESETS.forEach(function(p){provider.value(p[0],p[1]);});provider.value('_custom',_('Custom'));depends(provider);
+	provider.cfgvalue=function(sid){var found=TLS_PRESETS.filter(function(p){return name(sid)===p[3] && (ip(sid)===p[2] || p[0]==='malw');})[0];return found?found[0]:'_custom';};provider.write=function(){};provider.remove=function(){};
+	var address=s.taboption('dns',form.Value,'_remote_dns_tls_address',_('DoT hostname or IP'),_('Enter a hostname or IP. A hostname is resolved through the tunnel and used for TLS certificate verification.'));
+	address.rmempty=false;address.cfgvalue=function(sid){return name(sid)==='dns.malw.link'?'dns.malw.link':host(sid);};depends(address);
+	var bootstrap=s.taboption('dns',form.Value,'remote_dns_tls',_('DoT server IP'),_('Found automatically through the active tunnel. You can enter the provider IP manually or refresh it. No direct DNS lookup is used.'));
+	bootstrap.datatype='ipaddr(1)';bootstrap.rmempty=false;bootstrap.cfgvalue=ip;depends(bootstrap);
+	var port=s.taboption('dns',form.Value,'remote_dns_tls_port',_('DoT server port'));port.datatype='port';port.default='853';port.rmempty=false;depends(port);
+	var certificate=s.taboption('dns',form.Value,'remote_dns_tls_server_name',_('DoT certificate name'),_('The certificate must match this name. TLS verification is always enabled; the selected DNS outbound is respected.'));
+	certificate.datatype='hostname';certificate.default='cloudflare-dns.com';certificate.rmempty=false;depends(certificate);
+	certificate.onchange=function(){if(!settingCertificate)manualCertificate=true;};
+	function setCertificate(sid,v){var field=certificate.getUIElement(sid);if(field){settingCertificate=true;field.setValue(v);field.triggerValidation();settingCertificate=false;}}
+	var controller=dnsBootstrapControls(address,bootstrap,function(sid){return {url:tlsURL(host(sid)),bootstrap:ip(sid)};},tlsURL,function(sid,h){if(!dohLiteral(h) && !manualCertificate && h!==host(sid))setCertificate(sid,h);},true);
+	address.validate=function(sid,v){try{var h=dohHost(tlsURL(v)),b=this.section.formvalue(sid,'remote_dns_tls');return dohLiteral(h) || dohLiteral(b || '')?true:_('For a hostname, enter the bootstrap IP in the field below.');}catch(e){return e.message;}};
+	address.write=function(sid,v){var h=dohHost(tlsURL(v));if(dohLiteral(h)){uci.unset('zirgozar',sid,'remote_dns_tls_hostname');uci.set('zirgozar',sid,'remote_dns_tls',h);}else uci.set('zirgozar',sid,'remote_dns_tls_hostname',h);};address.remove=function(){};
+	provider.onchange=function(ev,sid,v){
+		var preset=TLS_PRESETS.filter(function(p){return p[0]===(v==null?provider.formvalue(sid):v);})[0];if(!preset)return;
+		var field=address.getUIElement(sid);if(field)field.setValue(preset[2]);manualCertificate=false;setCertificate(sid,preset[3]);
+		var portField=port.getUIElement(sid);if(portField)portField.setValue('853');
+		controller.setIP(sid,dohLiteral(preset[2])?preset[2]:'');return controller.resolve(sid,false).catch(function(){});
+	};
+	return {provider:provider,address:address,bootstrap:bootstrap,certificate:certificate,resolve:controller.resolve};
+}
 return view.extend({
 	load: function() {
 		return Promise.all([
@@ -722,53 +877,9 @@ return view.extend({
 		o.depends('remote_dns_protocol', 'tcp');
 		o.depends('remote_dns_protocol', 'udp');
 
-		o = s.taboption('dns', form.Value, 'remote_dns_doh', _('Remote DNS DoH'),
-			_('Use an HTTPS URL. A hostname requires one literal bootstrap IP after a comma; no direct DNS lookup is performed.'));
-		o.default = 'https://8.8.8.8/dns-query';
-		o.value('https://1.1.1.1/dns-query', 'CloudFlare');
-		o.value('https://1.1.1.2/dns-query', 'CloudFlare-Security');
-		o.value('https://8.8.4.4/dns-query', 'Google 8844');
-		o.value('https://8.8.8.8/dns-query', 'Google 8888');
-		o.value('https://9.9.9.9/dns-query', 'Quad9-Recommended 9.9.9.9');
-		o.value('https://149.112.112.112/dns-query', 'Quad9-Recommended 149.112.112.112');
-		o.value('https://208.67.222.222/dns-query', 'OpenDNS');
-		o.value('https://dns.adguard.com/dns-query,94.140.14.14', 'AdGuard');
-		o.value('https://doh.libredns.gr/dns-query,116.202.176.26', 'LibreDNS');
-		savedDns(o, 'remote_dns_doh_custom', []);
-		o.depends('remote_dns_protocol', 'doh');
-		o.depends('remote_dns_protocol', 'http3');
-		o.validate = function(section_id, value) {
-			if (!value) return _('A DoH endpoint is required.');
-			var parts = value.split(','), url;
-			try { url = new URL(parts[0]); } catch (e) { return _('Invalid HTTPS endpoint.'); }
-			if (url.protocol !== 'https:' || url.username || url.password || url.hash || /\s/.test(value) || parts.length > 2)
-				return _('Invalid HTTPS endpoint.');
-			var host = url.hostname.replace(/^\[|\]$/g, '');
-			var isIP = function(v) { return !!(validation.parseIPv4(v) || validation.parseIPv6(v)); };
-			if (parts.length === 2 && !isIP(parts[1])) return _('Enter one literal bootstrap IP.');
-			if (!isIP(host) && !isIP(parts[1] || '')) return _('A hostname requires a bootstrap IP after a comma.');
-			return true;
-		};
+		remoteDohFields(s);
 
-		o = s.taboption('dns', form.Value, 'remote_dns_tls', _('DoT server IP'));
-		o.datatype = 'ipaddr(1)';
-		o.default = '1.1.1.1';
-		o.rmempty = false;
-		o.depends('remote_dns_protocol', 'tls');
-		o.depends('remote_dns_protocol', 'quic');
-		o = s.taboption('dns', form.Value, 'remote_dns_tls_port', _('DoT server port'));
-		o.datatype = 'port';
-		o.default = '853';
-		o.rmempty = false;
-		o.depends('remote_dns_protocol', 'tls');
-		o.depends('remote_dns_protocol', 'quic');
-		o = s.taboption('dns', form.Value, 'remote_dns_tls_server_name', _('DoT certificate name'),
-			_('The certificate must match this name. TLS verification is always enabled; the selected DNS outbound is respected.'));
-		o.datatype = 'hostname';
-		o.default = 'cloudflare-dns.com';
-		o.rmempty = false;
-		o.depends('remote_dns_protocol', 'tls');
-		o.depends('remote_dns_protocol', 'quic');
+		remoteTlsFields(s);
 
 		o = s.taboption('dns', form.ListValue, 'encrypted_dns_policy', _('Client encrypted DNS policy'),
 			_('Known services tunnels port 853 and known DoH destinations. Strict mode also tunnels TCP/UDP 5353 and additional protected DNS ports, while the Iran traffic split still controls ordinary websites. LAN and local mDNS remain available. With the Kill switch enabled, DNS protection stays active when the tunnel stops. Unknown DoH destinations and unlisted custom ports are not guaranteed.'));

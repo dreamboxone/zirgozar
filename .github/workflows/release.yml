@@ -158,6 +158,8 @@ jobs:
           sudo -E env RIG_ROOT="$RUNNER_TEMP/zirgozar-openvpn-live" RIG_XRAY="$PWD/prebuilt/x86_64/xray" sh test/test-openvpn-live.sh
           RIG_ROOT="$RUNNER_TEMP/zirgozar-dnsmasq-install" sh test/test-dnsmasq-install.sh
           RIG_ROOT="$RUNNER_TEMP/zirgozar-core-check" sh test/test-core-check.sh
+          sh test/test-finalmask-check.sh
+          sh test/test-dns-bootstrap.sh
 
       - name: Test differential package downloads
         run: |

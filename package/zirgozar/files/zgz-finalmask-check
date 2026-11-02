@@ -1,0 +1,54 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+set -eu
+. "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
+umask 077
+work="$(mktemp -d "$ZGZ_RUN/finalmask-check.XXXXXX")"
+cleanup() { rm -f "$work/request" "$work/config.json" "$work/probe.json" "$work/error"; rmdir "$work" 2>/dev/null || true; }
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+reply() {
+	ucode -e 'printf("%J\n", {ok: ARGV[0] == "1", error: ARGV[1], core: ARGV[2], detail: ARGV[3]});' \
+		"$1" "${2:-}" "${core:-}" "${3:-}"
+}
+head -c 65537 > "$work/request"
+if [ "$(wc -c < "$work/request")" -gt 65536 ] || ! ucode -e '
+import { readfile, writefile } from "fs";
+let r = json(readfile(ARGV[0]));
+if (type(r) != "object" || type(r.mask) != "object") exit(1);
+let c = { log: { loglevel: "warning" }, outbounds: [{ protocol: "freedom", streamSettings: { network: "raw", finalmask: r.mask } }] };
+writefile(ARGV[1], sprintf("%J", c));
+c.outbounds[0].streamSettings.finalmask = { tcp: [{ type: "zirgozar-invalid-mask", settings: {} }] };
+writefile(ARGV[2], sprintf("%J", c));
+' "$work/request" "$work/config.json" "$work/probe.json" 2>/dev/null; then
+	reply 0 'Invalid FinalMask settings.'; exit 0
+fi
+if [ "$(jsonfilter -i "$work/request" -e '@.patterniha' 2>/dev/null)" = true ]; then
+	core="$(core_dir)/xray-patterniha"
+elif [ "$(core_engine)" != xray ]; then
+	reply 0 'FinalMask requires an Xray core. Select Xray or Xray-patterniha.'; exit 0
+else
+	core="$(xray_preferred)"
+	[ -n "$core" ] || core="$(xray_by_version | awk '{print $1; exit}')"
+fi
+if [ -z "$core" ] || [ ! -x "$core" ]; then
+	reply 0 'The selected Xray core is not installed.'; exit 0
+fi
+# Older cores can silently ignore the whole finalmask object. They must
+# reject an unknown mask type before a successful check can mean support.
+if bounded 8 "$core" run -test -config "$work/probe.json" > "$work/error" 2>&1; then
+	reply 0 'The selected core does not recognize FinalMask. Update it or select Xray-patterniha.'; exit 0
+fi
+if ! grep -qi 'zirgozar-invalid-mask' "$work/error"; then
+	reply 0 'The selected core could not validate FinalMask.' "$(tail -c 800 "$work/error")"; exit 0
+fi
+if bounded 8 "$core" run -test -config "$work/config.json" > "$work/error" 2>&1; then
+	reply 1
+else
+	if grep -qi 'unknown config id' "$work/error"; then
+		reply 0 'This mask is not supported by the selected core. Update it or select Xray-patterniha.' "$(tail -c 800 "$work/error")"
+	else
+		reply 0 'The selected core rejected these FinalMask settings.' "$(tail -c 800 "$work/error")"
+	fi
+fi

@@ -794,6 +794,20 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 .mk.mk-follow .pwp-status-row .pwp-usage-card{padding-inline-end:46px!important}
 .pwp-status-row>*,.pwp-usage-body,.pwp-social-card{min-width:0}
 .pwp-usage-title{overflow-wrap:anywhere}
+.pwp-finalmask{display:flex;flex-direction:column;gap:10px}
+.pwp-mask-editor{display:flex;flex-direction:column;gap:8px}
+.pwp-finalmask details{border:1px solid var(--line);border-radius:10px;padding:10px}
+.pwp-finalmask summary{cursor:pointer;font-weight:600}
+.pwp-mask-list{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.pwp-mask-row{border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--soft)}
+.pwp-mask-row-head{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.pwp-mask-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:8px 0}
+.pwp-mask-field{display:flex;flex-direction:column;gap:4px;min-width:0;font-size:12px}
+.pwp-mask-field input,.pwp-mask-field select{width:100%;min-width:0}
+.pwp-mask-notice{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;margin:4px 0}
+.pwp-doh-bootstrap{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.pwp-doh-bootstrap>div{flex:1 1 200px;min-width:0}
+.pwp-doh-bootstrap>button{flex:0 0 auto}
 @media(max-width:700px){
 	.mk .mk-tabs{max-width:100%;min-width:0}
 	.mk .mk-hero-controls{max-width:100%;flex-wrap:wrap}

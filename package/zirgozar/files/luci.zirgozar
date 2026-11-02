@@ -656,6 +656,14 @@ method_action() {
 			if [ -s "$JOB" ]; then fail "Another install is still running. Try again when it is done."; return; fi ;;
 	esac
 	case "$name" in
+		doh_bootstrap)
+			"$ZGZ_LIB/zgz-doh-bootstrap" "$arg"
+			return
+			;;
+		finalmask_check)
+			printf '%s\n' "$arg" | "$ZGZ_LIB/zgz-finalmask-check"
+			return
+			;;
 		check_sites)
 			local site count=0 choices=""
 			for site in $arg; do

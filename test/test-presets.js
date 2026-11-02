@@ -20,9 +20,10 @@ const textarea = new Element('textarea');
 const box = new Element('div', {}, [textarea]);
 let confirm = false, text = '';
 const widget = { getValue: () => text, setValue: value => { text = value; } };
-const presets = new Function('baseclass', 'form', 'i18n', 'E', 'window', source('presets.js'))(
+let compatibility = {ok:true};
+const presets = new Function('baseclass', 'form', 'i18n', 'E', 'window', 'rpc', source('presets.js'))(
  { extend: x => x }, { TextValue: { prototype: { renderWidget: () => box } } },
- { tr: x => x }, E, { confirm: () => confirm }
+ { tr: x => x }, E, { confirm: () => confirm }, {declare:()=>()=>Promise.resolve(compatibility)}
 );
 assert.equal(presets.finalMasks.length, 3);
 assert.deepEqual(presets.finalMasks[0].value.tcp[0].settings.lengths, ['0', '104', '1']);
@@ -45,6 +46,36 @@ assert.equal(presets.identify(text), 'udp-noise');
 picker.value = ''; picker.dispatchEvent(new Event('change'));
 assert.equal(text, '', 'default removes the mask');
 const mode = presets.withDialMode({ value: () => {} });
+assert.throws(()=>presets.editMask('[]',()=>{}), /JSON object/);
+text=JSON.stringify({tcp:[{type:'merge',settings:{times:1,provider:'keep'}}],udp:[{type:'custom-provider',settings:{token:'keep'}}],quicParams:{customExtension:4},foreign:'keep'});
+const editable=presets.withFinalMask({getUIElement:()=>widget});
+const formEditor=editable.renderWidget('node',0,text);
+function elements(node) { return node && typeof node === 'object' ? [node].concat(Array.isArray(node.children) ? node.children.flatMap(elements) : []) : []; }
+assert.ok(elements(formEditor).filter(el=>['input','select','button'].includes(el.tag)).every(el=>el.disabled == null), 'editable controls must omit the disabled attribute, not render disabled="false"');
+const mergeDelay=elements(formEditor).find(el=>el.tag==='label' && el.children[0]?.children==='Merge delay (ms)').children[1];
+mergeDelay.value='50';mergeDelay.dispatchEvent(new Event('change'));
+assert.equal(JSON.parse(text).tcp[0].settings.delayMs,50);
+assert.equal(JSON.parse(text).tcp[0].settings.provider,'keep');
+assert.equal(JSON.parse(text).udp[0].settings.token,'keep');
+const bbrProfile=elements(formEditor).find(el=>el.tag==='label' && el.children[0]?.children==='BBR profile').children[1];
+bbrProfile.value='aggressive';bbrProfile.dispatchEvent(new Event('change'));
+assert.equal(JSON.parse(text).quicParams.bbrProfile,'aggressive');
+assert.equal(JSON.parse(text).quicParams.customExtension,4);
+assert.equal(JSON.parse(text).foreign,'keep');
+const idleTimeout=elements(formEditor).find(el=>el.tag==='input' && el['aria-label']==='Idle timeout (seconds)');
+idleTimeout.value='30';idleTimeout.dispatchEvent(new Event('input'));
+assert.equal(JSON.parse(text).quicParams.maxIdleTimeout,30,'numeric fields update the underlying mask while typing');
+const rawMerge=elements(formEditor).find(el=>el.tag==='textarea' && el['aria-label']==='Additional mask settings');
+assert.equal(JSON.parse(rawMerge.value).delayMs,50,'structured edits keep the advanced settings editor synchronized');
+let savedMasks=0;
+const guarded=presets.withFinalMask({getUIElement:()=>widget,isActive:()=>true,formvalue:()=>text,parse:()=>{savedMasks++;return Promise.resolve();}});
+(async()=>{
+ compatibility={ok:false,error:'unsupported mask'};
+ await assert.rejects(guarded.parse('node'),/unsupported mask/);
+ assert.equal(savedMasks,0,'incompatible settings cannot be saved');
+ compatibility={ok:true};await guarded.parse('node');assert.equal(savedMasks,1);
+ console.log('FinalMask structured editing, unknown-field preservation, QUIC updates and save compatibility gate passed');
+})().catch(error=>{console.error(error);process.exitCode=1;});
 assert.equal(mode.validate('', ''), true);
 assert.equal(mode.validate('', 'custom-core-mode'), true);
 assert.notEqual(mode.validate('', 'mode; command'), true);
