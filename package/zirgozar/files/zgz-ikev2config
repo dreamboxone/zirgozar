@@ -143,10 +143,11 @@ let ip = ARGV[3], src = ARGV[4];
 if (!match(ip ?? '', /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/)) fail('Invalid IKEv2 server IPv4 address.');
 if (!match(src ?? '', /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/)) fail('Invalid IKEv2 local IPv4 address.');
 
-// The server proves itself with a certificate for its own name, or address,
-// unless the account says which identity to expect. With a shared key it is
-// whatever the server calls itself.
-let remote_id = node.remote_id || (psk == '' ? node.server : '%any');
+// A numeric endpoint need not be the identity in the server certificate.
+// Without an explicit identity, accept its authenticated certificate identity;
+// domain endpoints and explicit identities still require an exact match.
+let numeric_server = match(node.server, /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/);
+let remote_id = node.remote_id || (psk == '' && !numeric_server ? node.server : '%any');
 let local = psk == ''
 	? { auth: 'eap', id: node.username, eap_id: node.username }
 	: { auth: 'psk' };

@@ -429,6 +429,7 @@ var FA = {
 	'Username and password': 'نام کاربری و رمز',
 	'Shared key (PSK)': 'کلید مشترک (PSK)',
 	'Server identity': 'شناسه سرور',
+	'Optional. With an IP address, leave empty to accept the identity from the verified server certificate. Enter the provider’s identity to require an exact match. With a domain address, the domain is used by default.': 'اختیاری. برای آدرس IP، اگر خالی باشد هویت اعلام‌شده در گواهی معتبر سرور پذیرفته می‌شود. برای الزام به تطبیق دقیق، شناسه داده‌شده توسط سرویس‌دهنده را وارد کنید. برای آدرس دامنه، همان دامنه به‌طور پیش‌فرض استفاده می‌شود.',
 	'Optional. The name or address in the server certificate, when it is not the server address above.': 'اختیاری. دامنه یا آدرس IP درج شده در گواهی سرور را وارد کنید، اگر با آدرس سرور بالا فرق دارد.',
 	'Local identity': 'شناسه این روتر',
 	'Optional. Only when the provider gives one for this router.': 'اختیاری. فقط وقتی فروشنده یکی برای این روتر داده باشد.',

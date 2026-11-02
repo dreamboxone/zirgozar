@@ -378,6 +378,7 @@ return baseclass.extend({ strings: {
 	"Username and password": "Имя пользователя и пароль",
 	"Shared key (PSK)": "Общий ключ (PSK)",
 	"Server identity": "Серверная идентификация",
+	"Optional. With an IP address, leave empty to accept the identity from the verified server certificate. Enter the provider’s identity to require an exact match. With a domain address, the domain is used by default.": "Необязательно. При подключении по IP оставьте поле пустым, чтобы принять идентификатор из проверенного сертификата сервера. Укажите идентификатор провайдера для точного совпадения. Для доменного адреса по умолчанию используется домен.",
 	"Optional. The name or address in the server certificate, when it is not the server address above.": "Необязательно. Имя или адрес в сертификате сервера, когда это не адрес сервера выше.",
 	"Local identity": "Локальная идентичность",
 	"Optional. Only when the provider gives one for this router.": "Опционально, только когда провайдер выдает один для этого маршрутизатора.",

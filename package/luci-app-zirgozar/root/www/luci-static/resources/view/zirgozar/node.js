@@ -1420,7 +1420,7 @@ return view.extend({
 			o.password = true; o.rmempty = false;
 			o.depends({ '_proto': 'ikev2', '_ikev2_auth': 'psk' });
 			o = field(form.Value, 'ikev2_id', _('Server identity'),
-				_('Optional. The name or address in the server certificate, when it is not the server address above.'));
+				_('Optional. With an IP address, leave empty to accept the identity from the verified server certificate. Enter the provider’s identity to require an exact match. With a domain address, the domain is used by default.'));
 			o.depends('_proto', 'ikev2');
 			o = field(form.Value, 'ikev2_local_id', _('Local identity'),
 				_('Optional. Only when the provider gives one for this router.'));

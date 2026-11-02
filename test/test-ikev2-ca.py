@@ -45,3 +45,19 @@ with tempfile.TemporaryDirectory() as directory:
     assert load().returncode != 0
 
 print('IKEv2 PEM chain, DER, system roots and missing bundle checks passed')
+
+identity_source = (Path(__file__).resolve().parents[1] / 'package/zirgozar/files/zgz-ikev2config').read_text()
+identity_source = identity_source[identity_source.index('let numeric_server ='):identity_source.index('let local =')]
+for server, explicit, psk, expected in [
+    ('192.0.2.1', '', '', '%any'),
+    ('192.0.2.1', 'vpn.example.com', '', 'vpn.example.com'),
+    ('vpn.example.com', '', '', 'vpn.example.com'),
+    ('vpn.example.com', '', 'shared-key', '%any'),
+    ('192.0.2.1', 'provider-id', 'shared-key', 'provider-id'),
+]:
+    program = 'let node = ' + json.dumps(dict(server=server, remote_id=explicit)) + ';\n'
+    program += 'let psk = ' + json.dumps(psk) + ';\n' + identity_source + 'print(remote_id);'
+    actual = subprocess.run(['ucode', '-e', program], text=True, capture_output=True, check=True)
+    assert actual.stdout == expected, (server, explicit, actual.stdout)
+
+print('IKEv2 IP, domain, explicit identity and PSK identity checks passed')

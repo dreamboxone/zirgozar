@@ -378,6 +378,7 @@ return baseclass.extend({ strings: {
 	"Username and password": "用户名和密码",
 	"Shared key (PSK)": "共享密钥( PSK)",
 	"Server identity": "服务器身份",
+	"Optional. With an IP address, leave empty to accept the identity from the verified server certificate. Enter the provider’s identity to require an exact match. With a domain address, the domain is used by default.": "可选。使用 IP 地址时，留空以接受经过验证的服务器证书中的身份。填写服务商提供的身份可要求精确匹配。使用域名地址时，默认使用该域名。",
 	"Optional. The name or address in the server certificate, when it is not the server address above.": "可选。 服务器证书中的名称或地址, 当它不是上面的服务器地址时 。",
 	"Local identity": "当地身份",
 	"Optional. Only when the provider gives one for this router.": "可选。 只有在提供者给出此路由器时才会使用 。",
