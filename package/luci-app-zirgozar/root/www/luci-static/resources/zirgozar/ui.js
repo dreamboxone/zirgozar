@@ -54,6 +54,7 @@ var ICONS = {
 	plus:     '<path d="M12 5v14M5 12h14"/>',
 	link:     '<path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>',
 	code:     '<path d="M8 6l-6 6 6 6M16 6l6 6-6 6"/>',
+	'file-plus': '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 12v6M9 15h6"/>',
 	chart:    '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
 	layers:   '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 12.5l9 5 9-5M3 16.5l9 5 9-5"/>',
 	clock:    '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',

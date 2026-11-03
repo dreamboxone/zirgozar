@@ -102,10 +102,9 @@ function nameFromLink(text) {
    and copy it out is asking them to do by hand what the browser will do for
    nothing.
 
-   The file is read in the browser and its text goes into the box. It is never
-   uploaded anywhere, and what gets saved is the same text as if it had been
-   typed - so everything downstream, the parser included, sees exactly what it
-   saw before and none of it had to learn about files. */
+   Files are read in the browser before their text goes into the box. Binary
+   BPF profiles are decompressed locally into sing-box JSON; the router sees
+   the same text format its existing server parser already understands. */
 function certificatePEM(buffer) {
 	var bytes = new Uint8Array(buffer);
 	var text = new TextDecoder().decode(bytes).trim();
@@ -114,6 +113,99 @@ function certificatePEM(buffer) {
 	var binary = '';
 	for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
 	return '-----BEGIN CERTIFICATE-----\n' + btoa(binary).match(/.{1,64}/g).join('\n') + '\n-----END CERTIFICATE-----';
+}
+
+function normalizeSingboxProfile(config) {
+ if (!config || Array.isArray(config) || !Array.isArray(config.outbounds)) return false;
+ var servers = config.dns && config.dns.servers;
+ if (!Array.isArray(servers) || (config.route && (typeof config.route !== 'object' || Array.isArray(config.route) || config.route.default_domain_resolver))) return false;
+ var local = servers.find(function(server) { return server && server.tag && !server.detour && (server.type === 'local' || server.address === 'local'); });
+ var final = servers.find(function(server) { return server && server.tag && server.tag === config.dns.final && !server.detour && server.type !== 'fakeip'; });
+ var resolver = local || final;
+ if (!resolver) return false;
+ if (!config.route) config.route = {};
+ config.route.default_domain_resolver = {server:resolver.tag};
+ return true;
+}
+
+async function readProfileFile(buffer, name) {
+ var bytes = new Uint8Array(buffer), limit = 8 * 1024 * 1024;
+ var binary = bytes[0] === 3 && bytes.length > 1;
+ if (!binary && !/\.bpf$/i.test(name || '')) {
+  var plain = new TextDecoder('utf-8').decode(bytes).trim();
+  if (!/\.toml$/i.test(name || '')) return {text:plain, bpf:false};
+  if (bytes.length > limit) throw new Error(_('TOML file is too large.'));
+  var parser = await L.require('zirgozar.toml'), parsed;
+  try { parsed = parser.parse(plain,{maxDepth:64}); }
+  catch (error) { throw new Error(_('Invalid TOML file.')); }
+  if (!['outbounds','endpoints','proxies','nodes','links'].some(function(key) { return Array.isArray(parsed[key]); }) &&
+      typeof parsed.type !== 'string' && typeof parsed.protocol !== 'string')
+   throw new Error(_('This TOML file does not contain supported server definitions.'));
+  var repaired = normalizeSingboxProfile(parsed);
+  return {text:JSON.stringify(parsed,null,2), bpf:false, toml:true, repaired:repaired};
+ }
+ if (!binary || bytes.length < 12 || bytes[1] > 1 || bytes[2] !== 31 || bytes[3] !== 139)
+  throw new Error(_('Invalid BPF profile.'));
+ if (bytes.length > limit) throw new Error(_('BPF profile is too large.'));
+ if (typeof DecompressionStream === 'undefined') throw new Error(_('This browser cannot decompress BPF profiles.'));
+ var reader = new Blob([bytes.subarray(2)]).stream().pipeThrough(new DecompressionStream('gzip')).getReader();
+ var chunks = [], length = 0;
+ try {
+  while (true) {
+   var part = await reader.read();
+   if (part.done) break;
+   length += part.value.length;
+   if (length > limit) { await reader.cancel(); throw new Error(_('BPF profile is too large.')); }
+   chunks.push(part.value);
+  }
+ } catch (error) {
+  if (error.message === _('BPF profile is too large.')) throw error;
+  throw new Error(_('Invalid BPF profile.'));
+ }
+ var data = new Uint8Array(length), offset = 0;
+ chunks.forEach(function(chunk) { data.set(chunk,offset); offset += chunk.length; });
+ var pos = 0, decoder = new TextDecoder('utf-8',{fatal:true});
+ function requireBytes(count) { if (count < 0 || count > length - pos) throw new Error(_('Invalid BPF profile.')); }
+ function string() {
+  var size = 0, shift = 0, value;
+  do {
+   requireBytes(1); value = data[pos++];
+   if (shift >= 28) throw new Error(_('Invalid BPF profile.'));
+   size += (value & 127) * Math.pow(2,shift); shift += 7;
+  } while (value & 128);
+  requireBytes(size);
+  var text;
+  try { text = decoder.decode(data.subarray(pos,pos + size)); } catch (error) { throw new Error(_('Invalid BPF profile.')); }
+  pos += size; return text;
+ }
+ string();
+ requireBytes(4);
+ var type = new DataView(data.buffer).getInt32(pos,false); pos += 4;
+ if (type < 0 || type > 2) throw new Error(_('Invalid BPF profile.'));
+ var text = string();
+ if (type !== 0) string();
+ if (type === 2 || (bytes[1] === 0 && type !== 0)) {
+  requireBytes(1); if (data[pos++] > 1) throw new Error(_('Invalid BPF profile.'));
+  requireBytes((bytes[1] >= 1 ? 4 : 0) + 8); pos += (bytes[1] >= 1 ? 4 : 0) + 8;
+ }
+ if (pos !== length) throw new Error(_('Invalid BPF profile.'));
+ var config;
+ try { config = JSON.parse(text); } catch (error) { throw new Error(_('Invalid BPF profile.')); }
+ if (!config || Array.isArray(config) || (!Array.isArray(config.outbounds) && !Array.isArray(config.endpoints)))
+  throw new Error(_('Invalid BPF profile.'));
+ var repaired = normalizeSingboxProfile(config);
+ return {text:repaired ? JSON.stringify(config,null,2) : text, bpf:true, repaired:repaired};
+}
+
+function validateProfileInput(value) {
+ if (!value) return true;
+ if (/^\s*[\[{]/.test(value) && !/^\s*\[(interface|peer)\]/im.test(value)) {
+  try { var config = JSON.parse(value); return config && typeof config === 'object' ? true : _('Must be JSON text!'); }
+  catch (error) { return _('Must be JSON text!'); }
+ }
+ if (/^\s*[A-Za-z_][A-Za-z0-9_.-]*:[ \t]/m.test(value)) return true;
+ if (/:\/\//.test(value) || /^\s*\[(interface|peer)\]/im.test(value) || /^\s*(client\s*$|remote\s+\S+|<ca>)/im.test(value)) return true;
+ return _('That does not look like a share link');
 }
 
 function withBrowse(o, hint, options) {
@@ -125,16 +217,20 @@ function withBrowse(o, hint, options) {
 
 		var picker = E('input', {
 			'type': 'file',
-			'accept': options.accept || '.conf,.ovpn,.txt,.json,.yaml,.yml,text/plain',
+			'accept': options.accept || '.bpf,.toml,.conf,.ovpn,.txt,.json,.yaml,.yml,text/plain',
 			'style': 'display:none',
 			'change': function(ev) {
 				var f = ev.target.files && ev.target.files[0];
 				if (!f) return;
 				var reader = new FileReader();
-				reader.onload = function() {
-					var value;
-					try { value = options.certificate ? certificatePEM(reader.result) : String(reader.result || '').trim(); }
-					catch (e) { pui.note(browse, _('That file could not be read.'), 'error'); return; }
+				reader.onload = async function() {
+					var value, profile;
+					try {
+						if (options.certificate) value = certificatePEM(reader.result);
+						else { profile = await readProfileFile(reader.result,f.name); value = profile.text; }
+					} catch (e) { pui.note(browse, options.certificate ? _('That file could not be read.') : e.message || _('That file could not be read.'), 'error'); return; }
+					if (profile && profile.bpf) pui.note(browse, _('BPF profile decoded. Only servers are imported; DNS and routing use Zirgozar settings.'), 'info');
+					if (profile && profile.toml) pui.note(browse, _('TOML file converted. Only servers are imported; DNS and routing use Zirgozar settings.'), 'info');
 					var el = self.getUIElement(section_id);
 					if (el) el.setValue(value);
 					/* setValue puts the text in without telling anyone, so the
@@ -152,8 +248,7 @@ function withBrowse(o, hint, options) {
 				reader.onerror = function() {
 					pui.note(browse, _('That file could not be read.'), 'error');
 				};
-				if (options.certificate) reader.readAsArrayBuffer(f);
-				else reader.readAsText(f);
+				reader.readAsArrayBuffer(f);
 				/* So that choosing the same file twice in a row still fires
 				   a change. */
 				ev.target.value = '';
@@ -270,5 +365,7 @@ return baseclass.extend({
 	recordLink: recordLink,
 	nameFromLink: nameFromLink,
 	withBrowse: withBrowse,
+	readProfileFile: readProfileFile,
+	validateProfileInput: validateProfileInput,
 	validateXdrive: validateXdrive
 });

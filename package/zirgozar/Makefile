@@ -121,6 +121,8 @@ define Package/zirgozar/install
 		$(1)/www/luci-static/resources/zirgozar/qr.js
 	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/nodelink.js \
 		$(1)/www/luci-static/resources/zirgozar/nodelink.js
+	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/toml.js \
+		$(1)/www/luci-static/resources/zirgozar/toml.js
 	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/presets.js \
 		$(1)/www/luci-static/resources/zirgozar/presets.js
 	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/aetherscan.js \

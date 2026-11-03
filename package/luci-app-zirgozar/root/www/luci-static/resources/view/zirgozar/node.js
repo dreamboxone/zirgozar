@@ -883,6 +883,12 @@ function nodePicker(o, nodes) {
 
 return view.extend({
 	load: function() {
+		var params = new URLSearchParams(window.location.search);
+		if (!params.get('sid') && params.get('new') === 'file') {
+			return uci.load('zirgozar').catch(function() { return null; }).then(function(config) {
+				return [config, {nodes:[]}, {interfaces:[]}, {}, [], []];
+			});
+		}
 		return Promise.all([
 			uci.load('zirgozar').catch(function() { return null; }),
 			callNodes().catch(function() { return {}; }),
@@ -961,13 +967,9 @@ return view.extend({
 			o.monospace = true;
 			o.rmempty = false;
 			o.placeholder = 'vless://…';
-			nodelink.withBrowse(o, _('a .conf file, or a list of links'));
-			o.validate = function(section_id, value) {
-				if (!value) return true;
-				/* A WireGuard .conf is a file, not a link: it has no :// in it. */
-				if (!/:\/\//.test(value) && !/^\s*\[(interface|peer)\]/im.test(value) && !/^\s*(client\s*$|remote\s+\S+|<ca>)/im.test(value))
-					return _('That does not look like a share link');
-				return true;
+			nodelink.withBrowse(o, _('Supported files: .bpf, .toml, .json, .yaml, .yml, .conf, .ovpn, .txt'));
+			o.validate = function(section, value) {
+				return nodelink.validateProfileInput(value);
 			};
 		}
 

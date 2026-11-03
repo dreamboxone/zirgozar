@@ -327,6 +327,8 @@ stage_luci_assets() {
 	# The link-or-file input, shared by Node List and the Node Config page.
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/nodelink.js" \
 		"$i/www/luci-static/resources/zirgozar/nodelink.js"
+	install -m 0644 "$l/www/luci-static/resources/zirgozar/toml.js" \
+		"$i/www/luci-static/resources/zirgozar/toml.js"
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/presets.js" \
 		"$i/www/luci-static/resources/zirgozar/presets.js"
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/aetherscan.js" \

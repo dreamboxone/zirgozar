@@ -183,6 +183,7 @@ www/luci-static/resources/zirgozar/logfa.js
 www/luci-static/resources/zirgozar/status.js
 www/luci-static/resources/zirgozar/qr.js
 www/luci-static/resources/zirgozar/nodelink.js
+www/luci-static/resources/zirgozar/toml.js
 usr/share/luci/menu.d/luci-app-zirgozar.json
 usr/share/rpcd/acl.d/luci-app-zirgozar.json"
 # And every page the menu opens: a view added to the menu and to the tree but

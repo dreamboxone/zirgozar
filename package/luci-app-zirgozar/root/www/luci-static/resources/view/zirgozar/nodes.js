@@ -356,7 +356,7 @@ function toolbar(s) {
 		   .yaml, on the Node Config page as one node. */
 		pui.btn(_('Add file'), 'primary mk-small', function() {
 			window.location.href = L.url('admin', 'services', 'zirgozar', 'node') + '?new=file';
-		}, 'code'),
+		}, 'file-plus'),
 		pui.btn(_('Select all'), 'soft-blue mk-small', function(ev) {
 			all = !all;
 			document.querySelectorAll('.pwp-sel').forEach(function(c) { if (!c.closest('[hidden]')) c.checked = all; });
@@ -784,15 +784,11 @@ return view.extend({
 			_('A share link, several of them one per line, a whole WireGuard .conf file or an OpenVPN .ovpn profile. Choose a file and its contents are put in the box for you.'));
 		o.modalonly = true;
 		o.rows = 6;
-		withBrowse(o, _('a .conf file, or a list of links'));
+		withBrowse(o, _('Supported files: .bpf, .toml, .json, .yaml, .yml, .conf, .ovpn, .txt'));
 		o.rmempty = false;
 		o.placeholder = 'vless://…';
 		o.validate = function(section, value) {
-			if (!value) return true;
-			/* A WireGuard .conf is a file, not a link: it has no :// in it. */
-			if (!/:\/\//.test(value) && !/^\s*\[(interface|peer)\]/im.test(value) && !/^\s*(client\s*$|remote\s+\S+|<ca>)/im.test(value))
-				return _('That does not look like a share link');
-			return true;
+			return nodelink.validateProfileInput(value);
 		};
 		/* An OpenVPN profile does not always carry everything it needs: the user
 		   name and password of the account, and the pass phrase of a private key

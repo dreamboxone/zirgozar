@@ -18,6 +18,7 @@
 'require uci';
 'require zirgozar.i18n as i18n';
 'require zirgozar.ui as pui';
+'require zirgozar.nodelink as nodelink';
 'require tools.widgets as widgets';
 
 var _ = i18n.tr;
@@ -96,43 +97,6 @@ function column(s, name, title, draw) {
 /* A configuration file rather than an address. It is read in the browser and
    its text put in the box: nothing is uploaded, and what is saved is exactly
    what would have been typed. */
-function withBrowse(o, hint) {
-	o.renderWidget = function(section_id, option_index, cfgvalue) {
-		var self = this;
-		var box = form.TextValue.prototype.renderWidget.apply(this,
-			[ section_id, option_index, cfgvalue ]);
-		var browse = E('button', {
-			'class': 'btn cbi-button',
-			'click': function(ev) { ev.preventDefault(); picker.click(); }
-		}, _('Browse…'));
-		var picker = E('input', {
-			'type': 'file',
-			'accept': '.conf,.ovpn,.txt,.json,.yaml,.yml,text/plain',
-			'style': 'display:none',
-			'change': function(ev) {
-				var f = ev.target.files && ev.target.files[0];
-				if (!f) return;
-				var reader = new FileReader();
-				reader.onload = function() {
-					var el = self.getUIElement(section_id);
-					if (el) el.setValue(String(reader.result || '').trim());
-				};
-				reader.onerror = function() {
-					pui.note(browse, _('That file could not be read.'), 'error');
-				};
-				reader.readAsText(f);
-				ev.target.value = '';
-			}
-		});
-		return E([ box, E('div', { 'style': 'margin-top:6px' }, [
-			browse,
-			E('span', { 'style': 'margin-inline-start:8px;font-size:12px;opacity:.65' }, hint),
-			picker
-		]) ]);
-	};
-	return o;
-}
-
 /* A name of its own for a new section.
    A section without one is known by its place in the file, and loses that
    name - and every setting naming it - as soon as one ahead of it is added,
@@ -376,7 +340,7 @@ return view.extend({
 			_('Instead of an address: a configuration file — Xray, sing-box, Clash, a WireGuard .conf, or a plain list of links. Leave the address empty when you use this.'));
 		o.modalonly = true;
 		o.rows = 6;
-		withBrowse(o, _('a .json or .conf file'));
+		nodelink.withBrowse(o, _('Supported files: .bpf, .toml, .json, .yaml, .yml, .conf, .ovpn, .txt'));
 
 		o = s.taboption('main', form.Flag, 'enabled', _('On'));
 		o.default = '1';
