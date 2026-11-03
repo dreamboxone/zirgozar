@@ -65,6 +65,7 @@ function items(list) {
 }
 
 return view.extend({
+	__init__: function() { return pui.mount(this); },
 	load: function() {
 		return uci.load('zirgozar').catch(function() { return null; });
 	},

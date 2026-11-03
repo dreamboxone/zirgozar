@@ -888,3 +888,7 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 
 .mk .zgz-routing-title.zgz-has-help{display:inline-flex!important;align-items:center;gap:6px}
 .zgz-routing-control .zgz-help-content{font-weight:400}
+
+.mk.zgz-navigating{cursor:progress}
+.mk.zgz-navigating .mk-tabs{position:relative}
+.mk.zgz-navigating .mk-tabs:after{content:"";position:absolute;bottom:0;inset-inline:0;height:2px;background:var(--primary,#3b82f6);animation:mk-pulse .8s ease-in-out infinite}

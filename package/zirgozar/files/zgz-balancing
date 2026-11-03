@@ -10,6 +10,18 @@ set -e
 . "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
 
 list_nodes() {
+	local digest cache temp
+	digest="$(uci -q export zirgozar | sha256sum | cut -c1-64)"
+	cache="$ZGZ_RUN/balancing-list-$digest.tsv"
+	if [ -f "$cache" ]; then cat "$cache"; return 0; fi
+	mkdir -p "$ZGZ_RUN"
+	temp="$cache.$$"
+	list_nodes_uncached > "$temp"
+	mv -f "$temp" "$cache"
+	cat "$cache"
+}
+
+list_nodes_uncached() {
 	for section in $(uci -q -X show zirgozar | sed -n 's/^zirgozar\.\([A-Za-z0-9_]*\)=node$/\1/p'); do
 		[ "$(uci -q get "zirgozar.$section.enabled")" != 0 ] || continue
 		row="$(node_records "$section" 1 1 2>/dev/null | head -1)"

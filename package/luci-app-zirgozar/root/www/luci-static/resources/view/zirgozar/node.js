@@ -882,6 +882,7 @@ function nodePicker(o, nodes) {
 /* --------------------------------------------------------------- the page */
 
 return view.extend({
+	__init__: function() { return pui.mount(this); },
 	load: function() {
 		var params = new URLSearchParams(window.location.search);
 		if (!params.get('sid') && params.get('new') === 'file') {
@@ -889,20 +890,34 @@ return view.extend({
 				return [config, {nodes:[]}, {interfaces:[]}, {}, [], []];
 			});
 		}
-		return Promise.all([
-			uci.load('zirgozar').catch(function() { return null; }),
-			callNodes().catch(function() { return {}; }),
-			callLan().catch(function() { return {}; })
+		return uci.load('zirgozar').catch(function() { return null; }).then(function(config) {
+			var sid = params.get('sid');
+			var link = sid && uci.get ? String(uci.get('zirgozar', sid, 'link') || '') : '';
+			if (/^\s*[\[{]/.test(link) && !/^\s*\[(interface|peer)\]/i.test(link))
+				return [config, {nodes:[]}, {interfaces:[]}, {}, [], []];
+			var needsOrigins = !sid || /^balancing:\/\//i.test(link);
+			return Promise.all([
+			Promise.resolve(config),
+			needsOrigins ? callNodes().catch(function() { return {}; }) : Promise.resolve({nodes:[]}),
+			pui.loadInfo('lan', callLan).catch(function() { return {}; })
 		]).then(function(data) {
 			var nodes = (data[1] && data[1].nodes) || [];
+			var profileOrigins = {};
+			var unresolved = nodes.filter(function(n) {
+				var source = (n.sources || []).find(function(s) { return /^file:[A-Za-z0-9_]+$/.test(s); });
+				if (!source) return true;
+				profileOrigins[n.tag] = source.slice(5);
+				return false;
+			});
 			return Promise.all([
-				callNodeOrigins(nodes.map(function(n) { return n.tag; }).join(' ')).catch(function() { return {}; }),
-				callSubNodes().catch(function() { return {}; }),
-				callBalancingNodes().catch(function() { return {}; })
+				unresolved.length ? callNodeOrigins(unresolved.map(function(n) { return n.tag; }).join(' ')).catch(function() { return {}; }) : Promise.resolve({origins:{}}),
+				pui.loadInfo('subnodes', callSubNodes, pui.infoRevision()).catch(function() { return {}; }),
+				pui.loadInfo('balancingnodes', callBalancingNodes, pui.infoRevision()).catch(function() { return {}; })
 			]).then(function(results) {
-				data.push(results[0].origins || {}, results[1].nodes || [], results[2].nodes || []);
+				data.push(Object.assign(profileOrigins, results[0].origins || {}), results[1].nodes || [], results[2].nodes || []);
 				return data;
 			});
+		});
 		});
 	},
 
@@ -2068,7 +2083,7 @@ return view.extend({
 					pkgs = (d && d.packages) || '';
 					return save.apply(self, args);
 				}).then(function(r) {
-					window.history.replaceState(null, '', back);
+					window.history.replaceState(window.history.state, '', back);
 					/* Said with the buttons that install what is missing. */
 					var cores = pui.listOf(needs), packages = pui.listOf(pkgs);
 					if (cores.length || packages.length)

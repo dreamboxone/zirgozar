@@ -45,13 +45,14 @@ var WEEK = [
 ];
 
 return view.extend({
+	__init__: function() { return pui.mount(this); },
 	load: function() {
 		return Promise.all([
 			/* One ubus list and a lookup per interface: a tenth of a second,
 			   for the interface list and nothing else. */
-			callLan().catch(function() { return {}; }),
+			pui.loadInfo('lan', callLan).catch(function() { return {}; }),
 			uci.load('zirgozar').catch(function() { return null; }),
-			callLed().catch(function() { return {}; })
+			pui.loadInfo('led', callLed).catch(function() { return {}; })
 		]);
 	},
 
@@ -335,7 +336,7 @@ return view.extend({
 				if (!saving || !link || event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
 				event.preventDefault();
 				var href = link.href;
-				pending.then(function() { window.location.href = href; });
+				pending.then(function() { pui.navigate(href); });
 			}, true);
 			widget.addEventListener('change', function() {
 				var choices = control.getValue();

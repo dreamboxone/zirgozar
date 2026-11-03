@@ -55,10 +55,11 @@ function sourceOk(v) {
 }
 
 return view.extend({
+	__init__: function() { return pui.mount(this); },
 	load: function() {
 		return Promise.all([
-			callLan().catch(function() { return {}; }),
-			callHostHints().catch(function() { return {}; }),
+			pui.loadInfo('lan', callLan).catch(function() { return {}; }),
+			pui.loadInfo('host-hints', callHostHints).catch(function() { return {}; }),
 			uci.load('zirgozar').catch(function() { return null; })
 		]);
 	},

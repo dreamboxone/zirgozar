@@ -886,7 +886,11 @@ method_action() {
 			case "$arg" in ''|*[!A-Za-z0-9_]*) fail "unknown node"; return ;; esac
 			_list_sid="$("$NODES" origin "$arg" 2>/dev/null)" || _list_sid=''
 			case "$_list_sid" in ''|*[!A-Za-z0-9_]*) fail "unknown node"; return ;; esac
+			if grep -qF "$(printf '\tfile:%s' "$_list_sid")" "$ZGZ_RUN/candidate-sources.tsv"; then
+				"$NODES" drop-file-node "$_list_sid" "$arg" >/dev/null 2>&1 || { fail "unknown node"; return; }
+			else
 			"$NODES" delete "$_list_sid" >/dev/null 2>&1 || { fail "unknown node"; return; }
+			fi
 			;;
 		share_list_node)
 			case "$arg" in ''|*[!A-Za-z0-9_]*) fail "unknown node"; return ;; esac

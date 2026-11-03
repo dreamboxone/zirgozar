@@ -227,9 +227,10 @@ function renderStatus(d) {
 }
 
 return view.extend({
+	__init__: function() { return pui.mount(this); },
 	load: function() {
 		return Promise.all([
-			callServer().catch(function() { return {}; }),
+			Promise.resolve({}),
 			uci.load('zirgozar').catch(function() { return null; }),
 			uci.load(CONF).catch(function() { return null; })
 		]);
@@ -604,7 +605,7 @@ return view.extend({
 
 		return m.render().then(function(mapEl) {
 			renderStatus(data[0]);
-			window.setTimeout(function() { renderStatus(data[0]); }, 0);
+			window.setTimeout(function() { callServer().then(renderStatus).catch(function() {}); }, 0);
 			poll.add(function() {
 				return callServer().then(renderStatus).catch(function() {});
 			}, 5);

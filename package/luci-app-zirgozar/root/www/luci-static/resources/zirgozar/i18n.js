@@ -45,6 +45,7 @@ var LANGUAGES = { en: 'English', fa: 'فارسی', zh: '简体中文', ru: 'Ру
 var CATALOGS = { zh: zh.strings, ru: ru.strings };
 
 var FA = {
+	'There are unsaved changes. Leave this page?': 'تغییرات ذخیره‌نشده دارید. از این صفحه خارج می‌شوید؟',
 	'DoT provider': "سرویس DoT",
 	'DoT hostname or IP': "دامنه یا IP برای DoT",
 	'Enter a DNS hostname or IP address.': "دامنه یا نشانی IP سرور DNS را وارد کنید.",

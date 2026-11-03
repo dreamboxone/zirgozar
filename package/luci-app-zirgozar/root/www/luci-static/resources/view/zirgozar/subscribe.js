@@ -207,6 +207,7 @@ function done(b, r, ok) {
 }
 
 return view.extend({
+	__init__: function() { return pui.mount(this); },
 	load: function() {
 		return Promise.all([
 			Promise.resolve({}),

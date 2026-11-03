@@ -46,9 +46,10 @@ function fill(el, text, empty) {
 }
 
 return view.extend({
+	__init__: function() { return pui.mount(this); },
 	load: function() {
 		return Promise.all([
-			callLog().catch(function() { return {}; }),
+			Promise.resolve({}),
 			uci.load('zirgozar').catch(function() { return null; })
 		]);
 	},
@@ -126,7 +127,7 @@ return view.extend({
 		]);
 
 		/* Once LuCI has put the page in the document. */
-		window.setTimeout(function() { draw(data[0]); }, 0);
+		window.setTimeout(function() { callLog().then(draw).catch(function() {}); }, 0);
 		return page;
 	},
 

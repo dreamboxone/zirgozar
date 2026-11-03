@@ -174,7 +174,7 @@ function drawShuntRules(box) {
 		}
 	}
 	function keepAndGo(url) {
-		return uci.save().then(function() { window.location.href = url; });
+		return uci.save().then(function() { pui.navigate(url); });
 	}
 
 	var rows = [ E('tr', { 'class': 'tr cbi-section-table-titles' }, [
@@ -362,10 +362,11 @@ function routingManager() {
 }
 
 return view.extend({
+	__init__: function() { return pui.mount(this); },
 	load: function() {
 		return Promise.all([
 			uci.load('zirgozar').catch(function() { return null; }),
-			callGeo().catch(function() { return {}; })
+			Promise.resolve({})
 		]);
 	},
 
@@ -519,7 +520,7 @@ return view.extend({
 			else el.appendChild(shunt);
 			/* Filled in once it is in the document, then kept current - a
 			   download takes a while, and this is where it shows. */
-			window.setTimeout(function() { renderGeo(data[1]); }, 0);
+			window.setTimeout(function() { callGeo().then(renderGeo).catch(function() {}); }, 0);
 			poll.add(function() {
 				return callGeo().then(renderGeo).catch(function() {});
 			}, 5);

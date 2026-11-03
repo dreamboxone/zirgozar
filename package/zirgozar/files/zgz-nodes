@@ -635,6 +635,16 @@ add_node() {
 	if printf '%s\n' "$link" | grep -qE '^[[:space:]]*([\[{]|[A-Za-z_][A-Za-z0-9_.-]*:[[:space:]])'; then
 		local records="$ZGZ_RUN/profile-$_sec.tsv"
 		node_records "$_sec" "$(cfg max_nodes 300)" > "$records" 2>/dev/null || true
+		local overrides="$ZGZ_ETC/profile-edits"
+		if [ -s "$overrides/$_sec.edited" ]; then
+			awk -F'\t' 'FILENAME==ARGV[1] {key=$1; sub(/^[^\t]*\t/, ""); edits[key]=$0; next}
+			{key=$2 "|" $3 "|" $4 "|" $5 "|" $6; print (key in edits ? edits[key] : $0)}' "$overrides/$_sec.edited" "$records" > "$records.new"
+			mv -f "$records.new" "$records"
+		fi
+		if [ -s "$overrides/$_sec.deleted" ]; then
+			awk -F'\t' 'FILENAME==ARGV[1] {removed[$0]=1; next} !(($2 "|" $3 "|" $4 "|" $5 "|" $6) in removed)' "$overrides/$_sec.deleted" "$records" > "$records.new"
+			mv -f "$records.new" "$records"
+		fi
 		if [ "$(wc -l < "$records")" -gt 1 ]; then
 			printf 'file:%s\t%s\n' "$_sec" "$(printf '%s' "${name:-$_sec}" | tr '\t\r\n' '   ')" >> "$ZGZ_RUN/candidate-groups.new"
 			record_sources "$records" "file:$_sec"
@@ -1405,6 +1415,17 @@ cmd_resolve() {
 cmd_origin() {
 	_or="$(awk -F'\t' -v t="$1" '$1 == t { print; exit }' "$ZGZ_CANDIDATES" 2>/dev/null)"
 	[ -n "$_or" ] || return 1
+	# File membership was recorded during the build; do not reparse every
+	# manual profile just to open one candidate for editing.
+	local file_owner
+	file_owner="$(printf '%s\n' "$_or" | awk -F'\t' '
+		FILENAME==ARGV[1] { if ($2 ~ /^file:/) owners[$1]=$2; next }
+		{ key=$2 "|" $3 "|" $4 "|" $5 "|" $6; if (key in owners) { sub(/^file:/, "", owners[key]); print owners[key]; exit } }
+	' "$ZGZ_RUN/candidate-sources.tsv" - 2>/dev/null)"
+	case "$file_owner" in
+		''|*[!A-Za-z0-9_]*) ;;
+		*) if [ "$(uci -q get "zirgozar.$file_owner")" = node ]; then echo "$file_owner"; return 0; fi ;;
+	esac
 	# A node added by hand: its own record, as the list was built from it.
 	for _os in $(uci -q -X show zirgozar 2>/dev/null | sed -n 's/^zirgozar\.\([A-Za-z0-9_]*\)=node$/\1/p'); do
 		[ "$(uci -q get "zirgozar.$_os.enabled")" = "0" ] && continue
@@ -1440,6 +1461,17 @@ drop_subscription_node() {
 	printf '%s\n' "$key" >> "$SUBS_KEEP/$section.deleted"
 }
 
+drop_file_node() {
+	local section="$1" tag="$2" key
+	case "$section:$tag" in *[!A-Za-z0-9_:]*) return 1 ;; esac
+	[ -n "$section" ] && [ -n "$tag" ] || return 1
+	key="$(record_for_tag "$tag" | cut -f2- | tr '\t' '|')"
+	[ -n "$key" ] || return 1
+	printf '%s\tfile:%s\n' "$key" "$section" | grep -qxFf - "$ZGZ_RUN/candidate-sources.tsv" || return 1
+	mkdir -p "$ZGZ_ETC/profile-edits"
+	printf '%s\n' "$key" >> "$ZGZ_ETC/profile-edits/$section.deleted"
+}
+
 record_for_tag() {
 	case "$1" in ''|*[!A-Za-z0-9_]*) return 1 ;; esac
 	awk -F'\t' -v tag="$1" '$1==tag { print; exit }' "$ZGZ_CANDIDATES"
@@ -1465,7 +1497,7 @@ share_link() {
 }
 
 save_record() {
-	local source="$1" tag="$2" old key original replacement sid
+	local source="$1" tag="$2" old key original replacement sid edits_dir="$SUBS_KEEP"
 	old="$(record_for_tag "$tag")"
 	[ -n "$old" ] || return 1
 	[ -z "${3:-}" ] || [ "$old" = "$3" ] || return 1
@@ -1481,22 +1513,24 @@ save_record() {
 			uci -q set "zirgozar.$sid.name=$(printf '%s' "$replacement" | cut -f2)"
 			uci -q commit zirgozar
 			;;
-		sub:*)
-			sid="${source#sub:}"
+		sub:*|file:*)
+			sid="${source#*:}"
+			case "$source" in file:*) edits_dir="$ZGZ_ETC/profile-edits" ;; esac
 			case "$sid" in ''|*[!A-Za-z0-9_]*) return 1 ;; esac
 			printf '%s\t%s\n' "$key" "$source" | grep -qxFf - "$ZGZ_RUN/candidate-sources.tsv" || return 1
-			mkdir -p "$SUBS_KEEP"
-			original="$(ZGZ_RECORD_KEY="$key" awk -F'\t' '$3 "|" $4 "|" $5 "|" $6 "|" $7==ENVIRON["ZGZ_RECORD_KEY"] {print $1;exit}' "$SUBS_KEEP/$sid.edited" 2>/dev/null)" || original=''
+			mkdir -p "$edits_dir"
+			original="$(ZGZ_RECORD_KEY="$key" awk -F'\t' '$3 "|" $4 "|" $5 "|" $6 "|" $7==ENVIRON["ZGZ_RECORD_KEY"] {print $1;exit}' "$edits_dir/$sid.edited" 2>/dev/null)" || original=''
 			[ -n "$original" ] || original="$key"
-			ZGZ_RECORD_KEY="$original" awk -F'\t' '$1!=ENVIRON["ZGZ_RECORD_KEY"]' "$SUBS_KEEP/$sid.edited" 2>/dev/null > "$SUBS_KEEP/$sid.edited.new" || true
-			printf '%s\t%s\n' "$original" "$replacement" >> "$SUBS_KEEP/$sid.edited.new"
-			mv -f "$SUBS_KEEP/$sid.edited.new" "$SUBS_KEEP/$sid.edited"
+			ZGZ_RECORD_KEY="$original" awk -F'\t' '$1!=ENVIRON["ZGZ_RECORD_KEY"]' "$edits_dir/$sid.edited" 2>/dev/null > "$edits_dir/$sid.edited.new" || true
+			printf '%s\t%s\n' "$original" "$replacement" >> "$edits_dir/$sid.edited.new"
+			mv -f "$edits_dir/$sid.edited.new" "$edits_dir/$sid.edited"
 			;;
 		*) return 1 ;;
 	esac
 }
 
 case "${1:-update}" in
+	drop-file-node) nodes_locked drop_file_node "${2:-}" "${3:-}" && cmd_build ;;
 	sharelink) share_link "${2:-}" ;;
 	record) record_for_tag "${2:-}" ;;
 	save-record) nodes_locked save_record "${2:-}" "${3:-}" "${4:-}" && cmd_build ;;

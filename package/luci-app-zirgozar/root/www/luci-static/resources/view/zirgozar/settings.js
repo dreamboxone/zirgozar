@@ -374,6 +374,7 @@ function remoteTlsFields(s){
 	return {provider:provider,address:address,bootstrap:bootstrap,certificate:certificate,resolve:controller.resolve};
 }
 return view.extend({
+	__init__: function() { return pui.mount(this); },
 	load: function() {
 		return Promise.all([
 			uci.load('zirgozar').catch(function() { return null; }),

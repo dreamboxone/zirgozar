@@ -349,13 +349,13 @@ function toolbar(s) {
 		/* The Add: the whole Node Config page, empty. Nothing is
 		   written until it is saved there, so leaving it adds nothing. */
 		pui.btn(_('Add'), 'success mk-small', function() {
-			window.location.href = L.url('admin', 'services', 'zirgozar', 'node') + '?new=1';
+			pui.navigate(L.url('admin', 'services', 'zirgozar', 'node') + '?new=1');
 		}, 'plus'),
 		pui.btn(_('Import share links'), 'primary mk-small', addViaLinks, 'link'),
 		/* A WireGuard .conf, an OpenVPN .ovpn, an Xray .json or a Clash
 		   .yaml, on the Node Config page as one node. */
 		pui.btn(_('Add file'), 'primary mk-small', function() {
-			window.location.href = L.url('admin', 'services', 'zirgozar', 'node') + '?new=file';
+			pui.navigate(L.url('admin', 'services', 'zirgozar', 'node') + '?new=file');
 		}, 'file-plus'),
 		pui.btn(_('Select all'), 'soft-blue mk-small', function(ev) {
 			all = !all;
@@ -530,7 +530,7 @@ function editListNode(n) {
 	return callAction('get_list_node', n.tag).then(function(r) {
 		if (!r || r.error || !r.record) return;
 		if (source == 'manual' && r.sid) {
-			window.location.href = L.url('admin', 'services', 'zirgozar', 'node') + '?sid=' + encodeURIComponent(r.sid);
+			pui.navigate(L.url('admin', 'services', 'zirgozar', 'node') + '?sid=' + encodeURIComponent(r.sid));
 			return;
 		}
 		var editor = nodeRecordForm(r.record);
@@ -687,6 +687,7 @@ function renderNodes(d) {
 }
 
 return view.extend({
+	__init__: function() { return pui.mount(this); },
 	load: function() {
 		return Promise.all([
 			Promise.resolve({}),
@@ -731,7 +732,7 @@ return view.extend({
 		s.renderMoreOptionsModal = function(section_id, ev) {
 			if (this.map.addedSection == section_id || !uci.get('zirgozar', section_id, 'link'))
 				return form.GridSection.prototype.renderMoreOptionsModal.apply(this, [ section_id, ev ]);
-			window.location.href = L.url('admin', 'services', 'zirgozar', 'node') + '?sid=' + encodeURIComponent(section_id);
+			pui.navigate(L.url('admin', 'services', 'zirgozar', 'node') + '?sid=' + encodeURIComponent(section_id));
 			return Promise.resolve();
 		};
 
@@ -764,6 +765,8 @@ return view.extend({
 		o.modalonly = false;
 		o.textvalue = function(section_id) {
 			var record = uci.get('zirgozar', section_id, 'record');
+			var format = uci.get('zirgozar', section_id, 'profile_format');
+			if (format == 'bpf' || format == 'toml') return format.toUpperCase();
 			return record ? record.split('\t')[2] : linkType(uci.get('zirgozar', section_id, 'link'));
 		};
 

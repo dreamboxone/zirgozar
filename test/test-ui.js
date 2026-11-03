@@ -70,11 +70,11 @@ assert.equal(languageControl.style.height, '48px');
 headerHeight = 0; matchHeight(languageControl, themeControl);
 assert.equal(languageControl.style.height, '48px');
 console.log('Language selector matches theme control height and follows size changes');
-const ui = new Function('baseclass', 'rpc', 'i18n', 'L', 'E', source)(
+const ui = new Function('baseclass', 'rpc', 'i18n', 'L', 'E', 'navigation', source)(
 	{ extend: value => value }, { declare: () => () => Promise.resolve({}) },
 	{ tr: value => value },
 	{ toArray: value => value == null ? [] : Array.isArray(value) ? value : [value] },
-	element
+	element, {mount(){}, navigate(){}}
 );
 
 function render(option, value) {
@@ -230,3 +230,7 @@ async function cacheCase(installed, stamp, seen, repeats = 1) {
 })().catch(error => { console.error(error); process.exitCode = 1; });
 
 require('./test-dns-form.js');
+
+require('./test-info-cache.js');
+
+require('./test-navigation.js');

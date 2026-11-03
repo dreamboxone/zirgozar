@@ -5,6 +5,7 @@
 'require baseclass';
 
 return baseclass.extend({ strings: {
+	"There are unsaved changes. Leave this page?": "有未保存的更改。要离开此页面吗？",
 	"DoT provider": "DoT 服务商",
 	"DoT hostname or IP": "DoT 域名或 IP",
 	"Enter a DNS hostname or IP address.": "请输入 DNS 域名或 IP 地址。",

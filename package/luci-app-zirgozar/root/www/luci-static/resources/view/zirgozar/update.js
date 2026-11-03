@@ -607,6 +607,7 @@ function render(d, early) {
 }
 
 return view.extend({
+	__init__: function() { return pui.mount(this); },
 	/* The settings only. What the router has installed is asked for once the
 	   page is up and filled in when it answers: waiting for it here held the
 	   whole page back - blank, and in English - for as long as the router

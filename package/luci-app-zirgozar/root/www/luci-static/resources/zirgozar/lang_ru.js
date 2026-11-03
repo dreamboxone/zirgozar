@@ -5,6 +5,7 @@
 'require baseclass';
 
 return baseclass.extend({ strings: {
+	"There are unsaved changes. Leave this page?": "Есть несохранённые изменения. Покинуть эту страницу?",
 	"DoT provider": "Сервис DoT",
 	"DoT hostname or IP": "Домен или IP DoT",
 	"Enter a DNS hostname or IP address.": "Введите домен или IP сервера DNS.",

@@ -16,12 +16,13 @@
 'require ui';
 'require uci';
 'require zirgozar.i18n as i18n';
+'require zirgozar.navigation as navigation';
 
 var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.8.12-r2';
+var BUILD = '5.8.12-r4';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -93,7 +94,7 @@ function logoImg(file, height, cls) {
    removed. When the router says another version than the one these pages
    were built for, each file is fetched again past the cache and the page
    reloaded, once. */
-var OWN_FILES = [ 'zirgozar/ui', 'zirgozar/i18n', 'zirgozar/lang_ru', 'zirgozar/lang_zh', 'zirgozar/status', 'zirgozar/qr', 'zirgozar/logfa', 'zirgozar/nodelink', 'zirgozar/presets', 'zirgozar/aetherscan',
+var OWN_FILES = [ 'zirgozar/ui', 'zirgozar/navigation', 'zirgozar/i18n', 'zirgozar/lang_ru', 'zirgozar/lang_zh', 'zirgozar/status', 'zirgozar/qr', 'zirgozar/logfa', 'zirgozar/nodelink', 'zirgozar/presets', 'zirgozar/aetherscan',
 	'view/zirgozar/settings', 'view/zirgozar/nodes', 'view/zirgozar/node', 'view/zirgozar/server', 'view/zirgozar/subscribe', 'view/zirgozar/other',
 	'view/zirgozar/shunt_rule',
 	'view/zirgozar/update', 'view/zirgozar/traffic', 'view/zirgozar/geoview', 'view/zirgozar/acl',
@@ -627,6 +628,35 @@ var PAGES = [
 	[ 'log',      'book',     'Runtime Logs' ]
 ];
 
+/* Cache read-only choice lists across page navigation. Never cache UCI
+   settings or action results; callers supply a configuration revision for
+   lists whose contents depend on saved settings. */
+var infoRequests = {};
+function infoRevision(configs) {
+	var text = JSON.stringify((configs || ['zirgozar']).map(function(config) { return uci.sections(config); }));
+	var hash = 2166136261;
+	for (var i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
+	return String(hash >>> 0);
+}
+function loadInfo(key, request, revision) {
+	var storageKey = 'zirgozar.info.v1.' + key;
+	var identity = storageKey + ':' + (revision || '');
+	if (infoRequests[identity]) return infoRequests[identity];
+	try {
+		var saved = JSON.parse(window.sessionStorage.getItem(storageKey) || 'null');
+		if (saved && saved.revision === (revision || '') && Date.now() - saved.time >= 0 && Date.now() - saved.time < 15000)
+			return Promise.resolve(saved.value);
+	} catch (e) {}
+	var pending = Promise.resolve().then(request).then(function(value) {
+		if (value && !value.error) {
+			try { window.sessionStorage.setItem(storageKey, JSON.stringify({time:Date.now(), revision:revision || '', value:value})); } catch (e) {}
+		}
+		return value;
+	}).finally(function() { delete infoRequests[identity]; });
+	infoRequests[identity] = pending;
+	return pending;
+}
+
 function tabs() {
 	var colours = { settings: '#3b82f6', nodes: '#8b5cf6', subscribe: '#ea580c', other: '#64748b',
 		update: '#0284c7', traffic: '#16a34a', geoview: '#0d9488', server: '#9333ea', acl: '#db2777', log: '#b45309' };
@@ -747,7 +777,15 @@ function optionHelp(root) {
 	window.addEventListener('resize', close);
 }
 
+var sharedFrame = null, sharedContent = null;
 function page(children, opts) {
+	if (sharedFrame && sharedFrame.isConnected && sharedContent) {
+		var content = E('div', {'class':'zgz-page-content'}, i18n.page(children));
+		sharedContent.replaceWith(content);
+		sharedContent = content;
+		optionHelp(content);
+		return sharedFrame;
+	}
 	opts = opts || {};
 	var fa = i18n.get() === 'fa';
 	/* Kept out of sight until its stylesheet has arrived. Drawn before, it is
@@ -772,10 +810,12 @@ function page(children, opts) {
 	document.body.classList.add('pwp-active');
 	root.appendChild(hero(root, opts.version));
 	root.appendChild(tabs());
-	root.appendChild(i18n.page(children));
+	sharedContent = E('div', {'class':'zgz-page-content'}, i18n.page(children));
+	root.appendChild(sharedContent);
 	root.appendChild(footer());
 	root.zgzSyncTheme = followTheme(root);
-	optionHelp(root);
+	optionHelp(sharedContent);
+	sharedFrame = root;
 	window.setTimeout(root.zgzSyncTheme, 0);
 	return root;
 }
@@ -955,6 +995,10 @@ function listOf(s) {
 }
 
 return baseclass.extend({
+	mount: navigation.mount,
+	navigate: navigation.navigate,
+	loadInfo: loadInfo,
+	infoRevision: infoRevision,
 	installNotice: installNotice,
 	installButtons: installButtons,
 	installsIn: installsIn,

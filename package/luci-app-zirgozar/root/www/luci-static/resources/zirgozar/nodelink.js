@@ -231,6 +231,7 @@ function withBrowse(o, hint, options) {
 					} catch (e) { pui.note(browse, options.certificate ? _('That file could not be read.') : e.message || _('That file could not be read.'), 'error'); return; }
 					if (profile && profile.bpf) pui.note(browse, _('BPF profile decoded. Only servers are imported; DNS and routing use Zirgozar settings.'), 'info');
 					if (profile && profile.toml) pui.note(browse, _('TOML file converted. Only servers are imported; DNS and routing use Zirgozar settings.'), 'info');
+					if (!options.certificate && self.map && self.map.data) self.map.data.set(self.map.config, section_id, 'profile_format', profile && profile.bpf ? 'bpf' : profile && profile.toml ? 'toml' : '');
 					var el = self.getUIElement(section_id);
 					if (el) el.setValue(value);
 					/* setValue puts the text in without telling anyone, so the
