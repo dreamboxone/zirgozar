@@ -10,7 +10,7 @@
 # VERSION is the application version; increment RELEASE for package updates.
 # The main zirgozar package always includes the complete LuCI interface.
 VERSION=5.8.12
-RELEASE=4
+RELEASE=5
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -325,6 +325,8 @@ stage_luci_assets() {
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/qr.js" \
 		"$i/www/luci-static/resources/zirgozar/qr.js"
 	# The link-or-file input, shared by Node List and the Node Config page.
+	install -m 0644 "$l/www/luci-static/resources/zirgozar/navigation.js" \
+		"$i/www/luci-static/resources/zirgozar/navigation.js"
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/nodelink.js" \
 		"$i/www/luci-static/resources/zirgozar/nodelink.js"
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/toml.js" \
