@@ -642,6 +642,76 @@ method_system() {
 
 # -------------------------------------------------------------------- action
 
+save_routing_setting() {
+	local key value kind entry item keys count=0 savedir lock configdir package next
+	json_load "$1" 2>/dev/null || { fail 'Invalid routing setting.'; return 1; }
+	json_get_var key key
+	json_get_type kind value
+	case "$key" in
+		route_ir|route_games|block_ads|block_torrent)
+			[ "$kind" = string ] || { fail 'Invalid routing setting.'; return 1; }
+			json_get_var value value
+			case "$value" in 0|1) : ;; *) fail 'Invalid routing setting.'; return 1 ;; esac ;;
+		block_quic)
+			json_get_var value value
+			case "$value" in auto|0|1) : ;; *) fail 'Invalid routing setting.'; return 1 ;; esac ;;
+		game_domain)
+			[ "$kind" = array ] || { fail 'Invalid game domains.'; return 1; }
+			json_select value
+			json_get_keys keys
+			value=''
+			for item in $keys; do
+				json_get_type kind "$item"
+				json_get_var entry "$item"
+				count=$((count + 1))
+				if [ "$kind" != string ] || [ "$count" -gt 500 ] || [ "${#entry}" -gt 253 ] ||
+				   ! printf '%s\n' "$entry" | grep -Eq '^(geosite:[a-z0-9][a-z0-9-]*|([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)$'; then
+					fail 'Invalid game domains.'; return 1
+				fi
+				value="${value:+$value }$entry"
+			done
+			json_select .. ;;
+		*) fail 'Invalid routing setting.'; return 1 ;;
+	esac
+	lock="$ZGZ_RUN/routing-save.lock"
+	[ -z "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ] || rmdir "$lock" 2>/dev/null || true
+	mkdir "$lock" 2>/dev/null || { fail 'Routing settings are busy. Try again.'; return 1; }
+	savedir="$ZGZ_RUN/routing-uci.$$"
+	if ! mkdir -m 700 "$savedir"; then
+		rmdir "$lock"; fail 'Could not save settings.'; return 1
+	fi
+	# Work on a uniquely named copy of the committed file. Normal LuCI UCI
+	# deltas must neither be read nor committed by these immediate controls.
+	configdir="${ZGZ_ROUTING_CONFIG_DIR:-/etc/config}"
+	package="zgz_routing_$$"
+	next="$configdir/.zirgozar-routing.$$"
+	if ! mkdir "$savedir/delta" || ! cp -p "$configdir/zirgozar" "$savedir/$package"; then
+		rmdir "$savedir/delta" "$savedir" "$lock" 2>/dev/null || true
+		fail 'Could not save settings.'; return 1
+	fi
+	if [ "$key" = game_domain ]; then
+		uci -q -c "$savedir" -t "$savedir/delta" delete "$package.config.game_domain" || true
+		if [ -z "$value" ]; then
+			uci -c "$savedir" -t "$savedir/delta" set "$package.config.game_domain=none" || count=-1
+		else
+			for entry in $value; do
+				uci -c "$savedir" -t "$savedir/delta" add_list "$package.config.game_domain=$entry" || count=-1
+			done
+		fi
+	else
+		uci -c "$savedir" -t "$savedir/delta" set "$package.config.$key=$value" || count=-1
+	fi
+	if [ "$count" = -1 ] || ! uci -c "$savedir" -t "$savedir/delta" commit "$package" ||
+	   ! cp -p "$savedir/$package" "$next" || ! mv -f "$next" "$configdir/zirgozar"; then
+		rm -f "$next" "$savedir/$package" "$savedir/delta/$package"
+		rmdir "$savedir/delta" "$savedir" "$lock" 2>/dev/null || true
+		fail 'Could not save settings.'; return 1
+	fi
+	rm -f "$savedir/$package" "$savedir/delta/$package"
+	rmdir "$savedir/delta" "$savedir" "$lock" 2>/dev/null || true
+	if [ "$(cfg_bool enabled 0)" = 1 ]; then detach /etc/init.d/zirgozar reload; fi
+}
+
 method_action() {
 	local name arg input
 
@@ -656,6 +726,9 @@ method_action() {
 			if [ -s "$JOB" ]; then fail "Another install is still running. Try again when it is done."; return; fi ;;
 	esac
 	case "$name" in
+		routing_set)
+			save_routing_setting "$arg" || return
+			;;
 		doh_bootstrap)
 			"$ZGZ_LIB/zgz-doh-bootstrap" "$arg"
 			return

@@ -388,6 +388,23 @@ function kept() {
 	};
 }
 
+function latestLxVersions(versions) {
+	var seen = {};
+	return versions.filter(function(version) {
+		var channel = version.pre ? 'pre' : 'stable';
+		if (seen[channel]) return false;
+		seen[channel] = true;
+		return true;
+	});
+}
+
+function latestXrayVersions(versions) {
+	var selected = latestLxVersions(versions);
+	if (!selected.some(function(version) { return version.tag.replace(/^v/, '') === '26.1.23'; }))
+		selected.push({ tag: 'v26.1.23', pre: false });
+	return selected;
+}
+
 function render(d, early) {
 	d = d || {};
 	var cores = d.cores || {};
@@ -552,7 +569,7 @@ function render(d, early) {
 				}, 'download', d));
 			}
 			/* Explicit version choices include upstream prereleases. */
-			var versions = c.name == 'sing-box-lx' ? (cores.singbox_lx_versions || []) : c.name == 'xray' ? (cores.xray_versions || []) : [];
+			var versions = c.name == 'sing-box-lx' ? latestLxVersions(cores.singbox_lx_versions || []) : c.name == 'xray' ? latestXrayVersions(cores.xray_versions || []) : [];
 			if (c.arch_ok && versions.length) {
 				var picked = c.name == 'sing-box-lx' ? lxPicked : xrayPicked;
 				if (!picked && c.name == 'sing-box-lx') {
@@ -580,7 +597,7 @@ function render(d, early) {
 					return act('core:' + c.name, 'core_remove', c.name, _('%s removed.').format(c.name));
 				}, 'trash', d));
 
-			cbox.appendChild(row({ xray: 'Xray', geoview: 'Geoview', 'sing-box-lx': 'sing-box-lx', 'warp-plus': 'warp-plus', vwarp: 'Vwarp', aether: 'Aether', mihomo: 'Mihomo', sslocal: 'shadowsocks-rust', haproxy: 'HAProxy', 'xray-patterniha': _('Xray (patterniha)'), openvpn: 'OpenVPN' }[c.name] || c.name, value, actions, 'core:' + c.name));
+			cbox.appendChild(row({ xray: 'Xray', geoview: 'Geoview', 'sing-box-lx': 'sing-box-lx', 'warp-plus': 'warp-plus', vwarp: 'Vwarp', aether: 'Aether', mihomo: 'Mihomo', sslocal: 'ss-rust', haproxy: 'HAProxy', 'xray-patterniha': _('Xray (patterniha)'), openvpn: 'OpenVPN' }[c.name] || c.name, value, actions, 'core:' + c.name));
 		});
 		var freeRow = row(_('Free space'),
 			[ E('span', {}, cores.unknown ? '…' : bytes(cores.free)), verState(), E('code', { 'title': cores.dir || '', 'style': 'font-size:11.5px;color:var(--muted)' }, cores.dir || '') ]);

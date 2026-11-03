@@ -82,8 +82,12 @@ assert.equal(api.badge({enabled:false}).textContent,'Main switch is off');
 api.syncMainSwitch({enabled:true}); assert.equal(switchValue,'1','untouched switch follows external changes');
 api.syncMainSwitch({}); assert.equal(switchValue,'1');
 assert.equal(api.badge({}).textContent,'Status unavailable');
-assert.equal(api.badge({enabled:true,running:true,status:'ready',connected:false,connectivity:'checking'}).textContent,'Checking connection…');
-assert.equal(api.badge({enabled:true,running:true,status:'ready',connected:false,connectivity:'failed'}).textContent,'Connection check failed');
+for (const connectivity of ['checking', 'failed', 'unknown']) {
+	const badge = api.badge({enabled:true,running:true,status:'ready',connected:false,connectivity});
+	assert.equal(badge.textContent,'Tunnel running');
+	assert.doesNotMatch(badge.attrs.class, /warn|error|\bok\b/, 'unverified connectivity is neutral');
+}
+assert.equal(api.badge({enabled:true,running:true,status:'failed',connected:false}).textContent,'Could not connect');
 assert.equal(api.badge({enabled:true,running:true,status:'starting',connected:false}).textContent,'Starting…');
 console.log('Main switch: pending changes, applied state, external changes and unavailable status passed');
 const emptyList = 'No enabled configs are available. Add or enable a manual config or a subscription.';
@@ -115,3 +119,36 @@ console.log('Dashboard cache: connection, disconnection, invalid responses, priv
 api.bindMainSwitch({getUIElement() {throw new Error('form is still mounting');}}, 'config');
 assert.doesNotThrow(() => api.syncMainSwitch({enabled:true}));
 console.log('Dashboard state can refresh before the settings form finishes mounting');
+const countryStorage = new Map();
+let images = [];
+const orb = element('div', {id:'pwp-country-orb'}, [element('span', {}, 'globe')]);
+orb.getAttribute = key => orb.attrs[key];
+function exitApi() {
+ return new Function('rpc','i18n','window','document','E', source.slice(0, source.indexOf('\nreturn baseclass.extend(')) + '\nreturn {renderExit,retainedExitCountry};')(
+  {declare:()=>()=>Promise.resolve({})}, {tr:v=>v,get:()=> 'en'},
+  {localStorage:{getItem:k=>countryStorage.get(k),setItem:(k,v)=>countryStorage.set(k,v)}},
+  {getElementById:()=>orb}, (tag,attrs)=>{const img=element(tag,attrs);images.push(img);return img;});
+}
+const flags=exitApi();
+flags.renderExit({exit_cc:'FI'});
+assert.equal(orb.children[0].textContent,'globe','placeholder stays until first flag loads');
+images[0].attrs.load({target:images[0]});
+const finnishFlag=orb.children[0];
+flags.renderExit({exit_cc:''});
+flags.renderExit({enabled:false});
+assert.equal(orb.children[0],finnishFlag,'empty responses and disconnect preserve flag');
+assert.equal(exitApi().retainedExitCountry(''),'FI','last country survives page reload');
+flags.renderExit({exit_cc:'DE'});
+const failedImage=images.at(-1);
+failedImage.attrs.error();
+assert.equal(orb.children[0],finnishFlag,'failed replacement keeps previous flag');
+flags.renderExit({exit_cc:'DE'});
+const germanFlag=images.at(-1);
+germanFlag.attrs.load({target:germanFlag});
+assert.equal(orb.children[0],germanFlag,'loaded new country replaces flag');
+flags.renderExit({exit_cc:'FR'});
+const staleImage=images.at(-1);
+flags.renderExit({exit_cc:'DE'});
+staleImage.attrs.load({target:staleImage});
+assert.equal(orb.children[0],germanFlag,'outdated image cannot replace latest country');
+console.log('Country flag: retained across empty responses, disconnect and reload; safe image replacement passed');

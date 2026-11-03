@@ -77,6 +77,9 @@ jobs:
       - name: Check empty config choices
         run: node test/test-ui.js
 
+      - name: Check game traffic routing
+        run: RIG_ROOT="$RUNNER_TEMP/zirgozar-game-routing" sh test/test-game-routing.sh
+
       - name: Check subscription import
         run: node test/test-subs-ui.js
 

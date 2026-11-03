@@ -57,13 +57,27 @@ const coreNotes = new Function('_', 'var notes={},lastCore=""; function say(k,te
 assert.match(coreNotes('openvpn check-error blocked')['core:openvpn'].text, /installed core was not changed/);
 assert.equal(coreNotes('')['core:openvpn'], undefined, 'successful check clears the old error note');
 
+const lxSource = source.slice(source.indexOf('function latestLxVersions('), source.indexOf('\nfunction render(d, early)'));
+const {latestLxVersions, latestXrayVersions} = new Function(lxSource + '\nreturn {latestLxVersions, latestXrayVersions};')();
+const recentLxVersions = [
+ {tag:'v1.14.3-lx.25-rc.2',pre:true},
+ {tag:'v1.14.3-lx.25-rc.1',pre:true},
+ {tag:'v1.14.3-lx.24',pre:false},
+ {tag:'v1.14.3-lx.23',pre:false}
+];
+assert.deepEqual(latestLxVersions(recentLxVersions), [recentLxVersions[0],recentLxVersions[2]]);
+assert.deepEqual(latestLxVersions([]), []);
+assert.deepEqual(latestLxVersions(recentLxVersions.slice(2)), [recentLxVersions[2]]);
+assert.equal(recentLxVersions.length,4,'filter preserves upstream list');
+console.log('LX selector: latest prerelease and stable only, including empty and single-channel lists passed');
+
 const selectorSource = source.slice(source.indexOf("var versions = c.name == 'sing-box-lx'"), source.indexOf("\n\t\t\tif (c.installed && c.ours"));
 function selector(name, versions, picked, installedVersion) {
  const actions = [], calls = [];
  const E = (tag, attrs, children) => ({tag, ...attrs, children, value: children?.[0]?.value});
- const run = new Function('c','cores','E','_','actBtn','act','downloadText','actions','d','lxPicked','xrayPicked',
+ const run = new Function('latestXrayVersions','latestLxVersions','c','cores','E','_','actBtn','act','downloadText','actions','d','lxPicked','xrayPicked',
   selectorSource + '; return { actions, lxPicked, xrayPicked };');
- const result = run({name, arch_ok:true, installed:!!installedVersion, version:installedVersion}, {singbox_lx_versions:versions}, E,
+ const result = run(latestXrayVersions, latestLxVersions, {name, arch_ok:true, installed:!!installedVersion, version:installedVersion}, {singbox_lx_versions:versions,xray_versions:versions}, E,
   key => ({format:v => key.replace('%s',v)}),
   (label, style, key, click) => ({label,key,click}),
   (...args) => calls.push(args), name => name, actions, {}, picked, '');
@@ -94,3 +108,15 @@ for (const name of ['sing-box-lx','xray']) {
  assert.equal(update,name);
 }
 console.log('Reinstall preserves the installed LX prerelease; explicit version selection remains available');
+
+const recentXray = [{tag:'v26.11.2',pre:true},{tag:'v26.11.1',pre:true},{tag:'v26.10.31',pre:false},{tag:'v26.10.30',pre:false},{tag:'v26.1.23',pre:false}];
+assert.deepEqual(latestXrayVersions(recentXray).map(v=>v.tag), ['v26.11.2','v26.10.31','v26.1.23']);
+assert.deepEqual(latestXrayVersions([]), [{tag:'v26.1.23',pre:false}]);
+assert.equal(latestXrayVersions([{tag:'v26.1.23',pre:false}]).length,1,'pinned release must not be duplicated');
+assert.equal(latestXrayVersions([{tag:'26.1.23',pre:false}]).length,1,'normalized pinned tag must not be duplicated');
+const xrayList = selector('xray', recentXray, '');
+assert.equal(xrayList.actions[0].children.length,3);
+xrayList.actions[0].value='v26.1.23';
+xrayList.actions[1].click();
+assert.equal(xrayList.calls[0][2],'xray@v26.1.23');
+console.log('Xray selector: latest prerelease, latest stable and pinned 26.1.23; exact install target passed');

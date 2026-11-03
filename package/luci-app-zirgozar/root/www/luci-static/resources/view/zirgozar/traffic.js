@@ -271,6 +271,96 @@ function hostname(v) {
 	return /^[A-Za-z0-9_]([A-Za-z0-9_-]{0,62}\.)*[A-Za-z0-9_-]{1,63}\.?$/.test(v);
 }
 
+var routingSaved = {};
+
+function routingManager() {
+ function saved(key) {
+  return Object.prototype.hasOwnProperty.call(routingSaved,key) ? routingSaved[key] : uci.get('zirgozar','config',key);
+ }
+ var domains = saved('game_domain');
+ domains = domains == null ? ['geosite:category-games'] : (Array.isArray(domains) ? domains : String(domains).split(/\s+/));
+ domains = domains.filter(function(domain) { return domain && domain !== 'none'; });
+ var busy = false, panel, list, status;
+ function save(key, value) {
+  if (busy) return Promise.reject(new Error(_('Routing settings are busy. Try again.')));
+  busy = true;
+  panel.querySelectorAll('input, select, button').forEach(function(control) { control.disabled = true; });
+  status.textContent = _('Saving and applying…');
+  return callAction('routing_set', JSON.stringify({key:key, value:value})).then(function(result) {
+   if (!result || !result.ok || result.error) throw new Error(_(result && result.error || 'Could not save settings.'));
+   routingSaved[key] = value;
+   status.textContent = _('Saved. Routing changes are being applied.');
+  }).catch(function(error) {
+   status.textContent = error.message || _('Could not save settings.');
+   throw error;
+  }).finally(function() {
+   busy = false;
+   panel.querySelectorAll('input, select, button').forEach(function(control) { control.disabled = false; });
+  });
+ }
+ function toggle(key, label, description, extra) {
+  var input = E('input', {type:'checkbox', 'change':function() {
+   var enabled = input.checked;
+   return save(key, enabled ? '1' : '0').catch(function() { input.checked = !enabled; });
+  }});
+  input.checked = /^(1|on|true|yes|enabled)$/.test(String(saved(key) || '0'));
+  return E('div', {'class':'zgz-routing-control'}, [
+   E('label', {}, [E('strong', {'class':'zgz-routing-title'}, _(label)), input]),
+   E('p', {'class':'cbi-value-description'}, [_(description), extra ? ' ' + _(extra) : ''])
+  ]);
+ }
+ function renderDomains() {
+  while (list.firstChild) list.removeChild(list.firstChild);
+  domains.forEach(function(domain, index) {
+   list.appendChild(E('div', {'class':'zgz-game-domain'}, [
+    E('code', {}, domain), pui.btn(_('Remove'), 'danger mk-small', function() {
+     var next = domains.filter(function(_, i) { return i !== index; });
+     return save('game_domain', next).then(function() { domains = next; renderDomains(); }).catch(function() {});
+    }, 'trash')
+   ]));
+  });
+  if (!domains.length) list.appendChild(E('p', {}, _('No game domains have been selected.')));
+ }
+ var domainInput = E('input', {type:'text', dir:'ltr', placeholder:'example.com', 'aria-label':_('Game domain')});
+ function addDomain() {
+  if (busy) return;
+  var domain = domainInput.value.trim().toLowerCase().replace(/\.$/, '');
+  if (domain.length > 253 || !/^(geosite:[a-z0-9][a-z0-9-]*|([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)$/.test(domain)) {
+   status.textContent = _('That does not look like a domain name'); return;
+  }
+  if (domains.indexOf(domain) >= 0) { domainInput.value = ''; return; }
+  if (domains.length >= 500) { status.textContent = _('Select up to 500 game domains.'); return; }
+  var next = domains.concat([domain]);
+  return save('game_domain', next).then(function() { domains = next; domainInput.value = ''; renderDomains(); }).catch(function() {});
+ }
+ domainInput.addEventListener('keydown', function(event) { if (event.key === 'Enter') { event.preventDefault(); addDomain(); } });
+ var quic = E('select', {'aria-label':_('Refuse QUIC'), change:function() {
+  var previous = quic.getAttribute('data-saved');
+  return save('block_quic',quic.value).then(function() { quic.setAttribute('data-saved',quic.value); }).catch(function() { quic.value = previous; });
+ }}, [['auto','Auto'],['1','Always'],['0','Never']].map(function(option) { return E('option', {value:option[0]}, _(option[1])); }));
+ quic.value = saved('block_quic') || 'auto';
+ quic.setAttribute('data-saved',quic.value);
+ list = E('div', {'class':'zgz-game-domains'});
+ status = E('p', {'role':'status','aria-live':'polite','class':'zgz-routing-status'}, '');
+ panel = E('section', {'class':'cbi-section zgz-routing-manager','aria-labelledby':'zgz-routing-heading'}, [
+  E('h3', {id:'zgz-routing-heading'}, _('Traffic management')),
+  E('p', {}, _('Changes here are saved and applied automatically.')),
+  toggle('route_ir','Direct pass for Iranian traffic','Iranian sites and addresses skip the tunnel. Download the routing data first.'),
+  E('h3', {}, _('Block')),
+  toggle('block_ads','Block advertising','Block advertising for every device. Requires the routing data.'),
+  toggle('block_torrent','Block BitTorrent','Block BitTorrent traffic for every device.'),
+  E('div', {'class':'zgz-routing-control'}, [E('label',{},[E('strong',{'class':'zgz-routing-title'},_('Refuse QUIC')),quic]), E('p',{'class':'cbi-value-description'},_('Makes browsers fall back to TCP. Automatic follows the active tunnel transport.'))]),
+  E('h3', {}, _('Games')),
+  toggle('route_games','Direct game sites','Send the selected game domains directly, outside the tunnel.',
+   'geosite:category-games includes the full games category. Remove it to use only your own domains. A domain also includes its subdomains.'),
+  list,
+  E('div', {'class':'zgz-game-domain-add'}, [domainInput,pui.btn(_('Add'),'primary mk-small',addDomain,'plus')]),
+  status
+ ]);
+ renderDomains();
+ return panel;
+}
+
 return view.extend({
 	load: function() {
 		return Promise.all([
@@ -388,35 +478,6 @@ return view.extend({
 			]);
 		};
 
-		/* ------------------------------------------------------ Iran split */
-		s = m.section(form.NamedSection, 'config', 'zirgozar');
-		s.anonymous = true;
-
-		o = s.option(form.Flag, 'route_ir', _('Direct pass for Iranian traffic'),
-			_('Iranian sites and addresses skip the tunnel. Needs the routing data above — until that is downloaded this does nothing, because a core asked for a geo file it has not got refuses to start rather than carrying on without it.'));
-		o.rmempty = false;
-
-		/* ----------------------------------------------------------- block */
-		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Block'));
-		s.anonymous = true;
-
-		o = s.option(form.Flag, 'block_ads', _('Block advertising'),
-			_('For every device on the network. The names come from the category-ads-all list inside the same routing data, so this also needs it.'));
-		o.rmempty = false;
-
-		o = s.option(form.Flag, 'block_torrent', _('Block BitTorrent'),
-			_('BitTorrent through a free node is how a free node stops existing.'));
-		o.default = '0';
-		o.rmempty = false;
-
-		o = s.option(form.ListValue, 'block_quic', _('Refuse QUIC'),
-			_('Makes browsers fall back to TCP. Automatic refuses it while the node in use goes through a CDN (WebSocket, XHTTP, gRPC) - a Cloudflare Worker cannot carry UDP at all - and lets it through otherwise, where QUIC is faster.'));
-		o.value('auto', _('Auto'));
-		o.value('1', _('Always'));
-		o.value('0', _('Never'));
-		o.default = 'auto';
-		o.rmempty = false;
-
 		/* ------------------------------------------------------ rebind */
 		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Sites with a rebind weakness'));
 		s.anonymous = true;
@@ -463,7 +524,7 @@ return view.extend({
 				return callGeo().then(renderGeo).catch(function() {});
 			}, 5);
 			pui.sortable(el, 'zirgozar');
-			return pui.page([ el ]);
+			return pui.page([ routingManager(), el ]);
 		});
 	}
 });

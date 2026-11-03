@@ -12,6 +12,7 @@ require('./test-node-picker.js');
 require('./test-node-save.js');
 require('./test-i18n.js');
 require('./test-update-check.js');
+require('./test-routing-ui.js');
 require('./test-presets.js');
 require('./test-xdrive.js');
 

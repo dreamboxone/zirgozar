@@ -206,7 +206,7 @@ function badge(st) {
 	else if (!switchOn(st.enabled))    { text = _('Main switch is off'); cls = ''; }
 	else if (st.status == 'failed')    { text = _('Could not connect'); cls = 'error'; }
 	else if (st.running && st.status == 'ready')
-	                                   { text = st.connectivity == 'failed' ? _('Connection check failed') : _('Checking connection…'); cls = 'warn'; }
+	                                   { text = _('Tunnel running'); cls = ''; }
 	else if (st.running)               { text = _('Connecting…');  cls = 'warn'; }
 	else                               { text = _('Disconnected'); cls = ''; }
 
@@ -229,25 +229,53 @@ function countryName(cc) {
 	}
 }
 
+var lastExitCountry = '';
+var EXIT_COUNTRY_KEY = 'zirgozar.dashboard.country.v1';
+
+function retainedExitCountry(cc) {
+	if (/^[A-Z]{2}$/.test(cc || '')) {
+		lastExitCountry = cc;
+		try { window.localStorage.setItem(EXIT_COUNTRY_KEY, cc); } catch (e) {}
+	} else if (!lastExitCountry) {
+		try { lastExitCountry = window.localStorage.getItem(EXIT_COUNTRY_KEY) || ''; } catch (e) {}
+		if (!/^[A-Z]{2}$/.test(lastExitCountry)) lastExitCountry = '';
+	}
+	return lastExitCountry;
+}
+
 function renderExit(st) {
 	var globe = byId('pwp-country-orb');
 	if (!globe) return;
-	var cc = /^[A-Z]{2}$/.test(st.exit_cc || '') ? st.exit_cc : '';
-	if (globe.getAttribute('data-cc') === cc) return;
-	globe.setAttribute('data-cc', cc);
-	globe.setAttribute('aria-label', cc ? countryName(cc) : _('Where the tunnel comes out'));
-	while (globe.firstChild) globe.removeChild(globe.firstChild);
-	if (cc) globe.appendChild(E('img', {
+	var cc = retainedExitCountry(st.exit_cc);
+	if (!cc) return;
+	if (globe.getAttribute('data-cc') === cc) {
+		globe.setAttribute('data-pending-cc', '');
+		return;
+	}
+	if (globe.getAttribute('data-pending-cc') === cc) return;
+	globe.setAttribute('data-pending-cc', cc);
+	/* Keep the previous flag until its replacement has actually loaded. */
+	E('img', {
 		'src': 'https://flagcdn.com/w320/' + cc.toLowerCase() + '.png',
-		'alt': countryName(cc), 'error': function(ev) { ev.target.remove(); }
-	}));
-	else globe.appendChild(pui.icon('globe'));
+		'alt': countryName(cc),
+		'load': function(ev) {
+			if (globe.getAttribute('data-pending-cc') !== cc) return;
+			while (globe.firstChild) globe.removeChild(globe.firstChild);
+			globe.appendChild(ev.target);
+			globe.setAttribute('data-cc', cc);
+			globe.setAttribute('data-pending-cc', '');
+			globe.setAttribute('aria-label', countryName(cc));
+		},
+		'error': function() {
+			if (globe.getAttribute('data-pending-cc') === cc) globe.setAttribute('data-pending-cc', '');
+		}
+	});
 }
 
 function line(label, id) {
 	return E('div', { 'class': 'pwp-detail-row', 'style': 'display:flex;gap:10px;padding:4px 0;align-items:baseline' }, [
 		E('span', { 'style': 'flex:0 0 130px;color:var(--muted);font-size:13px' }, label),
-		E('span', { 'class': 'pwp-ticker', 'style': 'flex:1 1 auto;font-weight:600' }, [
+		E('span', { 'class': 'pwp-ticker' + (id === 'pwp-host' ? ' pwp-host-ticker' : ''), 'style': 'flex:1 1 auto;font-weight:600' }, [
 			E('span', { 'class': 'pwp-ticker-track' }, [ E('span', { 'id': id }, '-') ])
 		])
 	]);

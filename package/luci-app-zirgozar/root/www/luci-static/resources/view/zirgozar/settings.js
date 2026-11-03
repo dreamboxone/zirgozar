@@ -944,10 +944,10 @@ return view.extend({
 		o.rmempty = false;
 
 		o = s.taboption('log', form.ListValue, 'loglevel', _('Log Level'));
-		o.value('debug');
-		o.value('info');
-		o.value('warning');
-		o.value('error');
+		o.value('debug', _('Debug'));
+		o.value('info', _('Information'));
+		o.value('warning', _('Warning'));
+		o.value('error', _('Error'));
 		o.default = 'warning';
 		o.depends('log_node', '1');
 

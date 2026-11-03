@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.8.11-r4';
+var BUILD = '5.8.12-r1';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -674,8 +674,8 @@ function optionHelp(root) {
 	function enhance(scope) {
 		scope.querySelectorAll('.cbi-value-description').forEach(function(desc) {
 			if (desc.closest('.zgz-help') || !desc.textContent.trim()) return;
-			var row = desc.closest('.cbi-value');
-			var label = row && row.querySelector('.cbi-value-title');
+			var row = desc.closest('.cbi-value, .zgz-routing-control');
+			var label = row && row.querySelector('.cbi-value-title, .zgz-routing-title');
 			if (!label && desc.classList.contains('zgz-section-help')) {
 				var section = desc.closest('.cbi-section');
 				label = section && section.querySelector('h3');

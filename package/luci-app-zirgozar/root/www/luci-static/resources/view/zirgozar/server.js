@@ -255,7 +255,7 @@ return view.extend({
 		o.rmempty = false;
 
 		o = s.option(form.ListValue, 'loglevel', _('Log level'));
-		[ 'debug', 'info', 'warning', 'error', 'none' ].forEach(function(v) { o.value(v); });
+		[ ['debug','Debug'], ['info','Information'], ['warning','Warning'], ['error','Error'], ['none','No logging'] ].forEach(function(v) { o.value(v[0], _(v[1])); });
 		o.default = 'warning';
 
 		/* ---------------------------------------------------- the users */

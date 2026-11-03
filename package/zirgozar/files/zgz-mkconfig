@@ -250,9 +250,21 @@ add_rule "{\"type\":\"field\",\"ip\":[$PRIVATE_V4,$PRIVATE_V6],\"outboundTag\":\
 # is passed through as written. Direct addresses are not here: the firewall
 # never hands those to the core at all.
 direct_domains=""
-for _d in $(cfg direct_domain ''); do
+game_domains=""
+if [ "$(cfg_bool route_games 0)" = 1 ]; then
+	_game_geo="$(geo_dir)" || _game_geo=""
+	for _d in $(cfg game_domain 'geosite:category-games'); do
+		case "$_d" in
+			none) continue ;;
+			geosite:*)
+				[ "$FORCE_NO_GEO" = 0 ] && [ -n "$_game_geo" ] || continue ;;
+		esac
+		game_domains="${game_domains:+$game_domains }$_d"
+	done
+fi
+for _d in $(cfg direct_domain '') $game_domains; do
 	case "$_d" in
-		domain:*|full:*|regexp:*|keyword:*) : ;;
+		domain:*|full:*|regexp:*|keyword:*|geosite:*) : ;;
 		*) _d="domain:${_d#.}" ;;
 	esac
 	[ -n "$direct_domains" ] && direct_domains="$direct_domains,"
