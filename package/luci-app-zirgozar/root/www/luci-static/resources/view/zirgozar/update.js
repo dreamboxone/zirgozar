@@ -114,7 +114,7 @@ function say(key, text, kind) {
 
 function row(label, value, action, key) {
 	return E('div', {
-		'class': key && key.indexOf('core:') === 0 ? 'pwp-core-update-row' : '',
+		'class': key && (key === 'app' || key.indexOf('core:') === 0) ? 'pwp-core-update-row' : '',
 		'style': 'display:flex;gap:12px;align-items:center;padding:10px 0;flex-wrap:wrap;' +
 		         'border-bottom:1px solid var(--line)'
 	}, [
@@ -531,7 +531,6 @@ function render(d, early) {
 			if (c.unknown) {
 				value.push(verChip('…'));
 				value.push(verState());
-				value.push(E('code', { 'title': c.path, 'style': 'font-size:11.5px;color:var(--muted)' }, c.path));
 			} else if (c.installed) {
 				value.push(verChip('【 ' + (c.version ? ltr(c.version) : _('installed')) + ' 】', 'ok'));
 				/* What the project has published, when it is not what is
@@ -544,7 +543,6 @@ function render(d, early) {
 					value.push(verState(E('span', { 'style': 'color:var(--muted)' }, _('Up to date'))));
 				else
 					value.push(verState());
-				value.push(E('code', { 'style': 'font-size:11.5px;color:var(--muted)' }, c.path));
 				if (!c.ours)
 					value.push(E('span', { 'style': 'font-size:12px;color:var(--muted)' },
 						_('(installed by another package — left alone)')));
