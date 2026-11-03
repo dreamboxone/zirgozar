@@ -631,6 +631,19 @@ add_node() {
 			;;
 	esac
 
+	# Keep complete profiles together under their own source tab.
+	if printf '%s\n' "$link" | grep -qE '^[[:space:]]*([\[{]|[A-Za-z_][A-Za-z0-9_.-]*:[[:space:]])'; then
+		local records="$ZGZ_RUN/profile-$_sec.tsv"
+		node_records "$_sec" "$(cfg max_nodes 300)" > "$records" 2>/dev/null || true
+		if [ "$(wc -l < "$records")" -gt 1 ]; then
+			printf 'file:%s\t%s\n' "$_sec" "$(printf '%s' "${name:-$_sec}" | tr '\t\r\n' '   ')" >> "$ZGZ_RUN/candidate-groups.new"
+			record_sources "$records" "file:$_sec"
+		fi
+		cat "$records" >> "$CHAIN_TSV"
+		rm -f "$records"
+		return 0
+	fi
+
 	# A node with a chain of its own - a pre-proxy, or a landing node - is a
 	# record already, built where both ends of the chain are known, rather than
 	# a link for the parser to meet with no idea of what it dials through.
@@ -648,7 +661,7 @@ add_node() {
 	# others, and for one with settings of its own from its edit page, which
 	# hold for its links and no one else's.
 	if [ -n "$(node_extras "$_sec")" ] ||
-	   printf '%s\n' "$link" | grep -qiE '^[[:space:]]*(\[(interface|peer)\]|client[[:space:]]*$|remote[[:space:]]+[^[:space:]]+|<ca>)'; then
+	   printf '%s\n' "$link" | grep -qiE '^[[:space:]]*([\[{]|[A-Za-z_][A-Za-z0-9_.-]*:[[:space:]]|client[[:space:]]*$|remote[[:space:]]+[^[:space:]]+|<ca>)'; then
 		node_records "$_sec" "$(cfg max_nodes 300)" >> "$CHAIN_TSV" 2>/dev/null || true
 		return 0
 	fi
@@ -890,7 +903,12 @@ build_candidates() {
 	# Hand-added first, then the subscriptions. Separate parser runs cannot
 	# know about each other, so the tags they hand out collide and the same
 	# server can be in two lists: this renumbers and keeps the first of each.
-	record_sources "$CHAIN_TSV" manual
+	# Profile records already have a file source; leave ordinary manual records here.
+	awk -F'\t' 'FILENAME==ARGV[1] {if ($2 ~ /^file:/) files[$1]=1; next}
+		NF >= 6 && !(($2 "|" $3 "|" $4 "|" $5 "|" $6) in files)' \
+		"$ZGZ_RUN/candidate-sources.new" "$CHAIN_TSV" > "$ZGZ_RUN/manual-chain.tsv"
+	record_sources "$ZGZ_RUN/manual-chain.tsv" manual
+	rm -f "$ZGZ_RUN/manual-chain.tsv"
 	record_sources "$ZGZ_RUN/links.tsv" manual
 	cat "$CHAIN_TSV" "$ZGZ_RUN/links.tsv" "$SUB_TSV" > "$ZGZ_RUN/merge.tsv" 2>/dev/null || true
 	rm -f "$CHAIN_TSV" "$ZGZ_RUN/links.tsv" "$SUB_TSV"
