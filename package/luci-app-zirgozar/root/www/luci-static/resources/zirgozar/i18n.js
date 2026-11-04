@@ -427,7 +427,7 @@ var FA = {
 	'in use': 'در حال استفاده',
 	'Use': 'استفاده',
 	'This is the node the tunnel is using at the moment. Press Disconnect, or Choose fastest, before deleting it.':
-		'این همان کانفیگی است که تونل الان از آن استفاده می‌کند. قبل از حذفش «قطع» یا «انتخاب سریع‌ترین» را بزنید.',
+		'این کانفیگ اکنون فعال است و حذف نمی‌شود. قبل از حذف، کلید اصلی را «خاموش» کرده یا «انتخاب سریع‌ترین» را بزنید.',
 	'Connecting through %s…': 'در حال اتصال از راه %s…',
 	'Nothing read yet. Read the subscriptions on Node Subscribe, or turn on the main switch in Basic Settings.':
 		'هنوز چیزی خوانده نشده. اشتراک‌ها را در صفحه «اشتراک کانفیگ‌ها» بخوانید، یا کلید اصلی را در «تنظیمات پایه» روشن کنید.',

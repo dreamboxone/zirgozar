@@ -521,6 +521,10 @@ body.pwp-fa #modal_overlay:where(body.pwp-active *)>.modal textarea,body.pwp-fa 
 .mk-dark .pwp-note.ok{color:#34d399}
 .mk-dark .pwp-note.warn,.mk-dark .pwp-note.error{color:#f87171}
 .pwp-note-block{display:block;margin:8px 0 0}
+.mk .pwp-node-message>.td{text-align:start!important;padding:6px 12px 12px!important;border-top:0!important}
+.mk .pwp-node-message .pwp-note{display:block;white-space:nowrap;overflow-x:auto;max-width:100%;margin:0}
+.mk .pwp-node-message[dir=rtl]>.td,.mk .pwp-node-message[dir=rtl] .pwp-note{direction:rtl;text-align:right!important}
+.mk .pwp-node-message[dir=ltr]>.td,.mk .pwp-node-message[dir=ltr] .pwp-note{direction:ltr;text-align:left!important}
 /* A core tile's title is the word and the core's name, on one line. */
 #pwp-core-t,#pwp-bridge-t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mk-grid.pwp-status-row{grid-template-columns:minmax(0,2fr) repeat(4,minmax(0,1fr));align-items:stretch;width:100%;max-width:1240px;margin-inline:auto}

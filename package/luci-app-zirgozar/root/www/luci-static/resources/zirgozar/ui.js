@@ -22,7 +22,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.8.13-r4';
+var BUILD = '5.8.13-r5';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -246,13 +246,24 @@ function bytes(n) {
    empty text takes the message away. */
 function note(anchor, text, kind) {
 	if (!anchor || !anchor.parentNode) return;
-	var n = anchor.nextElementSibling;
+	var row = anchor.closest && anchor.closest('.cbi-section-actions') && anchor.closest('tr');
+	var messageRow = row && row.nextElementSibling;
+	if (row && (!messageRow || !messageRow.classList.contains('pwp-node-message'))) {
+		messageRow = E('tr', {'class':'tr pwp-node-message', 'dir':i18n.get() === 'fa' ? 'rtl' : 'ltr'}, [
+			E('td', {'class':'td', 'colspan':row.children.length}, [
+				E('span', {'class':'pwp-note', 'role':'status'})
+			])
+		]);
+		row.parentNode.insertBefore(messageRow, row.nextSibling);
+	}
+	var n = row ? messageRow.querySelector('.pwp-note') : anchor.nextElementSibling;
 	if (!n || !n.classList.contains('pwp-note')) {
 		n = E('span', { 'class': 'pwp-note', 'role': 'status' });
 		anchor.parentNode.insertBefore(n, anchor.nextSibling);
 	}
 	kind = kind || 'info';
 	n.className = 'pwp-note ' + kind;
+	if (messageRow && row) messageRow.hidden = !text;
 	n.textContent = text || '';
 	n.style.display = text ? '' : 'none';
 	window.clearTimeout(n.pwpTimer);
