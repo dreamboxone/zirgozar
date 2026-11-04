@@ -6,7 +6,8 @@ source=source.replace('mount:mount, navigate:navigate','mount:mount, navigate:na
 const events={},location={value:new URL('http://router/cgi-bin/luci/admin/services/zirgozar/nodes'),
  get href(){return this.value.href},set href(value){this.value=new URL(value,this.value)},
  get origin(){return this.value.origin},get pathname(){return this.value.pathname},get search(){return this.value.search}};
-let confirms=true,unloads=0,imports=0,contentWrites=0,oldPoll=()=>{},newPoll=()=>{};
+let confirms=true,unloads=0,imports=0,contentWrites=0,oldPoll=()=>{},newPoll=()=>{},reloads=0;
+location.reload=()=>reloads++;
 const poll={queue:[{fn:oldPoll}],remove(fn){this.queue=this.queue.filter(e=>e.fn!==fn)}};
 function element(){return {parentNode:null,appendChild(child){child.parentNode=this},querySelector(){return null},remove(){}}}
 const vp=element();vp.appendChild=function(child){child.parentNode=this};
@@ -26,6 +27,13 @@ api=new Function('baseclass','dom','poll','rpc','uci','ui','i18n','window','docu
  assert.equal(api.route('/cgi-bin/luci/admin/services/zirgozar/node?sid=abc').page,'node');
  await api.mount(instance('nodes'));
  assert.equal(contentWrites,1);
+ location.href='#menu';events.popstate({state:null});
+ assert.equal(reloads,0,'mobile menu hash changes do not reload the page');
+ assert.equal(contentWrites,1,'mobile menu hash changes do not remount the view');
+ let prevented=false;
+ const routerLink={href:'/cgi-bin/luci/admin/services/zirgozar/settings',hasAttribute:()=>false,closest:()=>null};
+ events.click({button:0,target:{closest:()=>routerLink},preventDefault(){prevented=true}});
+ assert.equal(prevented,false,'router theme links retain native navigation');
  await api.navigate('/cgi-bin/luci/admin/services/zirgozar/settings');
  assert.equal(imports,1);assert.equal(unloads,1);assert.equal(L.env.dispatchpath[3],'settings');
  assert.ok(poll.queue.some(e=>e.fn===oldPoll),'global polls survive');

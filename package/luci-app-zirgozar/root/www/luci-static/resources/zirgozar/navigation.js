@@ -152,6 +152,8 @@ function install() {
 		if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
 		var link = event.target.closest && event.target.closest('a[href]');
 		if (!link || link.target || link.hasAttribute('download')) return;
+		/* The router theme owns its menus, including mobile hash toggles. */
+		if (!link.closest('#view')) return;
 		var destination = route(link.href);
 		if (!destination || destination.url.pathname + destination.url.search === window.location.pathname + window.location.search) return;
 		event.preventDefault();
@@ -167,6 +169,13 @@ function install() {
 	});
 	window.addEventListener('popstate', function(event) {
 		if (restoring) { restoring = false; return; }
+		/* Opening a theme menu may create a hash history entry. It is not
+		   a page change and must not rebuild the view or close that menu. */
+		var previous = new URL(currentURL, window.location.href);
+		if (previous.pathname + previous.search === window.location.pathname + window.location.search) {
+			currentURL = window.location.href;
+			return;
+		}
 		var index = event.state && event.state.zirgozarIndex;
 		if (index == null) { window.location.reload(); return; }
 		navigate(window.location.href, index).catch(function() {});
