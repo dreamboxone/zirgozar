@@ -598,7 +598,7 @@ function render(d, early) {
 			cbox.appendChild(row({ xray: 'Xray', geoview: 'Geoview', 'sing-box-lx': 'sing-box-lx', 'warp-plus': 'warp-plus', vwarp: 'Vwarp', aether: 'Aether', mihomo: 'Mihomo', sslocal: 'ss-rust', haproxy: 'HAProxy', 'xray-patterniha': _('Xray (patterniha)'), openvpn: 'OpenVPN' }[c.name] || c.name, value, actions, 'core:' + c.name));
 		});
 		var freeRow = row(_('Free space'),
-			[ E('span', {}, cores.unknown ? '…' : bytes(cores.free)), verState(), E('code', { 'title': cores.dir || '', 'style': 'font-size:11.5px;color:var(--muted)' }, cores.dir || '') ]);
+			[ E('span', { 'class': 'pwp-free-space-value' }, cores.unknown ? '…' : bytes(cores.free)) ]);
 		freeRow.classList.add('pwp-core-update-row');
 		cbox.appendChild(freeRow);
 	}

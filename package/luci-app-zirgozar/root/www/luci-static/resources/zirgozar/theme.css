@@ -771,7 +771,8 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 
 /* Shared update rows keep actions next to the version instead of at the
    opposite edge. Narrow screens wrap controls without horizontal scrolling. */
-.mk .pwp-core-update-row{display:grid!important;grid-template-columns:100px minmax(150px,210px) minmax(0,1fr);column-gap:12px!important;row-gap:6px!important;align-items:center}
+.mk .pwp-core-update-row{display:grid!important;grid-template-columns:minmax(110px,150px) minmax(150px,200px) minmax(0,1fr);column-gap:12px!important;row-gap:6px!important;align-items:center}
+.mk .pwp-core-update-row>div:nth-child(1){min-width:0;overflow-wrap:anywhere}
 .mk .pwp-core-update-row>div:nth-child(2){display:flex!important;gap:6px;align-items:center;flex-wrap:wrap;min-width:0}
 .mk .pwp-core-update-row>div:nth-child(2)>span:not(.mk-chip){min-width:0!important}
 .mk .pwp-core-update-row>div:nth-child(3){grid-column:3;min-width:0;max-width:none;justify-content:flex-start;flex-wrap:wrap!important;gap:6px!important}
