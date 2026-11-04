@@ -769,27 +769,27 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 
 .pwp-usage-card[data-enabled=false] .pwp-usage-value>strong{font-size:12px;color:var(--muted)}.mk .pwp-usage-periods button:disabled{cursor:default;opacity:.6}
 
-.mk .pwp-core-update-row{display:grid!important;grid-template-columns:100px minmax(0,1fr) auto;gap:6px!important}
-.mk .pwp-core-update-row>div:nth-child(2){display:grid!important;grid-template-columns:125px 90px minmax(0,1fr);min-width:0}
-.mk .pwp-core-update-row>div:nth-child(2)>.mk-chip{justify-self:start}
+/* Shared update rows keep actions next to the version instead of at the
+   opposite edge. Narrow screens wrap controls without horizontal scrolling. */
+.mk .pwp-core-update-row{display:grid!important;grid-template-columns:100px minmax(150px,210px) minmax(0,1fr);column-gap:12px!important;row-gap:6px!important;align-items:center}
+.mk .pwp-core-update-row>div:nth-child(2){display:flex!important;gap:6px;align-items:center;flex-wrap:wrap;min-width:0}
 .mk .pwp-core-update-row>div:nth-child(2)>span:not(.mk-chip){min-width:0!important}
-.mk .pwp-core-update-row>div:nth-child(2)>code{justify-self:start;width:250px;min-width:0;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:ltr;unicode-bidi:isolate}
-.mk .pwp-core-update-row>div:nth-child(3){grid-column:3;min-width:0;max-width:none;justify-content:flex-end;flex-wrap:nowrap!important}
-.mk .pwp-core-update-row>div:nth-child(3) .mk-btn{padding-inline:10px;font-size:12px;gap:5px}
-.mk .pwp-core-update-row .pwp-vsel{width:170px;max-width:170px;min-width:0}
+.mk .pwp-core-update-row>div:nth-child(3){grid-column:3;min-width:0;max-width:none;justify-content:flex-start;flex-wrap:wrap!important;gap:6px!important}
+.mk .pwp-core-update-row>div:nth-child(3) .mk-btn{padding-inline:10px;font-size:12px;gap:5px;margin:0}
+.mk .pwp-core-update-row .pwp-vsel{width:170px;max-width:100%;min-width:0;margin:0}
 .mk .pwp-core-update-row>[data-note]{grid-column:1/-1;min-width:0}
-@media(min-width:701px) and (max-width:1200px){
-	.mk .pwp-core-update-row{grid-template-columns:100px minmax(0,1fr) auto}
-	.mk .pwp-core-update-row>div:nth-child(2){grid-template-columns:125px minmax(0,1fr)}
-	.mk .pwp-core-update-row>div:nth-child(2)>code{grid-column:1/-1}
-	.mk .pwp-core-update-row>div:nth-child(3){max-width:none}
+.mk .pwp-core-update-row>[data-note]:empty{display:none}
+@media(max-width:900px){
+	.mk .pwp-core-update-row{grid-template-columns:100px minmax(0,1fr);column-gap:10px!important;row-gap:6px!important}
+	.mk .pwp-core-update-row>div:nth-child(3){grid-column:1/-1}
 }
-@media(max-width:700px){
-	.mk .pwp-core-update-row{grid-template-columns:minmax(0,1fr)}
-	.mk .pwp-core-update-row>div:nth-child(2){display:flex!important}
-	.mk .pwp-core-update-row>div:nth-child(3),.mk .pwp-core-update-row>[data-note]{grid-column:1}
-	.mk .pwp-core-update-row>div:nth-child(3){overflow-x:auto;justify-content:flex-start}
-	.mk .pwp-core-update-row>div:nth-child(3)>*{flex-shrink:0}
+@media(max-width:480px){
+	.mk .pwp-core-update-row{grid-template-columns:minmax(0,1fr) auto;padding-block:10px!important;column-gap:8px!important}
+	.mk .pwp-core-update-row>div:nth-child(1){min-width:0;overflow-wrap:anywhere;font-size:13px!important}
+	.mk .pwp-core-update-row>div:nth-child(2){justify-content:flex-end}
+	.mk .pwp-core-update-row>div:nth-child(3){gap:6px!important}
+	.mk .pwp-core-update-row>div:nth-child(3) .mk-btn{padding:8px 9px;min-height:36px;font-size:12px}
+	.mk .pwp-core-update-row .pwp-vsel{flex:1 1 135px;width:135px;max-width:190px;min-height:36px;padding-block:7px;font-size:12px}
 }
 
 /* Reserve the tab rail even when the LuCI theme supplies card padding. */
