@@ -777,7 +777,7 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 .mk .pwp-core-update-row>div:nth-child(2)>span:not(.mk-chip){min-width:0!important}
 .mk .pwp-core-update-row>div:nth-child(3){grid-column:3;min-width:0;max-width:none;justify-content:flex-start;flex-wrap:wrap!important;gap:6px!important}
 .mk .pwp-core-update-row>div:nth-child(3) .mk-btn{padding-inline:10px;font-size:12px;gap:5px;margin:0}
-.mk .pwp-core-update-row .pwp-vsel{width:170px;max-width:100%;min-width:0;margin:0}
+.mk .pwp-core-update-row .pwp-vsel{width:150px;max-width:100%;min-width:0;margin:0}
 .mk .pwp-core-update-row>[data-note]{grid-column:1/-1;min-width:0}
 .mk .pwp-core-update-row>[data-note]:empty{display:none}
 @media(max-width:900px){
@@ -790,7 +790,7 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 	.mk .pwp-core-update-row>div:nth-child(2){justify-content:flex-end}
 	.mk .pwp-core-update-row>div:nth-child(3){gap:6px!important}
 	.mk .pwp-core-update-row>div:nth-child(3) .mk-btn{padding:8px 9px;min-height:36px;font-size:12px}
-	.mk .pwp-core-update-row .pwp-vsel{flex:1 1 135px;width:135px;max-width:190px;min-height:36px;padding-block:7px;font-size:12px}
+	.mk .pwp-core-update-row .pwp-vsel{flex:0 1 150px;width:150px;max-width:100%;min-height:36px;padding-block:7px;font-size:12px}
 }
 
 /* Reserve the tab rail even when the LuCI theme supplies card padding. */

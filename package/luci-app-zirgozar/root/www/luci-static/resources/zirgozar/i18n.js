@@ -709,7 +709,7 @@ var FA = {
 		'کانفیگ‌ها و اشتراک‌ها حذف می‌شوند و تنظیمات به حالت زمان نصب برمی‌گردند. داده‌های مسیریابی، هسته‌های دانلودشده و تاریخچه مصرف حفظ می‌شوند. این کار برگشت‌پذیر نیست.',
 	'Every config, every subscription and every setting will be deleted when you save. Continue?':
 		'با ذخیره کردن، همه کانفیگ‌ها، اشتراک‌ها و تنظیمات پاک می‌شوند. ادامه می‌دهید؟',
-	'%s (pre-release)': '%s (پیش‌انتشار)',
+	'%s (pre-release)': '%s (پ‌.ا.)',
 	'Install this version': 'نصب این نسخه',
 	'Downloading Xray %s.': 'در حال دانلود Xray %s.',
 	'Hide details': 'بستن جزییات',

@@ -503,7 +503,7 @@ function render(d, early) {
 		else if (!appBusy && app.latest)
 			value.push(verState(E('span', { 'style': 'color:var(--muted)' }, _('Up to date'))));
 		abox.appendChild(row('Zirgozar', value, [
-			checkBtn('primary', 'app', appBusy),
+			checkBtn('soft-blue', 'app', appBusy),
 			!appBusy && app.update && app.latest
 				? actBtn(_('Update to %s').format(appVersion(app.latest)), 'success mk-small', 'app', function() {
 					return act('app', 'app_update', '',
