@@ -22,10 +22,11 @@ with tempfile.TemporaryDirectory() as directory:
     node = dict(type='ikev2', server='vpn.example.com', port=500, mtu=1400,
                 username='test', password='test-password')
 
-    def load(custom=None):
+    def load(custom=None, unpadded=False):
         account = dict(node)
         if custom is not None:
-            account['ca'] = base64.b64encode(custom).decode()
+            account['ca'] = (base64.urlsafe_b64encode(custom).decode().rstrip('=')
+                             if unpadded else base64.b64encode(custom).decode())
         nodefile.write_text(json.dumps(account))
         return subprocess.run(['ucode', str(script), 'check', str(nodefile), 'zgzikev2t'],
                               text=True, capture_output=True)
@@ -40,6 +41,14 @@ with tempfile.TemporaryDirectory() as directory:
     assert 'U1lTVEVN' in certs[2]
     assert len(json.loads(load().stdout)) == 1
     assert json.loads(load(b'0test-DER').stdout)[0] == '0test-DER'
+    for custom in (pem('TQ==').encode(), pem('TQ==').replace('\n', '\r\n').encode()):
+        result = load(custom, unpadded=True)
+        assert result.returncode == 0, result.stderr
+        assert len(json.loads(result.stdout)) == 2
+    for custom in (b'0test-DER?', b'0test-DER?!'):
+        result = load(custom, unpadded=True)
+        assert result.returncode == 0, result.stderr
+        assert json.loads(result.stdout)[0].encode() == custom
     bundle.unlink()
     assert len(json.loads(load(chain.encode()).stdout)) == 2
     assert load().returncode != 0

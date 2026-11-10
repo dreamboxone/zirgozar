@@ -52,7 +52,11 @@ function add_pem_bundle(bundle) {
 	return count;
 }
 if (node.ca) {
-	let ca = b64dec(replace(replace(replace(node.ca, /[\r\n ]/g, ''), /-/g, '+'), /_/g, '/'));
+	let encoded = replace(replace(replace(node.ca, /[\r\n ]/g, ''), /-/g, '+'), /_/g, '/');
+	// The node editor omits padding in its base64url links.
+	if (length(encoded) % 4 == 2) encoded += '==';
+	else if (length(encoded) % 4 == 3) encoded += '=';
+	let ca = b64dec(encoded);
 	if (!ca) fail('Invalid IKEv2 certificate authority.');
 	if (index(ca, '-----BEGIN CERTIFICATE-----') >= 0) {
 		if (!add_pem_bundle(ca)) fail('Invalid IKEv2 certificate authority.');
