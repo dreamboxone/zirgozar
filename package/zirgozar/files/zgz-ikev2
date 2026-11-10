@@ -267,7 +267,13 @@ case "$MODE" in
 		# One account measured at a time, L2TP and PPP ones included: each
 		# pauses the router's own traffic going into the tunnel while it
 		# connects.
-		mkdir "$ZGZ_RUN/.l2tp-test-lock" 2>/dev/null || { echo -2; exit 1; }
+		lock_wait=0
+		[ "${ZGZ_IKEV2_WAIT_FOR_TEST:-0}" != 1 ] || lock_wait=20
+		while ! mkdir "$ZGZ_RUN/.l2tp-test-lock" 2>/dev/null; do
+			[ "$lock_wait" -gt 0 ] || { echo -2; exit 1; }
+			sleep 1
+			lock_wait=$((lock_wait - 1))
+		done
 		TEST_LOCK=1
 		DEV=zgzikev2t; TABLE=19017; STATE="$ZGZ_RUN/ikev2-test"
 		TEST_IN="$ZGZ_RUN/ikev2-test.$$"

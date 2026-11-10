@@ -337,7 +337,7 @@ do_url() {
 			endpoint_url_ms "$_payload2" "$_proto" > "$_out" 2>/dev/null || true
 			return 0 ;;
 		l2tp|pptp|sstp|ikev2)
-			_l2tp_ms="$(printf '%s\n' "$_payload2" | "$ZGZ_LIB/$(tunnel_helper "$_proto")" test url 2>/dev/null)" || _l2tp_ms=0
+			_l2tp_ms="$(printf '%s\n' "$_payload2" | ZGZ_IKEV2_WAIT_FOR_TEST=1 "$ZGZ_LIB/$(tunnel_helper "$_proto")" test url 2>/dev/null)" || _l2tp_ms=0
 			printf '%s\n' "$_l2tp_ms" > "$_out"
 			return 0 ;;
 		aether)
@@ -528,7 +528,7 @@ cmd_run() {
 	case "$_kind:$_proto" in
 		tcp:l2tp|tcp:pptp|tcp:sstp|tcp:ikev2)
 			put "$_id.tcp" -1
-			_l2tp_ms="$(printf '%s\n' "$_payload" | "$ZGZ_LIB/$(tunnel_helper "$_proto")" test tcp 2>/dev/null)" || _l2tp_ms=0
+			_l2tp_ms="$(printf '%s\n' "$_payload" | ZGZ_IKEV2_WAIT_FOR_TEST=1 "$ZGZ_LIB/$(tunnel_helper "$_proto")" test tcp 2>/dev/null)" || _l2tp_ms=0
 			put "$_id.tcp" "$_l2tp_ms"
 			return 0 ;;
 		ping:aether)

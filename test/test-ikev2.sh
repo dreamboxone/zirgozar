@@ -91,4 +91,14 @@ chmod +x "$RIG/bin/ip" "$RIG/bin/curl" "$RIG/lib/zgz-rules"
 check "$(sh "$RIG/lib/zgz-ikev2" test url < "$ZGZ_ETC/bridge.json")" 125 'active IKEv2 URL test bypasses localhost interception'
 check "$(cat "$ZGZ_RUN/local.calls")" "$(printf 'local pause\nlocal resume')" 'active connection test restores localhost interception'
 [ ! -e "$ZGZ_RUN/.l2tp-test-lock" ] && ok 'active connection test releases its lock' || bad 'active test left its lock'
+
+mkdir "$ZGZ_RUN/.l2tp-test-lock"
+result="$(sh "$RIG/lib/zgz-ikev2" test url < "$ZGZ_ETC/bridge.json")" && bad 'background test waited for a busy lock'
+check "$result" -2 'background test reports a busy lock immediately'
+cat > "$RIG/bin/sleep" <<'SH'
+#!/bin/sh
+rmdir "$ZGZ_RUN/.l2tp-test-lock"
+SH
+check "$(ZGZ_IKEV2_WAIT_FOR_TEST=1 sh "$RIG/lib/zgz-ikev2" test url < "$ZGZ_ETC/bridge.json")" 125 'manual URL test waits for the other tunnel test to finish'
+[ ! -e "$ZGZ_RUN/.l2tp-test-lock" ] && ok 'queued test releases its lock' || bad 'queued test left its lock'
 rig_report
