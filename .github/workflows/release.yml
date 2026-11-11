@@ -86,6 +86,8 @@ jobs:
                   continue
               text = source.read_text()
               for old, new in (
+                  ('mirror+file:///etc/apt/apt-mirrors.txt', 'https://archive.ubuntu.com/ubuntu'),
+                  ('mirror+file:///etc/apt/apt-mirrors-security.txt', 'https://security.ubuntu.com/ubuntu'),
                   ('mirror+file:/etc/apt/apt-mirrors.txt', 'https://archive.ubuntu.com/ubuntu'),
                   ('mirror+file:/etc/apt/apt-mirrors-security.txt', 'https://security.ubuntu.com/ubuntu'),
                   ('http://azure.archive.ubuntu.com/ubuntu', 'https://archive.ubuntu.com/ubuntu'),
@@ -93,6 +95,14 @@ jobs:
               ):
                   text = text.replace(old, new)
               source.write_text(text)
+          # Also cover mirror-list sources provided by future runner images.
+          for name, mirror in (
+              ('apt-mirrors.txt', 'https://archive.ubuntu.com/ubuntu'),
+              ('apt-mirrors-security.txt', 'https://security.ubuntu.com/ubuntu'),
+          ):
+              mirror_list = Path('/etc/apt') / name
+              if mirror_list.exists():
+                  mirror_list.write_text(mirror + '\n')
           # APT uses its own proxy settings; sudo otherwise drops these variables.
           proxies = getproxies()
           proxy_config = []
