@@ -1,0 +1,90 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+# Verify the execution path, not just the registered ubus object.
+. "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
+
+RPC_SERVICE="${ZGZ_RPC_SERVICE:-/etc/init.d/rpcd}"
+RPC_BACKEND="${ZGZ_RPC_BACKEND:-/usr/libexec/rpcd/luci.zirgozar}"
+RPC_ACL="${ZGZ_RPC_ACL:-/usr/share/rpcd/acl.d/luci-app-zirgozar.json}"
+RPC_VERSION="${ZGZ_RPC_VERSION:-$ZGZ_ETC/version}"
+RPC_STAMP="$ZGZ_RUN/rpc-schema"
+RPC_RESTART="$ZGZ_RUN/rpc-restart"
+RPC_LOCK="$ZGZ_RUN/rpc-recovery.lock"
+
+rpc_check() {
+	local reply expected
+	expected="$(cat "$RPC_VERSION" 2>/dev/null)"
+	[ -n "$expected" ] || return 1
+	reply="$(ubus -t 5 call luci.zirgozar health 2>/dev/null)" || return 1
+	ucode -e 'let v=json(ARGV[0]); exit(type(v)=="object" && v.ok==true && v.version==ARGV[1] ? 0 : 1);' \
+		"$reply" "$expected" >/dev/null 2>&1 || return 1
+}
+
+rpc_ensure() {
+	local schema signature saved owner age attempt
+	mkdir -p "$ZGZ_RUN" || return 1
+	if ! mkdir "$RPC_LOCK" 2>/dev/null; then
+		read -r owner < "$RPC_LOCK/pid" 2>/dev/null || owner=''
+		case "$owner" in
+			''|*[!0-9]*)
+				age=$(( $(date +%s) - $(date -r "$RPC_LOCK" +%s 2>/dev/null || date +%s) ))
+				[ "$age" -ge 60 ] || return 1
+				;;
+			*) kill -0 "$owner" 2>/dev/null && return 0 ;;
+		esac
+		rm -f "$RPC_LOCK/pid"
+		rmdir "$RPC_LOCK" 2>/dev/null && mkdir "$RPC_LOCK" 2>/dev/null || return 1
+	fi
+	echo "$$" > "$RPC_LOCK/pid"
+	trap 'rm -f "$RPC_LOCK/pid"; rmdir "$RPC_LOCK" 2>/dev/null' EXIT
+	[ -x "$RPC_BACKEND" ] && [ -s "$RPC_ACL" ] || return 1
+	signature="$("$RPC_BACKEND" list)" || return 1
+	ucode -e 'exit(type(json(ARGV[0]))=="object" ? 0 : 1);' "$signature" >/dev/null 2>&1 || return 1
+	schema="$( { printf '%s\n' "$signature"; cat "$RPC_ACL"; } | md5sum | awk '{print $1}')"
+	saved="$(cat "$RPC_STAMP" 2>/dev/null)"
+	if [ "$schema" = "$saved" ] && rpc_check; then return 0; fi
+	# SIGHUP/reload leaks descriptors on affected rpcd/ucode builds. An
+	# unchanged signature needs no reload; a changed signature or a broken
+	# execution path needs one bounded restart, never a tunnel restart.
+	echo "$(date +%s)" > "$RPC_RESTART"
+	warn 'Recovering the LuCI RPC interface; the tunnel is left running.'
+	bounded 20 "$RPC_SERVICE" restart >/dev/null 2>&1 || return 1
+	for attempt in 1 2 3 4 5; do
+		if rpc_check; then
+			printf '%s\n' "$schema" > "$RPC_STAMP.new"
+			mv -f "$RPC_STAMP.new" "$RPC_STAMP"
+			return 0
+		fi
+		sleep 1
+	done
+	warn 'LuCI RPC recovery failed; the tunnel is still running.'
+	return 1
+}
+
+rpc_watch() {
+	local phase now last owner age
+	# Do not interrupt an installation or its progress polling.
+	phase="$(cat "$ZGZ_RUN/self-update-phase" 2>/dev/null)"
+	if [ -n "$phase" ]; then
+		owner="$(cat "$ZGZ_RUN/package.lock/pid" 2>/dev/null)"
+		case "$owner" in ''|*[!0-9]*) : ;; *) kill -0 "$owner" 2>/dev/null && return 0 ;; esac
+		age=$(( $(date +%s) - $(date -r "$ZGZ_RUN/self-update-phase" +%s 2>/dev/null || date +%s) ))
+		[ "$age" -lt 120 ] && return 0
+	fi
+	rpc_check && return 0
+	sleep 1
+	rpc_check && return 0
+	now="$(date +%s)"
+	read -r last < "$RPC_RESTART" 2>/dev/null || last=0
+	case "$last" in ''|*[!0-9]*) last=0 ;; esac
+	[ "$now" -ge "$last" ] && [ $((now - last)) -lt 600 ] && return 1
+	rpc_ensure
+}
+
+case "${1:-check}" in
+	check) rpc_check ;;
+	ensure) rpc_ensure ;;
+	watch) rpc_watch ;;
+	*) echo 'usage: zgz-rpc check|ensure|watch' >&2; exit 1 ;;
+esac

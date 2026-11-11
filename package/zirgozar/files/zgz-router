@@ -135,6 +135,8 @@ cron_time() {
 cmd_schedule_sync() {
 	[ -f "$CRONTAB" ] || touch "$CRONTAB" 2>/dev/null || return 0
 	grep -v 'zgz-router schedule' "$CRONTAB" > "$CRONTAB.zgz" 2>/dev/null || true
+	# Interface health is independent of whether the tunnel is enabled.
+	echo "*/5 * * * * $ZGZ_LIB/zgz-router schedule rpc >/dev/null 2>&1" >> "$CRONTAB.zgz"
 	if [ "$(cfg_bool enabled 0)" = "1" ]; then
 		if [ "$(cfg_bool start_daemon 1)" = "1" ]; then
 			_hi="$(cfg health_interval 3)"
@@ -218,6 +220,9 @@ cmd_schedule_sync() {
 
 cmd_schedule() {
 	case "${1:-}" in
+		rpc)
+			"$ZGZ_LIB/zgz-rpc" watch
+			;;
 		health)
 			"$ZGZ_LIB/zgz-refresh" health
 			;;

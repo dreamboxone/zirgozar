@@ -6,7 +6,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zirgozar
 PKG_VERSION:=5.8.20
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
 PKG_LICENSE:=AGPL-3.0-or-later
@@ -16,7 +16,7 @@ include $(INCLUDE_DIR)/package.mk
 # Kept in step with build/packages.inc.sh, which is what the release builds
 # use. A helper that reaches one of them and not the other is a helper that
 # is missing on exactly half of the installations.
-ZGZ_SCRIPTS:=zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-dns-local zgz-stats zgz-led zgz-test zgz-geo zgz-cores zgz-delta zgz-delta-plan zgz-deps zgz-bridge zgz-openvpn zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-aether-scan zgz-aether-scan-result zgz-l2tp zgz-l2tpconfig zgz-pppvpn zgz-ikev2 zgz-ikev2config zgz-finalmask-check zgz-doh-bootstrap zgz-lb zgz-balancing
+ZGZ_SCRIPTS:=zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-dns-local zgz-stats zgz-led zgz-test zgz-geo zgz-cores zgz-delta zgz-delta-plan zgz-deps zgz-bridge zgz-openvpn zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-aether-scan zgz-aether-scan-result zgz-l2tp zgz-l2tpconfig zgz-pppvpn zgz-ikev2 zgz-ikev2config zgz-finalmask-check zgz-doh-bootstrap zgz-lb zgz-balancing zgz-rpc
 
 define Package/zirgozar
   SECTION:=net
@@ -253,21 +253,8 @@ echo '*/15 * * * * /usr/libexec/zgz-refresh >/dev/null 2>&1' >> /etc/crontabs/ro
 echo '*/5 * * * * /usr/libexec/zgz-stats sample >/dev/null 2>&1' >> /etc/crontabs/root
 bounded 15 /usr/libexec/zgz-router schedule sync >/dev/null 2>&1 || true
 /etc/init.d/cron reload >/dev/null 2>&1
-# rpcd has to be told there is a new object, and telling it once is not
-# reliable. On a fresh install this reload has been seen to return success
-# and leave the object unregistered - and an unregistered object is a web
-# interface on which every single button does nothing whatever, while every
-# script behind it works perfectly from the shell. It is the worst kind of
-# failure this package can have, because nothing anywhere says a word.
-# So ask afterwards, and restart if the answer is no.
-/etc/init.d/rpcd reload >/dev/null 2>&1
-for rpc_wait in 1 2 3 4 5; do
-	ubus list 2>/dev/null | grep -q '^luci.zirgozar$$' && break
-	sleep 1
-done
-if ! ubus list 2>/dev/null | grep -q '^luci.zirgozar$$'; then
-	/etc/init.d/rpcd restart >/dev/null 2>&1
-fi
+# Verify a real RPC reply and the installed schema; never use SIGHUP reload.
+/usr/libexec/zgz-rpc ensure >/dev/null 2>&1 || true
 # Always in the boot sequence; the main switch decides whether it runs.
 /etc/init.d/zirgozar enable >/dev/null 2>&1
 /etc/init.d/zirgozar-led enable >/dev/null 2>&1

@@ -1220,6 +1220,7 @@ fail() {
 case "$1" in
 	list)
 		json_init
+		json_add_object "health"; json_close_object
 		json_add_object "led"; json_close_object
 		json_add_object "state";   json_close_object
 		json_add_object "traffic"; json_close_object
@@ -1255,6 +1256,12 @@ case "$1" in
 		;;
 	call)
 		case "$2" in
+			health)
+				json_init
+				json_add_boolean ok 1
+				json_add_string version "$(cat "$ZGZ_ETC/version" 2>/dev/null)"
+				json_dump
+				;;
 			led)     method_led ;;
 			state)   method_state ;;
 			traffic) method_traffic ;;

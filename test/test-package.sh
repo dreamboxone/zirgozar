@@ -404,10 +404,10 @@ if [ -s "$RIG/postinst.sh" ] && sh -n "$RIG/postinst.sh" 2>/dev/null; then
 else
 	bad "the generated postinst does not parse"
 fi
-if grep -q 'luci.zirgozar' "$RIG/postinst.sh"; then
-	ok "and it checks rpcd really registered the object rather than assuming"
+if grep -q 'zgz-rpc ensure' "$RIG/postinst.sh" && ! grep -q '/etc/init.d/rpcd reload' "$RIG/postinst.sh"; then
+	ok "and it verifies RPC execution without leaking reloads"
 else
-	bad "the postinst reloads rpcd without checking it took"
+	bad "the postinst does not verify RPC execution safely"
 fi
 
 # Nothing may call `timeout` directly.

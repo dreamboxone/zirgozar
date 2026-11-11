@@ -29,6 +29,7 @@ check "$(grep 'schedule sub patterniha' "$ZGZ_CRONTAB" | cut -d' ' -f1)" '0,15,3
 check "$(grep 'schedule sub default' "$ZGZ_CRONTAB" | cut -d' ' -f1)" '5,20,35,50' 'Top 100 runs five minutes later'
 sh "$RIG/lib/zgz-router" schedule sync >/dev/null 2>&1
 check "$(grep -c 'schedule sub' "$ZGZ_CRONTAB")" 2 'schedule sync does not duplicate jobs'
+check "$(grep -c 'schedule rpc' "$ZGZ_CRONTAB")" 1 'RPC recovery is scheduled once even with the tunnel disabled'
 rig_set patterniha.enabled 0
 sh "$RIG/lib/zgz-router" schedule sync >/dev/null 2>&1
 check "$(grep -c 'schedule sub patterniha' "$ZGZ_CRONTAB")" 0 'disabled subscription loses its scheduled job'

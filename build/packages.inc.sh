@@ -10,7 +10,7 @@
 # VERSION is the application version; increment RELEASE for package updates.
 # The main zirgozar package always includes the complete LuCI interface.
 VERSION=5.8.20
-RELEASE=2
+RELEASE=3
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -48,7 +48,7 @@ LUCI_DESC="Compatibility package for older updaters; the web interface is includ
 CRON_LIST='*/15 * * * * /usr/libexec/zgz-refresh >/dev/null 2>&1'
 CRON_STATS='*/5 * * * * /usr/libexec/zgz-stats sample >/dev/null 2>&1'
 
-ZGZ_SCRIPTS="zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-dns-local zgz-stats zgz-led zgz-test zgz-geo zgz-cores zgz-delta zgz-delta-plan zgz-deps zgz-bridge zgz-openvpn zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-aether-scan zgz-aether-scan-result zgz-l2tp zgz-l2tpconfig zgz-pppvpn zgz-ikev2 zgz-ikev2config zgz-finalmask-check zgz-doh-bootstrap zgz-lb zgz-balancing"
+ZGZ_SCRIPTS="zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-dns-local zgz-stats zgz-led zgz-test zgz-geo zgz-cores zgz-delta zgz-delta-plan zgz-deps zgz-bridge zgz-openvpn zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-aether-scan zgz-aether-scan-result zgz-l2tp zgz-l2tpconfig zgz-pppvpn zgz-ikev2 zgz-ikev2config zgz-finalmask-check zgz-doh-bootstrap zgz-lb zgz-balancing zgz-rpc"
 
 # Direct package builds must not silently ship an old local prebuilt core.
 ensure_xray() {
@@ -202,23 +202,8 @@ bounded 15 /usr/libexec/zgz-router schedule sync >/dev/null 2>&1 || true
 # done and make the package impossible to remove afterwards. Bound them: none
 # of this is worth failing an installation over.
 bounded 15 /etc/init.d/cron reload >/dev/null 2>&1 || true
-# rpcd has to be told there is a new object, and telling it once is not
-# reliable. On a fresh install this reload has been seen to return success
-# and leave the object unregistered - and an unregistered object is a web
-# interface on which every single button does nothing whatever, while every
-# script behind it works perfectly from the shell. It is the worst kind of
-# failure this package can have, because nothing anywhere says a word.
-# So ask afterwards, and restart if the answer is no.
-bounded 15 /etc/init.d/rpcd reload >/dev/null 2>&1 || true
-# Reload preserves login sessions; allow registration to finish before the
-# restart fallback, which would discard those sessions.
-for rpc_wait in 1 2 3 4 5; do
-	ubus list 2>/dev/null | grep -q '^luci.zirgozar\$' && break
-	sleep 1
-done
-if ! ubus list 2>/dev/null | grep -q '^luci.zirgozar\$'; then
-	bounded 20 /etc/init.d/rpcd restart >/dev/null 2>&1 || true
-fi
+# Verify a real RPC reply and the installed schema; never use SIGHUP reload.
+bounded 40 /usr/libexec/zgz-rpc ensure >/dev/null 2>&1 || true
 # Always in the boot sequence; the main switch decides whether it runs.
 bounded 15 /etc/init.d/zirgozar enable >/dev/null 2>&1 || true
 bounded 15 /etc/init.d/zirgozar-led enable >/dev/null 2>&1 || true
@@ -370,7 +355,7 @@ rm -rf /tmp/luci-modulecache 2>/dev/null
 bounded() {
 	if timeout 5 true >/dev/null 2>&1; then timeout "$@"; else shift; "$@"; fi
 }
-bounded 15 /etc/init.d/rpcd reload >/dev/null 2>&1 || true
+bounded 40 /usr/libexec/zgz-rpc ensure >/dev/null 2>&1 || true
 bounded 15 /etc/init.d/uhttpd restart >/dev/null 2>&1 || true
 exit 0
 EOF
