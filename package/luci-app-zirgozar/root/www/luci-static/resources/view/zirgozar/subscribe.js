@@ -290,7 +290,7 @@ return view.extend({
 			uci.set('zirgozar', section_id, 'name', subscriptionName(url, value, section_id));
 		};
 
-		o = column(s, '_info', _('Subscribe Info'), function(sid) {
+		o = column(s, '_info', _('Node num'), function(sid) {
 			return E('div', { 'class': 'pwp-subinfo', 'data-sub': sid }, infoCell(sid));
 		});
 
@@ -343,7 +343,7 @@ return view.extend({
 		o.rows = 6;
 		nodelink.withBrowse(o, _('Supported files: .bpf, .toml, .json, .yaml, .yml, .conf, .ovpn, .txt'));
 
-		o = s.taboption('main', form.Flag, 'enabled', _('On'));
+		o = s.taboption('main', form.Flag, 'enabled', _('Status'));
 		o.default = '1';
 		o.rmempty = false;
 		o.editable = true;
@@ -491,7 +491,7 @@ return view.extend({
 		o.depends('chain_proxy', '2');
 		manual.forEach(function(n) { o.value(n['.name'], n.name || n['.name']); });
 
-		column(s, '_remove', _('Delete Nodes'), function(sid) {
+		column(s, '_remove', '', function(sid) {
 			return pui.btn(_('Delete Nodes'), 'danger zgz-sub-action', function(ev) {
 				var b = ev.currentTarget;
 				return callAction('forget_nodes', sid).then(function(r) {
@@ -501,7 +501,7 @@ return view.extend({
 			}, 'trash');
 		});
 
-		column(s, '_update', _('Update'), function(sid) {
+		column(s, '_update', '', function(sid) {
 			return pui.btn(_('Update'), 'primary zgz-sub-action', function(ev) {
 				var b = ev.currentTarget;
 				return callAction('refresh_nodes', sid).then(function(r) {

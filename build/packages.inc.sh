@@ -10,7 +10,7 @@
 # VERSION is the application version; increment RELEASE for package updates.
 # The main zirgozar package always includes the complete LuCI interface.
 VERSION=5.8.20
-RELEASE=7
+RELEASE=8
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -330,6 +330,10 @@ stage_luci_assets() {
 		"$i/www/luci-static/resources/zirgozar/fonts/Vazirmatn.woff2"
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/fonts/OFL.txt" \
 		"$i/www/luci-static/resources/zirgozar/fonts/OFL.txt"
+	install -m 0644 "$l/www/luci-static/resources/zirgozar/fonts/TwemojiCountryFlags.woff2" \
+		"$i/www/luci-static/resources/zirgozar/fonts/TwemojiCountryFlags.woff2"
+	install -m 0644 "$l/www/luci-static/resources/zirgozar/fonts/TwemojiCountryFlags-LICENSE.md" \
+		"$i/www/luci-static/resources/zirgozar/fonts/TwemojiCountryFlags-LICENSE.md"
 	# The artwork on the status page. Optional on purpose - it is the one file
 	# in this package that is not code, the page falls back to the name
 	# without it, and a build should not fail for want of a picture.

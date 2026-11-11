@@ -6,7 +6,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zirgozar
 PKG_VERSION:=5.8.20
-PKG_RELEASE:=7
+PKG_RELEASE:=8
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
 PKG_LICENSE:=AGPL-3.0-or-later
@@ -138,6 +138,10 @@ define Package/zirgozar/install
 		$(1)/www/luci-static/resources/zirgozar/fonts/Vazirmatn.woff2
 	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/fonts/OFL.txt \
 		$(1)/www/luci-static/resources/zirgozar/fonts/OFL.txt
+	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/fonts/TwemojiCountryFlags.woff2 \
+		$(1)/www/luci-static/resources/zirgozar/fonts/TwemojiCountryFlags.woff2
+	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/fonts/TwemojiCountryFlags-LICENSE.md \
+		$(1)/www/luci-static/resources/zirgozar/fonts/TwemojiCountryFlags-LICENSE.md
 	$(if $(wildcard ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/logo.png),\
 		$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/logo.png \
 			$(1)/www/luci-static/resources/zirgozar/logo.png)

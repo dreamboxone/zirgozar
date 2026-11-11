@@ -227,6 +227,21 @@ echo "== the staged web package contains every application module"
 	done
 ) && ok 'all application modules reach the staged package unchanged' || bad 'an application module is missing or changed in the staged package'
 
+echo "== every bundled font and its license reaches the package"
+(
+	set -e
+	_font_stage="$(mktemp -d)"
+	trap 'rm -rf "$_font_stage"' EXIT
+	. "$ROOT/build/packages.inc.sh"
+	printf 'exit 0\n' > "$_font_stage/zirgozar.postinst"
+	stage_luci_assets "$_font_stage" "$ROOT"
+	for _font in "$ROOT"/package/luci-app-zirgozar/root/www/luci-static/resources/zirgozar/fonts/*; do
+		_font_name="$(basename "$_font")"
+		grep -Fq "fonts/$_font_name" "$ROOT/package/zirgozar/Makefile"
+		cmp "$_font" "$_font_stage/zirgozar/www/luci-static/resources/zirgozar/fonts/$_font_name"
+	done
+) && ok 'font bytes and licenses are included in both packaging paths' || bad 'a font or its license is missing from the package'
+
 # A shared helper must not take a variable name away from whoever called it.
 #
 # There is no `local` in this shell, so every name a function assigns is

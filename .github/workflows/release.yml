@@ -618,7 +618,9 @@ jobs:
                -o sdk.tar "$base/$name"
           mkdir -p sdk
           case "$name" in
-            *.zst) sudo apt-get update -qq && sudo apt-get install -y zstd
+            *.zst) if ! command -v unzstd >/dev/null 2>&1; then
+                     sudo apt-get update -qq && sudo apt-get install -y zstd
+                   fi
                    tar --use-compress-program=unzstd -xf sdk.tar -C sdk --strip-components=1 ;;
             *.xz)  tar -xJf sdk.tar -C sdk --strip-components=1 ;;
           esac
@@ -692,6 +694,9 @@ jobs:
             test -s "$base/usr/share/rpcd/acl.d/luci-app-zirgozar.json"
             for module in package/luci-app-zirgozar/root/www/luci-static/resources/zirgozar/*.js; do
               cmp "$module" "$base/www/luci-static/resources/zirgozar/$(basename "$module")"
+            done
+            for font in package/luci-app-zirgozar/root/www/luci-static/resources/zirgozar/fonts/*; do
+              cmp "$font" "$base/www/luci-static/resources/zirgozar/fonts/$(basename "$font")"
             done
             for v in settings nodes node subscribe other update traffic geoview acl log; do
               test -s "$base/www/luci-static/resources/view/zirgozar/$v.js"
