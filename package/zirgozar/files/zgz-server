@@ -125,7 +125,14 @@ xray_stream() {
 			;;
 		xhttp)
 			_m="$(s_get "$_u" xhttp_mode)"
-			_ss="\"xhttpSettings\":{\"path\":\"$(j "${_path:-/}")\"$([ -n "$_host" ] && printf ',"host":"%s"' "$(j "$_host")"),\"mode\":\"${_m:-auto}\"}"
+			_h2="$(s_get "$_u" xhttp_h2_params)"
+			if [ -n "$_h2" ]; then
+				_h2="$(printf '%s' "$_h2" | jsonfilter -e '@' 2>/dev/null)" || {
+					echo 'Invalid XHTTP h2Params JSON.' >&2; return 1;
+				}
+				case "$_h2" in \{*\}) : ;; *) echo 'XHTTP h2Params must be a JSON object.' >&2; return 1 ;; esac
+			fi
+			_ss="\"xhttpSettings\":{\"path\":\"$(j "${_path:-/}")\"$([ -n "$_host" ] && printf ',"host":"%s"' "$(j "$_host")"),\"mode\":\"${_m:-auto}\"$([ -n "$_h2" ] && printf ',"h2Params":%s' "$_h2")}"
 			;;
 		kcp)
 			_seed="$(s_get "$_u" kcp_seed)"; _ht="$(s_get "$_u" header_type)"

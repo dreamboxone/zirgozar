@@ -44,6 +44,18 @@ set -e
 
 BEST="${ZGZ_BEST}"
 
+freedom_close=''
+_fc="$(cfg freedom_close '')"
+if [ -n "$_fc" ]; then
+	_fc="$(printf '%s' "$_fc" | ucode -e 'import { readfile } from "fs"; let v=json(readfile("/dev/stdin")); if (type(v)!="object") exit(1); printf("%J",v);' 2>/dev/null)" || { echo 'Invalid Freedom close JSON.' >&2; exit 1; }
+	case "$_fc" in \{*\}) : ;; *) echo 'Freedom close must be a JSON object.' >&2; exit 1 ;; esac
+	freedom_close=",\"close\":$_fc"
+fi
+dns_skip_hosts=''
+if [ "$(cfg_bool dns_skip_hosts_when_fake 0)" = 1 ]; then
+	dns_skip_hosts=',"skipHostsWhenFakeEnable":true'
+fi
+
 [ -s "$BEST" ] || { echo "no server selected yet" >&2; exit 1; }
 
 tproxy_port="$(cfg tproxy_port 1082)"
@@ -164,7 +176,7 @@ if bridge_is_aether && [ -z "$aether_via" ]; then
 	_ae_id="$(sed -n 's/.*"id":"\([A-Za-z0-9_]*\)".*/\1/p' "$ZGZ_ETC/bridge.json")"
 	_ae_mask="$(aether_entry_setting fm)" || _ae_mask=''
 	_ae_mode="$(aether_entry_setting dialMode)" || _ae_mode=''
-	case "$_ae_mode" in *[!A-Za-z0-9_.-]*) echo 'Invalid Aether dialMode name.' >&2; exit 1 ;; esac
+	valid_dial_mode "$_ae_mode" || { echo 'Invalid Aether dialMode name.' >&2; exit 1; }
 	if [ -n "$_ae_mask$_ae_mode" ]; then
 		_ae_stream="\"sockopt\":{\"mark\":${ZGZ_OUT_MARK}"
 		if [ -n "$_ae_mode" ]; then _ae_stream="$_ae_stream,\"dialMode\":\"$(json_escape "$_ae_mode")\""; fi
@@ -1393,7 +1405,7 @@ ${shunt_outbounds}
 ${chain_outs}
     $_aether_entry
     $dns_tls_out
-    { "tag": "direct", "protocol": "freedom", "settings": { "domainStrategy": "UseIP" }, "streamSettings": { "sockopt": { "mark": ${ZGZ_OUT_MARK} } } },
+    { "tag": "direct", "protocol": "freedom", "settings": { "domainStrategy": "UseIP"${freedom_close} }, "streamSettings": { "sockopt": { "mark": ${ZGZ_OUT_MARK} } } },
     { "tag": "dns-out", "protocol": "dns", "streamSettings": { "sockopt": { "mark": ${ZGZ_OUT_MARK} } } },
     { "tag": "block", "protocol": "blackhole" }
   ],
@@ -1403,7 +1415,7 @@ ${chain_outs}
     "servers": [ ${dns_servers} ],
     "queryStrategy": "UseIP",
     "disableFallbackIfMatch": true,
-    "disableCache": false
+    "disableCache": false${dns_skip_hosts}
   },
   "routing": {
     "domainStrategy": "${domain_strategy}"${domain_matcher},

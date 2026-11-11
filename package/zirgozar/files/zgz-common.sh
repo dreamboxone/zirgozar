@@ -290,10 +290,41 @@ xray_preferred() {
 	return 0
 }
 
+valid_dial_mode() {
+	case "$1" in *[!A-Za-z0-9_.,-]*) return 1 ;; esac
+	printf '%s\n' "$1" | awk '
+		length($0) > 64 { exit 1 }
+		/^oob\./ {
+			n = split(substr($0, 5), steps, ",")
+			if (!n) exit 1
+			for (i = 1; i <= n; i++)
+				if (steps[i] != "_" && (steps[i] !~ /^[0-9]+$/ || steps[i] + 0 > 255)) exit 1
+			exit 0
+		}
+		/[^A-Za-z0-9_.-]/ { exit 1 }
+	'
+}
+
 find_xray() {
 	_cfg="$1"
 	_pref="$(xray_preferred)"
 	_xpool="$_pref $(xray_by_version)"
+	_pattern_min=''
+	if [ -s "$_cfg" ]; then
+		if grep -q '"skipHostsWhenFakeEnable"[[:space:]]*:[[:space:]]*true' "$_cfg"; then _pattern_min=26.11.9; fi
+		if grep -q '"close"[[:space:]]*:[[:space:]]*{' "$_cfg"; then _pattern_min=26.11.12; fi
+	fi
+	if [ -n "$_pattern_min" ]; then
+		_xpool="$(core_dir)/xray-patterniha"
+		if [ ! -x "$_xpool" ] || ! core_version_cached "$_xpool" | awk -F. -v want="$_pattern_min" '
+			BEGIN { split(want, v, ".") }
+			{ for (i = 1; i <= 3; i++) { if ($i + 0 > v[i]) exit 0; if ($i + 0 < v[i]) exit 1 }; exit 0 }
+			END { if (NR == 0) exit 1 }
+		'; then
+			warn "These settings require Xray-patterniha $_pattern_min or newer. Update it on the App Update page."
+			return 1
+		fi
+	fi
 	if [ -s "$_cfg" ] && grep -q '"tag"[[:space:]]*:[[:space:]]*"aether-entry"' "$_cfg"; then
 		_xpool="$(core_dir)/xray-patterniha"
 		if [ ! -x "$_xpool" ]; then
@@ -1880,7 +1911,7 @@ node_domain_strategy() {
 # as the lines zgz-parse reads them from: "#!zgz-x.<key>=<value>". A
 # certificate keeps its lines with a bar between them, a JSON object loses its
 # line breaks. Nothing at all for a node that has none.
-NODE_EXTRA_KEYS="ech ech_repack tls_pin cert_name tls_pem cipher_suites user_agent finalmask dial_mode tcp_fast_open tcp_mptcp domain_strategy happy_eyeballs warpplus ws_heartbeat grpc_idle grpc_health grpc_window grpc_permit kcp_mtu kcp_tti kcp_uplink kcp_downlink kcp_read kcp_write kcp_congestion sb_mux sb_mux_streams sb_mux_padding sb_brutal_up sb_brutal_down wg_system ssrust hy_portmap"
+NODE_EXTRA_KEYS="ech ech_repack tls_pin cert_name tls_pem cipher_suites tls_session_resumption user_agent finalmask dial_mode tcp_fast_open tcp_mptcp domain_strategy happy_eyeballs warpplus ws_heartbeat grpc_idle grpc_health grpc_window grpc_permit kcp_mtu kcp_tti kcp_uplink kcp_downlink kcp_read kcp_write kcp_congestion sb_mux sb_mux_streams sb_mux_padding sb_brutal_up sb_brutal_down wg_system ssrust hy_portmap"
 
 node_extras() {
 	for _nk in $NODE_EXTRA_KEYS; do

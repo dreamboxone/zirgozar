@@ -1859,7 +1859,7 @@ return view.extend({
 
 			o = field(form.TextValue, 'xdrive_settings', _('XDRIVE settings (JSON)'),
 				_('Set service, remoteFolder and secrets here. Optional xmux and template settings are preserved, including hrefPath. For HTTP/3, select TLS and set ALPN to h3 only. Requires Xray 26.10.22 or newer.') + ' ' +
-				_('S3 requires Xray 26.10.29 or newer: set service to s3, secrets to [AccessKeyID, SecretAccessKey, optional SessionToken], and s3 to {endpoint, region, bucket, pathStyle}. Google Drive slot mode requires compatible cores on both ends.'));
+				_('S3 requires Xray 26.10.29 or newer: set service to s3, secrets to [AccessKeyID, SecretAccessKey, optional SessionToken], and s3 to {endpoint, region, bucket, pathStyle}. Google Drive slot mode requires compatible cores on both ends.') + ' ' + _('For Google Drive, use Xray 26.11.9 or newer with the same version on both client and server.'));
 			o.rows = 10; o.monospace = true; o.rmempty = false;
 			o.placeholder = '{"service":"google-drive","remoteFolder":"folder-id","secrets":["ClientID","ClientSecret","RefreshToken"]}';
 			o.validate = function(section_id, value) { return nodelink.validateXdrive(value); };
@@ -1938,6 +1938,9 @@ return view.extend({
 
 			o = tlsOnly(s.option(form.Value, 'tls_pin', _('TLS Chain Fingerprint (SHA256)'),
 				_('Once set, connects only when the server’s chain fingerprint matches.')));
+			o = tlsOnly(s.option(form.ListValue, 'tls_session_resumption', _('TLS session resumption'),
+				_('Reuse TLS sessions, including uTLS fingerprints with Xray-patterniha 26.11.9 or newer. Default preserves the imported setting.')));
+			o.value('', _('Default')); o.value('1', _('Enabled')); o.value('0', _('Disabled'));
 			o = tlsOnly(s.option(form.Value, 'cert_name', _('TLS Certificate Name (CertName)'),
 				_('TLS is used to verify the leaf certificate name.')));
 			o = tlsOnly(s.option(form.TextValue, 'tls_pem', _('TLS Certificate (PEM)'),

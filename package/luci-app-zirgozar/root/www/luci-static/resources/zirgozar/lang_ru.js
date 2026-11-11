@@ -5,6 +5,14 @@
 'require baseclass';
 
 return baseclass.extend({ strings: {
+	"TLS session resumption": "Возобновление сеанса TLS",
+	"Reuse TLS sessions, including uTLS fingerprints with Xray-patterniha 26.11.9 or newer. Default preserves the imported setting.": "Повторное использование сеансов TLS. Для отпечатков uTLS требуется Xray-patterniha 26.11.9 или новее. По умолчанию сохраняется импортированное значение.",
+	"Skip static hosts for FakeDNS": "Пропускать статические hosts для FakeDNS",
+	"Ignore static hosts for FakeDNS queries. Requires Xray-patterniha 26.11.9 or newer.": "Игнорировать статические записи hosts в запросах FakeDNS. Требуется Xray-patterniha 26.11.9 или новее.",
+	"Modify the first HTTP/1.1 request on the direct outbound. Supports rewriteHost, originalHostHeader, setHeaders, overrideHeaders, addHeaders, appendHeaders, removeHeaders, timeoutMs, onTimeout, nonHTTP and noHost. Empty disables it. Requires Xray-patterniha 26.11.12 or newer.": "Изменяет первый запрос HTTP/1.1 прямого выхода. Поддерживает rewriteHost, originalHostHeader, setHeaders, overrideHeaders, addHeaders, appendHeaders, removeHeaders, timeoutMs, onTimeout, nonHTTP и noHost. Пустое поле отключает настройку. Требуется Xray-patterniha 26.11.12 или новее.",
+	"For Google Drive, use Xray 26.11.9 or newer with the same version on both client and server.": "Для Google Drive используйте Xray 26.11.9 или новее; версии клиента и сервера должны совпадать.",
+	"Optional HTTP/2 server settings as a JSON object. Requires Xray 26.10.31 or newer.": "Необязательные настройки сервера HTTP/2 в виде объекта JSON. Требуется Xray 26.10.31 или новее.",
+	"Enter a JSON object.": "Введите объект JSON.",
 	"There are unsaved changes. Leave this page?": "Есть несохранённые изменения. Покинуть эту страницу?",
 	"DoT provider": "Сервис DoT",
 	"DoT hostname or IP": "Домен или IP DoT",

@@ -912,6 +912,10 @@ return view.extend({
 		o.default = '0';
 		o.rmempty = false;
 
+		o = s.taboption('dns', form.Flag, 'dns_skip_hosts_when_fake', _('Skip static hosts for FakeDNS'),
+			_('Ignore static hosts for FakeDNS queries. Requires Xray-patterniha 26.11.9 or newer.'));
+		o.default = '0';
+
 		o = s.taboption('dns', form.ListValue, 'remote_dns_query_strategy', _('Remote Query Strategy'));
 		o.value('UseIP');
 		o.value('UseIPv4');

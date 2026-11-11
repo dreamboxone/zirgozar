@@ -202,7 +202,7 @@ function stream(net, sec, host, path, sni, fp, alpn, pbk, sid, spx, svc, hdr, mo
 	if (sec == "tls" || sec == "reality") {
 		s = s ",\"security\":\"" jesc(sec) "\""
 		t = "\"serverName\":\"" jesc(sni != "" ? sni : host) "\""
-		# Only the fingerprints uTLS actually has, checked against Xray 26.3
+		# Only the fingerprints uTLS actually has, checked against Xray 26.11.9
 		# rather than guessed at. An unknown one is not ignored by the core -
 		# it refuses to build the outbound at all, and that costs the whole
 		# server over a cosmetic field. Dropping just the fingerprint leaves a
@@ -210,7 +210,7 @@ function stream(net, sec, host, path, sni, fp, alpn, pbk, sid, spx, svc, hdr, mo
 		#
 		# ("unsafe" is a real value and means Go's own TLS rather than uTLS.
 		# It looks like a mistake and is not one.)
-		if (fp ~ /^(chrome|firefox|safari|ios|android|edge|360|qq|random|randomized|randomizednoalpn|unsafe|hellogolang)$/)
+		if (fp ~ /^(chrome|hellochrome_155|firefox|safari|ios|android|edge|360|qq|random|randomized|randomizednoalpn|unsafe|hellogolang)$/)
 			t = t ",\"fingerprint\":\"" jesc(fp) "\""
 		# The cipher suites, as v2rayN's PattN writes them into a link -
 		# "cs", names joined by colons. Paired with the "unsafe" fingerprint
@@ -383,6 +383,18 @@ function filtered(label) {
 #
 # Only an outbound Xray knows - one with a "protocol". The nodes another core
 # carries have none of these.
+function valid_dial_mode(mode,   n, steps, i) {
+	if (length(mode) > 64) return 0
+	if (substr(mode, 1, 4) == "oob.") {
+		n = split(substr(mode, 5), steps, ",")
+		if (!n) return 0
+		for (i = 1; i <= n; i++)
+			if (steps[i] != "_" && (steps[i] !~ /^[0-9]+$/ || steps[i] + 0 > 255)) return 0
+		return 1
+	}
+	return mode ~ /^[A-Za-z0-9_.-]+$/
+}
+
 function node_extras(p,   ss, sec, t, sock, net, ws, k, v, pem, n, a, i, arr, h) {
 	if (substr(jtrim(p), 1, 1) != "{" || jstr(p, "protocol") == "") return p
 	ss = jraw(p, "streamSettings")
@@ -391,6 +403,8 @@ function node_extras(p,   ss, sec, t, sock, net, ws, k, v, pem, n, a, i, arr, h)
 	if (sec == "tls") {
 		t = jraw(ss, "tlsSettings")
 		if (t == "") t = "{}"
+		if (NX["tls_session_resumption"] ~ /^(0|1)$/)
+			t = jset(t, "enableSessionResumption", NX["tls_session_resumption"] == "1" ? "true" : "false")
 		if (NX["ech"] != "")           t = jset(t, "echConfigList", "\"" jesc(NX["ech"]) "\"")
 		if (NX["ech_repack"] == "1") {
 			v = jstr(t, "echConfigList")
@@ -465,7 +479,7 @@ function node_extras(p,   ss, sec, t, sock, net, ws, k, v, pem, n, a, i, arr, h)
 	if (NX["finalmask"] ~ /^[ \t]*\{.*\}[ \t]*$/) ss = jset(ss, "finalmask", NX["finalmask"])
 	sock = jraw(ss, "sockopt")
 	if (sock == "") sock = "{}"
-	if (NX["dial_mode"] ~ /^[A-Za-z0-9_.-]+$/ && length(NX["dial_mode"]) <= 64)
+	if (valid_dial_mode(NX["dial_mode"]))
 		sock = jset(sock, "dialMode", "\"" jesc(NX["dial_mode"]) "\"")
 	if (NX["tcp_fast_open"] == "1")  sock = jset(sock, "tcpFastOpen", "true")
 	if (NX["tcp_mptcp"] == "1")      sock = jset(sock, "tcpMptcp", "true")

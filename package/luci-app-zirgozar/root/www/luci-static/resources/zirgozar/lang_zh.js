@@ -5,6 +5,14 @@
 'require baseclass';
 
 return baseclass.extend({ strings: {
+	"TLS session resumption": "TLS 会话恢复",
+	"Reuse TLS sessions, including uTLS fingerprints with Xray-patterniha 26.11.9 or newer. Default preserves the imported setting.": "复用 TLS 会话。uTLS 指纹需要 Xray-patterniha 26.11.9 或更新版本。默认保留导入的设置。",
+	"Skip static hosts for FakeDNS": "FakeDNS 跳过静态 hosts",
+	"Ignore static hosts for FakeDNS queries. Requires Xray-patterniha 26.11.9 or newer.": "FakeDNS 查询忽略静态 hosts 映射。需要 Xray-patterniha 26.11.9 或更新版本。",
+	"Modify the first HTTP/1.1 request on the direct outbound. Supports rewriteHost, originalHostHeader, setHeaders, overrideHeaders, addHeaders, appendHeaders, removeHeaders, timeoutMs, onTimeout, nonHTTP and noHost. Empty disables it. Requires Xray-patterniha 26.11.12 or newer.": "修改直连出站的首个 HTTP/1.1 请求。支持 rewriteHost、originalHostHeader、setHeaders、overrideHeaders、addHeaders、appendHeaders、removeHeaders、timeoutMs、onTimeout、nonHTTP 和 noHost。留空禁用。需要 Xray-patterniha 26.11.12 或更新版本。",
+	"For Google Drive, use Xray 26.11.9 or newer with the same version on both client and server.": "Google Drive 需要 Xray 26.11.9 或更新版本，且客户端与服务端版本必须一致。",
+	"Optional HTTP/2 server settings as a JSON object. Requires Xray 26.10.31 or newer.": "可选的 HTTP/2 服务端设置，格式为 JSON 对象。需要 Xray 26.10.31 或更新版本。",
+	"Enter a JSON object.": "请输入 JSON 对象。",
 	"There are unsaved changes. Leave this page?": "有未保存的更改。要离开此页面吗？",
 	"DoT provider": "DoT 服务商",
 	"DoT hostname or IP": "DoT 域名或 IP",

@@ -5,8 +5,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-zirgozar
-PKG_VERSION:=5.8.19
-PKG_RELEASE:=2
+PKG_VERSION:=5.8.20
+PKG_RELEASE:=1
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
 PKG_LICENSE:=AGPL-3.0-or-later

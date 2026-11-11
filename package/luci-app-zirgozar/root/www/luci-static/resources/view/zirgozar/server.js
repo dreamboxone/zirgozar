@@ -429,7 +429,7 @@ return view.extend({
 
 		o = s.taboption('transport', form.TextValue, 'xdrive_settings', _('XDRIVE settings (JSON)'),
 			_('Set service, remoteFolder and secrets here. Optional xmux and template settings are preserved, including hrefPath. For HTTP/3, select TLS and set ALPN to h3 only. Requires Xray 26.10.22 or newer.') + ' ' +
-			_('S3 requires Xray 26.10.29 or newer: set service to s3, secrets to [AccessKeyID, SecretAccessKey, optional SessionToken], and s3 to {endpoint, region, bucket, pathStyle}. Google Drive slot mode requires compatible cores on both ends.'));
+			_('S3 requires Xray 26.10.29 or newer: set service to s3, secrets to [AccessKeyID, SecretAccessKey, optional SessionToken], and s3 to {endpoint, region, bucket, pathStyle}. Google Drive slot mode requires compatible cores on both ends.') + ' ' + _('For Google Drive, use Xray 26.11.9 or newer with the same version on both client and server.'));
 		o.modalonly = true; o.rows = 10; o.monospace = true; o.rmempty = false;
 		o.placeholder = '{"service":"google-drive","remoteFolder":"folder-id","secrets":["ClientID","ClientSecret","RefreshToken"]}';
 		o.validate = function(section_id, value) { return nodelink.validateXdrive(value); };
@@ -463,6 +463,18 @@ return view.extend({
 		o = s.taboption('transport', form.ListValue, 'xhttp_mode', _('XHTTP Mode'));
 		o.modalonly = true;
 		[ 'auto', 'packet-up', 'stream-up', 'stream-one' ].forEach(function(v) { o.value(v); });
+		onNet(o, [ 'xhttp' ]);
+		o = s.taboption('transport', form.TextValue, 'xhttp_h2_params', 'XHTTP h2Params (JSON)',
+			_('Optional HTTP/2 server settings as a JSON object. Requires Xray 26.10.31 or newer.'));
+		o.modalonly = true; o.rows = 5; o.monospace = true;
+		o.validate = function(section_id, value) {
+			if (!value) return true;
+			try {
+				var params = JSON.parse(value);
+				if (params && typeof params == 'object' && !Array.isArray(params)) return true;
+			} catch (e) {}
+			return _('Enter a JSON object.');
+		};
 		onNet(o, [ 'xhttp' ]);
 		o = s.taboption('transport', form.ListValue, 'header_type', _('Camouflage Type'));
 		o.modalonly = true;

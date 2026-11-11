@@ -93,6 +93,8 @@ if (type(X) != 'object') {
 	stderr.write('error: the Xray configuration could not be read\n');
 	exit(2);
 }
+if (X.dns?.skipHostsWhenFakeEnable || length(filter(X.outbounds ?? [], o => type(o.settings?.close) == 'object')))
+	die('Freedom close and skipHostsWhenFakeEnable require Xray-patterniha.\n');
 
 let MARK = int(args.mark ?? 255);
 let GEOVIEW = args.geoview;

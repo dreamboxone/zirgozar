@@ -254,6 +254,22 @@ try {
 	assert.deepEqual(config.inbounds[0].streamSettings.xdriveSettings,template);
 	assert.equal(config.inbounds[0].streamSettings.finalmask,undefined);
 	checkCore(config,'server-xdrive');
+	const h2Params={maxConcurrentStreams:128};
+	const xhttp={protocol:'vless',port:'23456',uuid:id,transport:'xhttp',security:'none'};
+	const h2Result=serverConfig({...xhttp,xhttp_h2_params:JSON.stringify(h2Params,null,2)});
+	assert.equal(h2Result.status,0,h2Result.stderr);
+	const h2Config=JSON.parse(h2Result.stdout);
+	assert.deepEqual(h2Config.inbounds[0].streamSettings.xhttpSettings.h2Params,h2Params);
+	checkCore(h2Config,'server-xhttp-h2');
+	assert.equal(JSON.parse(serverConfig(xhttp).stdout).inbounds[0].streamSettings.xhttpSettings.h2Params,undefined);
+	for (const invalid of ['not-json','[]','null','42'])
+		assert.notEqual(serverConfig({...xhttp,xhttp_h2_params:invalid}).status,0,'invalid h2Params must fail');
+	for (const fp of ['chrome','hellochrome_155']) {
+		const outbound=parse('vless://'+id+'@example.com:443?security=tls&type=tcp&fp='+fp)[0];
+		assert.equal(outbound.streamSettings.tlsSettings.fingerprint,fp);
+		checkCore({outbounds:[outbound]},'fingerprint-'+fp);
+	}
+	assert.equal(parse('vless://'+id+'@example.com:443?security=tls&fp=hellochrome_999')[0].streamSettings.tlsSettings.fingerprint,undefined);
 	const h3=JSON.parse(serverConfig({...base,security:'tls',alpn:'h3',xdrive_settings:JSON.stringify(drive)}).stdout);
 	assert.deepEqual(h3.inbounds[0].streamSettings.tlsSettings,{alpn:['h3']},'XDRIVE storage TLS does not need a local server certificate');
 	checkCore(h3,'server-xdrive-h3');

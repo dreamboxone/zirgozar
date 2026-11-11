@@ -201,6 +201,16 @@ return view.extend({
 		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Xray Settings'));
 		s.anonymous = true;
 
+		o = s.option(form.TextValue, 'freedom_close', 'Freedom close (JSON)',
+			_('Modify the first HTTP/1.1 request on the direct outbound. Supports rewriteHost, originalHostHeader, setHeaders, overrideHeaders, addHeaders, appendHeaders, removeHeaders, timeoutMs, onTimeout, nonHTTP and noHost. Empty disables it. Requires Xray-patterniha 26.11.12 or newer.'));
+		o.rows = 6; o.monospace = true;
+		o.placeholder = '{"rewriteHost":"example.com","setHeaders":{"Connection":"close"}}';
+		o.validate = function(section_id, value) {
+			if (!value) return true;
+			try { var v = JSON.parse(value); if (v && typeof v == 'object' && !Array.isArray(v)) return true; } catch (e) {}
+			return _('Enter a JSON object.');
+		};
+
 		o = s.option(form.Flag, 'fragment', _('Fragment'),
 			_('TCP fragments, which can deceive the censorship system in some cases, such as bypassing SNI blacklists.'));
 		o.default = '0';

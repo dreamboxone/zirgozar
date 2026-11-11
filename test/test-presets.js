@@ -78,6 +78,8 @@ const guarded=presets.withFinalMask({getUIElement:()=>widget,isActive:()=>true,f
 })().catch(error=>{console.error(error);process.exitCode=1;});
 assert.equal(mode.validate('', ''), true);
 assert.equal(mode.validate('', 'custom-core-mode'), true);
+for (const value of ['oob.0,_,12', 'oob._', 'oob.255,0']) assert.equal(mode.validate('', value), true);
+for (const value of ['oob.', 'oob.256', 'oob.1,,2', 'oob.-1', 'oob.1,', 'custom,mode']) assert.notEqual(mode.validate('', value), true);
 assert.notEqual(mode.validate('', 'mode; command'), true);
 const scan = new Function('baseclass', 'rpc', 'ui', 'i18n', source('aetherscan.js'))(
  { extend: x => x }, { declare: () => () => Promise.resolve({}) }, {}, { tr: x => x }

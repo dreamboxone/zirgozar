@@ -45,6 +45,19 @@ var LANGUAGES = { en: 'English', fa: 'فارسی', zh: '简体中文', ru: 'Ру
 var CATALOGS = { zh: zh.strings, ru: ru.strings };
 
 var FA = {
+	'TLS session resumption': 'ازسرگیری نشست TLS',
+	'Reuse TLS sessions, including uTLS fingerprints with Xray-patterniha 26.11.9 or newer. Default preserves the imported setting.':
+		'استفاده دوباره از نشست TLS؛ برای اثر انگشت‌های uTLS به Xray پترنیها نسخه 26.11.9 یا جدیدتر نیاز دارد. حالت پیش‌فرض، مقدار کانفیگ واردشده را حفظ می‌کند.',
+	'Skip static hosts for FakeDNS': 'نادیده‌گرفتن hosts ثابت برای FakeDNS',
+	'Ignore static hosts for FakeDNS queries. Requires Xray-patterniha 26.11.9 or newer.':
+		'نگاشت‌های ثابت hosts را برای پرس‌وجوهای FakeDNS نادیده می‌گیرد. به Xray پترنیها نسخه 26.11.9 یا جدیدتر نیاز دارد.',
+	'Modify the first HTTP/1.1 request on the direct outbound. Supports rewriteHost, originalHostHeader, setHeaders, overrideHeaders, addHeaders, appendHeaders, removeHeaders, timeoutMs, onTimeout, nonHTTP and noHost. Empty disables it. Requires Xray-patterniha 26.11.12 or newer.':
+		'اولین درخواست HTTP/1.1 در خروجی مستقیم را تغییر می‌دهد. گزینه‌های rewriteHost، originalHostHeader، setHeaders، overrideHeaders، addHeaders، appendHeaders، removeHeaders، timeoutMs، onTimeout، nonHTTP و noHost را می‌پذیرد. مقدار خالی آن را غیرفعال می‌کند. به Xray پترنیها نسخه 26.11.12 یا جدیدتر نیاز دارد.',
+	'For Google Drive, use Xray 26.11.9 or newer with the same version on both client and server.':
+		'برای Google Drive از Xray نسخه 26.11.9 یا جدیدتر استفاده کنید؛ نسخه کلاینت و سرور باید یکسان باشد.',
+	'Optional HTTP/2 server settings as a JSON object. Requires Xray 26.10.31 or newer.':
+		'تنظیمات اختیاری HTTP/2 سرور به شکل شی JSON. به Xray نسخه 26.10.31 یا جدیدتر نیاز دارد.',
+	'Enter a JSON object.': 'یک شی JSON وارد کنید.',
 	'There are unsaved changes. Leave this page?': 'تغییرات ذخیره‌نشده دارید. از این صفحه خارج می‌شوید؟',
 	'DoT provider': "سرویس DoT",
 	'DoT hostname or IP': "دامنه یا IP برای DoT",

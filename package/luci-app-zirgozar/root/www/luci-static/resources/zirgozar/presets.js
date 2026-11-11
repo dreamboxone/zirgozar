@@ -245,7 +245,16 @@ function withFinalMask(option) {
 function withDialMode(option) {
 	option.value('', _('Default'));
 	option.description = _('Empty uses the core default. Custom dialMode names require a core that implements them.');
-	option.validate = function(section, value) { return !value || /^[A-Za-z0-9._-]{1,64}$/.test(value) || _('Invalid dialMode name.'); };
+	option.validate = function(section, value) {
+		if (!value) return true;
+		if (value.length > 64) return _('Invalid dialMode name.');
+		if (value.indexOf('oob.') == 0)
+			return value.slice(4).split(',').every(function(step) {
+				return step == '_' || (/^\d+$/.test(step) && Number(step) <= 255);
+			}) || _('Invalid dialMode name.');
+		return /^[A-Za-z0-9._-]+$/.test(value) || _('Invalid dialMode name.');
+	};
+	option.value('oob.0,_,12', 'oob.0,_,12');
 	return option;
 }
 return baseclass.extend({ finalMasks: finalMasks, identify: identify, validate: validate, editMask: editMask, coreCheck: coreCheck, withFinalMask: withFinalMask, withDialMode: withDialMode });
