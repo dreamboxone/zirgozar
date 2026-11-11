@@ -73,6 +73,10 @@ jobs:
           set -euo pipefail
           # Avoid the Azure-first mirror list when its DNS is unavailable.
           sudo python3 - <<'PY'
+          import ipaddress
+          import json
+          import socket
+          from urllib.request import urlopen
           from pathlib import Path
           sources = [Path('/etc/apt/sources.list')]
           sources += list(Path('/etc/apt/sources.list.d').glob('*.sources'))
@@ -89,9 +93,36 @@ jobs:
               ):
                   text = text.replace(old, new)
               source.write_text(text)
+          # Recover only repository lookups when the runner's DNS fails.
+          # HTTPS still validates the repository hostname and APT checks signatures.
+          for host in ('archive.ubuntu.com', 'security.ubuntu.com'):
+              try:
+                  socket.getaddrinfo(host, 443)
+                  continue
+              except socket.gaierror:
+                  pass
+              addresses = []
+              for resolver in ('https://dns.google/resolve', 'https://cloudflare-dns.com/dns-query'):
+                  try:
+                      from urllib.request import Request
+                      request = Request(resolver + '?name=' + host + '&type=A', headers={'Accept': 'application/dns-json'})
+                      with urlopen(request, timeout=15) as response:
+                          answer = json.load(response)
+                      addresses = [str(ipaddress.IPv4Address(record['data']))
+                                   for record in answer.get('Answer', []) if record.get('type') == 1]
+                      if addresses:
+                          break
+                  except (OSError, ValueError, KeyError):
+                      continue
+              if not addresses:
+                  raise SystemExit('Cannot resolve Ubuntu repository: ' + host)
+              with Path('/etc/hosts').open('a') as hosts:
+                  for address in addresses:
+                      hosts.write('\n' + address + ' ' + host + '\n')
+              print('Resolved repository through HTTPS DNS: ' + host, flush=True)
           PY
-          sudo apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update -qq
-          sudo apt-get -o Acquire::Retries=3 install -y nftables dnsmasq-base openvpn cmake pkg-config libjson-c-dev
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::https::Timeout=30 -o APT::Update::Error-Mode=any update -qq
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::https::Timeout=30 install -y nftables dnsmasq-base openvpn cmake pkg-config libjson-c-dev
 
       - name: Check dependency installation outcomes
         run: python3 test/test-deps-install.py
