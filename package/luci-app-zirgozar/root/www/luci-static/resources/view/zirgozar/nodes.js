@@ -631,7 +631,8 @@ function renderNodes(d) {
 		rows.push(E('tr', { 'class': 'tr' }, [
 			E('td', { 'class': 'td' }, [
 				E('div', { 'style': 'display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap' }, [
-					E('span', { 'style': n.current ? 'font-weight:700' : '' }, n.label || n.host),
+					E('span', { 'class': 'zgz-node-label', 'dir': 'auto', 'title': n.label || n.host,
+						'style': n.current ? 'font-weight:700' : '' }, n.label || n.host),
 					n.current ? pill(_('in use'), '#10b981') : E('span')
 				]),
 				address(n.host + ':' + n.port)

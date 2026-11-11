@@ -83,6 +83,11 @@ jobs:
       - name: Check subscription import
         run: node test/test-subs-ui.js
 
+      - name: Check complete subscription remarks
+        run: |
+          node test/test-node-labels.js
+          node test/test-nodes-ui.js
+
       - name: Check XDRIVE and inbound source filters
         env:
           XRAY_VERSION: ${{ steps.xray-version.outputs.version }}

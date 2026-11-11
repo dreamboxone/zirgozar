@@ -37,9 +37,7 @@ function b64init(   i, chars) {
 	for (i = 1; i <= 64; i++) B64[substr(chars, i, 1)] = i - 1
 	for (i = 1; i < 256; i++) CHR[i] = sprintf("%c", i)
 	CHR[0] = ""
-	# The other direction, for the one place that has to know what a byte is
-	# worth rather than what it looks like: trimming a name without cutting a
-	# UTF-8 character in half.
+	# Byte values for encoding and hashing without changing UTF-8 sequences.
 	for (i = 1; i < 256; i++) ORD[CHR[i]] = i
 }
 
@@ -135,32 +133,12 @@ function urlencode(s,   out, i, c) {
 	return out
 }
 
-# A server name is decoration. It arrives with channel advertising, control
-# characters and occasionally a whole line of emoji in it, so keep it short
-# and printable and let the rest go.
-function clean_label(s,   c) {
+# Preserve subscription remarks, including emoji and mixed-language suffixes.
+# Only control characters need replacing to keep the TSV record on one line.
+function clean_label(s) {
 	s = urldec(s)
 	gsub(/[[:cntrl:]]/, " ", s)
-	gsub(/\|.*$/, "", s)
 	gsub(/^[ \t]+|[ \t]+$/, "", s)
-	if (length(s) > 48) {
-		s = substr(s, 1, 48)
-		# This runs in the C locale, where length() counts bytes, so 48 is 48
-		# bytes and a Persian, Arabic or Chinese name is two or three bytes a
-		# character. Cutting at a fixed count therefore lands in the middle of
-		# a character about as often as not, and half a character is not a
-		# shorter name - it is a byte sequence that is no longer UTF-8, and it
-		# travels all the way to the web interface as a broken one. So walk
-		# back off any continuation bytes, and then off the lead byte whose
-		# body has just been removed.
-		while (length(s) > 0) {
-			c = ORD[substr(s, length(s), 1)]
-			if (c >= 128 && c < 192) { s = substr(s, 1, length(s) - 1); continue }
-			if (c >= 192) s = substr(s, 1, length(s) - 1)
-			break
-		}
-		gsub(/[ \t]+$/, "", s)
-	}
 	return s
 }
 

@@ -32,7 +32,6 @@ function decodeName(s) {
 	if (!s) return '';
 	try { s = decodeURIComponent(s.replace(/\+/g, ' ')); } catch (e) { /* raw already */ }
 	s = s.replace(/[\x00-\x1f\x7f]/g, ' ').replace(/\s+/g, ' ').trim();
-	if (s.length > 60) s = s.slice(0, 60).trim();
 	return s;
 }
 

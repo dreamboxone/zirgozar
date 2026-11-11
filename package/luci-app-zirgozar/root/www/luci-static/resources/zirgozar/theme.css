@@ -10,6 +10,11 @@
  * the few pieces Makhzan has no need of.
  */
 @font-face{font-family:Vazirmatn;src:url("fonts/Vazirmatn.woff2") format("woff2");font-weight:100 900;font-style:normal;font-display:swap}
+/* Country flags are bundled for browsers without native flag emoji support.
+ * Twemoji artwork: CC-BY-4.0; see fonts/TwemojiCountryFlags-LICENSE.md. */
+@font-face{font-family:ZirgozarFlags;src:url("fonts/TwemojiCountryFlags.woff2") format("woff2");font-display:swap;unicode-range:U+1F1E6-1F1FF,U+1F3F4,U+E0062-E007F}
+.mk .zgz-node-label{font-family:ZirgozarFlags,"Segoe UI",Tahoma,Arial,sans-serif;unicode-bidi:isolate;white-space:normal;overflow-wrap:anywhere;min-width:0;max-width:100%}
+.mk[dir=rtl] .zgz-node-label{font-family:ZirgozarFlags,Vazirmatn,Tahoma,sans-serif}
 .mk[dir=rtl],.mk[dir=rtl] *{font-family:Vazirmatn,Tahoma,sans-serif}
 .mk[dir=rtl] button.mk-btn,.mk[dir=rtl] input,.mk[dir=rtl] select,.mk[dir=rtl] textarea{font-family:Vazirmatn,Tahoma,sans-serif!important}
 /* Persian text inside the English (LTR) page, e.g. the language switch button */
