@@ -2267,7 +2267,15 @@ function from_singbox(it,   t, lab, peer, aw, ak, ai, nk, sbp, hyo) {
 	}
 
 	XEXTRA = ""
-	if (t == "masque") {
+	if (t == "trusttunnel") {
+		sbp = it; gsub(/[\n\r\t]/, " ", sbp)
+		emit(lab, "trusttunnel", "{\"type\":\"trusttunnel\",\"server\":\"" jesc(HOST) "\",\"port\":" PORT \
+			",\"username\":\"" jesc(jstr(it,"username")) "\",\"password\":\"" jesc(jstr(it,"password")) "\"" \
+			",\"sni\":\"" jesc(jstr(jraw(it,"tls"),"server_name")) "\",\"quic\":" (jbool(it,"quic") ? "true" : "false") \
+			",\"insecure\":" (jbool(jraw(it,"tls"),"insecure") ? "true" : "false") ",\"native\":" sbp "}")
+		return
+	}
+	if (t == "masque" || t == "masque-client") {
 		sbp = mk_masque(jstr(it, "private_key"), jstr(it, "public_key"), (jraw(it, "ip") == "" ? "" : jraw(it, "ip")) (jraw(it, "ipv6") != "" ? "," jraw(it, "ipv6") : ""), jstr(it, "vhttp") == "h3")
 		emit(lab, "masque", sbp)
 		return

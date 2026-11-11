@@ -97,6 +97,17 @@ if (X.dns?.skipHostsWhenFakeEnable || length(filter(X.outbounds ?? [], o => type
 	die('Freedom close and skipHostsWhenFakeEnable require Xray-patterniha.\n');
 
 let MARK = int(args.mark ?? 255);
+let LX = args.lx ? json(args.lx) : {};
+if (type(LX) != 'object') die('sing-box-lx options must be a JSON object.\n');
+if (length(keys(LX)) && args.lxcore != '1') die('These settings require sing-box-lx.\n');
+if (args.lxlegacy == '1' && 'quic_sniff_decoy' in LX)
+	die('QUIC decoy controls require the 1.14.4-lx.33 stable line; the 1.15.0-lx.1-rc.1 preview uses an older schema.\n');
+if (args.newmasque == '1' && LX.masque?.idle_timeout)
+	die('MASQUE idle_timeout is not implemented on the 1.15 line; set on_demand on the masque-client endpoint instead.\n');
+if ('awg_masquerade' in LX) die('lx.awg_masquerade was removed; use quic_sniff_decoy instead.\n');
+if (length(keys(LX.wg ?? {}))) die('lx.wg idle controls require a mobile build and cannot run on this router.\n');
+if (type(LX.quic_sniff_decoy) == 'string') LX.quic_sniff_decoy = { mode: LX.quic_sniff_decoy };
+else if (type(LX.quic_sniff_decoy) == 'bool') LX.quic_sniff_decoy = { mode: LX.quic_sniff_decoy ? 'all' : 'off' };
 let GEOVIEW = args.geoview;
 let GEODIR = args.geodir;
 let RSDIR = args.rsdir ?? '/var/run/zirgozar/rs';
@@ -124,6 +135,12 @@ function awg_endpoint(b, tag, mark) {
 const ENDPOINT_TYPES = { wireguard: true, openconnect: true, tailscale: true };
 
 function bridge_node(b, tag, mark) {
+	if (b.type == 'trusttunnel' && args.lxcore == '1') {
+		if (b.native) return { ...b.native, tag, routing_mark: mark };
+		return { type:'trusttunnel', tag, server:b.server, server_port:int(b.port),
+			username:b.username, password:b.password, quic:!!b.quic, routing_mark:mark,
+			tls:{enabled:true,server_name:b.sni || b.server,insecure:!!b.insecure} };
+	}
 	if (b.type == 'amneziawg')
 		return awg_endpoint(b, tag, mark);
 	// A pinned certificate is sing-box 1.15's.
@@ -353,6 +370,7 @@ if (args.mode == 'bridge') {
 		push(c.outbounds, node._extra);
 		delete node._extra;
 	}
+	if (length(keys(LX))) c.lx = LX;
 	print(sprintf('%J', c), '\n');
 	exit(0);
 }
@@ -571,12 +589,16 @@ function conv_outbound(o) {
 	if (o.streamSettings?.tlsSettings?.echSockopt?.dialerProxy == 'tls-repack-dns')
 		return fail_out(o.tag, 'ECH TLS repacking requires Xray; sing-box cannot preserve echSockopt/fromMitM');
 	let tag = o.tag;
-	if (o.protocol == 'masque' && o.sbNative?.type == 'masque') {
+	if (o.protocol == 'masque' && o.sbNative && (o.sbNative.type == 'masque' || o.sbNative.type == 'masque-client')) {
 		let r = { ...o.sbNative, tag };
+		if (r.type == 'masque-client' && args.newmasque != '1')
+			return fail_out(tag, 'masque-client requires sing-box-lx 1.15 or newer');
+		if (r.type == 'masque' && args.newmasque == '1')
+			return fail_out(tag, 'legacy MASQUE requires sing-box-lx 1.14; on 1.15 import a masque-client endpoint with TLS client certificate and key');
 		let sock = o.streamSettings?.sockopt ?? {};
 		if (sock.dialerProxy) r.detour = sock.dialerProxy;
 		else r.routing_mark = sock.mark ?? MARK;
-		push(outbounds, r);
+		push(r.type == 'masque-client' ? endpoints : outbounds, r);
 		out_tags[tag] = true;
 		return;
 	}
@@ -1185,6 +1207,7 @@ let cfg = {
 	outbounds: [ ...outbounds, { type: 'direct', tag: 'direct', routing_mark: MARK } ],
 	route
 };
+if (length(keys(LX))) cfg.lx = LX;
 if (args.mode != 'test')
 	cfg.experimental = { clash_api: { external_controller: `127.0.0.1:${args.api ?? 10853}` } };
 if (length(endpoints))

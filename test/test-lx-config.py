@@ -20,15 +20,15 @@ node = {
                   'xmux': {'max_concurrency': '16-32'}}
 }
 
-def convert(node):
+def convert(node, extra=()):
     parsed = subprocess.run(['awk', '-f', str(files / 'zgz-parse')], input=json.dumps({'outbounds':[node]}, indent=2), text=True, capture_output=True, check=True).stdout
     rows = parsed.splitlines()
     assert len(rows) == 1, parsed
     payload = json.loads(rows[0].split('\t')[5])
     payload['tag'] = 'proxy'
-    result = subprocess.run(['ucode', str(files / 'zgz-sbconfig'), 'mode=test'], input=json.dumps({'outbounds':[payload]}), text=True, capture_output=True, check=True)
+    result = subprocess.run(['ucode', str(files / 'zgz-sbconfig'), 'mode=test', *extra], input=json.dumps({'outbounds':[payload]}), text=True, capture_output=True, check=True)
     out = json.loads(result.stdout)
-    return payload, next(n for n in out['outbounds'] if n['tag'] == 'proxy'), out
+    return payload, next(n for n in out['outbounds'] + out.get('endpoints', []) if n['tag'] == 'proxy'), out
 
 payload, actual, config = convert(node)
 assert payload['settings']['vnext'][0]['users'][0]['encryption'] == node['encryption']
@@ -49,6 +49,72 @@ masque = {'type':'masque', 'tag':'warp', 'server':'162.159.198.2', 'server_port'
 _, actual, _ = convert(masque)
 for key, value in masque.items():
     if key != 'tag': assert actual[key] == value, (key, actual)
+
+options = {'quic_sniff_decoy': {'mode':'detour','outbound_type':['masque','wireguard'],
+                               'detour_type':['vless'],'send':'retry'},
+           'mtu_align': {'mode':'clamp','except':['proxy']},
+           'masque': {'idle_timeout':'2m'}, 'trusttunnel': {'idle_timeout':'5m'}}
+plain['encryption']='none'
+plain['tls']={'enabled':True,'server_name':'example.com'}
+_, _, lx_config = convert(plain, ['lxcore=1', 'lx='+json.dumps(options)])
+assert lx_config['lx'] == options
+assert 'lx' not in convert(plain)[2]
+for old, expected in [('detour','detour'), (True,'all'), (False,'off')]:
+    assert convert(plain, ['lxcore=1','lx='+json.dumps({'quic_sniff_decoy':old})])[2]['lx']['quic_sniff_decoy']=={'mode':expected}
+for invalid, extra in [({'awg_masquerade':'all'}, ['lxcore=1']),
+                       ({'wg':{'idle_suspend':'1m'}}, ['lxcore=1']),
+                       (options, ['lxcore=1','lxlegacy=1']),
+                       ({'masque':{'idle_timeout':'2m'}}, ['lxcore=1','newmasque=1']),
+                       (options, []), ([], ['lxcore=1'])]:
+    try: convert(plain, extra+['lx='+json.dumps(invalid)])
+    except subprocess.CalledProcessError: pass
+    else: raise AssertionError('unsupported LX settings accepted')
+
+endpoint={'type':'masque-client','tag':'new masque','server':'example.com','server_port':443,
+          'profile':'standard','path':'/connect-ip','version':3,
+          'tls':{'enabled':True,'server_name':'example.com'},'on_demand':True}
+_, actual, new_config=convert(endpoint,['newmasque=1','certpin=1'])
+assert actual['type']=='masque-client' and actual['on_demand'] is True
+assert actual['path']=='/connect-ip' and actual in new_config['endpoints']
+for candidate, extra in [(endpoint, []), (masque, ['newmasque=1'])]:
+    try: convert(candidate,extra)
+    except subprocess.CalledProcessError: pass
+    else: raise AssertionError('incompatible MASQUE schema accepted')
+
+for binary, config in [(os.environ.get('RIG_LX_STABLE'), lx_config), (os.environ.get('RIG_LX_NEW'), new_config)]:
+    if binary:
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'config.json'
+            path.write_text(json.dumps(config))
+            subprocess.run([binary,'check','-c',str(path)],check=True)
+print('LX root options, legacy decoy migration, router capability guards and MASQUE 1.15 endpoints passed')
+
+trust={'type':'trusttunnel','tag':'native trust','server':'example.com','server_port':443,
+       'username':'user','password':'secret','quic':True,'idle_timeout':'3m',
+       'tls':{'enabled':True,'server_name':'example.com'}}
+parsed=subprocess.run(['awk','-f',str(files/'zgz-parse')],input=json.dumps({'outbounds':[trust]},indent=2),text=True,capture_output=True,check=True).stdout
+assert len(parsed.splitlines())==1
+bridge=json.loads(parsed.strip().split('\t')[5])
+assert bridge['native']==trust
+with tempfile.TemporaryDirectory() as tmp:
+    path=Path(tmp)/'bridge.json'; path.write_text(json.dumps(bridge))
+    result=subprocess.run(['ucode',str(files/'zgz-sbconfig'),'mode=bridge','lxcore=1',
+                           'bridge='+str(path),'lx='+json.dumps(options)],text=True,capture_output=True,check=True)
+    config=json.loads(result.stdout)
+    actual=config['outbounds'][0]
+    assert actual['type']=='trusttunnel' and actual['idle_timeout']=='3m' and actual['tls']==trust['tls']
+    assert config['lx']==options
+    if os.environ.get('RIG_LX_STABLE'):
+        # The standalone helper has tag out, so its exception must name that tag.
+        config['lx']['mtu_align']['except']=['out']
+        checked=Path(tmp)/'check.json'; checked.write_text(json.dumps(config))
+        subprocess.run([os.environ['RIG_LX_STABLE'],'check','-c',str(checked)],check=True)
+    inlet={'outbounds':[{'tag':'proxy','protocol':'socks','settings':{'servers':[{'address':'127.0.0.1','port':10808}]}}]}
+    result=subprocess.run(['ucode',str(files/'zgz-sbconfig'),'mode=test','lxcore=1','bridge='+str(Path(tmp)/'bridge.json')],
+                          input=json.dumps(inlet),text=True,capture_output=True,check=True)
+    actual=next(o for o in json.loads(result.stdout)['outbounds'] if o['tag']=='proxy')
+    assert actual['type']=='trusttunnel' and actual['idle_timeout']=='3m'
+print('Native TrustTunnel import and helper configuration preserve TLS, QUIC and idle settings')
 
 # Test a real LX binary when supplied; a plain TLS XHTTP node needs no live server.
 if os.environ.get('RIG_LX'):

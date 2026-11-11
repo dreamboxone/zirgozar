@@ -5,6 +5,22 @@
 'require baseclass';
 
 return baseclass.extend({ strings: {
+	"QUIC anti-sniff paths": "Пути защиты QUIC от анализа",
+	"Requires sing-box-lx 1.14.4-lx.33 or newer. Retry sends a decoy only after a failed attempt.": "Требуется sing-box-lx 1.14.4-lx.33 или новее. В режиме повтора маскирующий пакет отправляется только после неудачной попытки.",
+	"QUIC decoy timing": "Момент отправки маскировки QUIC",
+	"QUIC decoy node types": "Типы узлов маскировки QUIC",
+	"QUIC decoy relay types": "Типы релеев маскировки QUIC",
+	"Tunnel MTU alignment": "Согласование MTU туннеля",
+	"MTU alignment exceptions": "Исключения согласования MTU",
+	"Exact outbound or endpoint tags excluded from automatic MTU alignment.": "Точные теги выходов или конечных точек, исключённых из автоматического согласования MTU.",
+	"MASQUE idle timeout": "Тайм-аут простоя MASQUE",
+	"TrustTunnel idle timeout": "Тайм-аут простоя TrustTunnel",
+	"Duration such as 30s or 5m. Empty keeps the core default.": "Длительность, например 30s или 5m. Пустое поле сохраняет значение ядра по умолчанию.",
+	"Advanced sing-box-lx options (JSON)": "Дополнительные настройки sing-box-lx (JSON)",
+	"Root lx object. Fields above override matching JSON settings. Removed awg_masquerade and mobile-only wg idle controls are rejected.": "Корневой объект lx. Поля выше заменяют одноимённые настройки JSON. Удалённый awg_masquerade и мобильные настройки простоя wg не допускаются.",
+	"Enter supported sing-box-lx settings as a JSON object.": "Введите поддерживаемые настройки sing-box-lx в виде объекта JSON.",
+	"Retry": "Повтор",
+	"Invalid value.": "Недопустимое значение.",
 	"TLS session resumption": "Возобновление сеанса TLS",
 	"Reuse TLS sessions, including uTLS fingerprints with Xray-patterniha 26.11.9 or newer. Default preserves the imported setting.": "Повторное использование сеансов TLS. Для отпечатков uTLS требуется Xray-patterniha 26.11.9 или новее. По умолчанию сохраняется импортированное значение.",
 	"Skip static hosts for FakeDNS": "Пропускать статические hosts для FakeDNS",

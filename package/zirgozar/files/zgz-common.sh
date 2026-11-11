@@ -443,8 +443,10 @@ wanted_engine() {
 			xray) case "$_wp" in vless|vmess|trojan|shadowsocks|socks|http) _we=xray ;; esac ;;
 		esac
 	fi
-	# WARP over MASQUE is Xray's alone: sing-box has no such outbound.
-	if [ "$_we" = "singbox" ] && grep -q '"protocol":"masque"' "$ZGZ_BEST" 2>/dev/null; then
+	# A native MASQUE import keeps its own schema for the selected sing-box.
+	# WARP registrations generated for Xray still need Xray's transport.
+	if [ "$_we" = "singbox" ] && grep -q '"protocol":"masque"' "$ZGZ_BEST" 2>/dev/null &&
+	   ! grep -q '"sbNative"[[:space:]]*:' "$ZGZ_BEST" 2>/dev/null; then
 		_we=xray
 	fi
 	# A SOCKS node set to carry UDP over TCP: Xray would connect it, and send
@@ -574,6 +576,8 @@ bridge_wanted() {
 	bridge_is_l2tp && return 0
 	bridge_is_ppp && return 0
 	bridge_is_ikev2 && return 0
+	if [ "$(bridge_type)" = trusttunnel ] && [ "${1:-$(active_engine)}" = singbox ] &&
+	   sb_is_lx "$(engine_singbox_path)"; then return 1; fi
 	bridge_is_own && return 0
 	[ "${1:-$(active_engine)}" = "xray" ] && return 0
 	return 1
@@ -606,16 +610,53 @@ core_title() {
 
 # Xray's configuration on stdin, sing-box's on stdout. What could not be
 # carried over is said on stderr, one line each, and ends up in the log.
+sb_lx_config() {
+	ucode -e '
+		let raw=ARGV[0], lx=raw ? json(raw) : {};
+		if (type(lx)!="object") die("sing-box-lx options must be a JSON object\n");
+		let list=(v)=>filter(split(v,/[, \t\r\n]+/), s=>length(s)>0);
+		if (ARGV[1] || ARGV[2] || ARGV[3] || ARGV[4]) {
+			let old=lx.quic_sniff_decoy;
+			lx.quic_sniff_decoy=type(old)=="object" ? old : {mode:type(old)=="string" ? old : (old ? "all" : "off")};
+			if (ARGV[1]) lx.quic_sniff_decoy.mode=ARGV[1];
+			if (ARGV[4]) lx.quic_sniff_decoy.send=ARGV[4];
+			if (ARGV[2]) lx.quic_sniff_decoy.outbound_type=list(ARGV[2]);
+			if (ARGV[3]) lx.quic_sniff_decoy.detour_type=list(ARGV[3]);
+		}
+		if (ARGV[5] || ARGV[6]) {
+			let old=lx.mtu_align;
+			lx.mtu_align=type(old)=="object" ? old : {mode:old || "clamp"};
+			if (ARGV[5]) lx.mtu_align.mode=ARGV[5];
+			if (ARGV[6]) lx.mtu_align.except=list(ARGV[6]);
+		}
+		if (ARGV[7]) lx.masque={...(lx.masque ?? {}),idle_timeout:ARGV[7]};
+		if (ARGV[8]) lx.trusttunnel={...(lx.trusttunnel ?? {}),idle_timeout:ARGV[8]};
+		printf("%J",lx);
+	' "$(cfg singbox_lx_options '')" "$(cfg lx_decoy_mode '')" \
+		"$(cfg lx_decoy_outbound '')" "$(cfg lx_decoy_detour '')" "$(cfg lx_decoy_send '')" \
+		"$(cfg lx_mtu_mode '')" "$(cfg lx_mtu_except '')" \
+		"$(cfg lx_masque_idle '')" "$(cfg lx_trusttunnel_idle '')"
+}
+
+sb_is_lx() {
+	core_version_cached "$1" | grep -q -- '-lx\.'
+}
+
 sbconfig() {
 	_sb_level="$(cfg loglevel warning)"
 	_sb_pin=""
 	sb_certpin "$(engine_singbox_path)" && _sb_pin=1
+	_sb_lx=""
+	sb_is_lx "$(engine_singbox_path)" && _sb_lx=1
+	_sb_lxlegacy=""
+	case "$(core_version_cached "$(engine_singbox_path)")" in 1.15.0-lx.1-rc.1) _sb_lxlegacy=1 ;; esac
+	_sb_options="$(sb_lx_config)" || return 1
 	[ "$(cfg_bool log_node 1)" = "1" ] || _sb_level=none
 	ucode "$ZGZ_LIB/zgz-sbconfig" \
 		geoview="$(geoview_path)" geodir="$(geo_dir 2>/dev/null)" \
 		rsdir="$ZGZ_RUN/rs" api="$(cfg api_port 10853)" \
 		bridge="$ZGZ_ETC/bridge.json" bridgeport="$(cfg bridge_port 10808)" etc="$ZGZ_ETC" \
-		mark="$ZGZ_OUT_MARK" level="$_sb_level" certpin="$_sb_pin" "$@"
+		mark="$ZGZ_OUT_MARK" level="$_sb_level" certpin="$_sb_pin" newmasque="$_sb_pin" lxcore="$_sb_lx" lxlegacy="$_sb_lxlegacy" lx="$_sb_options" "$@"
 }
 
 # Does this sing-box pin a server's certificate by its hash - 1.15 on?

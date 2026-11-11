@@ -5,6 +5,22 @@
 'require baseclass';
 
 return baseclass.extend({ strings: {
+	"QUIC anti-sniff paths": "QUIC 反嗅探路径",
+	"Requires sing-box-lx 1.14.4-lx.33 or newer. Retry sends a decoy only after a failed attempt.": "需要 sing-box-lx 1.14.4-lx.33 或更新版本。重试模式仅在尝试失败后发送伪装包。",
+	"QUIC decoy timing": "QUIC 伪装发送时机",
+	"QUIC decoy node types": "QUIC 伪装节点类型",
+	"QUIC decoy relay types": "QUIC 伪装中继类型",
+	"Tunnel MTU alignment": "隧道 MTU 对齐",
+	"MTU alignment exceptions": "MTU 对齐例外",
+	"Exact outbound or endpoint tags excluded from automatic MTU alignment.": "不参与自动 MTU 对齐的出站或端点完整标签。",
+	"MASQUE idle timeout": "MASQUE 空闲超时",
+	"TrustTunnel idle timeout": "TrustTunnel 空闲超时",
+	"Duration such as 30s or 5m. Empty keeps the core default.": "时长，例如 30s 或 5m。留空使用内核默认值。",
+	"Advanced sing-box-lx options (JSON)": "sing-box-lx 高级选项（JSON）",
+	"Root lx object. Fields above override matching JSON settings. Removed awg_masquerade and mobile-only wg idle controls are rejected.": "根 lx 对象。上方选项覆盖同名 JSON 设置。拒绝已移除的 awg_masquerade 和仅移动端支持的 wg 空闲控制。",
+	"Enter supported sing-box-lx settings as a JSON object.": "请输入包含受支持 sing-box-lx 设置的 JSON 对象。",
+	"Retry": "重试",
+	"Invalid value.": "无效值。",
 	"TLS session resumption": "TLS 会话恢复",
 	"Reuse TLS sessions, including uTLS fingerprints with Xray-patterniha 26.11.9 or newer. Default preserves the imported setting.": "复用 TLS 会话。uTLS 指纹需要 Xray-patterniha 26.11.9 或更新版本。默认保留导入的设置。",
 	"Skip static hosts for FakeDNS": "FakeDNS 跳过静态 hosts",

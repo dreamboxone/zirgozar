@@ -8,9 +8,8 @@
  * After them, the two things of this program's own that are neither a basic
  * setting nor an update: the router's clock and the traffic history.
  *
- * The Sing-Box settings are not here. They fragment TLS over TCP, and
- * sing-box is only ever used here as the helper for hysteria2 and tuic nodes,
- * which are QUIC: there would be nothing for them to act on.
+ * Native sing-box-lx options sit beside the Xray settings and are passed to
+ * the native tunnel and helper configurations.
  */
 
 'use strict';
@@ -196,6 +195,41 @@ return view.extend({
 		var curlan = uci.get('zirgozar', 'config', 'lan_zone');
 		if (curlan && !seen[curlan])
 			o.value(curlan, curlan);
+
+		/* ---------------------------------------------- sing-box-lx Settings */
+		s = m.section(form.NamedSection, 'config', 'zirgozar', 'sing-box-lx');
+		s.anonymous = true;
+		o = s.option(form.ListValue, 'lx_decoy_mode', _('QUIC anti-sniff paths'),
+			_('Requires sing-box-lx 1.14.4-lx.33 or newer. Retry sends a decoy only after a failed attempt.'));
+		o.value('', _('Default'));
+		[ 'off', 'direct', 'detour', 'all' ].forEach(function(v) { o.value(v); });
+		o = s.option(form.ListValue, 'lx_decoy_send', _('QUIC decoy timing'));
+		o.value('', _('Default')); o.value('retry', _('Retry')); o.value('always', _('Always'));
+		o = s.option(form.DynamicList, 'lx_decoy_outbound', _('QUIC decoy node types'));
+		[ 'masque', 'hysteria2', 'tuic', 'trusttunnel', 'vless', 'vmess', 'trojan', 'wireguard' ].forEach(function(v) { o.value(v); });
+		o.placeholder = 'masque';
+		o.validate = function(section_id, value) { return !value || /^(masque|hysteria2|tuic|trusttunnel|vless|vmess|trojan|wireguard)$/.test(value) || _('Invalid value.'); };
+		o = s.option(form.DynamicList, 'lx_decoy_detour', _('QUIC decoy relay types'));
+		o.placeholder = 'vless';
+		o.validate = function(section_id, value) { return !value || (/^[a-z][a-z0-9-]*$/.test(value) && !/^(selector|urltest|chain)$/.test(value)) || _('Invalid value.'); };
+		o = s.option(form.ListValue, 'lx_mtu_mode', _('Tunnel MTU alignment'));
+		o.value('', _('Default')); [ 'off', 'fill', 'clamp' ].forEach(function(v) { o.value(v); });
+		o = s.option(form.DynamicList, 'lx_mtu_except', _('MTU alignment exceptions'),
+			_('Exact outbound or endpoint tags excluded from automatic MTU alignment.'));
+		o.placeholder = 'proxy';
+		[ [ 'lx_masque_idle', 'MASQUE idle timeout' ], [ 'lx_trusttunnel_idle', 'TrustTunnel idle timeout' ] ].forEach(function(item) {
+			o = s.option(form.Value, item[0], _(item[1]), _('Duration such as 30s or 5m. Empty keeps the core default.'));
+			o.placeholder = '5m';
+			o.validate = function(section_id, value) { return !value || /^(0|(?:[0-9]+(?:\.[0-9]+)?(?:ns|us|ms|s|m|h))+)$/.test(value) || _('Invalid value.'); };
+		});
+		o = s.option(form.TextValue, 'singbox_lx_options', _('Advanced sing-box-lx options (JSON)'),
+			_('Root lx object. Fields above override matching JSON settings. Removed awg_masquerade and mobile-only wg idle controls are rejected.'));
+		o.rows = 5; o.monospace = true;
+		o.validate = function(section_id, value) {
+			if (!value) return true;
+			try { var v=JSON.parse(value); if (v && typeof v == 'object' && !Array.isArray(v) && !Object.prototype.hasOwnProperty.call(v,'awg_masquerade') && (!v.wg || Object.keys(v.wg).length == 0)) return true; } catch (e) {}
+			return _('Enter supported sing-box-lx settings as a JSON object.');
+		};
 
 		/* -------------------------------------------------- Xray Settings */
 		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Xray Settings'));

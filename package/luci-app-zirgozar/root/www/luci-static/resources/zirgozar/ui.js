@@ -22,7 +22,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.8.20-r1';
+var BUILD = '5.8.20-r2';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -48,6 +48,7 @@ var ICONS = {
 	sun:      '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
 	moon:     '<path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z"/>',
 	refresh:  '<path d="M20 11a8 8 0 0 0-14.9-3M4 4v4h4M4 13a8 8 0 0 0 14.9 3M20 20v-4h-4"/>',
+	rocket:   '<path d="M12 16 8 12c2-6 6-9 13-9 0 7-3 11-9 13Z"/><circle cx="16" cy="8" r="2"/><path d="m8 12-5 1 4-6 5-1M12 16l-1 5 6-4 1-5M7 17c-1 0-3 1-4 4 3-1 4-3 4-4Z"/>',
 	trash:    '<path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/>',
 	check:    '<path d="M5 12l5 5 9-10"/>',
 	alert:    '<path d="M12 3 2 21h20z"/><path d="M12 10v5M12 18h.01"/>',

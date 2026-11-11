@@ -45,6 +45,22 @@ var LANGUAGES = { en: 'English', fa: 'فارسی', zh: '简体中文', ru: 'Ру
 var CATALOGS = { zh: zh.strings, ru: ru.strings };
 
 var FA = {
+	'QUIC anti-sniff paths': 'مسیرهای ضد تشخیص QUIC',
+	'Requires sing-box-lx 1.14.4-lx.33 or newer. Retry sends a decoy only after a failed attempt.': 'به sing-box-lx نسخه 1.14.4-lx.33 یا جدیدتر نیاز دارد. حالت تلاش مجدد، بسته پوششی را تنها پس از تلاش ناموفق می‌فرستد.',
+	'QUIC decoy timing': 'زمان ارسال پوشش QUIC',
+	'QUIC decoy node types': 'نوع نودهای پوشش QUIC',
+	'QUIC decoy relay types': 'نوع رله‌های پوشش QUIC',
+	'Tunnel MTU alignment': 'هماهنگ‌سازی MTU تونل',
+	'MTU alignment exceptions': 'استثناهای هماهنگ‌سازی MTU',
+	'Exact outbound or endpoint tags excluded from automatic MTU alignment.': 'تگ دقیق خروجی یا endpoint که از هماهنگ‌سازی خودکار MTU کنار گذاشته می‌شود.',
+	'MASQUE idle timeout': 'مهلت بیکاری MASQUE',
+	'TrustTunnel idle timeout': 'مهلت بیکاری TrustTunnel',
+	'Duration such as 30s or 5m. Empty keeps the core default.': 'مدت زمان مانند 30s یا 5m. مقدار خالی، پیش‌فرض هسته را حفظ می‌کند.',
+	'Advanced sing-box-lx options (JSON)': 'تنظیمات پیشرفته sing-box-lx با JSON',
+	'Root lx object. Fields above override matching JSON settings. Removed awg_masquerade and mobile-only wg idle controls are rejected.': 'شی lx اصلی. گزینه‌های بالا بر تنظیمات هم‌نام JSON مقدم‌اند. گزینه حذف‌شده awg_masquerade و تنظیمات بیکاری wg مخصوص موبایل پذیرفته نمی‌شوند.',
+	'Enter supported sing-box-lx settings as a JSON object.': 'تنظیمات پشتیبانی‌شده sing-box-lx را به شکل شی JSON وارد کنید.',
+	'Retry': 'تلاش مجدد',
+	'Invalid value.': 'مقدار نامعتبر است.',
 	'TLS session resumption': 'ازسرگیری نشست TLS',
 	'Reuse TLS sessions, including uTLS fingerprints with Xray-patterniha 26.11.9 or newer. Default preserves the imported setting.':
 		'استفاده دوباره از نشست TLS؛ برای اثر انگشت‌های uTLS به Xray پترنیها نسخه 26.11.9 یا جدیدتر نیاز دارد. حالت پیش‌فرض، مقدار کانفیگ واردشده را حفظ می‌کند.',

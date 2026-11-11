@@ -150,6 +150,19 @@ jobs:
           sh test/test-package-install.sh
           python3 test/test-rpcd-reload.py
 
+      - name: Test sing-box-lx options and schemas
+        run: |
+          set -euo pipefail
+          for tag in 1.14.4-lx.33 1.15.0-lx.1-rc.1; do
+            mkdir -p ".test-tools/lx-$tag"
+            curl -fsSL --retry 3 -o ".test-tools/lx-$tag/core.tar.gz" \
+              "https://github.com/Leadaxe/sing-box-lx/releases/download/v$tag/sing-box-$tag-linux-amd64.tar.gz"
+            tar -xzf ".test-tools/lx-$tag/core.tar.gz" -C ".test-tools/lx-$tag" --strip-components=1
+          done
+          RIG_ROOT="$RUNNER_TEMP/zirgozar-lx-options" sh test/test-lx-options.sh
+          RIG_LX_STABLE="$PWD/.test-tools/lx-1.14.4-lx.33/sing-box" \
+            RIG_LX_NEW="$PWD/.test-tools/lx-1.15.0-lx.1-rc.1/sing-box" python3 test/test-lx-config.py
+
       - name: Test patterniha extensions
         run: |
           set -euo pipefail
