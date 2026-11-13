@@ -1068,6 +1068,7 @@ var FA = {
 	'DNS Redirect': 'تغییر مسیر DNS',
 
 	'Preproxy': 'پیش‌پروکسی',
+	'The pre-proxy must use a protocol Xray supports directly. L2TP and IKEv2 cannot be pre-proxies; they can be the main connection or balancing members.': 'پیش‌پروکسی باید از پروتکل‌هایی باشد که Xray مستقیم پشتیبانی می‌کند. L2TP و IKEv2 نمی‌توانند پیش‌پروکسی باشند؛ اما می‌توانند اتصال اصلی یا عضو بالانسینگ باشند.',
 	'Every node the tunnel may choose dials out through this node first — the pre-proxy. For a node that cannot be reached from here directly, or to hide which nodes are being used. With it on, the first-pass handshake is skipped, because no node is reached directly.':
 		'هر کانفیگی که تونل انتخاب کند، اول از داخل این نود رد می‌شود. برای نودی که از اینجا مستقیم در دسترس نیست، یا برای پنهان کردن اینکه از کدام نودها استفاده می‌شود. وقتی روشن است، هندشیک مرحله اول انجام نمی‌شود، چون به هیچ نودی مستقیم وصل نمی‌شویم.',
 	'Preproxy Node': 'کانفیگ پیش‌پروکسی',

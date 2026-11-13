@@ -480,7 +480,7 @@ return view.extend({
 		o.value('2', _('Landing Node'));
 
 		o = s.taboption('chain', form.ListValue, 'preproxy_node', _('Preproxy Node'),
-			_('Every node of this subscription is reached through the one chosen here.'));
+			_('Every node of this subscription is reached through the one chosen here.') + ' ' + _('The pre-proxy must use a protocol Xray supports directly. L2TP and IKEv2 cannot be pre-proxies; they can be the main connection or balancing members.'));
 		o.modalonly = true;
 		o.depends('chain_proxy', '1');
 		manual.forEach(function(n) { o.value(n['.name'], n.name || n['.name']); });

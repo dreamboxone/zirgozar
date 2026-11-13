@@ -489,12 +489,13 @@ return view.extend({
 		subChoices(o);
 
 		o = s.taboption('main', form.Flag, 'preproxy_enabled', _('Preproxy'),
-			_('Every node the tunnel may choose dials out through this node first — the pre-proxy. For a node that cannot be reached from here directly, or to hide which nodes are being used. With it on, the first-pass handshake is skipped, because no node is reached directly.'));
+			_('Every node the tunnel may choose dials out through this node first — the pre-proxy. For a node that cannot be reached from here directly, or to hide which nodes are being used. With it on, the first-pass handshake is skipped, because no node is reached directly.') + ' ' +
+			_('The pre-proxy must use a protocol Xray supports directly. L2TP and IKEv2 cannot be pre-proxies; they can be the main connection or balancing members.'));
 		o.default = '0';
 		o.rmempty = false;
 
 		o = s.taboption('main', form.ListValue, 'preproxy_node', _('Preproxy Node'),
-			_('Nodes added by hand on the Configs page.'));
+			_('Nodes added by hand on the Configs page.') + ' ' + _('The pre-proxy must use a protocol Xray supports directly. L2TP and IKEv2 cannot be pre-proxies; they can be the main connection or balancing members.'));
 		o.depends('preproxy_enabled', '1');
 		nodeChoices(o);
 
@@ -729,7 +730,7 @@ return view.extend({
 		so.default = '0';
 		so.editable = true;
 
-		so = sr.option(form.ListValue, 'preproxy', _('Preproxy'));
+		so = sr.option(form.ListValue, 'preproxy', _('Preproxy'), _('The pre-proxy must use a protocol Xray supports directly. L2TP and IKEv2 cannot be pre-proxies; they can be the main connection or balancing members.'));
 		so.value('', _('Close (Not use)'));
 		nodeChoices(so);
 		so.editable = true;
@@ -821,7 +822,7 @@ return view.extend({
 		o.default = '0';
 
 		o = s.taboption('shunt', form.ListValue, 'default_preproxy', _('Default Preproxy'),
-			_('When the Default row goes to a node, it is reached through this node first.'));
+			_('When the Default row goes to a node, it is reached through this node first.') + ' ' + _('The pre-proxy must use a protocol Xray supports directly. L2TP and IKEv2 cannot be pre-proxies; they can be the main connection or balancing members.'));
 		o.value('', _('Close (Not use)'));
 		nodeChoices(o);
 

@@ -367,6 +367,15 @@ function renderState(st) {
 	if (statusCard) statusCard.setAttribute('data-connected', String(!!st.connected));
 	setNode('pwp-node', st.server || '-');
 	setNode('pwp-proto', st.protocol ? st.protocol : '-');
+	var members = byId('pwp-balancing-members');
+	if (members) {
+		members.style.display = st.protocol === 'balancing' && (st.balancing_members || []).length ? 'block' : 'none';
+		setNode('pwp-balancing-members', (st.balancing_members || []).map(function(member) {
+			var labels = { connected: _('Connected'), disconnected: _('Disconnected'), failed: _('Disconnected'),
+				starting: _('Starting…'), retrying: _('Retry'), stopped: _('Disconnected') };
+			return '#' + member.slot + ' ' + member.protocol + ': ' + (labels[member.status] || member.status);
+		}).join(' · '));
+	}
 	setNode('pwp-host', st.host ? st.host : '');
 	renderExit(st);
 	setNode('pwp-latency', st.latency_ms > 0 ? pui.ms(st.latency_ms) : '-');
@@ -557,6 +566,7 @@ return baseclass.extend({
 			]),
 			line(_('Node name'), 'pwp-node'),
 			protoLine(),
+			E('div', { 'id': 'pwp-balancing-members', 'style': 'display:none;font-size:12px;margin:8px 0' }, ''),
 			line(_('Server'), 'pwp-host'),
 			E('div', { 'class': 'mk-row', 'style': 'margin-top:14px' }, [
 				E('button', {

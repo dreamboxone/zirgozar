@@ -5,6 +5,7 @@
 'require baseclass';
 
 return baseclass.extend({ strings: {
+	"The pre-proxy must use a protocol Xray supports directly. L2TP and IKEv2 cannot be pre-proxies; they can be the main connection or balancing members.": "Предварительный прокси должен использовать протокол, который Xray поддерживает напрямую. L2TP и IKEv2 нельзя использовать как предварительный прокси, но можно использовать как основное подключение или участника балансировки.",
 	"QUIC anti-sniff paths": "Пути защиты QUIC от анализа",
 	"Requires sing-box-lx 1.14.4-lx.33 or newer. Retry sends a decoy only after a failed attempt.": "Требуется sing-box-lx 1.14.4-lx.33 или новее. В режиме повтора маскирующий пакет отправляется только после неудачной попытки.",
 	"QUIC decoy timing": "Момент отправки маскировки QUIC",

@@ -838,7 +838,7 @@ return view.extend({
 		o.value('2', _('Landing Node'));
 
 		o = s.option(form.ListValue, 'preproxy_node', _('Preproxy Node'),
-			_('This node is reached through the one chosen here.'));
+			_('This node is reached through the one chosen here.') + ' ' + _('The pre-proxy must use a protocol Xray supports directly. L2TP and IKEv2 cannot be pre-proxies; they can be the main connection or balancing members.'));
 		o.modalonly = true;
 		o.depends('chain_proxy', '1');
 		others.forEach(function(n) {

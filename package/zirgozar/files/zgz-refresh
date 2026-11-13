@@ -112,6 +112,10 @@ if tunnel_running; then
 	# Twice before acting. One failed request is a blip, and reconnecting
 	# on a blip drops every connection in progress to fix nothing.
 	if _ms="$("$ZGZ_LIB/zgz-test" live 2>/dev/null)"; then
+		if [ "$(sed -n 's/^protocol=//p' "$ZGZ_BEST_META" | tail -1)" = balancing ]; then
+			say_status ready
+			case "$(cat "$ZGZ_MESSAGE" 2>/dev/null)" in 'Balancing '*) clear_message ;; esac
+		fi
 		rm -f "$ZGZ_RUN/health.fail"
 		case "$_ms" in ''|*[!0-9]*) exit 0 ;; esac
 		_baseline="$(cat "$ZGZ_RUN/health.baseline" 2>/dev/null)" || _baseline=0
@@ -152,6 +156,13 @@ if tunnel_running; then
 	esac
 	_fails=$((_fails + 1))
 	echo "$_fails" > "$ZGZ_RUN/health.fail"
+	if [ "$(sed -n 's/^protocol=//p' "$ZGZ_BEST_META" | tail -1)" = balancing ]; then
+		say_status failed
+		say_message "Balancing connectivity test failed. Check the member logs and uplink."
+		# Workers recover independently; restarting the entire group here
+		# discards their backoff and interrupts its surviving connections.
+		exit 0
+	fi
 	if [ "$_fails" -lt 2 ]; then
 		log "the tunnel carried nothing this time - waiting for the next health check"
 		exit 0

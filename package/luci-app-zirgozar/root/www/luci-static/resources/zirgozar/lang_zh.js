@@ -5,6 +5,7 @@
 'require baseclass';
 
 return baseclass.extend({ strings: {
+	"The pre-proxy must use a protocol Xray supports directly. L2TP and IKEv2 cannot be pre-proxies; they can be the main connection or balancing members.": "前置代理必须使用 Xray 直接支持的协议。L2TP 和 IKEv2 不能用作前置代理，但可以用作主连接或负载均衡成员。",
 	"QUIC anti-sniff paths": "QUIC 反嗅探路径",
 	"Requires sing-box-lx 1.14.4-lx.33 or newer. Retry sends a decoy only after a failed attempt.": "需要 sing-box-lx 1.14.4-lx.33 或更新版本。重试模式仅在尝试失败后发送伪装包。",
 	"QUIC decoy timing": "QUIC 伪装发送时机",

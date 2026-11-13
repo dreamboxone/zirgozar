@@ -42,6 +42,12 @@ set -e
 
 . "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
 
+config_error() {
+	warn "$*"
+	printf '%s\n' "$*" >&2
+	exit 1
+}
+
 BEST="${ZGZ_BEST}"
 
 freedom_close=''
@@ -966,6 +972,11 @@ esac
 best_host="$(sed -n 's/^host=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)"
 best_port="$(sed -n 's/^port=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)"
 preproxy="$(global_preproxy)" || preproxy=""
+if [ "$(cfg_bool preproxy_enabled 0)" = 1 ]; then
+	if [ -z "$preproxy" ] || ! chain_outbound "$preproxy" >/dev/null; then
+		config_error "Invalid global pre-proxy '$(cfg preproxy_node '')': choose an existing node with an Xray-supported protocol"
+	fi
+fi
 pre_hp=""
 if [ -n "$preproxy" ]; then
 	pre_hp="$(section_links "$preproxy" | LC_ALL=C awk -v LIMIT=1 -f "$ZGZ_LIB/zgz-parse" 2>/dev/null |
@@ -990,6 +1001,10 @@ if [ "${ZGZ_BALANCING_CHILD:-0}" != 1 ]; then
 fi
 balancing_payload() {
 	local row="$2" payload
+	case "${3:-}" in
+		''|sub:*) : ;;
+		*) validate_balancing_chain "$3" "$(printf '%s' "$row" | cut -f3)" ;;
+	esac
 	payload="$(printf '%s' "$row" | cut -f6-)"
 	# Native outbounds stay in the routing core; all other protocols get a
 	# supervised helper with a loopback SOCKS outbound of its own.
@@ -998,6 +1013,26 @@ balancing_payload() {
 	else
 		printf '%s\n' "$row" | decorate "${preproxy:+chain-$preproxy}" "$pre_hp" | cut -f6-
 	fi
+}
+validate_balancing_chain() {
+	local reference="$1" protocol="$2" mode target
+	mode="$(uci -q get "zirgozar.$reference.chain_proxy")" || mode=0
+	case "$mode" in
+		1)
+			target="$(uci -q get "zirgozar.$reference.preproxy_node")" || target=''
+			if [ "$target" = "$reference" ] || ! chain_outbound "$target" >/dev/null; then
+				config_error "Balancing member '$reference' has an invalid pre-proxy '$target'"
+			fi
+			case "$protocol" in
+				openvpn) : ;;
+				*) chain_outbound "$reference" >/dev/null || config_error "Balancing member '$reference' ($protocol) cannot use a pre-proxy" ;;
+			esac ;;
+		2)
+			target="$(uci -q get "zirgozar.$reference.to_node")" || target=''
+			if [ "$target" = "$reference" ] || ! chain_outbound "$target" >/dev/null || ! chain_outbound "$reference" >/dev/null; then
+				config_error "Balancing member '$reference' has an invalid landing chain '$target'"
+			fi ;;
+	esac
 }
 if [ "$(sed -n 's/^protocol=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)" = "balancing" ]; then
 	active_balancing="$(sed -n 's/^tag=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)"
@@ -1010,14 +1045,16 @@ if [ "$(sed -n 's/^protocol=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)" = "bal
 		[ -n "$_bal_member" ] || continue
 		case "$_bal_member" in
 			sub:*) _bal_row="$("$ZGZ_LIB/zgz-nodes" resolve "$_bal_member" 2>/dev/null | head -1)" ;;
-			*) _bal_row="$(node_records "$_bal_member" 1 2>/dev/null | head -1)" ;;
+			*) _bal_row="$(node_records "$_bal_member" 1 1 2>/dev/null | head -1)" ;;
 		esac
-		[ -n "$_bal_row" ] || continue
+		[ -n "$_bal_row" ] || config_error "Balancing member '$_bal_member' cannot be read"
 		case "$(printf '%s' "$_bal_row" | cut -f3)" in
-			balancing|shunt) continue ;;
+			balancing|shunt) config_error "Balancing member '$_bal_member' must not be a balancing or shunt node" ;;
 		esac
-		_bal_payload="$(balancing_payload "$((_bal_i + 1))" "$_bal_row" "$_bal_member")" || continue
-		[ -n "$_bal_payload" ] || continue
+		_bal_payload="$(balancing_payload "$((_bal_i + 1))" "$_bal_row" "$_bal_member")" || {
+			config_error "Balancing member '$_bal_member' could not be prepared"
+		}
+		[ -n "$_bal_payload" ] || config_error "Balancing member '$_bal_member' has no outbound"
 		_bal_i=$((_bal_i + 1))
 		_bal_tag="bal-$active_balancing-$_bal_i"
 		_bal_item="$(printf '%s\n' "$_bal_payload" | sed -e 's/^[[:space:]]*//' -e "s/^{/{\"tag\":\"$_bal_tag\",/")"
@@ -1036,7 +1073,7 @@ EOF
 			*)
 				case "$_bal_fallback" in
 					sub:*) _bal_fb_row="$("$ZGZ_LIB/zgz-nodes" resolve "$_bal_fallback" 2>/dev/null | head -1)" ;;
-					*) _bal_fb_row="$(node_records "$_bal_fallback" 1 2>/dev/null | head -1)" ;;
+					*) _bal_fb_row="$(node_records "$_bal_fallback" 1 1 2>/dev/null | head -1)" ;;
 				esac
 				case "$(printf '%s' "$_bal_fb_row" | cut -f3)" in
 					balancing|shunt) _bal_fb_row="" ;;
@@ -1049,6 +1086,9 @@ EOF
 $(printf '%s\n' "$_bal_fb" | sed -e 's/^[[:space:]]*//' -e "s/^{/{\"tag\":\"$balancing_fallback\",/"),"
 					fi
 				fi
+				[ "$balancing_fallback" != direct ] || {
+					config_error "Balancing fallback '$_bal_fallback' cannot be used"
+				}
 				;;
 		esac
 		_bal_probe="$(uci -q get "zirgozar.$active_balancing.probeInterval" 2>/dev/null)" || _bal_probe="1m"
@@ -1067,8 +1107,7 @@ $(printf '%s\n' "$_bal_fb" | sed -e 's/^[[:space:]]*//' -e "s/^{/{\"tag\":\"$bal
 		balancing_entries="{\"tag\":\"balancer-$active_balancing\",\"selector\":[$balancing_selector],\"fallbackTag\":\"$balancing_fallback\",\"strategy\":{\"type\":\"$_bal_strategy\"}}"
 		balancing_rule="{\"type\":\"field\",\"inboundTag\":[\"balance-$active_balancing\"],\"balancerTag\":\"balancer-$active_balancing\"}"
 	else
-		warn "balancing node '$active_balancing' has no usable members"
-		proxy_out='{"tag":"proxy","protocol":"blackhole","settings":{}}'
+		config_error "balancing node '$active_balancing' has no usable members"
 	fi
 fi
 if [ -n "$balancing_rule" ]; then
@@ -1096,7 +1135,8 @@ ${ovpn_via:+\"dialerProxy\":\"chain-$ovpn_via\"}
 ${aether_via:+\"dialerProxy\":\"chain-$aether_via\"}
 $acl_outbounds
 $socks_outbounds
-$shunt_outbounds" | awk 'NF { printf "%s%s,\n", "    ", $0 }')"
+$shunt_outbounds")" || exit 1
+chain_outs="$(printf '%s\n' "$chain_outs" | awk 'NF { printf "%s%s,\n", "    ", $0 }')"
 
 # ---------------------------------------------------------------------- DNS
 

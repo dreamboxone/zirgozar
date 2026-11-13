@@ -1743,6 +1743,22 @@ mux_json() {
 	return 0
 }
 
+# Use the bypass mark so an old tunnel policy cannot masquerade as an uplink.
+# A route without a source address is not ready to establish connections.
+wait_uplink() {
+	local remaining="${1:-60}" route
+	while :; do
+		for route in "$(ip -4 route get 1.1.1.1 mark 255 2>/dev/null)" \
+			"$(ip -6 route get 2606:4700:4700::1111 mark 255 2>/dev/null)"; do
+			case "$route" in ''|*unreachable*|*blackhole*|*prohibit*|*' dev lo '*) continue ;; esac
+			case "$route" in *' dev '*' src '*) return 0 ;; esac
+		done
+		[ "$remaining" -gt 0 ] || return 1
+		sleep 1
+		remaining=$((remaining - 1))
+	done
+}
+
 # The section named as the pre-proxy for every node, when it is switched on.
 # The pre-proxy of a shunt node, elsewhere; here the tunnel is that
 # shunt - Iran one way, everything else the other - so it is set once, here,
@@ -1909,12 +1925,21 @@ chain_outbound() {
 # Every chain-<section> the given outbounds dial through, as outbounds of
 # their own, one per line, each once.
 chain_outbounds() {
-	local dependencies
-	dependencies="$(printf '%s\n' "$1" | grep -o '"dialerProxy":"chain-[A-Za-z0-9_]*"' | sort -u |
-		sed 's/.*"chain-\([A-Za-z0-9_]*\)"/\1/' | while read -r _cs; do
+	local dependencies failed references
+	failed=0
+	references="$(printf '%s\n' "$1" | grep -o '"dialerProxy":"chain-[A-Za-z0-9_]*"' | sort -u |
+		sed 's/.*"chain-\([A-Za-z0-9_]*\)"/\1/')"
+	dependencies="$(while read -r _cs; do
 			[ -n "$_cs" ] || continue
-			chain_outbound "$_cs" || warn "the pre-proxy '$_cs' could not be read - it has been deleted, or Xray cannot speak it"
-		done)"
+			chain_outbound "$_cs" || {
+				warn "the pre-proxy '$_cs' could not be read - it has been deleted, or Xray cannot speak it"
+				printf "Invalid pre-proxy '%s': missing node, unreadable link or unsupported protocol\n" "$_cs" >&2
+				failed=1
+			}
+		done <<EOF
+$references
+EOF
+		exit "$failed")" || return 1
 	[ -z "$dependencies" ] || printf '%s\n' "$dependencies"
 	# ECH bootstrap must leave directly, before the tunnel exists. Both the
 	# tunnel and measuring/exported configurations collect dependencies here.

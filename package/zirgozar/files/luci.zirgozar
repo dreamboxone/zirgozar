@@ -155,7 +155,7 @@ method_state() {
 		-v running="$running" -v connected="$connected" -v connectivity="$connectivity" -v autostart="$autostart" \
 		-v backend="$backend" -v geo="$geo" -v pw="$pw" -v bridge_on="$bridge_on" -v cpath="$cpath" \
 		-v vfile="$ZGZ_VERSION_FILE" -v sfile="$ZGZ_STATUS" -v mfile="$ZGZ_MESSAGE" -v jfile="$JOB" \
-		-v meta="$ZGZ_BEST_META" -v prog="$ZGZ_PROGRESS" -v cinfo="$ZGZ_RUN/core.info" '
+		-v meta="$ZGZ_BEST_META" -v prog="$ZGZ_PROGRESS" -v cinfo="$ZGZ_RUN/core.info" -v members="$ZGZ_RUN/balancing.applied" '
 		function esc(s) {
 			gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s)
 			gsub(/\n/, "\\n", s); gsub(/\r/, "\\r", s); gsub(/\t/, "\\t", s)
@@ -210,6 +210,17 @@ method_state() {
 			str("bridge", bb); str("bridge_version", C["bridge_version"]); bool("bridge_running", bridge_on)
 			str("backend", backend); bool("route_ir", ri); bool("stats_enabled", se)
 			bool("geo_ready", geo); bool("passwall", pw); int_("now", now)
+			printf ",\"balancing_members\":["
+			n = 0
+			if (M["protocol"] == "balancing" && running) while ((getline work < members) > 0) {
+				if (work !~ /\/balancing\/[0-9]+-[0-9a-f]+$/) continue
+				slot = work; sub(/.*\/balancing\//, "", slot); sub(/-.*/, "", slot)
+				state = whole(work "/status"); if (state == "") state = "starting"
+				row = whole(work "/record"); split(row, fields, "\t")
+				printf "%s{\"slot\":%d,\"protocol\":\"%s\",\"status\":\"%s\"}", n++ ? "," : "", slot, esc(fields[3]), esc(state)
+			}
+			close(members)
+			printf "]"
 			print "}"
 		}'
 }

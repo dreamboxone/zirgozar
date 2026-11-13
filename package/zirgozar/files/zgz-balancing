@@ -76,6 +76,22 @@ run_member() {
 	slot="$(cat "$work/ready")"
 	case "$slot" in ''|*[!0-9]*) exit 1 ;; esac
 	[ "$slot" -ge 1 ] && [ "$slot" -le 1000 ] || exit 1
+	if [ "${2:-}" != build ]; then
+		trap 'printf "stopped\n" > "$work/status"; trap - EXIT; exit 0' INT TERM
+		failures="$(cat "$work/retries" 2>/dev/null)" || failures=0
+		case "$failures" in ''|*[!0-9]*) failures=0 ;; esac
+		[ "$failures" -le 7 ] || failures=7
+		if [ "$failures" -gt 0 ]; then
+			delay=$((5 << (failures - 1)))
+			[ "$delay" -le 300 ] || delay=300
+			printf 'retrying\n' > "$work/status"
+			warn "Balancing member $slot: retry in $delay seconds after $failures failures"
+			while [ "$delay" -gt 0 ]; do sleep 1; delay=$((delay - 1)); done
+		fi
+		printf '%s\n' "$((failures + 1))" > "$work/retries"
+		printf 'starting\n' > "$work/status"
+		trap 'printf "failed\n" > "$work/status"' EXIT
+	fi
 	port=$((26000 + slot * 4))
 	row="$(cat "$work/record")"
 	proto="$(printf '%s' "$row" | cut -f3)"
@@ -124,19 +140,22 @@ run_member() {
 	command="$("$ZGZ_LIB/zgz-bridge" command)" || { warn "Balancing member $slot: helper unavailable ($proto)"; exit 1; }
 	bridge_pid=''; core_pid=''
 	cleanup() {
+		result=$?
 		trap - EXIT INT TERM
+		[ "$result" = 0 ] || printf 'failed\n' > "$work/status"
 		[ -z "$bridge_pid" ] || kill "$bridge_pid" 2>/dev/null || true
 		[ -z "$core_pid" ] || kill "$core_pid" 2>/dev/null || true
 		tries=0
-		while [ -n "$bridge_pid" ] && kill -0 "$bridge_pid" 2>/dev/null && [ "$tries" -lt 10 ]; do
+		while { kill -0 "$bridge_pid" 2>/dev/null || kill -0 "$core_pid" 2>/dev/null; } && [ "$tries" -lt 10 ]; do
 			sleep 1; tries=$((tries + 1))
 		done
 		[ -z "$bridge_pid" ] || kill -KILL "$bridge_pid" 2>/dev/null || true
+		[ -z "$core_pid" ] || kill -KILL "$core_pid" 2>/dev/null || true
 		[ -z "$bridge_pid" ] || wait "$bridge_pid" 2>/dev/null || true
 		[ -z "$core_pid" ] || wait "$core_pid" 2>/dev/null || true
 	}
 	trap cleanup EXIT
-	trap 'exit 0' INT TERM
+	trap 'printf "stopped\n" > "$work/status"; exit 0' INT TERM
 	# The upstream for Aether/OpenVPN must exist before its helper connects.
 	"$core" run -config "$ZGZ_CONFIG_JSON" >> "$work/core.log" 2>&1 &
 	core_pid=$!
@@ -144,8 +163,42 @@ run_member() {
 	# and numeric ports; it is never evaluated as shell source.
 	$command >> "$work/bridge.log" 2>&1 &
 	bridge_pid=$!
-	while kill -0 "$core_pid" 2>/dev/null && kill -0 "$bridge_pid" 2>/dev/null; do sleep 2; done
-	warn "Balancing member $slot stopped ($proto); see $work/bridge.log"
+	connected_since=0; next_probe=0; probe_failures=0
+	started_at="$(date +%s)"
+	while kill -0 "$core_pid" 2>/dev/null && kill -0 "$bridge_pid" 2>/dev/null; do
+		now="$(date +%s)"
+		if [ "$now" -ge "$next_probe" ]; then
+			if curl -fsS -o /dev/null --socks5-hostname "127.0.0.1:$port" \
+				--connect-timeout 5 --max-time 10 "$(cfg test_url 'http://www.gstatic.com/generate_204')"; then
+				printf 'connected\n' > "$work/status"
+				probe_failures=0
+				[ "$connected_since" != 0 ] || connected_since="$now"
+				[ $((now - connected_since)) -lt 300 ] || printf '0\n' > "$work/retries"
+			else
+				if [ "$connected_since" != 0 ] || [ $((now - started_at)) -ge 180 ]; then
+					printf 'disconnected\n' > "$work/status"
+				fi
+				connected_since=0
+				if [ $((now - started_at)) -ge 180 ]; then
+					probe_failures=$((probe_failures + 1))
+					if [ "$probe_failures" -ge 3 ]; then
+						warn "Balancing member $slot ($proto): three connectivity tests failed; restarting only this member; see $work/core.log and $work/bridge.log"
+						exit 1
+					fi
+				fi
+			fi
+			next_probe=$((now + 30))
+		fi
+		sleep 2
+	done
+	if ! kill -0 "$core_pid" 2>/dev/null; then
+		code=0; wait "$core_pid" || code=$?
+		warn "Balancing member $slot stopped ($proto): Xray exited with status $code; see $work/core.log"
+	fi
+	if ! kill -0 "$bridge_pid" 2>/dev/null; then
+		code=0; wait "$bridge_pid" || code=$?
+		warn "Balancing member $slot stopped ($proto): tunnel helper exited with status $code; see $work/bridge.log"
+	fi
 	exit 1
 }
 

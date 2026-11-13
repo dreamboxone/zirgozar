@@ -145,4 +145,18 @@ check "$(tail -1 "$ZGZ_RUN/dns.calls")" up 'failed enabled node keeps isolated D
 rig_set enabled 0
 sh -c '. "$ZGZ_LIB/zgz-common.sh"; DNS="$ZGZ_LIB/zgz-dns"; . "$ZGZ_LIB/../start-failed"; start_failed'
 check "$(tail -1 "$ZGZ_RUN/dns.calls")" down 'disabled service restores normal DNS deliberately'
+
+# A selected group is repaired by its workers, preserving surviving members
+# and retry history instead of restarting every tunnel on a failed probe.
+rig_set enabled 1
+rig_set start_daemon 1
+printf 'protocol=balancing\n' > "$ZGZ_ETC/best.meta"
+: > "$ZGZ_RUN/repair.calls"
+echo 0 > "$ZGZ_RUN/live.delay"
+health; health
+check "$(cat "$ZGZ_RUN/status")" failed 'failed balancing probe cannot report ready'
+check "$(cat "$ZGZ_RUN/repair.calls")" '' 'balancing health preserves independent worker recovery'
+echo 100 > "$ZGZ_RUN/live.delay"
+health
+check "$(cat "$ZGZ_RUN/status")" ready 'balancing recovery restores ready after a successful request'
 rig_report

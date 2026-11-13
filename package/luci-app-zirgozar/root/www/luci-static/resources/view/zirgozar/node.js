@@ -2019,7 +2019,7 @@ return view.extend({
 		o.value('1', _('Preproxy Node'));
 		o.value('2', _('Landing Node'));
 		o = s.option(form.ListValue, 'preproxy_node', _('Preproxy Node'),
-			_('This node is reached through the one chosen here.'));
+			_('This node is reached through the one chosen here.') + ' ' + _('The pre-proxy must use a protocol Xray supports directly. L2TP and IKEv2 cannot be pre-proxies; they can be the main connection or balancing members.'));
 		[ 'vless', 'vmess', 'trojan', 'shadowsocks', 'socks', 'http', 'hysteria2', 'tuic', 'warp', 'wireguard', 'openvpn' ]
 			.forEach(function(p) { o.depends({ 'chain_proxy': '1', '_proto': p }); });
 		others.forEach(function(n) { o.value(n['.name'], n.name || n['.name']); });
