@@ -9,12 +9,14 @@ trap 'rm -rf "$task"' EXIT
 mkdir -p "$task/lib" "$task/run" "$task/bin" "$task/cores"
 export ZGZ_LIB="$task/lib" ZGZ_RUN="$task/run" MASK_CORE_DIR="$task/cores" MASK_CORE="$task/cores/xray"
 export MASK_ENGINE=xray MASK_MODE=supported
+export MASK_VERSION=26.11.20
 cat > "$ZGZ_LIB/zgz-common.sh" <<'SH'
 core_engine() { echo "$MASK_ENGINE"; }
 core_dir() { echo "$MASK_CORE_DIR"; }
 xray_preferred() { echo "$MASK_CORE"; }
 xray_by_version() { echo "$MASK_CORE_DIR/xray"; }
 bounded() { shift; "$@"; }
+core_version_cached() { echo "$MASK_VERSION"; }
 SH
 cat > "$task/bin/jsonfilter" <<'SH'
 #!/bin/sh
@@ -36,9 +38,14 @@ export PATH="$task/bin:$PATH"
 check() {
 	result="$(printf '%s\n' "$1" | sh "$root/package/zirgozar/files/zgz-finalmask-check")"
 	printf '%s' "$result" | ucode -e 'import {readfile} from "fs"; let r=json(readfile("/dev/stdin")); if(r.ok != (ARGV[0] == "true")) { warn(sprintf("%J\n",r)); exit(1); } if(ARGV[1] && index(r.error,ARGV[1]) < 0) exit(1);' "$2" "${3:-}"
-	[ -z "$(find "$ZGZ_RUN" -mindepth 1 -print -quit)" ] || { echo 'request files were not removed'; exit 1; }
+	[ -z "$(find "$ZGZ_RUN" -mindepth 1 -print | head -1)" ] || { echo 'request files were not removed'; exit 1; }
 }
 check '{"mask":{"tcp":[{"type":"fragment","settings":{}}]}}' true
+check '{"mask":{"tcp4":[]}}' false '26.11.20'
+MASK_VERSION=26.11.15; export MASK_VERSION
+check '{"mask":{"tcp4":[]},"patterniha":true}' false '26.11.20'
+MASK_VERSION=26.11.20; export MASK_VERSION
+check '{"mask":{"tcp4":[]},"patterniha":true}' true
 check '{"mask":[]}' false 'Invalid'
 check 'not JSON' false 'Invalid'
 check '{"mask":{"tcp":[{"type":"unsupported-mask"}]}}' false 'not supported'

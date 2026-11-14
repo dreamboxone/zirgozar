@@ -361,16 +361,22 @@ function filtered(label) {
 #
 # Only an outbound Xray knows - one with a "protocol". The nodes another core
 # carries have none of these.
-function valid_dial_mode(mode,   n, steps, i) {
-	if (length(mode) > 64) return 0
-	if (substr(mode, 1, 4) == "oob.") {
-		n = split(substr(mode, 5), steps, ",")
-		if (!n) return 0
-		for (i = 1; i <= n; i++)
-			if (steps[i] != "_" && (steps[i] !~ /^[0-9]+$/ || steps[i] + 0 > 255)) return 0
-		return 1
+function valid_dial_mode(mode,   n, opts, steps, i, j, m, prefix, seen, key) {
+	if (!length(mode) || length(mode) > 256) return 0
+	n = split(mode, opts, ";")
+	for (i=1; i<=n; i++) {
+		if (opts[i] ~ /^oob[46]?\./) {
+			prefix=opts[i]; sub(/\..*$/, "", prefix)
+			key="|" prefix "|"
+			if (index(seen,key)) return 0
+			seen=seen key
+			sub(/^[^.]*\./, "", opts[i]); m=split(opts[i], steps, ",")
+			if (!m) return 0
+			for (j=1; j<=m; j++)
+				if (steps[j] != "_" && (steps[j] !~ /^[0-9]+$/ || steps[j]+0 > 255)) return 0
+		} else if (n != 1 || opts[i] !~ /^[A-Za-z0-9_.-]+$/) return 0
 	}
-	return mode ~ /^[A-Za-z0-9_.-]+$/
+	return !(index(seen,"|oob|") && (index(seen,"|oob4|") || index(seen,"|oob6|")))
 }
 
 function node_extras(p,   ss, sec, t, sock, net, ws, k, v, pem, n, a, i, arr, h) {
@@ -383,6 +389,8 @@ function node_extras(p,   ss, sec, t, sock, net, ws, k, v, pem, n, a, i, arr, h)
 		if (t == "") t = "{}"
 		if (NX["tls_session_resumption"] ~ /^(0|1)$/)
 			t = jset(t, "enableSessionResumption", NX["tls_session_resumption"] == "1" ? "true" : "false")
+		if (NX["tls_handshake_timeout"] ~ /^[0-9]+$/)
+			t = jset(t, "tlsHandshakeTimeout", NX["tls_handshake_timeout"]+0)
 		if (NX["ech"] != "")           t = jset(t, "echConfigList", "\"" jesc(NX["ech"]) "\"")
 		if (NX["ech_repack"] == "1") {
 			v = jstr(t, "echConfigList")
@@ -461,10 +469,32 @@ function node_extras(p,   ss, sec, t, sock, net, ws, k, v, pem, n, a, i, arr, h)
 		sock = jset(sock, "dialMode", "\"" jesc(NX["dial_mode"]) "\"")
 	if (NX["tcp_fast_open"] == "1")  sock = jset(sock, "tcpFastOpen", "true")
 	if (NX["tcp_mptcp"] == "1")      sock = jset(sock, "tcpMptcp", "true")
+	if (NX["tcp_handshake_timeout"] ~ /^[0-9]+$/) sock = jset(sock, "tcpHandshakeTimeout", NX["tcp_handshake_timeout"]+0)
+	if (NX["tcp_keepalive_count"] ~ /^[0-9]+$/) sock = jset(sock, "tcpKeepAliveCount", NX["tcp_keepalive_count"]+0)
 	if (NX["domain_strategy"] ~ /^(AsIs|UseIP|UseIPv4|UseIPv6|UseIPv4v6|UseIPv6v4|ForceIP|ForceIPv4|ForceIPv6|ForceIPv4v6|ForceIPv6v4)$/)
 		sock = jset(sock, "domainStrategy", "\"" NX["domain_strategy"] "\"")
-	if (NX["happy_eyeballs"] == "1")
-		sock = jset(sock, "happyEyeballs", "{\"tryDelayMs\":250,\"prioritizeIPv6\":false,\"interleave\":1,\"maxConcurrentTry\":4}")
+	if (NX["happy_eyeballs"] == "1") {
+		h = jraw(sock, "happyEyeballs")
+		if (h == "" || h == "null") h="{\"tryDelayMs\":250,\"prioritizeIPv6\":false,\"interleave\":1,\"maxConcurrentTry\":4}"
+		if (NX["happy_eyeballs_success"] ~ /^(tcpConnected|tlsHandshakeComplete)$/)
+			h = jset(h, "successDefinition", "\"" NX["happy_eyeballs_success"] "\"")
+		sock = jset(sock, "happyEyeballs", h)
+	}
+	if (NX["fallback_failed"] != "" || NX["fallback_no_response"] != "" || NX["fallback_no_ip"] != "" ||
+	    ((NX["fallback_wait_ms"] != "" || NX["fallback_buffer_size"] != "") && jraw(sock,"fallback") != "")) {
+		h=jraw(sock,"fallback"); if (h == "" || h == "null") h="{}"
+		if (NX["fallback_failed"] == "_none") h=jdrop(h,"failedDialFallbackDialerProxy")
+		else if (NX["fallback_failed"] ~ /^[A-Za-z0-9_]+$/) h=jset(h,"failedDialFallbackDialerProxy","\"chain-" NX["fallback_failed"] "\"")
+		if (NX["fallback_no_response"] == "_none") h=jdrop(h,"noResponseFallbackDialerProxy")
+		else if (NX["fallback_no_response"] ~ /^[A-Za-z0-9_]+$/) h=jset(h,"noResponseFallbackDialerProxy","\"chain-" NX["fallback_no_response"] "\"")
+		if (NX["fallback_no_ip"] == "_none") h=jdrop(h,"noIPFallbackDialerProxy")
+		else if (NX["fallback_no_ip"] ~ /^[A-Za-z0-9_]+$/) h=jset(h,"noIPFallbackDialerProxy","\"chain-" NX["fallback_no_ip"] "\"")
+		if (jstr(h,"failedDialFallbackDialerProxy") != "" || jstr(h,"noResponseFallbackDialerProxy") != "" || jstr(h,"noIPFallbackDialerProxy") != "") {
+			if (NX["fallback_wait_ms"] ~ /^[0-9]+$/) h=jset(h,"waitMs",NX["fallback_wait_ms"]+0)
+			if (NX["fallback_buffer_size"] ~ /^[0-9]+$/) h=jset(h,"maxBufferSize",NX["fallback_buffer_size"]+0)
+			sock=jset(sock,"fallback",h)
+		} else sock=jdrop(sock,"fallback")
+	}
 	if (sock != "{}") ss = jset(ss, "sockopt", sock)
 	if (ss != "{}") p = jset(p, "streamSettings", ss)
 	# For the sing-box engine only; Xray passes over the keys.
@@ -1889,9 +1919,11 @@ function decorate(p, hp,   proto, ss, sock, net, fm, tcp, udp, first, d, wgs, bt
 	if (first && proto != "wireguard") {
 		tcp = ""; udp = ""
 		if (ENVIRON["FRAG"] != "" && net ~ /^(tcp|raw|ws|httpupgrade|grpc|xhttp|splithttp)$/ &&
+		    jraw(ss, "finalmask") !~ /"tcp[46]"[ \t]*:/ &&
 		    jraw(ss, "finalmask") !~ /"type":[ \t]*"fragment"/)
 			tcp = ENVIRON["FRAG"]
 		if (ENVIRON["NOISE"] != "" && (net ~ /^(kcp|mkcp)$/ || (net ~ /^(xhttp|splithttp)$/ && ss ~ /"alpn":[ \t]*\[[^]]*"h3"/)) &&
+		    jraw(ss, "finalmask") !~ /"udp[46]"[ \t]*:/ &&
 		    jraw(ss, "finalmask") !~ /"type":[ \t]*"noise"/)
 			udp = ENVIRON["NOISE"]
 		if (tcp != "" || udp != "") {
@@ -2550,6 +2582,7 @@ function json_doc(doc, depth,   list, extra, m, k, i, src, label) {
 # -------------------------------------------------------------------------
 
 BEGIN {
+	if (CHECK_DIAL_MODE != "") { exit(valid_dial_mode(CHECK_DIAL_MODE) ? 0 : 1) }
 	n = 0
 	FS = "\n"
 	b64init()

@@ -291,18 +291,8 @@ xray_preferred() {
 }
 
 valid_dial_mode() {
-	case "$1" in *[!A-Za-z0-9_.,-]*) return 1 ;; esac
-	printf '%s\n' "$1" | awk '
-		length($0) > 64 { exit 1 }
-		/^oob\./ {
-			n = split(substr($0, 5), steps, ",")
-			if (!n) exit 1
-			for (i = 1; i <= n; i++)
-				if (steps[i] != "_" && (steps[i] !~ /^[0-9]+$/ || steps[i] + 0 > 255)) exit 1
-			exit 0
-		}
-		/[^A-Za-z0-9_.-]/ { exit 1 }
-	'
+	[ -n "$1" ] || return 1
+	CHECK_DIAL_MODE="$1" awk -v CHECK_DIAL_MODE="$1" -f "$ZGZ_LIB/zgz-parse" </dev/null
 }
 
 find_xray() {
@@ -313,6 +303,7 @@ find_xray() {
 	if [ -s "$_cfg" ]; then
 		if grep -q '"skipHostsWhenFakeEnable"[[:space:]]*:[[:space:]]*true' "$_cfg"; then _pattern_min=26.11.9; fi
 		if grep -q '"close"[[:space:]]*:[[:space:]]*{' "$_cfg"; then _pattern_min=26.11.12; fi
+		if grep -qE '"(tcpHandshakeTimeout|tlsHandshakeTimeout|tcpKeepAliveCount|successDefinition|tcp4|tcp6|udp4|udp6|removeHeaderSpace)"|"(failedDialFallbackDialerProxy|noResponseFallbackDialerProxy|noIPFallbackDialerProxy)"|"dialMode"[[:space:]]*:[[:space:]]*"[^"]*oob[46]\.' "$_cfg"; then _pattern_min=26.11.20; fi
 	fi
 	if [ -n "$_pattern_min" ]; then
 		_xpool="$(core_dir)/xray-patterniha"
@@ -1898,10 +1889,10 @@ masque_native() {
 # two sections naming each other cannot become a loop.
 chain_outbound() {
 	_co_link="$(uci -q get "zirgozar.$1.link" 2>/dev/null)" || _co_link=""
-	if [ -n "$_co_link" ]; then
+	_co_record="$(uci -q get "zirgozar.$1.record" 2>/dev/null)" || _co_record=""
+	if [ -n "$_co_link$_co_record" ]; then
 		# A WARP node is read with its section, which names its account.
-		_co_link="$(section_links "$1")"
-		_co="$(printf '%s\n' "$_co_link" | LC_ALL=C awk -v LIMIT=1 -f "$ZGZ_LIB/zgz-parse" 2>/dev/null | head -1)"
+		_co="$(node_records "$1" 1 2>/dev/null | head -1)"
 	else
 		# Not a hand-added node: a subscription's own node that its landing
 		# chain goes through, kept beside the list by zgz-nodes under the
@@ -1915,7 +1906,7 @@ chain_outbound() {
 	[ -n "$_co" ] || return 1
 	case "$(printf '%s' "$_co" | cut -f3)" in
 		# A pre-proxy Xray cannot speak cannot be dialled through by Xray.
-		hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|ikev2|aether) return 1 ;;
+		hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|l2tp|pptp|sstp|ikev2|aether|balancing|shunt) return 1 ;;
 	esac
 	printf '%s\n' "$_co" | cut -f6- | DOMSTRAT="${DOMSTRAT:-}" decorate |
 		sed -e "s/^{/{\"tag\":\"chain-$1\",/"
@@ -1924,22 +1915,28 @@ chain_outbound() {
 
 # Every chain-<section> the given outbounds dial through, as outbounds of
 # their own, one per line, each once.
+outbound_references() {
+	printf '%s\n' "$1" | grep -oE '"(dialerProxy|failedDialFallbackDialerProxy|noResponseFallbackDialerProxy|noIPFallbackDialerProxy)"[[:space:]]*:[[:space:]]*"chain-[A-Za-z0-9_]+"' |
+		sed 's/.*"chain-\([A-Za-z0-9_]*\)"/\1/' | sort -u
+}
+
+chain_dependency() {
+	local id="$1" path="$2" depth="$3" outbound refs ref
+	case " $path " in *" $id "*) printf "Outbound dependency cycle: %s %s\n" "$path" "$id" >&2; return 1 ;; esac
+	case " $CHAIN_SEEN " in *" $id "*) return 0 ;; esac
+	[ "$depth" -lt 32 ] || { echo 'Outbound dependency chain is too deep' >&2; return 1; }
+	outbound="$(chain_outbound "$id")" || { printf "Invalid pre-proxy or fallback '%s': missing node, unreadable link or unsupported protocol\n" "$id" >&2; return 1; }
+	refs="$(outbound_references "$outbound")"
+	for ref in $refs; do chain_dependency "$ref" "$path $id" "$((depth+1))" || return 1; done
+	CHAIN_SEEN="$CHAIN_SEEN $id"
+	printf '%s\n' "$outbound"
+}
+
 chain_outbounds() {
-	local dependencies failed references
-	failed=0
-	references="$(printf '%s\n' "$1" | grep -o '"dialerProxy":"chain-[A-Za-z0-9_]*"' | sort -u |
-		sed 's/.*"chain-\([A-Za-z0-9_]*\)"/\1/')"
-	dependencies="$(while read -r _cs; do
-			[ -n "$_cs" ] || continue
-			chain_outbound "$_cs" || {
-				warn "the pre-proxy '$_cs' could not be read - it has been deleted, or Xray cannot speak it"
-				printf "Invalid pre-proxy '%s': missing node, unreadable link or unsupported protocol\n" "$_cs" >&2
-				failed=1
-			}
-		done <<EOF
-$references
-EOF
-		exit "$failed")" || return 1
+	local dependencies references ref
+	references="$(outbound_references "$1")"
+	dependencies="$(CHAIN_SEEN=''; for ref in $references; do chain_dependency "$ref" '' 0 || exit 1; done)" || return 1
+	dependencies="$(printf '%s\n' "$dependencies" | awk '!seen[$0]++')"
 	[ -z "$dependencies" ] || printf '%s\n' "$dependencies"
 	# ECH bootstrap must leave directly, before the tunnel exists. Both the
 	# tunnel and measuring/exported configurations collect dependencies here.
@@ -1977,7 +1974,7 @@ node_domain_strategy() {
 # as the lines zgz-parse reads them from: "#!zgz-x.<key>=<value>". A
 # certificate keeps its lines with a bar between them, a JSON object loses its
 # line breaks. Nothing at all for a node that has none.
-NODE_EXTRA_KEYS="ech ech_repack tls_pin cert_name tls_pem cipher_suites tls_session_resumption user_agent finalmask dial_mode tcp_fast_open tcp_mptcp domain_strategy happy_eyeballs warpplus ws_heartbeat grpc_idle grpc_health grpc_window grpc_permit kcp_mtu kcp_tti kcp_uplink kcp_downlink kcp_read kcp_write kcp_congestion sb_mux sb_mux_streams sb_mux_padding sb_brutal_up sb_brutal_down wg_system ssrust hy_portmap"
+NODE_EXTRA_KEYS="ech ech_repack tls_pin cert_name tls_pem cipher_suites tls_session_resumption tls_handshake_timeout tcp_handshake_timeout tcp_keepalive_count happy_eyeballs_success fallback_failed fallback_no_response fallback_no_ip fallback_wait_ms fallback_buffer_size user_agent finalmask dial_mode tcp_fast_open tcp_mptcp domain_strategy happy_eyeballs warpplus ws_heartbeat grpc_idle grpc_health grpc_window grpc_permit kcp_mtu kcp_tti kcp_uplink kcp_downlink kcp_read kcp_write kcp_congestion sb_mux sb_mux_streams sb_mux_padding sb_brutal_up sb_brutal_down wg_system ssrust hy_portmap"
 
 node_extras() {
 	for _nk in $NODE_EXTRA_KEYS; do

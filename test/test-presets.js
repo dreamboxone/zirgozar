@@ -79,6 +79,12 @@ const guarded=presets.withFinalMask({getUIElement:()=>widget,isActive:()=>true,f
 assert.equal(mode.validate('', ''), true);
 assert.equal(mode.validate('', 'custom-core-mode'), true);
 for (const value of ['oob.0,_,12', 'oob._', 'oob.255,0']) assert.equal(mode.validate('', value), true);
+for (const value of ['oob4.0,0;oob6.5,_,8', 'oob6._', 'oob4.255']) assert.equal(mode.validate('', value), true);
+for (const value of ['oob4.0;oob6.256', 'oob.0;oob4.0', 'oob4.0;oob4.1', 'oob4.0;', 'custom;oob4.0']) assert.notEqual(mode.validate('', value), true);
+assert.equal(presets.validate('{"tcp4":[],"tcp6":[]}'),true);
+assert.equal(presets.validate('{"tcp":[],"tcp4":[]}'),false);
+assert.equal(presets.validate('{"udp6":[{"type":"udphop"}]}'),false);
+assert.equal(presets.validate('{"tcp4":{}}'),false);
 for (const value of ['oob.', 'oob.256', 'oob.1,,2', 'oob.-1', 'oob.1,', 'custom,mode']) assert.notEqual(mode.validate('', value), true);
 assert.notEqual(mode.validate('', 'mode; command'), true);
 const scan = new Function('baseclass', 'rpc', 'ui', 'i18n', source('aetherscan.js'))(

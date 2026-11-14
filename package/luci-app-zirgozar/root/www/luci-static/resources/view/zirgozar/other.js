@@ -236,7 +236,7 @@ return view.extend({
 		s.anonymous = true;
 
 		o = s.option(form.TextValue, 'freedom_close', 'Freedom close (JSON)',
-			_('Modify the first HTTP/1.1 request on the direct outbound. Supports rewriteHost, originalHostHeader, setHeaders, overrideHeaders, addHeaders, appendHeaders, removeHeaders, timeoutMs, onTimeout, nonHTTP and noHost. Empty disables it. Requires Xray-patterniha 26.11.12 or newer.'));
+			_('Modify the first HTTP/1.1 request on the direct outbound. Supports rewriteHost, originalHostHeader, setHeaders, overrideHeaders, addHeaders, appendHeaders, removeHeaders, timeoutMs, onTimeout, nonHTTP and noHost. Empty disables it. Requires Xray-patterniha 26.11.12 or newer.') + ' ' + _('Set removeHeaderSpace to true to remove the space after HTTP header names. Requires Xray-patterniha 26.11.20 or newer.'));
 		o.rows = 6; o.monospace = true;
 		o.placeholder = '{"rewriteHost":"example.com","setHeaders":{"Connection":"close"}}';
 		o.validate = function(section_id, value) {

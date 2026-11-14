@@ -30,6 +30,7 @@
 'require zirgozar.ui as pui';
 'require zirgozar.nodelink as nodelink';
 'require zirgozar.presets as presets';
+'require zirgozar.transport as transport';
 'require zirgozar.aetherscan as aetherscan';
 
 var _ = i18n.tr;
@@ -1990,6 +1991,7 @@ return view.extend({
 
 			o = xr(s.option(form.Flag, 'happy_eyeballs', _('Enable Happy Eyeballs'),
 				_('Attempts IPv4 and IPv6 simultaneously; automatically uses the faster connection.')));
+			transport.addFields(s, xr, tlsOnly, sid);
 
 			/* Multiplex, for the sing-box engine. */
 			o = s.option(form.ListValue, 'sb_mux', _('sing-box Mux'), _('Only with the sing-box engine.'));

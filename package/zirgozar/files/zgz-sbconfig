@@ -95,6 +95,13 @@ if (type(X) != 'object') {
 }
 if (X.dns?.skipHostsWhenFakeEnable || length(filter(X.outbounds ?? [], o => type(o.settings?.close) == 'object')))
 	die('Freedom close and skipHostsWhenFakeEnable require Xray-patterniha.\n');
+for (let outbound in X.outbounds ?? []) {
+	let stream = outbound.streamSettings ?? {}, sock = stream.sockopt ?? {}, mask = stream.finalmask ?? {};
+	if (sock.tcpHandshakeTimeout != null || sock.tcpKeepAliveCount != null || sock.fallback != null ||
+		stream.tlsSettings?.tlsHandshakeTimeout != null || sock.happyEyeballs?.successDefinition != null ||
+		mask.tcp4 != null || mask.tcp6 != null || mask.udp4 != null || mask.udp6 != null || match(sock.dialMode ?? '', /oob[46]\./))
+		die('Advanced transport settings require Xray-patterniha 26.11.20 or newer.\n');
+}
 
 let MARK = int(args.mark ?? 255);
 let LX = args.lx ? json(args.lx) : {};

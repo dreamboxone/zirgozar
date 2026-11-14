@@ -212,11 +212,12 @@ url_ms() {
 	fi
 	_out="$(printf 'x\tx\tx\t%s\t%s\t%s\n' "${2:-}" "${3:-}" "$_payload" |
 		DOMSTRAT="$(node_domain_strategy)" decorate "${_gp:+chain-$_gp}" "$_ghp" | cut -f6-)"
+	_url_dependencies="$(chain_outbounds "$_out")" || { rmdir "$DIR/.url-lock" 2>/dev/null || true; echo -2; return 1; }
 	set -- $(direct_dns)
 	if [ "$1" = "tcp" ]; then _dns="{\"address\":\"tcp://$2:$3\"}"; else _dns="{\"address\":\"$2\",\"port\":$3}"; fi
 	printf '{"log":{"loglevel":"none"},"inbounds":[{"tag":"in","listen":"127.0.0.1","port":%d,"protocol":"socks","settings":{"udp":false}}],"outbounds":[%s%s,{"tag":"direct","protocol":"freedom","streamSettings":{"sockopt":{"mark":255}}}],"dns":{"tag":"dns-module","servers":[%s],"queryStrategy":"%s"},"routing":{"rules":[{"type":"field","inboundTag":["dns-module"],"outboundTag":"direct"},{"type":"field","inboundTag":["in"],"outboundTag":"out"}]}}' \
 		"$PORT" "$(printf '%s' "$_out" | sed 's/^{/{"tag":"out",/')" \
-		"$(chain_outbounds "$_out" | while read -r _co; do [ -n "$_co" ] && printf ',%s' "$_co"; done)" \
+		"$(printf '%s\n' "$_url_dependencies" | while read -r _co; do [ -n "$_co" ] && printf ',%s' "$_co"; done)" \
 		"$_dns" "$(node_domain_strategy)" > "$_cfg"
 
 	# Measured by the core the tunnel runs on - see test_core.

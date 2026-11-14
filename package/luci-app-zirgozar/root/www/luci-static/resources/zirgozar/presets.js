@@ -44,13 +44,24 @@ function validate(text) {
 	if (!String(text || '').trim()) return true;
 	try {
 		var value = JSON.parse(text);
-		return !!value && typeof value == 'object' && !Array.isArray(value);
+		if (!value || typeof value != 'object' || Array.isArray(value)) return false;
+		for (var family of ['tcp','udp']) {
+			if (value[family] && (value[family + '4'] || value[family + '6'])) return false;
+			for (var name of [family, family + '4', family + '6']) {
+				if (value[name] != null && !Array.isArray(value[name])) return false;
+				if (name != family && (value[name] || []).some(function(mask) { return mask && /^(udphop|xicmp)$/.test(mask.type); })) return false;
+			}
+		}
+		return true;
 	} catch (e) { return false; }
 }
 var maskTypes = {
 	tcp: ['fragment', 'merge', 'filter', 'header-custom', 'sudoku', 'xmc'],
 	udp: ['noise', 'salamander', 'sudoku', 'udphop', 'xdns', 'xicmp', 'realm', 'filter', 'header-custom', 'mkcp-legacy']
 };
+['tcp4','tcp6','udp4','udp6'].forEach(function(family) {
+	maskTypes[family] = maskTypes[family.slice(0,3)].filter(function(type) { return type != 'udphop' && type != 'xicmp'; });
+});
 var maskDefaults = {
 	fragment: {packets: 'tlshello', lengths: ['100-200'], delays: ['0-1']},
 	merge: {times: 1, delayMs: 30, maxBytes: 16384},
@@ -117,7 +128,11 @@ function maskEditor(option, section, box, initial) {
 		if (!redraw) rawBindings.forEach(function(binding) { binding.input.value=JSON.stringify(binding.read(root),null,2); });
 		if (redraw) render();
 	}
-	function change(fn, redraw) { var root = String(read() || '').trim() ? JSON.parse(read()) : {}; fn(root); write(root,redraw); }
+	function change(fn, redraw) {
+		var root = String(read() || '').trim() ? JSON.parse(read()) : {}; fn(root);
+		if (!validate(JSON.stringify(root))) { notice.textContent = _('Generic and IP-specific mask lists cannot be combined. Family-specific lists cannot use udphop or xicmp.'); return; }
+		write(root,redraw);
+	}
 	function button(label, fn) { return E('button', {'type':'button','class':'btn cbi-button','disabled':readonly ? '' : null,'click':fn}, label); }
 	function field(parent, spec, value, save) {
 		var key=spec[0], kind=spec[2], input, errorKey='field'+(++fieldSequence);
@@ -159,7 +174,9 @@ function maskEditor(option, section, box, initial) {
 		editor.textContent=''; errors={}; rawBindings=[];
 		if (!validate(read())) { editor.appendChild(E('p',{},_('Correct the JSON to use the form.'))); return; }
 		var root=String(read() || '').trim() ? JSON.parse(read()) : {};
-		['tcp','udp'].forEach(function(family) {
+		var familyLabels = {tcp:_('TCP masks'),udp:_('UDP masks'),tcp4:_('TCP IPv4 masks'),tcp6:_('TCP IPv6 masks'),udp4:_('UDP IPv4 masks'),udp6:_('UDP IPv6 masks')};
+		editor.appendChild(E('p',{},_('IP-specific masks require Xray-patterniha 26.11.20 or newer. Use either the generic list or separate IPv4/IPv6 lists for each transport.')));
+		['tcp','tcp4','tcp6','udp','udp4','udp6'].forEach(function(family) {
 			var list=root[family];
 			if (list != null && !Array.isArray(list)) { editor.appendChild(E('p',{},_('Mask lists must be arrays.'))); return; }
 			list=list || [];
@@ -190,8 +207,8 @@ function maskEditor(option, section, box, initial) {
 				rawSettings(row,settings,function(s){change(function(r){r[family][index].settings=s;},true);},family+index,function(r){return r[family][index].settings || {};});
 				body.appendChild(row);
 			});
-			body.appendChild(button(_('Add mask'),function(){change(function(r){var t=family=='tcp'?'fragment':'noise';r[family]=r[family] || [];r[family].push({type:t,settings:JSON.parse(JSON.stringify(maskDefaults[t]))});},true);}));
-			editor.appendChild(E('details',{'open':list.length ? '' : null},[E('summary',{},family=='tcp'?_('TCP masks'):_('UDP masks')),body]));
+			body.appendChild(button(_('Add mask'),function(){change(function(r){var t=family.slice(0,3)=='tcp'?'fragment':'noise';r[family]=r[family] || [];r[family].push({type:t,settings:JSON.parse(JSON.stringify(maskDefaults[t]))});},true);}));
+			editor.appendChild(E('details',{'open':list.length ? '' : null},[E('summary',{},familyLabels[family]),body]));
 		});
 		var quic=root.quicParams;
 		if (quic != null && (!quic || typeof quic != 'object' || Array.isArray(quic))) { editor.appendChild(E('p',{},_('Expected a JSON object.'))); return; }
@@ -244,17 +261,26 @@ function withFinalMask(option) {
 }
 function withDialMode(option) {
 	option.value('', _('Default'));
-	option.description = _('Empty uses the core default. Custom dialMode names require a core that implements them.');
+	option.description = _('Empty uses the core default. Custom dialMode names require a core that implements them.') + ' ' + _('Use oob4/oob6 for separate IPv4/IPv6 settings, for example oob4.0,0;oob6.5,_,8. Requires Xray-patterniha 26.11.20 or newer.');
 	option.validate = function(section, value) {
 		if (!value) return true;
-		if (value.length > 64) return _('Invalid dialMode name.');
-		if (value.indexOf('oob.') == 0)
-			return value.slice(4).split(',').every(function(step) {
-				return step == '_' || (/^\d+$/.test(step) && Number(step) <= 255);
-			}) || _('Invalid dialMode name.');
-		return /^[A-Za-z0-9._-]+$/.test(value) || _('Invalid dialMode name.');
+		return validDialMode(value) || _('Invalid dialMode name.');
 	};
 	option.value('oob.0,_,12', 'oob.0,_,12');
+	option.value('oob4.0,0;oob6.5,_,8', 'oob4.0,0;oob6.5,_,8');
 	return option;
 }
-return baseclass.extend({ finalMasks: finalMasks, identify: identify, validate: validate, editMask: editMask, coreCheck: coreCheck, withFinalMask: withFinalMask, withDialMode: withDialMode });
+function validDialMode(value) {
+	if (!value || value.length > 256) return false;
+	var options=value.split(';'), seen={};
+	for (var part of options) {
+		var match=part.match(/^(oob[46]?)\.(.*)$/);
+		if (match) {
+			if (seen[match[1]]) return false;
+			seen[match[1]]=true;
+			if (!match[2].split(',').every(function(step) { return step=='_' || /^\d+$/.test(step) && Number(step)<=255; })) return false;
+		} else if (options.length!=1 || !/^[A-Za-z0-9._-]+$/.test(part)) return false;
+	}
+	return !(seen.oob && (seen.oob4 || seen.oob6));
+}
+return baseclass.extend({ finalMasks: finalMasks, identify: identify, validate: validate, editMask: editMask, coreCheck: coreCheck, withFinalMask: withFinalMask, withDialMode: withDialMode, validDialMode:validDialMode });

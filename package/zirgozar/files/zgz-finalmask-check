@@ -35,6 +35,12 @@ fi
 if [ -z "$core" ] || [ ! -x "$core" ]; then
 	reply 0 'The selected Xray core is not installed.'; exit 0
 fi
+if grep -qE '"(tcp4|tcp6|udp4|udp6)"[[:space:]]*:' "$work/config.json"; then
+	if [ "$core" != "$(core_dir)/xray-patterniha" ] ||
+	   ! core_version_cached "$core" | awk -F. 'NR { exit !(($1+0 > 26) || ($1+0 == 26 && ($2+0 > 11 || ($2+0 == 11 && $3+0 >= 20)))) } END { if (!NR) exit 1 }'; then
+		reply 0 'These masks require Xray-patterniha 26.11.20 or newer.'; exit 0
+	fi
+fi
 # Older cores can silently ignore the whole finalmask object. They must
 # reject an unknown mask type before a successful check can mean support.
 if bounded 8 "$core" run -test -config "$work/probe.json" > "$work/error" 2>&1; then

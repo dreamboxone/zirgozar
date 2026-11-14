@@ -17,6 +17,7 @@ require('./test-bpf.js');
 require('./test-toml.js');
 require('./test-node-load.js');
 require('./test-presets.js');
+require('./test-transport-ui.js');
 require('./test-xdrive.js');
 
 const assert = require('node:assert/strict');

@@ -276,8 +276,10 @@ measure_dns() {
 # Everything the batch needs, in one small Xray: one SOCKS inbound per server,
 # that server's outbound behind it, and a routing rule joining the two.
 build_batch_config() {
+	local batch_dependencies
 	_list="$1"
 	decorated "$_list" > "$_list.dec"
+	batch_dependencies="$(chain_outbounds "$(cut -f6- "$_list.dec")")" || return 1
 	{
 		printf '{"log":{"loglevel":"none"},"inbounds":['
 		_i=0
@@ -296,7 +298,7 @@ build_batch_config() {
 			printf '%s' "$payload" | sed "s/^{/{\"tag\":\"$tag\",/"
 			_i=$((_i + 1))
 		done < "$_list.dec"
-		chain_outbounds "$(cut -f6- "$_list.dec")" | while read -r _co; do
+		printf '%s\n' "$batch_dependencies" | while read -r _co; do
 			[ -n "$_co" ] && printf ',%s' "$_co"
 		done
 		printf ',{"tag":"direct","protocol":"freedom","streamSettings":{"sockopt":{"mark":255}}}],%s,"routing":{"rules":[' "$(measure_dns)"
@@ -340,9 +342,10 @@ prune_batch() {
 		[ -n "$tag" ] || continue
 		printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$tag" "$label" "$proto" "$host" "$port" "$payload" > "$ZGZ_RUN/one.tsv"
 		_one="$(decorated "$ZGZ_RUN/one.tsv" | cut -f6-)"
+		_one_dependencies="$(chain_outbounds "$_one")" || { echo "$tag" >> "$REJECTED"; continue; }
 		printf '{"log":{"loglevel":"none"},"outbounds":[%s%s,{"tag":"direct","protocol":"freedom","streamSettings":{"sockopt":{"mark":255}}}],%s}' \
 			"$(printf '%s' "$_one" | sed 's/^{/{"tag":"one",/')" \
-			"$(chain_outbounds "$_one" | while read -r _co; do [ -n "$_co" ] && printf ',%s' "$_co"; done)" \
+			"$(printf '%s\n' "$_one_dependencies" | while read -r _co; do [ -n "$_co" ] && printf ',%s' "$_co"; done)" \
 			"$(measure_dns)" > "$ZGZ_RUN/one.json"
 		if test_core "$ZGZ_RUN/one.json" >/dev/null 2>&1; then
 			printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$tag" "$label" "$proto" "$host" "$port" "$payload" >> "$_kept"
@@ -371,16 +374,14 @@ run_batch() {
 	awk -F '\t' '$3 != "l2tp" && $3 != "pptp" && $3 != "sstp" && $3 != "ikev2"' "$_list" > "$_list.native"
 	mv "$_list.native" "$_list"
 	[ -s "$_list" ] || return 0
-	build_batch_config "$_list"
-
 	# Measured by the core the tunnel runs on - see test_core.
-	if ! _xray="$(test_core "$TEST_CFG")"; then
+	if ! build_batch_config "$_list" || ! _xray="$(test_core "$TEST_CFG")"; then
 		prune_batch "$_list"
 		if [ ! -s "$_list" ]; then
 			warn "no server in this batch can be used by any core on this router"
 			return 1
 		fi
-		build_batch_config "$_list"
+		build_batch_config "$_list" || return 1
 		if ! _xray="$(test_core "$TEST_CFG")"; then
 			warn "this batch is still refused after dropping the bad entries"
 			return 1

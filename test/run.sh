@@ -17,6 +17,7 @@
 cd "$(dirname "$0")/.."
 
 rc=0
+sh test/test-transport.sh || rc=1
 node test/test-direct-rules-ui.js || rc=1
 sh test/test-direct-rules.sh || rc=1
 python3 test/test-build-xray-version.py || rc=1

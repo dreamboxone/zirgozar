@@ -250,7 +250,7 @@ jobs:
           set -euo pipefail
           mkdir -p .test-tools/patterniha
           curl -fsSL --retry 3 -o .test-tools/patterniha/core.zip \
-            https://github.com/patterniha/Xray-core/releases/download/v26.11.12/Xray-linux-64.zip
+            https://github.com/patterniha/Xray-core/releases/download/v26.11.20/Xray-linux-64.zip
           unzip -q .test-tools/patterniha/core.zip xray -d .test-tools/patterniha
           chmod +x .test-tools/patterniha/xray
           RIG_ROOT="$RUNNER_TEMP/zirgozar-patterniha" \
@@ -282,6 +282,8 @@ jobs:
         run: |
           node test/test-direct-rules-ui.js
           RIG_ROOT="$RUNNER_TEMP/zirgozar-direct-rules" sh test/test-direct-rules.sh
+          RIG_ROOT="$RUNNER_TEMP/zirgozar-transport" RIG_PATTERNIHA_XRAY="$PWD/.test-tools/patterniha/xray" sh test/test-transport.sh
+          python3 test/test-transport-live.py "$PWD/.test-tools/patterniha/xray"
 
       - name: Test LED control
         run: sh test/test-led.sh

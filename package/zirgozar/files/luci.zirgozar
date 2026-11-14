@@ -452,7 +452,8 @@ method_nodeconfig() {
 		hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|warp|l2tp|pptp|sstp|ikev2) fail "not xray"; return ;;
 	esac
 	out="$(printf '%s\n' "$rec" | DOMSTRAT="" decorate | cut -f6- | sed 's/^{/{"tag":"proxy",/')"
-	chains="$(chain_outbounds "$out" | while read -r _co; do [ -n "$_co" ] && printf ',%s' "$_co"; done)"
+	chains="$(chain_outbounds "$out")" || { fail 'Fallback and proxy chains must not contain loops or missing configs.'; return; }
+	chains="$(printf '%s\n' "$chains" | while read -r _co; do [ -n "$_co" ] && printf ',%s' "$_co"; done)"
 	json_init
 	json_add_boolean "ok" 1
 	json_add_string "config" "$(printf '{"log":{"loglevel":"warning"},"inbounds":[{"tag":"socks","listen":"127.0.0.1","port":1080,"protocol":"socks","settings":{"udp":true},"sniffing":{"enabled":true,"destOverride":["http","tls","quic"]}},{"tag":"http","listen":"127.0.0.1","port":1081,"protocol":"http"}],"outbounds":[%s%s,{"tag":"direct","protocol":"freedom"},{"tag":"block","protocol":"blackhole"}]}' "$out" "$chains")"

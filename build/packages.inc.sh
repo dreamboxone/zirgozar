@@ -10,7 +10,7 @@
 # VERSION is the application version; increment RELEASE for package updates.
 # The main zirgozar package always includes the complete LuCI interface.
 VERSION=5.8.23
-RELEASE=1
+RELEASE=2
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -318,6 +318,8 @@ stage_luci_assets() {
 		"$i/www/luci-static/resources/zirgozar/toml.js"
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/presets.js" \
 		"$i/www/luci-static/resources/zirgozar/presets.js"
+	install -m 0644 "$l/www/luci-static/resources/zirgozar/transport.js" \
+		"$i/www/luci-static/resources/zirgozar/transport.js"
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/aetherscan.js" \
 		"$i/www/luci-static/resources/zirgozar/aetherscan.js"
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/theme.css" \
