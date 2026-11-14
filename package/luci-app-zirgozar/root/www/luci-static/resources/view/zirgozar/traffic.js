@@ -498,19 +498,34 @@ return view.extend({
 		o = s.option(form.DynamicList, 'direct_ip', _('Direct IP List'),
 			E('span', { 'style': 'color:#ef4444' },
 				_('These had been joined ip addresses will connect directly (not entering the core).')));
-		o.datatype = 'ipmask4';
-		o.placeholder = '1.2.3.4 or 5.6.0.0/16';
+		o.validate = function(section_id, value) {
+			if (!value) return true;
+			value = value.trim();
+			if (/^geoip:!?[a-zA-Z0-9_-]+$/.test(value) || /^ext:[a-zA-Z0-9_.-]+:[a-zA-Z0-9_!@-]+$/.test(value)) return true;
+			var parts = value.split('/'), octets = parts[0].split('.');
+			var mask = parts[1] && parts[1].split('.');
+			var dottedMask = mask && mask.length === 4 && mask.every(function(v) { return /^\d{1,3}$/.test(v) && Number(v) <= 255; });
+			if (parts.length <= 2 && octets.length === 4 && octets.every(function(v) { return /^\d{1,3}$/.test(v) && Number(v) <= 255; }) &&
+				(parts.length === 1 || dottedMask || /^\d{1,2}$/.test(parts[1]) && Number(parts[1]) <= 32)) return true;
+			return _('Invalid value.');
+		};
+		o.write = function(section_id, value) { uci.set('zirgozar', section_id, this.option, (value || []).map(function(v) { return v.trim(); })); };
+		o.placeholder = '1.2.3.4 or ext:geoip_IR.dat:ir';
+		o.description = _('Use regexp:, geosite: or ext:geosite_IR.dat:ir for domains; use geoip: or ext:geoip_IR.dat:ir for IP rules. External .dat files must exist in the configured geo directory and contain the requested tag.');
 
 		o = s.option(form.DynamicList, 'direct_domain', _('Domains'));
-		o.description = _('These sites always go straight out, never through the tunnel. A name covers everything under it: example.com also covers www.example.com. Xray’s own forms — full:, regexp:, keyword: — are accepted as written.');
+		o.description = _('These sites always go straight out, never through the tunnel. A name covers everything under it: example.com also covers www.example.com. Xray’s own forms — full:, regexp:, keyword: — are accepted as written.') + ' ' + _('Use regexp:, geosite: or ext:geosite_IR.dat:ir for domains; use geoip: or ext:geoip_IR.dat:ir for IP rules. External .dat files must exist in the configured geo directory and contain the requested tag.');
 		o.placeholder = 'example.com';
 		o.validate = function(section_id, value) {
 			if (!value) return true;
+			value = value.trim();
+			if (/^geosite:[a-zA-Z0-9_@!-]+$/.test(value) || /^geoip:!?[a-zA-Z0-9_-]+$/.test(value) || /^ext:[a-zA-Z0-9_.-]+:[a-zA-Z0-9_!@-]+$/.test(value)) return true;
 			if (/^(domain|full):/.test(value)) value = value.replace(/^[a-z]+:/, '');
 			else if (/^(regexp|keyword):./.test(value)) return true;
 			if (hostname(value.replace(/^\./, ''))) return true;
 			return _('That does not look like a domain name');
 		};
+		o.write = function(section_id, value) { uci.set('zirgozar', section_id, this.option, (value || []).map(function(v) { return v.trim(); })); };
 
 		return m.render().then(function(el) {
 			/* Under the rule status. */

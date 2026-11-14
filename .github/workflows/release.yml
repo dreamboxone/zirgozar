@@ -278,6 +278,11 @@ jobs:
       - name: Test IKEv2 bootstrap and service readiness
         run: sh test/test-ikev2.sh
 
+      - name: Test direct domain and IP rules
+        run: |
+          node test/test-direct-rules-ui.js
+          RIG_ROOT="$RUNNER_TEMP/zirgozar-direct-rules" sh test/test-direct-rules.sh
+
       - name: Test LED control
         run: sh test/test-led.sh
 

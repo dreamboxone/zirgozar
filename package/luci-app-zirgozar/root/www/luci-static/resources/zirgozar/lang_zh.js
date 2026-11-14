@@ -5,6 +5,8 @@
 'require baseclass';
 
 return baseclass.extend({ strings: {
+	"Use regexp:, geosite: or ext:geosite_IR.dat:ir for domains; use geoip: or ext:geoip_IR.dat:ir for IP rules. External .dat files must exist in the configured geo directory and contain the requested tag.": "域名规则可使用 regexp:、geosite: 或 ext:geosite_IR.dat:ir；IP 规则可使用 geoip: 或 ext:geoip_IR.dat:ir。外部 .dat 文件必须位于配置的地理数据目录中，并包含指定标签。",
+	"Balancing connectivity test failed. Check the member logs and uplink.": "负载均衡连接测试失败。请检查成员日志和路由器的互联网连接。",
 	"The pre-proxy must use a protocol Xray supports directly. L2TP and IKEv2 cannot be pre-proxies; they can be the main connection or balancing members.": "前置代理必须使用 Xray 直接支持的协议。L2TP 和 IKEv2 不能用作前置代理，但可以用作主连接或负载均衡成员。",
 	"QUIC anti-sniff paths": "QUIC 反嗅探路径",
 	"Requires sing-box-lx 1.14.4-lx.33 or newer. Retry sends a decoy only after a failed attempt.": "需要 sing-box-lx 1.14.4-lx.33 或更新版本。重试模式仅在尝试失败后发送伪装包。",

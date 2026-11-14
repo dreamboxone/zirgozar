@@ -15,6 +15,9 @@ assert.equal(catalog.selected(catalog.sites.map(s => s.id)).length, 4);
 assert.equal(catalog.selected('steam')[0].url, 'https://store.steampowered.com');
 assert.deepEqual(catalog.selected('radiojavan').map(s=>s.id), ['youtube']);
 assert.equal(catalog.selected('youtube')[0].url, 'https://www.youtube.com');
+assert.equal(catalog.selected('telegram')[0].url, 'https://telegram.org');
+assert.deepEqual(catalog.selected('soft98').map(s => s.id), ['telegram']);
+assert.ok(!catalog.sites.some(s => s.id === 'soft98'));
 for (const site of catalog.sites.filter(s => !s.mark)) {
 	const extension = site.id === 'arvancloud' ? '.svg' : '.ico';
 	const icon = fs.readFileSync(path.join(resources, 'zirgozar/site-icons', site.id + extension));

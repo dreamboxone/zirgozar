@@ -5,6 +5,8 @@
 'require baseclass';
 
 return baseclass.extend({ strings: {
+	"Use regexp:, geosite: or ext:geosite_IR.dat:ir for domains; use geoip: or ext:geoip_IR.dat:ir for IP rules. External .dat files must exist in the configured geo directory and contain the requested tag.": "Для доменов используйте regexp:, geosite: или ext:geosite_IR.dat:ir; для IP — geoip: или ext:geoip_IR.dat:ir. Внешние файлы .dat должны находиться в настроенном каталоге геоданных и содержать указанный тег.",
+	"Balancing connectivity test failed. Check the member logs and uplink.": "Проверка подключения балансировки не удалась. Проверьте журналы участников и подключение роутера к интернету.",
 	"The pre-proxy must use a protocol Xray supports directly. L2TP and IKEv2 cannot be pre-proxies; they can be the main connection or balancing members.": "Предварительный прокси должен использовать протокол, который Xray поддерживает напрямую. L2TP и IKEv2 нельзя использовать как предварительный прокси, но можно использовать как основное подключение или участника балансировки.",
 	"QUIC anti-sniff paths": "Пути защиты QUIC от анализа",
 	"Requires sing-box-lx 1.14.4-lx.33 or newer. Retry sends a decoy only after a failed attempt.": "Требуется sing-box-lx 1.14.4-lx.33 или новее. В режиме повтора маскирующий пакет отправляется только после неудачной попытки.",

@@ -174,6 +174,7 @@ function socialCheck(id, name, mark, colour, url, icon) {
 /* The three sites' marks, drawn in one colour like every other icon on the
    page - white on the tile's own colour - rather than in their makers'. */
 var BRANDS = {
+	telegram: '<path d="M21.5 3.5 18 20c-.3 1.2-1 1.5-2 .9l-5.3-3.9-2.6 2.5c-.3.3-.5.5-1 .5l.4-5.4 9.8-8.8c.4-.4-.1-.6-.6-.2L4.6 13.2l-5-1.6c-1.1-.3-1.1-1.1.2-1.6L20 2.2c.9-.3 1.7.2 1.5 1.3Z"/>',
 	youtube: '<rect x="2" y="5" width="20" height="14" rx="4"/><path d="M10 9l6 3-6 3z" fill="var(--panel,#fff)"/>',
 	instagram:  '<path fill-rule="evenodd" d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5zm0 2a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3H7zm5 3.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9zm0 2a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/>' +
 	            '<circle cx="17.5" cy="6.5" r="1.2"/>',

@@ -752,7 +752,7 @@ method_action() {
 			local site count=0 choices=""
 			for site in $arg; do
 				[ "$site" != radiojavan ] || site=youtube
-				case "$site" in ig|reddit|x|youtube|arvancloud|soft98|cloudflare|nvidia|intel|steam) : ;; *) fail 'Invalid connection check sites.'; return ;; esac
+				case "$site" in ig|reddit|x|youtube|arvancloud|telegram|cloudflare|nvidia|intel|steam) : ;; *) fail 'Invalid connection check sites.'; return ;; esac
 				case " $choices " in *" $site "*) fail 'Invalid connection check sites.'; return ;; esac
 				count=$((count + 1))
 				[ "$count" -le 4 ] || { fail 'Select up to four sites.'; return; }

@@ -45,6 +45,8 @@ var LANGUAGES = { en: 'English', fa: 'فارسی', zh: '简体中文', ru: 'Ру
 var CATALOGS = { zh: zh.strings, ru: ru.strings };
 
 var FA = {
+	'Use regexp:, geosite: or ext:geosite_IR.dat:ir for domains; use geoip: or ext:geoip_IR.dat:ir for IP rules. External .dat files must exist in the configured geo directory and contain the requested tag.': "برای دامنه‌ها از regexp:، geosite: یا ext:geosite_IR.dat:ir و برای قوانین IP از geoip: یا ext:geoip_IR.dat:ir استفاده کنید. فایل‌های خارجی .dat باید در پوشه تنظیم‌شده داده‌های جغرافیایی موجود باشند و برچسب موردنظر را داشته باشند.",
+	'Balancing connectivity test failed. Check the member logs and uplink.': 'تست اتصال بالانسینگ ناموفق بود. گزارش اعضای بالانسینگ و اتصال اینترنت روتر را بررسی کنید.',
 	'QUIC anti-sniff paths': 'مسیرهای ضد تشخیص QUIC',
 	'Requires sing-box-lx 1.14.4-lx.33 or newer. Retry sends a decoy only after a failed attempt.': 'به sing-box-lx نسخه 1.14.4-lx.33 یا جدیدتر نیاز دارد. حالت تلاش مجدد، بسته پوششی را تنها پس از تلاش ناموفق می‌فرستد.',
 	'QUIC decoy timing': 'زمان ارسال پوشش QUIC',
@@ -1161,7 +1163,7 @@ var FA = {
 	'Installing %s': 'در حال نصب %s',
 	'The full files are about 17 MB and 8 MB. If they will not fit, the same project publishes geoip-lite.dat (38 KB) and geosite-lite.dat (2 MB), which carry the Iranian categories and nothing else — put those addresses in the boxes below. A download that will not fit is refused rather than half written.':
 		'فایل‌های کامل حدود ۱۷ و ۸ مگابایت هستند. اگر جا نمی‌شوند، همان پروژه ‎geoip-lite.dat‎ (۳۸ کیلوبایت) و ‎geosite-lite.dat‎ (۲ مگابایت) را هم منتشر می‌کند که فقط دسته‌های ایرانی را دارند — آدرس آن‌ها را در کادرهای پایین بگذارید. دانلودی که جا نشود رد می‌شود، نه اینکه نصفه نوشته شود.',
-	'App Path': 'مسیر برنامه‌ها',
+	'App Path': 'مسیر نصب هسته‌ها',
 	'Core download folder': 'پوشه دانلود هسته‌ها',
 	'Point this at USB storage on a router short of flash. A core another package installed is used where it is and never moved.':
 		'روی روتری که حافظه‌اش کم است، این را روی حافظه USB بگذارید. هسته‌ای که پکیج دیگری نصب کرده همان‌جا که هست استفاده می‌شود و جابه‌جا نمی‌شود.',
