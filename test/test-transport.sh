@@ -49,7 +49,7 @@ chain_outbounds "$(cat "$WORK/node.json")" >/dev/null 2>"$WORK/error" && bad 'in
 rig_set c.fallback_no_ip ''
 rig_set b.fallback_failed missing
 chain_outbounds "$(cat "$WORK/node.json")" >/dev/null 2>"$WORK/error" && bad 'missing fallback accepted' || ok 'missing fallback rejected'
-for mode in 'oob4.0,0;oob6.5,_,8' 'oob6._' 'oob4.255'; do
+for mode in '' 'oob4.0,0;oob6.5,_,8' 'oob6._' 'oob4.255'; do
  valid_dial_mode "$mode" && ok "valid family dialMode: $mode" || bad "valid mode refused: $mode"
 done
 for mode in 'oob4.0;oob6.256' 'oob.0;oob4.0' 'oob4.0;oob4.1' 'oob4.0;' 'custom;oob4.0'; do

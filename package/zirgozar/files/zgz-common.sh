@@ -291,7 +291,7 @@ xray_preferred() {
 }
 
 valid_dial_mode() {
-	[ -n "$1" ] || return 1
+	[ -n "$1" ] || return 0
 	CHECK_DIAL_MODE="$1" awk -v CHECK_DIAL_MODE="$1" -f "$ZGZ_LIB/zgz-parse" </dev/null
 }
 
