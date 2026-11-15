@@ -120,6 +120,7 @@ g_udp_r="$(port_list "$(cfg udp_redir_ports 1:65535)")"
 # address is reached directly, and for a WireGuard node it carries, that
 # node's server.
 local_exclusions() {
+	local _lx_work _lx_acl_host
 	_lx_proto="$(sed -n 's/^protocol=//p' "$ZGZ_BEST_META" 2>/dev/null | tail -1)"
 	case "$_lx_proto" in
 		hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|warp|l2tp|pptp|sstp|ikev2)
@@ -129,6 +130,16 @@ local_exclusions() {
 	esac
 	if [ "$_lx_proto" = "warp" ]; then
 		for _lx_c in $ZGZ_WARP_V4; do echo "$_lx_c"; done
+	fi
+	# xl2tpd and IPsec use ordinary sockets. Their private server connections
+	# must not be captured by the router's own proxy and sent into the main
+	# tunnel. IPv6 already bypasses the router-local interception chains.
+	if [ -r "$ZGZ_RUN/acl-tunnels.instances" ]; then
+		while IFS= read -r _lx_work; do
+			case "$_lx_work" in "$ZGZ_RUN"/acl-tunnels/[0-9]*-[0-9a-f]*) : ;; *) continue ;; esac
+			_lx_acl_host="$(sed -n 's/.*"server":"\([^"]*\)".*/\1/p' "$_lx_work/node.json" | head -1)"
+			resolve_direct_all "$_lx_acl_host" 2>/dev/null | awk '/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/' || true
+		done < "$ZGZ_RUN/acl-tunnels.instances"
 	fi
 	return 0
 }
@@ -1088,51 +1099,53 @@ ipt_status() {
 # Redirect is off, and replies to connections that came in from outside.
 # Anything else - including pings, which the tunnel does not carry - is dropped.
 KS_TABLE=zirgozar_ks
-# Iranian address ranges, cut out of geoip.dat once and kept on flash, so that
+# Selected-country address ranges, cut out of geoip.dat and kept on flash, so that
 # the rule can be loaded at boot without reading seventeen megabytes.
-KS_IR="$ZGZ_ETC/ks-ir.list"
 KS_IPSET=zgz_ks_ir
 KS_APPLIED="$ZGZ_RUN/ks.applied"
 
-# The ranges the Iran split sends direct, when the split is really on - the
+# The ranges the selected countries send direct, when routing data is present - the
 # same condition zgz-mkconfig applies: switched on, and the routing data there.
 ks_ir_cidrs() {
-	[ "$(cfg_bool route_ir 0)" = "1" ] || return 0
+	local country file
 	geo_dir >/dev/null 2>&1 || return 0
-	[ -s "$KS_IR" ] || return 0
-	grep -E '^[0-9A-Fa-f:.]+(/[0-9]+)?$' "$KS_IR" 2>/dev/null || true
+	for country in $(direct_countries); do
+		file="$ZGZ_ETC/ks-$country.list"
+		[ -s "$file" ] || continue
+		grep -E '^[0-9A-Fa-f:.]+(/[0-9]+)?$' "$file" 2>/dev/null || true
+	done
 	return 0
 }
 
-# Cut the list out of geoip.dat again when that is newer than the list.
-# Needs Geoview (App Update installs it); without it the list from last time
-# is kept, and without that the Iranian exception is simply not there - which
-# fails closed.
+# Keep separate caches so switching countries never reuses another country's ranges.
+# Without an extractor or a previous cache, the firewall exception stays closed.
 ks_ir_refresh() {
-	[ "$(cfg_bool route_ir 0)" = "1" ] || return 0
-	_kd="$(geo_dir)" || return 0
-	if [ -s "$KS_IR" ] && [ "$KS_IR" -nt "$_kd/geoip.dat" ]; then
-		return 0
-	fi
-	_kg="$(find_geoview)" || {
-		[ -s "$KS_IR" ] || warn "Geoview is not installed; Iranian firewall bypass is unavailable - install Geoview on the App Update page"
-		return 0
-	}
-	_kn="$KS_IR.new.$$"
-	if "$_kg" -type geoip -action extract -input "$_kd/geoip.dat" -list ir -lowmem=true > "$_kn" 2>/dev/null &&
-	   [ "$(grep -c . "$_kn" 2>/dev/null || echo 0)" -gt 10 ] &&
-	   ! grep -qEv '^[0-9A-Fa-f:.]+(/[0-9]+)?$' "$_kn"; then
-		write_if_changed "$_kn" "$KS_IR" || true
-		touch "$KS_IR" 2>/dev/null || true
-	else
-		warn "Geoview could not read the Iranian addresses out of geoip.dat; keeping the previous list"
-	fi
-	rm -f "$_kn"
+	local country file geo bin tmp
+	[ -n "$(direct_countries)" ] || return 0
+	geo="$(geo_dir)" || return 0
+	for country in $(direct_countries); do
+		file="$ZGZ_ETC/ks-$country.list"
+		[ ! -s "$file" ] || [ ! "$file" -nt "$geo/geoip.dat" ] || continue
+		bin="$(find_geoview)" || {
+			[ -s "$file" ] || warn "Geoview is not installed; firewall bypass for $country is unavailable - install Geoview on the App Update page"
+			continue
+		}
+		tmp="$file.new.$$"
+		if "$bin" -type geoip -action extract -input "$geo/geoip.dat" -list "$country" -lowmem=true > "$tmp" 2>/dev/null &&
+		   [ "$(grep -c . "$tmp" 2>/dev/null || echo 0)" -gt 10 ] &&
+		   ! grep -qEv '^[0-9A-Fa-f:.]+(/[0-9]+)?$' "$tmp"; then
+			write_if_changed "$tmp" "$file" || true
+			touch "$file" 2>/dev/null || true
+		else
+			warn "Geoview could not extract addresses for $country; keeping the previous list"
+		fi
+		rm -f "$tmp"
+	done
 	return 0
 }
 
 # Empty sets keep updates atomic even when the split is switched off. Shunt
-# rules can select a different outbound for Iranian destinations, so defer to
+# rules can select a different outbound for country destinations, so defer to
 # the core whenever any are configured. Access Control runs before this path.
 ir_cidrs() {
 	[ "$(cfg_bool route_ir_pre 1)" = 1 ] || return 0
@@ -1173,7 +1186,7 @@ ir_nft_sync() {
 			[ -z "$_ir_elements" ] || printf 'add element inet %s iran4 { %s }\n' "$_ir_table" "$_ir_elements"
 		done
 		:
-	} | nft -f - || { warn "could not refresh the Iranian firewall sets"; return 1; }
+	} | nft -f - || { warn "could not refresh the country firewall sets"; return 1; }
 }
 
 ks_nft_ruleset() {

@@ -1,0 +1,64 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+# Part of Zirgozar - https://github.com/dreamboxone/zirgozar
+
+# Per-device L2TP connections share neither runtime files nor policy tables
+# with the primary tunnel or balancing members. procd owns their lifecycle.
+set -e
+. "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
+
+prepare() {
+	local slot="$1" row payload snapshot digest work existing
+	case "$slot" in ''|*[!0-9]*) return 1 ;; esac
+	[ "$slot" -ge 1 ] && [ "$slot" -le 1000 ] || return 1
+	row="$(cat)"
+	[ "$(printf '%s' "$row" | cut -f3)" = l2tp ] || return 1
+	payload="$(printf '%s' "$row" | cut -f6-)"
+	[ -n "$payload" ] || return 1
+	umask 077
+	snapshot="$(uci export zirgozar)"
+	digest="$(printf '%s\n%s\n' "$payload" "$snapshot" | sha256sum | cut -c1-20)"
+	# Several devices assigned the same account use one PPP session.
+	if [ -r "$ZGZ_RUN/acl-tunnels.instances" ]; then
+		while IFS= read -r existing; do
+			case "$existing" in "$ZGZ_RUN"/acl-tunnels/[0-9]*-"$digest")
+				[ -s "$existing/ready" ] || continue
+				slot="$(cat "$existing/ready")"
+				printf '{"protocol":"freedom","settings":{},"streamSettings":{"sockopt":{"interface":"zgza%s","mark":255,"domainStrategy":"UseIP"}}}\n' "$slot"
+				return 0 ;;
+			esac
+		done < "$ZGZ_RUN/acl-tunnels.instances"
+	fi
+	work="$ZGZ_RUN/acl-tunnels/$slot-$digest"
+	if [ ! -s "$work/ready" ]; then
+		mkdir -p "$work/config" "$work/delta" "$work/bin" "$work/etc" "$work/run"
+		printf '%s\n' "$snapshot" > "$work/config/zirgozar"
+		printf '%s\n' "$payload" > "$work/node.json"
+		printf '#!/bin/sh\nexec "%s" -c "%s/config" -t "%s/delta" "$@"\n' "$(command -v uci)" "$work" "$work" > "$work/bin/uci"
+		chmod 700 "$work/bin/uci"
+		printf '%s\n' "$slot" > "$work/ready"
+	fi
+	printf '%s\n' "$work" >> "$ZGZ_RUN/acl-tunnels.instances"
+	printf '{"protocol":"freedom","settings":{},"streamSettings":{"sockopt":{"interface":"zgza%s","mark":255,"domainStrategy":"UseIP"}}}\n' "$slot"
+}
+
+run_tunnel() {
+	local work="$1" slot
+	case "$work" in "$ZGZ_RUN"/acl-tunnels/[0-9]*-[0-9a-f]*) : ;; *) return 1 ;; esac
+	[ -s "$work/ready" ] && [ -s "$work/node.json" ] || return 1
+	slot="$(cat "$work/ready")"
+	case "$slot" in ''|*[!0-9]*) return 1 ;; esac
+	[ "$slot" -ge 1 ] && [ "$slot" -le 1000 ] || return 1
+	# exec forwards stop/reload signals to the helper's own cleanup handler.
+	export PATH="$work/bin:$PATH" ZGZ_L2TP_NODE="$work/node.json"
+	export ZGZ_ETC="$work/etc" ZGZ_RUN="$work/run"
+	export ZGZ_TUNNEL_DEV="zgza$slot" ZGZ_TUNNEL_TABLE="$((22000 + slot))"
+	exec "$ZGZ_LIB/zgz-l2tp" run
+}
+
+case "${1:-}" in
+	prepare) prepare "${2:-}" ;;
+	run) run_tunnel "${2:-}" ;;
+	*) echo 'usage: zgz-acl-tunnel prepare SLOT|run DIRECTORY' >&2; exit 1 ;;
+esac

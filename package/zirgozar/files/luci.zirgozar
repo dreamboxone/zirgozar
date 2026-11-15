@@ -660,7 +660,7 @@ save_routing_setting() {
 	json_get_var key key
 	json_get_type kind value
 	case "$key" in
-		route_ir|route_games|block_ads|block_torrent)
+		route_ir|route_ru|route_cn|route_games|block_ads|block_torrent)
 			[ "$kind" = string ] || { fail 'Invalid routing setting.'; return 1; }
 			json_get_var value value
 			case "$value" in 0|1) : ;; *) fail 'Invalid routing setting.'; return 1 ;; esac ;;

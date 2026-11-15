@@ -158,7 +158,7 @@ return view.extend({
 		o.value('2', _('Proxy') + ' ' + _('Use global config') + ' (' + _('the node the tunnel is using') + ')');
 
 		o = s.taboption('main', form.ListValue, 'node', E('a', { 'style': 'color:red' }, _('Node name')),
-			_('Nodes added by hand on the Configs page. A hysteria2 or tuic node cannot be given a rule of its own; such a rule uses the node the tunnel is using instead.'));
+			_('Choose a config added manually on the Configs page. L2TP creates an independent connection for these devices, even when the main config is another L2TP account. Devices assigned the same L2TP account share one connection. Requires the L2TP dependencies under Router requirements. If the private connection fails, these devices do not switch to the main config. Separate hysteria2 and tuic connections are not supported here; those use the main config.'));
 		o.modalonly = true;
 		o.depends('mode', '1');
 		uci.sections('zirgozar', 'node').forEach(function(n) {

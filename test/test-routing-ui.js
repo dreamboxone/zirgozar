@@ -18,7 +18,7 @@ function E(tag,attrs={},children=[]) {
  if (Array.isArray(children)) node.children=children.filter(Boolean);else node.textContent=children;
  return node;
 }
-const calls=[],config={route_ir:'0',route_games:'0',block_ads:'0',block_quic:'auto'};
+const calls=[],config={route_ir:'1',route_ru:'0',route_cn:'0',route_games:'0',block_ads:'0',block_quic:'auto'};
 let rejectNext=false;
 const helpers=source.slice(source.indexOf('var routingSaved ='),source.indexOf('return view.extend({'));
 const {routingManager}=new Function('uci','E','pui','_','callAction',helpers+';return {routingManager};')(
@@ -29,8 +29,19 @@ const {routingManager}=new Function('uci','E','pui','_','callAction',helpers+';r
 (async()=>{
  const panel=routingManager();
  const toggles=panel.querySelectorAll('input').filter(node=>node.attrs.type==='checkbox');
- assert.equal(toggles.length,4);
- toggles[3].checked=true;await toggles[3].attrs.change();
+ assert.equal(toggles.length,6);
+ assert.equal(toggles[0].checked,true,'existing Iran choice is preserved');
+ assert.equal(toggles[1].checked,false,'Russia defaults off');
+ assert.equal(toggles[2].checked,false,'China defaults off');
+ for (const [index,key] of [[1,'route_ru'],[2,'route_cn']]) {
+  toggles[index].checked=true;await toggles[index].attrs.change();
+  assert.deepEqual(calls.at(-1),{key,value:'1'});
+ }
+ assert.ok(toggles.slice(0,3).every(node=>node.checked),'all countries can be enabled together');
+ toggles[0].checked=false;await toggles[0].attrs.change();
+ assert.deepEqual(calls.at(-1),{key:'route_ir',value:'0'});
+ assert.ok(toggles[1].checked && toggles[2].checked,'disabling Iran keeps Russia and China enabled');
+ toggles[5].checked=true;await toggles[5].attrs.change();
  assert.deepEqual(calls.at(-1),{key:'route_games',value:'1'});
  rejectNext=true;toggles[0].checked=true;await toggles[0].attrs.change();
  assert.equal(toggles[0].checked,false,'failed immediate save restores switch');
@@ -45,7 +56,7 @@ const {routingManager}=new Function('uci','E','pui','_','callAction',helpers+';r
  await panel.querySelectorAll('button').find(node=>node.textContent==='Remove').attrs.click();
  assert.deepEqual(calls.at(-1).value,[],'last domain deletion is saved');
  const returned=routingManager();
- assert.equal(returned.querySelectorAll('input').filter(node=>node.attrs.type==='checkbox')[3].checked,true,'returning to page uses saved value despite stale UCI cache');
+ assert.equal(returned.querySelectorAll('input').filter(node=>node.attrs.type==='checkbox')[5].checked,true,'returning to page uses saved value despite stale UCI cache');
  assert.equal(returned.querySelectorAll('button').filter(node=>node.textContent==='Remove').length,0,'empty saved list survives navigation');
  assert.equal(panel.children[0].tag,'h3');
  assert.equal(panel.children[0].textContent,'Traffic management');

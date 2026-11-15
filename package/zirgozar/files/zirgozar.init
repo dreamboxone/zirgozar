@@ -48,7 +48,7 @@ boot() {
 # background and the tunnel reloaded onto it. Tried once until the next
 # reboot; when it cannot be installed, the front page says so.
 geoview_for_singbox() {
-	[ "$(cfg_bool route_ir 0)" = "1" ] || [ "$(cfg_bool block_ads 0)" = "1" ] || return 0
+	[ -n "$(direct_countries)" ] || [ "$(cfg_bool block_ads 0)" = "1" ] || return 0
 	[ -x "$(geoview_path)" ] && return 0
 	geo_dir >/dev/null 2>&1 || return 0
 	mkdir "$ZGZ_RUN/geoview.auto" 2>/dev/null || return 0
@@ -71,6 +71,24 @@ fi"
 		( /bin/sh -c "$_gv" </dev/null >/dev/null 2>&1 & ) &
 	fi
 	return 0
+}
+
+start_acl_tunnels() {
+	local _acl_work _acl_slot
+	# Access Control L2TP links have independent devices, tables and cleanup.
+	if [ -r "$ZGZ_RUN/acl-tunnels.instances" ]; then
+		while IFS= read -r _acl_work; do
+			case "$_acl_work" in "$ZGZ_RUN"/acl-tunnels/[0-9]*-[0-9a-f]*) : ;; *) continue ;; esac
+			_acl_slot="${_acl_work##*/}"; _acl_slot="${_acl_slot%%-*}"
+			procd_open_instance "acl-l2tp-$_acl_slot"
+			procd_set_param command "$ZGZ_LIB/zgz-acl-tunnel" run "$_acl_work"
+			procd_set_param respawn 3600 5 0
+			procd_set_param term_timeout 30
+			procd_set_param stdout 1
+			procd_set_param stderr 1
+			procd_close_instance
+		done < "$ZGZ_RUN/acl-tunnels.instances"
+	fi
 }
 
 start_service() {
@@ -205,13 +223,13 @@ start_service() {
 	# categories, and asking for one it has not got makes the core refuse the
 	# whole file. Connected without the split beats not connected, as long as
 	# the page says which of the two happened.
-	if [ "$ENGINE" = "xray" ] && [ -z "$PROG" ] && grep -q 'geoip:ir\|geosite:ir\|geosite:category-ads-all' "$ZGZ_CONFIG_JSON" 2>/dev/null; then
+	if [ "$ENGINE" = "xray" ] && [ -z "$PROG" ] && grep -qE 'geoip:(ir|ru|cn)|geosite:(ir|cn|category-ru|category-ads-all)' "$ZGZ_CONFIG_JSON" 2>/dev/null; then
 		if "$MKCONFIG" nogeo > "$ZGZ_CONFIG_JSON.nogeo" 2>/dev/null &&
 		   PROG="$(ZGZ_XRAY_CHECK_LOG="$ZGZ_RUN/config-check.err" find_xray "$ZGZ_CONFIG_JSON.nogeo")"; then
 			mv -f "$ZGZ_CONFIG_JSON.nogeo" "$ZGZ_CONFIG_JSON"
 			chmod 600 "$ZGZ_CONFIG_JSON"
-			log "the core would not read the routing data - connected with the Iran split off"
-			say_message "The routing data on this router is not the pair this expects: the core refused geoip:ir and geosite:ir. Connected with the Iran split off. Press Update beside the routing data on the settings page to fetch the right files."
+			log "the core would not read the routing data - connected with country bypass and ad blocking off"
+			say_message "The routing data does not contain the required country or advertising lists. Connected with country bypass and ad blocking off. Download the full routing files on the App Update page."
 		else
 			rm -f "$ZGZ_CONFIG_JSON.nogeo"
 			PROG=""
@@ -287,6 +305,8 @@ start_service() {
 		done < "$ZGZ_RUN/balancing.instances"
 	fi
 
+	start_acl_tunnels
+
 	procd_open_instance zirgozar
 	# shellcheck disable=SC2046
 	procd_set_param command "$PROG" $(core_run_args "$ENGINE" "$ZGZ_CONFIG_JSON")
@@ -345,6 +365,11 @@ start_service() {
 		cp "$ZGZ_RUN/balancing.instances" "$ZGZ_RUN/balancing.applied"
 	else
 		: > "$ZGZ_RUN/balancing.applied"
+	fi
+	if [ -f "$ZGZ_RUN/acl-tunnels.instances" ]; then
+		cp "$ZGZ_RUN/acl-tunnels.instances" "$ZGZ_RUN/acl-tunnels.applied"
+	else
+		: > "$ZGZ_RUN/acl-tunnels.applied"
 	fi
 	touch "$STARTED_FLAG"
 	return 0
@@ -692,6 +717,9 @@ reload_service() {
 	# A helper account can change while the parent's SOCKS port stays the
 	# same. Replace its procd instance even when the parent JSON is identical.
 	cmp -s "$ZGZ_RUN/balancing.instances" "$ZGZ_RUN/balancing.applied" || _core=changed
+	if [ -s "$ZGZ_RUN/acl-tunnels.instances" ] || [ -s "$ZGZ_RUN/acl-tunnels.applied" ]; then
+		cmp -s "$ZGZ_RUN/acl-tunnels.instances" "$ZGZ_RUN/acl-tunnels.applied" || _core=changed
+	fi
 	_rules=same
 	"$RULES" dump 2>/dev/null | cmp -s - "$ZGZ_RUN/rules.applied" || _rules=changed
 	_dns=same

@@ -345,7 +345,11 @@ function routingManager() {
  panel = E('section', {'class':'cbi-section zgz-routing-manager','aria-labelledby':'zgz-routing-heading'}, [
   E('h3', {id:'zgz-routing-heading'}, _('Traffic management')),
   E('p', {}, _('Changes here are saved and applied automatically.')),
-  toggle('route_ir','Direct pass for Iranian traffic','Iranian sites and addresses skip the tunnel. Download the routing data first.'),
+  E('h3', {}, _('Direct traffic bypass')),
+  E('p', {'class':'cbi-value-description zgz-section-help'}, _('Choose countries independently: one, two, or all three. Sites and destination IPs listed for enabled countries connect directly, using your normal internet connection. Requires routing data containing those countries; custom shunt and device rules take priority.')),
+  toggle('route_ir','Iran','Send Iranian sites and destination IPs directly. Turn off to use the normal routing policy.'),
+  toggle('route_ru','Russia','Send Russian sites and destination IPs directly. Turn off to use the normal routing policy.'),
+  toggle('route_cn','China','Send Chinese sites and destination IPs directly. Turn off to use the normal routing policy.'),
   E('h3', {}, _('Block')),
   toggle('block_ads','Block advertising','Block advertising for every device. Requires the routing data.'),
   toggle('block_torrent','Block BitTorrent','Block BitTorrent traffic for every device.'),

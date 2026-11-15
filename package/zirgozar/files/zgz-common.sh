@@ -240,6 +240,24 @@ cfg_bool() {
 	return 0
 }
 
+# Independent switches preserve existing Iran-only installations.
+direct_countries() {
+	local country
+	for country in ir ru cn; do
+		[ "$(cfg_bool "route_$country" 0)" != 1 ] || printf '%s\n' "$country"
+	done
+	return 0
+}
+
+# Russia is named category-ru in the default domain database.
+direct_country_geosite() {
+	case "$1" in
+		ru) printf 'category-ru\n' ;;
+		ir|cn) printf '%s\n' "$1" ;;
+		*) return 1 ;;
+	esac
+}
+
 # Strict DNS ports are handled before geographical and per-device routing.
 # HTTPS is deliberately excluded: the Iran split still controls ordinary sites.
 strict_dns_ports() {

@@ -106,7 +106,7 @@ run_member() {
 	umask 077
 	# This is an isolated snapshot: suppress transparent listeners and the
 	# global routing policy, which has already run in the parent core.
-	for key in acl_enable socks_enabled shunt_fakedns remote_fakedns route_ir block_ads block_torrent; do
+	for key in acl_enable socks_enabled shunt_fakedns remote_fakedns route_ir route_ru route_cn block_ads block_torrent; do
 		uci set "zirgozar.config.$key=0"
 	done
 	uci set "zirgozar.config.bridge_port=$((port + 1))"

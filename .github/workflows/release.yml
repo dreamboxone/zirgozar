@@ -209,12 +209,11 @@ jobs:
       - name: Fetch the routing data the split needs
         run: |
           set -euo pipefail
-          # The lite pair, because the tests only need the categories to exist
-          # and the full pair is twenty-five megabytes.
+          # Full country lists are needed to validate Iran, Russia and China.
           mkdir -p geo
           base=https://raw.githubusercontent.com/Chocolate4U/Iran-v2ray-rules/release
-          curl -fsSL --retry 3 -o geo/geoip.dat   "$base/geoip-lite.dat"
-          curl -fsSL --retry 3 -o geo/geosite.dat "$base/geosite-lite.dat"
+          curl -fsSL --retry 3 -o geo/geoip.dat   "$base/geoip.dat"
+          curl -fsSL --retry 3 -o geo/geosite.dat "$base/geosite.dat"
           ls -l geo/
 
       - name: Test package
@@ -371,6 +370,15 @@ jobs:
             ZGZ_GEO_DIR="$PWD/geo" \
             PATH="$PATH" \
             timeout -k 5 90 sh test/test-rules.sh
+
+      - name: Test independent L2TP access control and country bypass
+        run: |
+          set -euo pipefail
+          export RIG_XRAY="$PWD/prebuilt/x86_64/xray"
+          export RIG_SINGBOX="$PWD/.test-tools/sing-box"
+          export RIG_GEO_DIR="$PWD/geo"
+          RIG_ROOT="$RUNNER_TEMP/zirgozar-acl-l2tp" sh test/test-acl-l2tp.sh
+          RIG_ROOT="$RUNNER_TEMP/zirgozar-country-routing" sh test/test-country-routing.sh
 
       - name: Test acl
         run: |

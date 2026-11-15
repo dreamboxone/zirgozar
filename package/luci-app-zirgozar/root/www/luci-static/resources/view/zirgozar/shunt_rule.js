@@ -100,7 +100,7 @@ return view.extend({
 
 		var o;
 
-		o = s.option(form.Value, 'remarks', _('Remarks'));
+		o = s.option(form.Value, 'remarks', _('Remarks'), _("A unique name to recognize this rule, such as YouTube. This name does not select a website or an outbound config."));
 		o.default = sid;
 		o.rmempty = false;
 		o.validate = function(section_id, value) {
@@ -110,7 +110,7 @@ return view.extend({
 			return true;
 		};
 
-		o = s.option(form.Value, 'group', _('Shunt Rule Group'));
+		o = s.option(form.Value, 'group', _('Shunt Rule Group'), _("Organize related rules in a group. Leave default unless you need separate groups; select the active group in Basic Settings. This is not the outbound config."));
 		o.default = '';
 		o.value('', _('default'));
 		Object.keys(groups).sort().forEach(function(g) { o.value(g); });
@@ -126,47 +126,42 @@ return view.extend({
 			uci.unset('zirgozar', section_id, 'group');
 		};
 
-		o = s.option(form.MultiValue, 'protocol', _('Protocol'));
+		o = s.option(form.MultiValue, 'protocol', _('Protocol'), _("Match detected application protocols: http for plain web traffic, tls for HTTPS, quic for HTTP/3, or bittorrent. Leave all unchecked to include every protocol; selecting one may miss other traffic used by the same site."));
 		o.value('http');
 		o.value('tls');
 		o.value('quic');
 		o.value('bittorrent');
 		pui.checkboxes(o);
 
-		o = s.option(form.MultiValue, 'inbound', _('Inbound Tag'));
+		o = s.option(form.MultiValue, 'inbound', _('Inbound Tag'), _("Choose where traffic enters: Transparent proxy for devices routed through this router, or Socks for connections to its SOCKS listener. Leave both unchecked to include all available inputs."));
 		o.value('tproxy', _('Transparent proxy'));
 		o.value('socks', 'Socks');
 		pui.checkboxes(o);
 
-		o = s.option(form.ListValue, 'network', _('Network'));
+		o = s.option(form.ListValue, 'network', _('Network'), _("TCP UDP includes both transport types and is recommended for a website rule. Select only TCP or UDP when you deliberately want to limit the rule to that transport."));
 		o.value('tcp,udp', 'TCP UDP');
 		o.value('tcp', 'TCP');
 		o.value('udp', 'UDP');
 
-		o = s.option(form.DynamicList, 'source', _('Source'), items([
-			_('Example:'),
-			_('IP') + ': 192.168.1.100',
-			_('IP CIDR') + ': 192.168.1.0/24',
-			'GeoIP: geoip:private'
-		]));
+		o = s.option(form.DynamicList, 'source', _('Source'), _("The local device address, not the website or outbound config. Leave empty for all devices. To limit the rule, type an IP such as 192.168.1.100 or a subnet such as 192.168.1.0/24, then press + for each entry."));
 		o.validate = function(section_id, value) {
 			if (!value || /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/.test(value) || /^geoip:\S+$/.test(value)) return true;
 			return _('Not true format, please re-enter!') + ' ' + value;
 		};
 
-		o = s.option(form.Value, 'port', _('Port'));
+		o = s.option(form.Value, 'port', _('Port'), _("Destination port on the website or service, such as 443 for HTTPS. Accepts a single port, a range such as 1000-2000, or a comma-separated list such as 80,443. Leave empty for all destination ports."));
 		o.validate = function(section_id, value) {
 			if (!value || /^[0-9]+([-:][0-9]+)?(,[0-9]+([-:][0-9]+)?)*$/.test(String(value).replace(/\s/g, ''))) return true;
 			return _('Not valid, please re-enter: %s').format(value);
 		};
 
-		o = s.option(form.Value, 'sourcePort', _('Source port'), _('The port the connection comes from. Such as 1000-2000,3000.'));
+		o = s.option(form.Value, 'sourcePort', _('Source port'), _("The port used by the local device to start a connection, usually chosen automatically. For a website rule, leave empty. Only set it for a known source port; accepts 1000-2000,3000. This is not the website port."));
 		o.validate = function(section_id, value) {
 			if (!value || /^[0-9]+([-:][0-9]+)?(,[0-9]+([-:][0-9]+)?)*$/.test(String(value).replace(/\s/g, ''))) return true;
 			return _('Not valid, please re-enter: %s').format(value);
 		};
 
-		o = s.option(form.TextValue, 'domain_list', _('Domain'), items([
+		o = s.option(form.TextValue, 'domain_list', _('Domain'), E('div', {}, [ _("Website domains, one entry per line, without https:// or a page path. Recommended: domain:example.com includes the domain and subdomains; full:example.com matches only that exact name. For YouTube use geosite:youtube, which requires routing data. Leave empty if matching only by destination IP or other fields."), items([
 			_("Plaintext: If this string matches any part of the targeting domain, this rule takes effet. Example: rule 'sina.com' matches targeting domain 'sina.com', 'sina.com.cn' and 'www.sina.com', but not 'sina.cn'."),
 			_("Regular expression: Begining with 'regexp:', the rest is a regular expression. When the regexp matches targeting domain, this rule takes effect. Example: rule 'regexp:\\.goo.*\\.com$' matches 'www.google.com' and 'fonts.googleapis.com', but not 'google.com'."),
 			_("Subdomain (recommended): Begining with 'domain:' and the rest is a domain. When the targeting domain is exactly the value, or is a subdomain of the value, this rule takes effect. Example: rule 'domain:v2ray.com' matches 'www.v2ray.com', 'v2ray.com', but not 'xv2ray.com'."),
@@ -177,14 +172,14 @@ return view.extend({
 				_('Such as:') + "'rule-set:local:/usr/share/sing-box/geosite-cn.srs'"
 			]) ]),
 			_('Annotation: Begining with #')
-		]));
+		]) ]));
 		o.rows = 10;
 		o.wrap = 'off';
 		o.validate = function(section_id, value) {
 			return eachLine(value, domainEntry, _('Not valid domain name, please re-enter!'));
 		};
 
-		o = s.option(form.TextValue, 'ip_list', 'IP', items([
+		o = s.option(form.TextValue, 'ip_list', 'IP', E('div', {}, [ _("Destination addresses of websites or services, one IP or CIDR per line, such as 203.0.113.10 or 203.0.113.0/24. GeoIP lists such as geoip:ir need routing data. Leave empty for a domain-only rule. When both domain and IP lists are filled, either list can match; other selected fields still restrict the traffic."), items([
 			_("IP: such as '127.0.0.1'."),
 			_("CIDR: such as '127.0.0.0/8'."),
 			_("GeoIP: such as 'geoip:cn'. It begins with geoip: (lower case) and followed by two letter of country code."),
@@ -193,7 +188,7 @@ return view.extend({
 				_('Such as:') + "'rule-set:local:/usr/share/sing-box/geoip-cn.srs'"
 			]) ]),
 			_('Annotation: Begining with #')
-		]));
+		]) ]));
 		o.rows = 10;
 		o.wrap = 'off';
 		o.validate = function(section_id, value) {
@@ -203,9 +198,7 @@ return view.extend({
 		/* Xray has no inverted rule. Under Xray a rule with this ticked is left
 		   out - and the log says so - rather than run the right way round,
 		   which would send exactly the other traffic. */
-		o = s.option(form.Flag, 'invert', 'invert',
-			_('Invert match result.') + ' ' + _('Only support Sing-Box.') + ' ' +
-			_('With Xray as the active core the rule is left out.'));
+		o = s.option(form.Flag, 'invert', 'invert', _("Reverse the whole match: apply this rule to traffic that does not match its conditions. Supported only by Sing-Box; Xray skips this rule entirely when enabled. Keep off for a normal website rule."));
 
 		return m.render().then(function(mapEl) {
 			if (i18n.get() == 'fa') {
@@ -220,8 +213,8 @@ return view.extend({
 			}
 			return pui.page([
 				E('div', { 'style': 'margin-bottom:12px' }, [ backBtn ]),
-				E('div', { 'style': 'color:#ef4444;margin:0 0 10px' },
-					_('Where this rule sends what it matches is chosen in the Shunt Rule tab of Basic Settings.')),
+				E('div', { 'style': 'margin:0 0 10px' },
+					_('This page defines which traffic matches the rule. After saving, open Basic Settings > Shunt Rule and choose the outbound config, Direct, or Block beside this rule.')),
 				mapEl
 			]);
 		});

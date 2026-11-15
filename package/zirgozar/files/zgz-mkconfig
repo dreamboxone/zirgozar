@@ -67,7 +67,7 @@ fi
 tproxy_port="$(cfg tproxy_port 1082)"
 dns_port="$(cfg dns_port 1053)"
 api_port="$(cfg api_port 10853)"
-route_ir="$(cfg_bool route_ir 0)"
+route_countries="$(direct_countries)"
 block_ads="$(cfg_bool block_ads 0)"
 block_torrent="$(cfg_bool block_torrent 0)"
 loglevel="$(cfg loglevel warning)"
@@ -86,18 +86,18 @@ PRIVATE_V6='"::1/128","fc00::/7","fe80::/10"'
 FORCE_NO_GEO=0
 if [ "${1:-}" = "nogeo" ]; then
 	FORCE_NO_GEO=1
-	route_ir=0
+	route_countries=""
 	block_ads=0
 fi
 
 # The split needs both files. Anything less and the rules below stay out.
 geo=""
-if [ "$route_ir" = "1" ] || [ "$block_ads" = "1" ]; then
+if [ -n "$route_countries" ] || [ "$block_ads" = "1" ]; then
 	geo="$(geo_dir)" || geo=""
 	if [ -z "$geo" ]; then
-		say_message "Iran routing is switched on but geoip.dat and geosite.dat are not on the router yet - press Update beside them. Until then everything goes through the tunnel."
+		say_message "Routing data is missing. Country bypass and ad blocking need geoip.dat and geosite.dat; download them on the App Update page. Country traffic uses the tunnel until the data is available."
 		warn "geo files missing - routing everything through the tunnel"
-		route_ir=0
+		route_countries=""
 		block_ads=0
 	fi
 fi
@@ -305,14 +305,17 @@ if [ -n "$direct_geoips" ]; then
 fi
 
 # Everything above holds for all traffic. The Shunt Rule tab's rules go here,
-# ahead of the Iran split, and are put in further down, once the ways in they
+# ahead of the country bypass, and are put in further down, once the ways in they
 # apply to are known.
 rules_head="$rules"
 rules=""
 
-if [ "$route_ir" = "1" ]; then
-	add_rule '{"type":"field","domain":["geosite:ir"],"outboundTag":"direct"}'
-	add_rule '{"type":"field","ip":["geoip:ir","geoip:private"],"outboundTag":"direct"}'
+if [ -n "$route_countries" ]; then
+	for country in $route_countries; do
+		add_rule "{\"type\":\"field\",\"domain\":[\"geosite:$(direct_country_geosite "$country")\"],\"outboundTag\":\"direct\"}"
+		add_rule "{\"type\":\"field\",\"ip\":[\"geoip:$country\"],\"outboundTag\":\"direct\"}"
+	done
+	add_rule '{"type":"field","ip":["geoip:private"],"outboundTag":"direct"}'
 	domain_strategy=IPIfNonMatch
 else
 	# With everything going the same way there is nothing to look up, and
@@ -375,18 +378,22 @@ tunnel_twin() {
 # The node's own outbound, with its own chain if it has one, and the Xray tab
 # applied - but not the tunnel's pre-proxy: a rule naming one node means that
 # node as it is set up, not as the tunnel's own choice would be.
-acl_outbound() {
-	warp_in_use "$1" && return 1
+acl_record() {
 	case "$1" in
 		sub:*) "$ZGZ_LIB/zgz-nodes" resolve "$1" 2>/dev/null | head -1 ;;
 		*) node_records "$1" 1 2>/dev/null | head -1 ;;
-	esac | warp_natives |
+	esac
+}
+
+acl_outbound() {
+	warp_in_use "$1" && return 1
+	{ if [ "$#" -gt 1 ]; then printf '%s\n' "$2"; else acl_record "$1"; fi; } | warp_natives |
 		awk -F'\t' '$6 ~ /"protocol"/ { print; found = 1; exit } END { exit found ? 0 : 1 }' |
 		decorate | cut -f6-
 }
 
 acl_one() {
-	local enabled iface sources mode node macs ips sets port out
+	local enabled iface sources mode node macs ips sets port out row
 	config_get_bool enabled "$1" enabled 1
 	[ "$enabled" = "1" ] || return 0
 	config_get iface "$1" interface ""
@@ -408,8 +415,22 @@ acl_one() {
 		0|2) : ;;
 		1)
 			config_get node "$1" node ""
-			out="$(acl_outbound "$node")" || out=""
-			if [ -n "$out" ] && tunnel_twin "$out"; then
+			row="$(acl_record "$node")" || row=""
+			if [ "$(printf '%s' "$row" | cut -f3)" = l2tp ]; then
+				if bridge_is_l2tp && printf '%s\n' "$row" | cut -f6- | cmp -s - "$ZGZ_ETC/bridge.json"; then
+					# Reuse an identical active account rather than dial it twice.
+					mode=2; out=""
+				elif ! out="$(printf '%s\n' "$row" | "$ZGZ_LIB/zgz-acl-tunnel" prepare "$((acl_count + 1))")"; then
+					# A failed private tunnel must never select the primary account.
+					warn "access control rule $1: could not prepare L2TP node '$node'; blocking this rule"
+					out='{"protocol":"blackhole","settings":{}}'
+				fi
+			else
+				out="$(acl_outbound "$node" "$row")" || out=""
+			fi
+			if [ "$mode" = 2 ]; then
+				:
+			elif [ -n "$out" ] && tunnel_twin "$out"; then
 				# The tunnel's own WireGuard: the tunnel's way, as is.
 				mode=2
 			elif [ -n "$out" ]; then
@@ -460,6 +481,7 @@ $(printf '%s\n' "$out" | sed -e 's/^[[:space:]]*//' -e "s/^{/{\"tag\":\"acl$acl_
 	return 0
 }
 
+: > "$ZGZ_RUN/acl-tunnels.instances"
 : > "$ACL_TSV.new" 2>/dev/null || true
 if [ "$(cfg_bool acl_enable 0)" = "1" ] && [ -r /lib/functions.sh ]; then
 	. /lib/functions.sh
@@ -1306,7 +1328,9 @@ esac
 [ -n "$node_dns" ] || direct_names="$node_names"
 [ -n "$direct_domains" ] && direct_names="${direct_names:+$direct_names,}$direct_domains"
 [ -n "$shunt_direct_names" ] && direct_names="${direct_names:+$direct_names,}$shunt_direct_names"
-[ "$route_ir" = "1" ] && direct_names="${direct_names:+$direct_names,}\"geosite:ir\""
+for country in $route_countries; do
+	direct_names="${direct_names:+$direct_names,}\"geosite:$(direct_country_geosite "$country")\""
+done
 
 if [ "$dd_proto" = "tcp" ]; then
 	direct_server="\"address\":\"tcp://$dd_addr:$dd_port\""

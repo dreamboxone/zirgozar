@@ -20,6 +20,11 @@
 'require baseclass';
 
 var T = [
+	[ "access control rule {}: could not prepare L2TP node '{}'; blocking this rule", 'قانون کنترل دسترسی {1}: آماده‌سازی کانفیگ L2TP با نام {2} ناموفق بود؛ ترافیک این قانون مسدود می‌شود.' ],
+	[ 'the core would not read the routing data - connected with country bypass and ad blocking off', 'هسته داده‌های مسیریابی را نخواند؛ اتصال با عبور مستقیم کشورها و مسدودکردن تبلیغات خاموش برقرار شد.' ],
+	[ 'Geoview is not installed; firewall bypass for {} is unavailable - install Geoview on the App Update page', 'ابزار Geoview نصب نیست؛ عبور مستقیم فایروال برای {1} در دسترس نیست. آن را از صفحه به‌روزرسانی نصب کنید.' ],
+	[ 'Geoview could not extract addresses for {}; keeping the previous list', 'استخراج آدرس‌های {1} با Geoview ناموفق بود؛ فهرست قبلی حفظ می‌شود.' ],
+	[ 'could not refresh the country firewall sets', 'به‌روزرسانی مجموعه آدرس کشورهای فایروال ناموفق بود.' ],
 	/* ------------------------------------------------------ start and stop */
 	[ 'Start running...', 'شروع اجرا...' ],
 	[ 'core rejected configuration: {}', 'هسته پیکربندی را رد کرد: {1}' ],

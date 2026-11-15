@@ -17,6 +17,9 @@
 cd "$(dirname "$0")/.."
 
 rc=0
+sh test/test-acl-l2tp.sh || rc=1
+sh test/test-country-routing.sh || rc=1
+sh test/test-routing-settings.sh || rc=1
 sh test/test-transport.sh || rc=1
 node test/test-direct-rules-ui.js || rc=1
 sh test/test-direct-rules.sh || rc=1

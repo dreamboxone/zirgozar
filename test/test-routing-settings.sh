@@ -22,6 +22,14 @@ committed() { command uci -c "$WORK/config" -t "$WORK/empty" get "zirgozar.confi
 uci set zirgozar.config.block_ads=1
 save_routing_setting '{"key":"route_ir","value":"1"}'
 [ "$(committed route_ir)" = 1 ]
+save_routing_setting '{"key":"route_ru","value":"1"}'
+save_routing_setting '{"key":"route_cn","value":"1"}'
+[ "$(committed route_ru)" = 1 ]
+[ "$(committed route_cn)" = 1 ]
+save_routing_setting '{"key":"route_ru","value":"0"}'
+[ "$(committed route_ir)" = 1 ]
+[ "$(committed route_ru)" = 0 ]
+[ "$(committed route_cn)" = 1 ]
 [ "$(committed block_ads)" = 0 ]
 [ "$(uci get zirgozar.config.block_ads)" = 1 ]
 save_routing_setting '{"key":"route_games","value":"1"}'
@@ -29,7 +37,7 @@ save_routing_setting '{"key":"game_domain","value":["geosite:category-games","ga
 [ "$(committed game_domain)" = 'geosite:category-games games.example' ]
 save_routing_setting '{"key":"game_domain","value":[]}'
 [ "$(committed game_domain)" = none ]
-for input in '{"key":"enabled","value":"0"}' '{"key":"route_ir","value":"2"}' '{"key":"game_domain","value":["bad.example;reboot"]}' '{"key":"game_domain","value":"games.example"}'; do
+for input in '{"key":"enabled","value":"0"}' '{"key":"route_ir","value":"2"}' '{"key":"route_ru","value":"2"}' '{"key":"route_cn","value":true}' '{"key":"game_domain","value":["bad.example;reboot"]}' '{"key":"game_domain","value":"games.example"}'; do
  if save_routing_setting "$input" >/dev/null; then echo 'invalid input accepted' >&2; exit 1; fi
 done
 [ "$(committed route_ir)" = 1 ]
