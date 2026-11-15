@@ -20,6 +20,7 @@
 'require baseclass';
 
 var T = [
+	[ 'Main switch is off - not waiting for the tunnel', 'کلید اصلی خاموش شد؛ انتظار برای اتصال تونل متوقف شد.' ],
 	[ "access control rule {}: could not prepare L2TP node '{}'; blocking this rule", 'قانون کنترل دسترسی {1}: آماده‌سازی کانفیگ L2TP با نام {2} ناموفق بود؛ ترافیک این قانون مسدود می‌شود.' ],
 	[ 'the core would not read the routing data - connected with country bypass and ad blocking off', 'هسته داده‌های مسیریابی را نخواند؛ اتصال با عبور مستقیم کشورها و مسدودکردن تبلیغات خاموش برقرار شد.' ],
 	[ 'Geoview is not installed; firewall bypass for {} is unavailable - install Geoview on the App Update page', 'ابزار Geoview نصب نیست؛ عبور مستقیم فایروال برای {1} در دسترس نیست. آن را از صفحه به‌روزرسانی نصب کنید.' ],

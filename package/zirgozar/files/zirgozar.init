@@ -425,9 +425,21 @@ listening() {
 	return 1
 }
 
+# A queued stop cannot acquire the service lock until this start returns.
+switched_off() { [ "$(cfg_bool enabled 0)" = 0 ]; }
+
+abandon_start() {
+	log "Main switch is off - not waiting for the tunnel"
+	"$RULES" down >/dev/null 2>&1 || true
+	start_failed
+	say_status idle
+	return 0
+}
+
 wait_for_port() {
 	local port="$1" limit="${2:-20}" n=0
 	while [ "$n" -lt "$limit" ]; do
+		switched_off && return 1
 		listening "$port" && return 0
 		n=$((n + 1))
 		sleep 1
@@ -476,6 +488,7 @@ service_started() {
 	# would run its full course and report a failure about a tunnel nobody
 	# asked for.
 	[ -f "$STARTED_FLAG" ] || { start_failed; return 0; }
+	switched_off && { abandon_start; return 1; }
 
 	tproxy_port="$(cfg tproxy_port 1082)"
 	bridge_port="$(cfg bridge_port 10808)"
@@ -493,6 +506,7 @@ service_started() {
 		# rules do not send the network into a way out that is not there yet.
 		_ovw=0
 		while [ "$_ovw" -lt 120 ]; do
+			switched_off && { abandon_start; return 1; }
 			ip -4 addr show dev "$_tunnel_dev" 2>/dev/null | grep -q inet && break
 			sleep 1
 			_ovw=$((_ovw + 1))
@@ -514,6 +528,7 @@ service_started() {
 		# A balanced Aether scan alone can take two minutes, after provisioning.
 		if bridge_is_aether; then _bwait=240; fi
 		if ! wait_for_port "$bridge_port" "$_bwait"; then
+			switched_off && { abandon_start; return 1; }
 			log "the bridge never started listening on $bridge_port"
 			say_status failed
 			if bridge_is_warp; then
@@ -540,6 +555,7 @@ service_started() {
 	_cw=0
 	_cwarned=0
 	until listening "$tproxy_port"; do
+		switched_off && { abandon_start; return 1; }
 		_cw=$((_cw + 1))
 		if [ "$_cw" -ge 20 ]; then
 			pgrep -f "$ZGZ_CONFIG_JSON" >/dev/null 2>&1 || break
@@ -562,6 +578,7 @@ service_started() {
 		return 1
 	fi
 
+	switched_off && { abandon_start; return 1; }
 	if ! "$RULES" up >/dev/null 2>&1; then
 		log "could not install the routing rules - leaving the network untouched"
 		ks_on && log "Kill switch is on: devices have no way out by the uplink until the tunnel works"
@@ -578,6 +595,7 @@ service_started() {
 		return 1
 	fi
 
+	switched_off && { abandon_start; return 1; }
 	# What was put in place, so that a save can tell whether it changes any
 	# of it - see reload_service.
 	"$RULES" dump > "$ZGZ_RUN/rules.applied" 2>/dev/null || rm -f "$ZGZ_RUN/rules.applied"

@@ -371,6 +371,9 @@ jobs:
             PATH="$PATH" \
             timeout -k 5 90 sh test/test-rules.sh
 
+      - name: Test cancellation while connecting
+        run: RIG_ROOT="$RUNNER_TEMP/zirgozar-start-cancel" sh test/test-start-cancel.sh
+
       - name: Test independent L2TP access control and country bypass
         run: |
           set -euo pipefail

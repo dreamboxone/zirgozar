@@ -8,6 +8,7 @@
 rig_setup
 . "$ZGZ_LIB/zgz-common.sh"
 export ZGZ_LOG="$RIG/live.log"
+rig_set enabled 1
 rig_set tproxy_port 31080
 rig_set node_socks_port 31081
 rig_set test_url 'http://www.gstatic.com/generate_204'
@@ -24,6 +25,7 @@ exit 0
 EOF
 printf '#!/bin/sh\nexit 0\n' > "$DNS"
 chmod +x "$RULES" "$DNS"
+eval "$(sed -n '/^switched_off() {/p; /^abandon_start() {/,/^}/p; /^start_failed() {/,/^}/p' "$RIG_SRC/package/zirgozar/files/zirgozar.init")"
 eval "$(sed -n '/^service_started() {/,/^}/p' "$RIG_SRC/package/zirgozar/files/zirgozar.init")"
 eval "$(sed -n '/^report_ready() {/,/^}/p' "$RIG_SRC/package/zirgozar/files/zirgozar.init")"
 eval "$(sed -n '/^listening() {/,/^}/p' "$RIG_SRC/package/zirgozar/files/zirgozar.init")"
