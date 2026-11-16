@@ -70,3 +70,49 @@ for server, explicit, psk, expected in [
     assert actual.stdout == expected, (server, explicit, actual.stdout)
 
 print('IKEv2 IP, domain, explicit identity and PSK identity checks passed')
+
+# Missing issuers are available offline, but are not trust anchors in the
+# connection. Exercise the complete load path and inspect its VICI requests.
+production = (Path(__file__).resolve().parents[1] / 'package/zirgozar/files/zgz-ikev2config').read_text()
+production = production.replace("import * as socket from 'socket';", '')
+start = production.index('function request(')
+end = production.index("if (mode == 'stop')", start)
+production = production[:start] + '''function request(command, data, optional) {
+    printf('%J\\n', { command, data });
+    return true;
+}
+''' + production[end:]
+with tempfile.TemporaryDirectory() as directory:
+    root = Path(directory)
+    roots = root / 'roots.pem'
+    roots.write_text(pem('U1lTVEVN'))
+    issuers = root / 'issuers'
+    issuers.mkdir()
+    (issuers / 'issuer.pem').write_text(pem('SVNTVUVS'))
+    script = root / 'load.uc'
+    script.write_text(production.replace('/etc/ssl/certs/ca-certificates.crt', str(roots))
+                      .replace('/usr/share/zirgozar/ikev2-intermediates/*.pem', str(issuers / '*.pem')))
+    nodefile = root / 'node.json'
+
+    def requests(account, mode='load'):
+        nodefile.write_text(json.dumps(account))
+        result = subprocess.run(['ucode', str(script), mode, str(nodefile),
+                                 'zgzikev2t', '192.0.2.1', '192.0.2.2'],
+                                text=True, capture_output=True, check=True)
+        return [json.loads(line) for line in result.stdout.splitlines()]
+
+    account = dict(type='ikev2', server='192.0.2.1', port=500, mtu=1400,
+                   username='test', password='test-password')
+    calls = requests(account)
+    loaded = [r['data'] for r in calls if r['command'] == 'load-cert']
+    assert loaded == [dict(type='X509', flag='CA', data=pem('SVNTVUVS'))], loaded
+    conn = next(r['data'] for r in calls if r['command'] == 'load-conn')
+    remote = conn['zirgozar-zgzikev2t']['remote']
+    assert remote['cacerts'] == [pem('U1lTVEVN')], remote
+    assert remote['id'] == '%any'
+    assert not any(r['command'] == 'load-cert' for r in requests(account | {'psk': 'test-key'}))
+    assert not any(r['command'] == 'load-cert' for r in requests(account, 'stop'))
+    (issuers / 'issuer.pem').unlink()
+    assert not any(r['command'] == 'load-cert' for r in requests(account))
+
+print('IKEv2 offline issuer loading, root constraints, PSK and cleanup checks passed')

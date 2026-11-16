@@ -9,8 +9,8 @@
 
 # VERSION is the application version; increment RELEASE for package updates.
 # The main zirgozar package always includes the complete LuCI interface.
-VERSION=5.8.24
-RELEASE=2
+VERSION=5.8.25
+RELEASE=1
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -82,6 +82,8 @@ stage_zgz() {
 	# /etc/config is the reader's from the first save on.
 	install -d "$i/usr/share/zirgozar"
 	install -m 0644 "$f/zirgozar.config"   "$i/usr/share/zirgozar/zirgozar.config"
+	install -d "$i/usr/share/zirgozar/ikev2-intermediates"
+	install -m 0644 "$f"/ikev2-intermediates/*.pem "$i/usr/share/zirgozar/ikev2-intermediates/"
 	install -m 0755 "$f/zirgozar.init"     "$i/etc/init.d/zirgozar"
 	install -m 0755 "$f/zirgozar-led.init" "$i/etc/init.d/zirgozar-led"
 	install -m 0755 "$f/zirgozar-dns.init" "$i/etc/init.d/zirgozar-dns"

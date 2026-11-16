@@ -12,7 +12,7 @@
 // Only this connection and its own secrets are loaded and unloaded, by name:
 // swanctl --load-all would also unload whatever else strongSwan is running.
 
-import { readfile } from 'fs';
+import { readfile, glob } from 'fs';
 import * as socket from 'socket';
 
 let mode = ARGV[0], file = ARGV[1], dev = ARGV[2];
@@ -183,6 +183,14 @@ connection[name].children[name] = {
 };
 
 request('unload-conn', { name }, true);
+// Issuers that a server may omit are shipped with the package, so building
+// their chain never depends on reaching a CA website before the VPN is up.
+// Keep them OUT of remote.cacerts: only the system roots and the account's
+// explicit CA may satisfy that connection's trust-anchor constraint.
+if (psk == '') {
+	for (let path in glob('/usr/share/zirgozar/ikev2-intermediates/*.pem') ?? [])
+		request('load-cert', { type: 'X509', flag: 'CA', data: readfile(path) });
+}
 if (psk == '')
 	request('load-shared', { id: name + '-eap', type: 'EAP', data: node.password, owners: [ node.username ] });
 else {

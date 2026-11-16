@@ -8,6 +8,9 @@ node "$RIG_SRC/test/test-ikev2-form.js" || bad 'IKEv2 certificate import or auth
 if command -v ucode >/dev/null 2>&1; then
 	python3 "$RIG_SRC/test/test-ikev2-ca.py" || bad 'IKEv2 CA chain loading failed'
 fi
+if command -v openssl >/dev/null 2>&1; then
+	python3 "$RIG_SRC/test/test-ikev2-intermediates.py" || bad 'IKEv2 offline issuer verification failed'
+fi
 
 # Exercise the production helpers without starting IPsec or altering routes.
 sed '/^case "$MODE" in/,$d; s/^check() {/ikev2_check() {/' "$RIG/lib/zgz-ikev2" > "$RIG/ikev2-functions"
