@@ -1,0 +1,41 @@
+diff --git a/main.c b/main.c
+index 824ab4a..45ec26e 100644
+--- a/main.c
++++ b/main.c
+@@ -18,6 +18,9 @@
+  */
+ 
+ #include <unistd.h>
++#include <dirent.h>
++#include <fcntl.h>
++#include <sys/resource.h>
+ #include <stdlib.h>
+ 
+ #include <libubox/blobmsg_json.h>
+@@ -62,6 +65,26 @@ exec_self(int argc, char **argv)
+ 	for (i = 0; i < argc; i++)
+ 		args[i] = argv[i];
+ 
++	/* Plugins may retain source streams and pipes for their lifetime. They
++	 * must not be inherited by the next daemon instance after SIGHUP. */
++	DIR *dir = opendir("/proc/self/fd");
++	struct dirent *entry;
++	struct rlimit limit;
++	int fd;
++
++	if (dir) {
++		while ((entry = readdir(dir)) != NULL) {
++			fd = atoi(entry->d_name);
++			if (fd > STDERR_FILENO && fd != dirfd(dir))
++				fcntl(fd, F_SETFD, FD_CLOEXEC);
++		}
++		closedir(dir);
++	}
++	else if (getrlimit(RLIMIT_NOFILE, &limit) == 0) {
++		for (fd = STDERR_FILENO + 1; (rlim_t)fd < limit.rlim_cur; fd++)
++			fcntl(fd, F_SETFD, FD_CLOEXEC);
++	}
++
+ 	setenv("RPC_HANGUP", "1", 1);
+ 	execv(cmd, (char * const *)args);
+ }

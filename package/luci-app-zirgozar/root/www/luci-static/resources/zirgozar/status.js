@@ -50,7 +50,7 @@ function cachedState() {
 	try {
 		var saved = JSON.parse(window.sessionStorage.getItem(STATE_CACHE_KEY) || 'null');
 		if (saved && saved.state && saved.state.enabled != null && Date.now() - saved.time < 86400000)
-			return saved.state;
+			return Object.assign({}, saved.state, { stale: true });
 	} catch (e) {}
 	return null;
 }
@@ -196,7 +196,7 @@ function badge(st) {
 	   its way down; off and still is simply off, whatever the last attempt
 	   ended as - a failed measurement from before is not news with the switch
 	   off. */
-	if (st.enabled == null)             { text = _('Status unavailable'); cls = 'warn'; }
+	if (st.stale || st.enabled == null)             { text = _('Status unavailable'); cls = 'warn'; }
 	else if (mainSwitch && mainSwitch.edited && mainSwitch.intent !== switchOn(st.enabled))
 	                                   { text = mainSwitch.intent ? _('Switch on pending apply') : _('Switch off pending apply'); cls = 'warn'; }
 	else if (!switchOn(st.enabled) && (st.running || st.connected))
@@ -333,8 +333,8 @@ function coreTile(id, word, name, version, running) {
 	if (t && version)
 		t.appendChild(E('div', { 'class': 'pwp-core-version' }, version));
 	if (v) {
-		v.className = 'mk-big ' + (running ? 'mk-on' : 'mk-bad');
-		v.textContent = running ? _('RUNNING') : _('NOT RUNNING');
+		v.className = 'mk-big ' + (running == null ? '' : (running ? 'mk-on' : 'mk-bad'));
+		v.textContent = running == null ? _('Status unavailable') : (running ? _('RUNNING') : _('NOT RUNNING'));
 	}
 }
 
@@ -388,7 +388,7 @@ function renderState(st) {
 	/* The core: its name beside the word, on
 	   one line, and under it whether it is running, in green or in red. The
 	   version is there when the pointer rests on the tile. */
-	coreTile('pwp-core', _('Core'), coreName(st.core_name), st.core_version, st.core_running);
+	coreTile('pwp-core', _('Core'), st.stale ? '-' : coreName(st.core_name), st.stale ? '' : st.core_version, st.stale ? null : st.core_running);
 
 	/* Anything the user has to act on - and only that. The cross puts it away:
 	   a stored message is cleared, and one worked out fresh each time is
@@ -476,11 +476,17 @@ function renderTraffic(t) {
 	renderUsage();
 }
 
+function renderUnavailable() {
+	renderState(Object.assign({}, lastState || {}, { stale: true, connected: false, status: 'unknown' }));
+}
+
 function refreshState() {
 	var request = ++stateRequest;
 	return callState().then(function(st) {
-		if (request === stateRequest && st && st.enabled != null) { rememberState(st); renderState(st); }
-	}).catch(function() {});
+		if (request !== stateRequest) return;
+		if (st && st.enabled != null) { rememberState(st); renderState(st); }
+		else renderUnavailable();
+	}).catch(function() { if (request === stateRequest) renderUnavailable(); });
 }
 
 /* The connection check: press the tile, one request, timed. */
@@ -628,6 +634,7 @@ return baseclass.extend({
 				if (!byId('pwp-state') && tries++ < 100) { window.setTimeout(whenShown, 50); return; }
 				gotState.then(function(fresh) {
 					if (fresh && fresh.enabled != null) { rememberState(fresh); renderState(fresh); }
+					else renderUnavailable();
 				});
 				if (gotTraffic) gotTraffic.then(renderTraffic);
 			})();

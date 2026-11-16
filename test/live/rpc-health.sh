@@ -6,7 +6,8 @@
 set -eu
 WORK="$(mktemp -d /tmp/zgz-rpc-live.XXXXXX)"
 case "$WORK" in /tmp/zgz-rpc-live.*) : ;; *) exit 1 ;; esac
-export WORK
+RPC_BINARY="${RPC_BINARY:-/sbin/rpcd}"
+export WORK RPC_BINARY
 mkdir "$WORK/bin" "$WORK/run"
 REAL_UBUS="$(command -v ubus)"
 export REAL_UBUS
@@ -23,7 +24,7 @@ cat > "$WORK/service" <<'SERVICE'
 #!/bin/sh
 [ "$1" = restart ] || exit 1
 if [ -s "$WORK/rpc.pid" ]; then kill "$(cat "$WORK/rpc.pid")" 2>/dev/null || true; fi
-(ulimit -n 64; exec /sbin/rpcd -s "$WORK/bus" -t 3) >"$WORK/rpc.log" 2>&1 &
+(ulimit -n 64; exec "$RPC_BINARY" -s "$WORK/bus" -t 3) >"$WORK/rpc.log" 2>&1 &
 echo "$!" > "$WORK/rpc.pid"
 echo restart >> "$WORK/restarts"
 SERVICE
@@ -41,18 +42,28 @@ rpc_pid="$(cat "$WORK/rpc.pid")"
 for i in 1 2 3; do "$HELPER" ensure; done
 [ "$(cat "$WORK/rpc.pid")" = "$rpc_pid" ]
 echo 'PASS: repeated healthy registration checks preserve the RPC process'
+echo "RPC descriptors before reload: $(ls /proc/$rpc_pid/fd | wc -l)"
+initial_fds="$(ls /proc/$rpc_pid/fd | wc -l)"
 broken=0
-for i in 1 2 3 4 5 6 7 8 9 10; do
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
 	kill -HUP "$rpc_pid"
 	sleep 1
+	echo "RPC descriptors after reload $i: $(ls /proc/$rpc_pid/fd | wc -l)"
 	if ! "$HELPER" check; then broken=1; break; fi
 done
+if [ "${RPC_EXPECT_STABLE:-0}" = 1 ]; then
+	[ "$broken" = 0 ]
+	[ "$(ls /proc/$rpc_pid/fd | wc -l)" = "$initial_fds" ]
+	echo 'PASS: twenty reloads preserve RPC execution and the descriptor count'
+	exit 0
+fi
 if [ "$broken" = 0 ]; then
 	echo 'SKIP: this rpcd did not reproduce descriptor exhaustion after reload'
 	exit 0
 fi
 ubus list luci.zirgozar | grep -q '^luci.zirgozar$'
 echo 'PASS: reproduced a registered object whose execution path is broken'
+tail -n 6 "$WORK/rpc.log"
 echo 0 > "$ZGZ_RUN/rpc-restart"
 "$HELPER" watch
 "$HELPER" check

@@ -17,6 +17,9 @@ for source in ['build/packages.inc.sh', 'package/zirgozar/Makefile']:
     assert 'zgz-rpc ensure' in text
     assert '/etc/init.d/rpcd reload' not in text
     assert 'zgz-rpc' in next(line for line in text.splitlines() if line.startswith('ZGZ_SCRIPTS'))
+refresh = (ROOT / 'package/zirgozar/files/zgz-refresh').read_text()
+assert '/etc/init.d/rpcd reload' not in refresh
+assert '"$ZGZ_LIB/zgz-rpc" watch' in refresh
 if not shutil.which('ucode'):
     print('RPC packaging checks passed; runtime tests need ucode')
     raise SystemExit(0)

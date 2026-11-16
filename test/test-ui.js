@@ -5,6 +5,7 @@
 'use strict';
 require('./test-checksites.js');
 require('./test-status-ui.js');
+require('./test-status-freshness.js');
 require('./test-home-ui.js');
 require('./test-nodes-ui.js');
 require('./test-balancing-ui.js');

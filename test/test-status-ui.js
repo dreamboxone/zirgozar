@@ -105,7 +105,8 @@ const stateCache = new Function('rpc', 'i18n', 'window', source.slice(0, source.
 );
 assert.equal(stateCache.cachedState(), null);
 stateCache.rememberState({enabled:true, connected:true, server:'Home', core_name:'Xray', core_version:'26.10.31', message:'Old warning', password:'secret'});
-assert.deepEqual(stateCache.cachedState(), {enabled:true, connected:true, server:'Home', core_name:'Xray', core_version:'26.10.31'});
+assert.deepEqual(stateCache.cachedState(), {enabled:true, connected:true, server:'Home', core_name:'Xray', core_version:'26.10.31', stale:true});
+assert.equal(api.badge({enabled:true, connected:true, stale:true}).textContent, 'Status unavailable');
 stateCache.rememberState({});
 assert.equal(stateCache.cachedState().connected, true, 'empty responses preserve the last valid snapshot');
 stateCache.rememberState({enabled:false, connected:false, core_running:false});
