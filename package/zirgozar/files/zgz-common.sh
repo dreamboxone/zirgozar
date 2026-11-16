@@ -665,7 +665,7 @@ sbconfig() {
 		geoview="$(geoview_path)" geodir="$(geo_dir 2>/dev/null)" \
 		rsdir="$ZGZ_RUN/rs" api="$(cfg api_port 10853)" \
 		bridge="$ZGZ_ETC/bridge.json" bridgeport="$(cfg bridge_port 10808)" etc="$ZGZ_ETC" \
-		mark="$ZGZ_OUT_MARK" level="$_sb_level" certpin="$_sb_pin" newmasque="$_sb_pin" lxcore="$_sb_lx" lxlegacy="$_sb_lxlegacy" lx="$_sb_options" "$@"
+		mark="$ZGZ_OUT_MARK" level="$_sb_level" certpin="$_sb_pin" newmasque="$_sb_pin" lxcore="$_sb_lx" lxlegacy="$_sb_lxlegacy" lxversion="$(core_version_cached "$(engine_singbox_path)")" lx="$_sb_options" "$@"
 }
 
 # Does this sing-box pin a server's certificate by its hash - 1.15 on?

@@ -59,6 +59,25 @@ plain['tls']={'enabled':True,'server_name':'example.com'}
 _, _, lx_config = convert(plain, ['lxcore=1', 'lx='+json.dumps(options)])
 assert lx_config['lx'] == options
 assert 'lx' not in convert(plain)[2]
+# Stable lx.34+ removed the old key; preserve the selected paths and retry policy.
+for version in ['1.14.4-lx.34', '1.14.4-lx.35']:
+    migrated = convert(plain, ['lxcore=1', 'lxversion='+version, 'lx='+json.dumps(options)])[2]['lx']
+    assert 'quic_sniff_decoy' not in migrated
+    assert migrated['sniff_guard'] == {
+        'nodes': {'outbound_type':['masque','wireguard']},
+        'quic': {'method':'decoy_first_byte',
+                 'detour_type': {'*':'never','direct':'never','vless':'clean'}}}
+for mode in ['off', 'direct', 'detour', 'all']:
+    for send in ['retry', 'always']:
+        opts = {'quic_sniff_decoy':{'mode':mode,'send':send}}
+        guard = convert(plain, ['lxcore=1','lxversion=1.14.4-lx.35','lx='+json.dumps(opts)])[2]['lx']['sniff_guard']
+        paths = guard['quic']['detour_type']
+        label = 'clean' if send == 'retry' else 'suspect'
+        assert paths['direct'] == (label if mode in ['direct','all'] else 'never')
+        assert paths.get('vless', 'never') == (label if mode in ['detour','all'] else 'never')
+        assert guard['quic']['method'] == ('off' if mode == 'off' else 'decoy_first_byte')
+assert convert(plain, ['lxcore=1','lxversion=1.14.4-lx.33','lx='+json.dumps(options)])[2]['lx'] == options
+
 for old, expected in [('detour','detour'), (True,'all'), (False,'off')]:
     assert convert(plain, ['lxcore=1','lx='+json.dumps({'quic_sniff_decoy':old})])[2]['lx']['quic_sniff_decoy']=={'mode':expected}
 for invalid, extra in [({'awg_masquerade':'all'}, ['lxcore=1']),
@@ -81,7 +100,8 @@ for candidate, extra in [(endpoint, []), (masque, ['newmasque=1'])]:
     except subprocess.CalledProcessError: pass
     else: raise AssertionError('incompatible MASQUE schema accepted')
 
-for binary, config in [(os.environ.get('RIG_LX_STABLE'), lx_config), (os.environ.get('RIG_LX_NEW'), new_config)]:
+guard_config = convert(plain, ['lxcore=1', 'lxversion=1.14.4-lx.35', 'lx='+json.dumps(options)])[2]
+for binary, config in [(os.environ.get('RIG_LX_GUARD'), guard_config), (os.environ.get('RIG_LX_STABLE'), lx_config), (os.environ.get('RIG_LX_NEW'), new_config)]:
     if binary:
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/'config.json'
@@ -126,3 +146,22 @@ if os.environ.get('RIG_LX'):
         path.write_text(json.dumps(config))
         subprocess.run([os.environ['RIG_LX'], 'check', '-c', str(path)], check=True)
 print('LX imports: encryption, REALITY key_share, XHTTP headers/padding/XMUX, multiline TSV and native MASQUE passed')
+
+# AWG 3 imports must retain header protection and timing ranges.
+awg_extra = {'header_protection_key':'1234567890', 'content_padding_addition':'4-18',
+             'rekey_after_time':120, 'rekey_timeout':'5-10', 'reject_after_time':180,
+             'keepalive_timeout':10, 'max_handshake_attempts':20}
+ini_names = ['HeaderProtectionKey','ContentPaddingAddition','RekeyAfterTime','RekeyTimeout',
+             'RejectAfterTime','KeepaliveTimeout','MaxHandshakeAttempts']
+ini = '[Interface]\nPrivateKey = test-private\nAddress = 10.0.0.2/32\n'
+ini += ''.join(name+' = '+str(value)+'\n' for name,value in zip(ini_names,awg_extra.values()))
+ini += '[Peer]\nPublicKey = test-public\nEndpoint = example.com:13231\n'
+parsed = subprocess.run(['awk','-f',str(files/'zgz-parse')],input=ini,text=True,capture_output=True,check=True).stdout
+payload = json.loads(parsed.strip().split('\t')[5])
+assert payload['type'] == 'amneziawg' and payload['awg'] == awg_extra
+native_awg = {'type':'wireguard','tag':'AWG3','private_key':'test-private','address':['10.0.0.2/32'],
+              'peers':[{'address':'example.com','port':13231,'public_key':'test-public'}], **awg_extra}
+parsed = subprocess.run(['awk','-f',str(files/'zgz-parse')],input=json.dumps({'endpoints':[native_awg]}),text=True,capture_output=True,check=True).stdout
+payload = json.loads(parsed.strip().split('\t')[5])
+assert payload['awg'] == awg_extra
+print('AWG 3 INI and native imports preserve header protection, padding and timing ranges')

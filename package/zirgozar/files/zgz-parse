@@ -2022,13 +2022,13 @@ function mk_wg(secret, addrs, pubkey, psk, keepalive, mtu, reserved) {
 # A number stays a number; a range such as the h1..h4 of version 2, and the
 # decoy-packet language of i1..i5, stay text.
 function awg_json(a,   keys, n, i, k, out) {
-	n = split("jc jmin jmax s1 s2 s3 s4 h1 h2 h3 h4 i1 i2 i3 i4 i5", keys, " ")
+	n = split("jc jmin jmax s1 s2 s3 s4 h1 h2 h3 h4 i1 i2 i3 i4 i5 header_protection_key content_padding_addition rekey_after_time rekey_timeout reject_after_time keepalive_timeout max_handshake_attempts", keys, " ")
 	out = ""
 	for (i = 1; i <= n; i++) {
 		k = keys[i]
 		if (!(k in a)) continue
 		out = out (out != "" ? "," : "") "\"" k "\":" \
-		      (a[k] ~ /^[0-9]+$/ ? a[k] : "\"" jesc(a[k]) "\"")
+		      (k != "header_protection_key" && a[k] ~ /^[0-9]+$/ ? a[k] : "\"" jesc(a[k]) "\"")
 	}
 	return "{" out "}"
 }
@@ -2195,7 +2195,7 @@ function from_singbox(it,   t, lab, peer, aw, ak, ai, nk, sbp, hyo) {
 		# that it does not look like WireGuard on the wire. Xray's wireguard
 		# cannot speak any of it, so it is a node of its own kind, carried by
 		# sing-box-lx.
-		nk = split("jc jmin jmax s1 s2 s3 s4 h1 h2 h3 h4 i1 i2 i3 i4 i5", ak, " ")
+		nk = split("jc jmin jmax s1 s2 s3 s4 h1 h2 h3 h4 i1 i2 i3 i4 i5 header_protection_key content_padding_addition rekey_after_time rekey_timeout reject_after_time keepalive_timeout max_handshake_attempts", ak, " ")
 		for (ai = 1; ai <= nk; ai++)
 			if (jraw(it, ak[ai]) != "") aw[ak[ai]] = junq(jraw(it, ak[ai]))
 		for (ai in aw) {
@@ -3289,6 +3289,7 @@ function wg_conf(doc,   lines, m, i, l, sect, k, v, p,
 			else if (k == "reserved")   reserved = v
 			# AmneziaWG's own lines: junk packets, padding, the message types
 			# it rewrites and the decoy packets sent first.
+			else if (k in AWG_EXTRA) { awg[AWG_EXTRA[k]] = v; nawg++ }
 			else if (k ~ /^(jc|jmin|jmax|s[1-4]|h[1-4]|i[1-5])$/) { awg[k] = v; nawg++ }
 		} else if (sect == "[peer]") {
 			if      (k == "publickey")           pubkey = v
@@ -3343,4 +3344,14 @@ function do_wireguard(body,   label, secret, query, p) {
 		      qs(query, "publickey") != "" ? qs(query, "publickey") : qs(query, "public-key"), \
 		      qs(query, "presharedkey"), qs(query, "keepalive") + 0, \
 		      qs(query, "mtu") + 0, wg_reserved(qs(query, "reserved"))))
+}
+
+BEGIN {
+	AWG_EXTRA["headerprotectionkey"] = "header_protection_key"
+	AWG_EXTRA["contentpaddingaddition"] = "content_padding_addition"
+	AWG_EXTRA["rekeyaftertime"] = "rekey_after_time"
+	AWG_EXTRA["rekeytimeout"] = "rekey_timeout"
+	AWG_EXTRA["rejectaftertime"] = "reject_after_time"
+	AWG_EXTRA["keepalivetimeout"] = "keepalive_timeout"
+	AWG_EXTRA["maxhandshakeattempts"] = "max_handshake_attempts"
 }

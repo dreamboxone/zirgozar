@@ -94,7 +94,7 @@ singbox_config() {
 		_lxlegacy=""; case "$(core_version_cached "$_sb")" in 1.15.0-lx.1-rc.1) _lxlegacy=1 ;; esac
 		_lx_options="$(sb_lx_config)" || return 1
 		ucode "$ZGZ_LIB/zgz-sbconfig" mode=bridge bridge="$NODE" bridgeport="$PORT" etc="$ZGZ_ETC" certpin="$_pin" \
-			lib="$ZGZ_LIB" rsdir="$ZGZ_RUN/rs" mark="$ZGZ_OUT_MARK" lxcore="$_lx" lxlegacy="$_lxlegacy" lx="$_lx_options" > "$ZGZ_BRIDGE_JSON.new" 2>"$ZGZ_RUN/bridge.err" || {
+			lib="$ZGZ_LIB" rsdir="$ZGZ_RUN/rs" mark="$ZGZ_OUT_MARK" lxcore="$_lx" lxlegacy="$_lxlegacy" lxversion="$(core_version_cached "$_sb")" lx="$_lx_options" > "$ZGZ_BRIDGE_JSON.new" 2>"$ZGZ_RUN/bridge.err" || {
 			rm -f "$ZGZ_BRIDGE_JSON.new"
 			say_message "$(sed -n 's/^error: //p' "$ZGZ_RUN/bridge.err" | head -1)"
 			return 1
