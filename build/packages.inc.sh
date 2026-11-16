@@ -9,8 +9,8 @@
 
 # VERSION is the application version; increment RELEASE for package updates.
 # The main zirgozar package always includes the complete LuCI interface.
-VERSION=5.8.26
-RELEASE=1
+VERSION=5.8.25
+RELEASE=3
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
