@@ -6,7 +6,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zirgozar
 PKG_VERSION:=5.8.25
-PKG_RELEASE:=4
+PKG_RELEASE:=5
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
 PKG_LICENSE:=AGPL-3.0-or-later
@@ -241,7 +241,7 @@ fi
 # kept from an older version has no such list; it gets one once, and a list
 # the reader has since trimmed is never filled back in.
 if [ -z "$$(uci -q get zirgozar.config.rebind_seeded)" ]; then
-	for d in banksepah.ir cbi.ir ebanksepah.ir esata.ir gov.ir medu.ir qmb.ir tamin.ir meedc.net ntp.faraborddi.com; do
+	for d in banksepah.ir cbi.ir ebanksepah.ir esata.ir gov.ir medu.ir qmb.ir qmehr724.com tamin.ir meedc.net ntp.faraborddi.com; do
 		uci -q add_list zirgozar.config.rebind_domain="$$d"
 	done
 	uci -q set zirgozar.config.rebind_seeded='1'
