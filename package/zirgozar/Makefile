@@ -5,8 +5,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zirgozar
-PKG_VERSION:=5.8.25
-PKG_RELEASE:=5
+PKG_VERSION:=5.8.26
+PKG_RELEASE:=1
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
 PKG_LICENSE:=AGPL-3.0-or-later
@@ -47,6 +47,7 @@ define Package/zirgozar/install
 	$(INSTALL_DIR) $(1)/usr/libexec/zirgozar
 	$(INSTALL_BIN) ./files/../../../prebuilt/$(ARCH_PACKAGES)/xray $(1)/usr/libexec/zirgozar/xray
 	$(INSTALL_BIN) ./files/../../../prebuilt/$(ARCH_PACKAGES)/sing-box $(1)/usr/libexec/zirgozar/sing-box
+	$(INSTALL_BIN) ./files/../../../prebuilt/$(ARCH_PACKAGES)/zgz-amnezia $(1)/usr/libexec/zirgozar/zgz-amnezia
 
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_DATA) ./files/zirgozar.config $(1)/etc/config/zirgozar

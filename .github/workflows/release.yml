@@ -58,6 +58,20 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v7
 
+      - name: Set up Go for the Amnezia importer
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache: false
+
+      - name: Test the Amnezia importer
+        run: |
+          cd tools/amnezia && go test -race ./...
+          cd ../..
+          sh build/build-amnezia.sh x86_64
+          sh test/test-amnezia.sh
+          node test/test-amnezia-ui.js
+
       - name: Resolve the official Xray release
         id: xray-version
         run: |
@@ -574,6 +588,15 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@v7
+
+      - name: Set up Go for the Amnezia importer
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache: false
+
+      - name: Build the Amnezia importer
+        run: sh build/build-amnezia.sh ${{ matrix.openwrt_arch }}
 
       - name: Fetch the Xray core for ${{ matrix.name }}
         env:

@@ -176,6 +176,7 @@ function selected() {
 /* What kind of node a link is, from the link itself. */
 function linkType(link) {
 	var l = String(link || '').trim();
+	if (/^(vpn|amnezia):\/\//.test(l)) return 'amneziawg';
 	var m = l.match(/^([a-z][a-z0-9+.-]*):\/\//i);
 	if (m) {
 		var t = m[1].toLowerCase();
@@ -249,11 +250,13 @@ function addViaLinks() {
 	/* Where what the new configs need is said, with its install buttons; and
 	   once something was added, closing shows it in the list. */
 	var needsBox = E('div', {});
+	var captchaBox = E('div', {}), captchaInput = null, captchaLink = '';
 	var added = false;
 	ui.showModal(_('Import share links'), [
 		E('p', {}, _('Enter share links, one per line. Subscription links are not supported!')),
 		box,
 		needsBox,
+		captchaBox,
 		E('div', { 'class': 'right' }, [
 			E('button', { 'class': 'btn cbi-button cbi-button-neutral', 'click': function() {
 				ui.hideModal();
@@ -268,7 +271,31 @@ function addViaLinks() {
 						pui.note(b, _('Please enter the correct link.'), 'error');
 						return;
 					}
-					return callAction('add_links', box.value).then(function(r) {
+					var solving = captchaInput && captchaLink === box.value;
+					if (solving && !captchaInput.value.trim()) {
+						pui.note(b, _('Enter the Amnezia verification code shown below.'), 'error');
+						return;
+					}
+					return callAction(solving ? 'amnezia_captcha' : 'add_links', solving ? JSON.stringify({link:box.value, solution:captchaInput.value.trim()}) : box.value).then(function(r) {
+						while (captchaBox.firstChild) captchaBox.removeChild(captchaBox.firstChild);
+						captchaInput = null;
+						if (r && r.amnezia_captcha) {
+							try {
+								var challenge = JSON.parse(r.amnezia_captcha), image = String(challenge.image || '');
+								if (/^[A-Za-z0-9+/=\r\n]+$/.test(image)) image = 'data:image/png;base64,' + image.replace(/[\r\n]/g, '');
+								if (image.length < 524288 && /^data:image\/(png|jpeg|jpg);base64,[A-Za-z0-9+/=]+$/.test(image)) {
+									captchaBox.appendChild(E('img', {src:image, alt:_('Amnezia verification code'), style:'display:block;max-width:100%;margin:8px 0'}));
+									captchaInput = E('input', {type:'text', autocomplete:'off', maxlength:32, placeholder:_('Verification code'), style:'direction:ltr'});
+									captchaBox.appendChild(captchaInput);
+									captchaLink = box.value;
+								}
+							} catch (error) {}
+						}
+						if (r && r.import_error) {
+							added = added || !!r.added;
+							pui.note(b, _(r.import_error), 'error');
+							return;
+						}
 						if (r && !r.added && r.skipped) {
 							pui.note(b, _('They are already in the list.'), 'warn');
 							return;

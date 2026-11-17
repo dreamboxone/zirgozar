@@ -5,6 +5,14 @@
 'require baseclass';
 
 return baseclass.extend({ strings: {
+	"Enter the Amnezia verification code shown below.": "Введите код проверки Amnezia с изображения ниже.",
+	"Amnezia verification code": "Код проверки Amnezia",
+	"Verification code": "Код проверки",
+	"This Amnezia API key is obsolete. Create a new connection in AmneziaVPN, or use amnezia://free?country=ir.": "Этот ключ API Amnezia устарел. Создайте новое подключение в AmneziaVPN или используйте amnezia://free?country=ir.",
+	"Amnezia gateway and its fallback routes are unreachable.": "Шлюз Amnezia и резервные маршруты недоступны.",
+	"The Amnezia importer is not installed.": "Средство импорта Amnezia не установлено.",
+	"Amnezia configuration must be refreshed online.": "Конфигурацию Amnezia необходимо обновить через Интернет.",
+	"No complete AmneziaWG client profile was returned.": "Полный клиентский профиль AmneziaWG не получен.",
 	"Choose a config added manually on the Configs page. L2TP creates an independent connection for these devices, even when the main config is another L2TP account. Devices assigned the same L2TP account share one connection. Requires the L2TP dependencies under Router requirements. If the private connection fails, these devices do not switch to the main config. Separate hysteria2 and tuic connections are not supported here; those use the main config.": "Выберите вручную добавленный узел. L2TP создает отдельное соединение для этих устройств, даже если основной узел — другой аккаунт L2TP. Устройства с одним аккаунтом используют общее соединение. Установите зависимости L2TP в требованиях роутера. При сбое отдельного соединения устройства не переходят на основной узел. Отдельные соединения hysteria2 и tuic здесь не поддерживаются; для них используется основной узел.",
 	"The routing data does not contain the required country or advertising lists. Connected with country bypass and ad blocking off. Download the full routing files on the App Update page.": "В данных маршрутизации отсутствуют нужные списки стран или рекламы. Соединение установлено без прямого подключения по странам и блокировки рекламы. Загрузите полные файлы на странице обновления.",
 	"Routing data is missing. Country bypass and ad blocking need geoip.dat and geosite.dat; download them on the App Update page. Country traffic uses the tunnel until the data is available.": "Нет данных маршрутизации. Для прямого подключения по странам и блокировки рекламы нужны geoip.dat и geosite.dat; загрузите их на странице обновления. Пока данные недоступны, трафик стран идет через туннель.",

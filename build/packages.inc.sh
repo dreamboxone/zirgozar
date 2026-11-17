@@ -7,10 +7,11 @@
 # packages.inc.sh - what goes into a package, shared by the .apk and .ipk
 # builders so the two formats can never drift apart.
 
-# VERSION is the application version; increment RELEASE for package updates.
+# VERSION follows the Solar Hijri date: 1405/08/26 becomes 5.8.26.
+# RELEASE starts at 1 each day and increases for further releases that day.
 # The main zirgozar package always includes the complete LuCI interface.
-VERSION=5.8.25
-RELEASE=5
+VERSION=5.8.26
+RELEASE=1
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -73,6 +74,7 @@ stage_zgz() {
 	install -d "$i/usr/libexec/zirgozar" "$i/etc/config" "$i/etc/init.d" \
 	           "$i/usr/libexec/rpcd" "$i/etc/zirgozar" "$i/etc/zirgozar/geo"
 	install -m 0755 "$core"            "$i/usr/libexec/zirgozar/xray"
+	install -m 0755 "$(dirname "$core")/zgz-amnezia" "$i/usr/libexec/zirgozar/zgz-amnezia"
 	# sing-box ships beside it: the rest of the helpers are installed only
 	# when the reader asks for them, on App Update.
 	[ -f "$(dirname "$core")/sing-box" ] && install -m 0755 "$(dirname "$core")/sing-box" "$i/usr/libexec/zirgozar/sing-box"

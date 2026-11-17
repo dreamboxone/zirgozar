@@ -915,7 +915,12 @@ find_geoview() {
 # and this router does not have - one name a line, each once. What is in no
 # list here needs nothing beyond the engine.
 missing_cores() {
-	LC_ALL=C awk -v LIMIT=1000 -f "$ZGZ_LIB/zgz-parse" 2>/dev/null | cut -f3,6 | while IFS="$(printf '\t')" read -r _mc_p _mc_j; do
+	while IFS= read -r _mc_line || [ -n "$_mc_line" ]; do
+		case "$_mc_line" in
+			vpn://*|amnezia://*) printf '%s\n' "$_mc_line" | amnezia_resolve -offline 2>/dev/null || true ;;
+			*) printf '%s\n' "$_mc_line" ;;
+		esac
+	done | LC_ALL=C awk -v LIMIT=1000 -f "$ZGZ_LIB/zgz-parse" 2>/dev/null | cut -f3,6 | while IFS="$(printf '\t')" read -r _mc_p _mc_j; do
 		case "$_mc_p" in
 			hysteria2|hysteria|tuic|anytls|snell|ssh|ssplugin|openconnect|tailscale)
 				[ -x "$(singbox_path)" ] || [ -x "$(singbox_lx_path)" ] || find_singbox >/dev/null 2>&1 || echo sing-box ;;
@@ -2013,10 +2018,23 @@ node_extras() {
 # several pasted at once; it is split only where a new link begins, because
 # names have spaces in them. A name typed on the page goes after the # of a
 # link that has none of its own.
+amnezia_resolve() {
+	local binary proxy
+	binary="${ZGZ_AMNEZIA_BIN:-$(core_dir)/zgz-amnezia}"
+	[ -x "$binary" ] || { echo 'The Amnezia importer is not installed.' >&2; return 1; }
+	proxy="$(cfg amnezia_proxy '')"
+	ZGZ_AMNEZIA_PROXY="$proxy" "$binary" -cache "$ZGZ_ETC/amnezia" "$@"
+}
+
 section_links() {
 	_sl_link="$(uci -q get "zirgozar.$1.link" 2>/dev/null)" || return 1
 	[ -n "$_sl_link" ] || return 1
 	_sl_name="$(uci -q get "zirgozar.$1.name" 2>/dev/null)" || _sl_name=""
+	case "$_sl_link" in
+		vpn://*|amnezia://*)
+			_sl_link="$(printf '%s\n' "$_sl_link" | amnezia_resolve)" || return 1
+			;;
+	esac
 	# The node's own settings first; they hold for everything that follows.
 	node_extras "$1"
 	# Preserve JSON documents verbatim, including embedded Aether commands.

@@ -625,6 +625,10 @@ add_node() {
 	fi
 	[ -n "$link" ] || return 0
 	case "$link" in
+		vpn://*|amnezia://*)
+			node_records "$_sec" "$(cfg max_nodes 300)" >> "$CHAIN_TSV" || true
+			return 0
+			;;
 		balancing://*|shunt://*|interface://*)
 			node_records "$_sec" "$(cfg max_nodes 300)" >> "$CHAIN_TSV" 2>/dev/null || true
 			return 0
@@ -1134,7 +1138,11 @@ forget_refs() {
 # What a node is, leaving its name aside: the servers its link or file reads
 # as - protocol, address, port and everything else - one a line, sorted.
 node_key() {
-	printf '%s\n' "$1" | LC_ALL=C awk -f "$PARSE" 2>/dev/null | cut -f3- | sort -u
+	local input="$1"
+	case "$input" in
+		vpn://*|amnezia://*) input="$(printf '%s\n' "$input" | amnezia_resolve -offline)" || return 1 ;;
+	esac
+	printf '%s\n' "$input" | LC_ALL=C awk -f "$PARSE" 2>/dev/null | cut -f3- | sort -u
 }
 
 # The node added by hand that the link or file on stdin already is, if any,
@@ -1164,7 +1172,11 @@ cmd_addlinks() {
 	while IFS= read -r _l; do
 		_l="$(printf '%s' "$_l" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 		case "$_l" in *://*) : ;; *) continue ;; esac
-		_rec="$(printf '%s\n' "$_l" | LC_ALL=C awk -v LIMIT=1 -f "$PARSE" 2>/dev/null | head -1)"
+		_input="$_l"
+		case "$_l" in
+			vpn://*|amnezia://*) _input="$(printf '%s\n' "$_l" | amnezia_resolve)" || continue ;;
+		esac
+		_rec="$(printf '%s\n' "$_input" | LC_ALL=C awk -v LIMIT=1 -f "$PARSE" 2>/dev/null | head -1)"
 		[ -n "$_rec" ] || continue
 		if printf '%s\n' "$_l" | cmd_dupof >/dev/null; then
 			_dup=$((_dup + 1))

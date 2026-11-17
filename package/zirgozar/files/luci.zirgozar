@@ -952,14 +952,27 @@ printf("%s\n%s\n%s\nn0\t%s\t%s\t%s\t%d\t%J\n",x.source,x.tag,x.original,x.name,x
 			esac
 			"$NODES" forget $arg >/dev/null 2>&1
 			;;
-		add_links)
+		add_links|amnezia_captcha)
 			# Import share links: one node per link.
-			_n="$(printf '%s\n' "$arg" | "$NODES" addlinks 2>/dev/null)" || _n="0 0"
+			if [ "$name" = 'amnezia_captcha' ]; then
+				json_load "$arg" || { fail 'Invalid Amnezia verification request.'; return; }
+				json_get_var _solution solution
+				json_get_var arg link
+				case "$_solution" in ''|*[!A-Za-z0-9]*) fail 'Invalid Amnezia verification code.'; return ;; esac
+				export ZGZ_AMNEZIA_CAPTCHA_SOLUTION="$_solution"
+			fi
+			_import_err="$(mktemp "$ZGZ_RUN/import-error.XXXXXX")" || { fail 'Import could not be started.'; return; }
+			_import_challenge="$(mktemp "$ZGZ_RUN/import-captcha.XXXXXX")" || { rm -f "$_import_err"; fail 'Import could not be started.'; return; }
+			chmod 600 "$_import_err"
+			_n="$(printf '%s\n' "$arg" | ZGZ_AMNEZIA_CHALLENGE="$_import_challenge" "$NODES" addlinks 2>"$_import_err")" || _n="0 0"
 			detach "$NODES" build
 			json_init
 			json_add_boolean "ok" 1
 			json_add_int "added" "$(echo "$_n" | cut -d' ' -f1)"
 			json_add_int "skipped" "$(echo "$_n 0" | cut -d' ' -f2)"
+			json_add_string "import_error" "$(head -c 1024 "$_import_err")"
+			json_add_string "amnezia_captcha" "$(cat "$_import_challenge")"
+			rm -f "$_import_err" "$_import_challenge"
 			json_add_string "needs" "$(printf '%s\n' "$arg" | missing_cores | tr '\n' ',' | sed 's/,$//')"
 			json_add_string "packages" "$(printf '%s\n' "$arg" | "$DEPS" for 2>/dev/null | tr '\n' ',' | sed 's/,$//')"
 			json_dump

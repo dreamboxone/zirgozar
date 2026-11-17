@@ -32,6 +32,7 @@ DIST="$ROOT/dist"
 
 CORE="$ROOT/prebuilt/$ARCH/xray"
 ensure_xray "$ROOT" "$ARCH"
+sh "$ROOT/build/build-amnezia.sh" "$ARCH"
 [ -f "$CORE" ] || { echo "missing xray: $CORE (run build/build-core.sh)"; exit 1; }
 
 echo ">>> arch    : $ARCH"

@@ -45,6 +45,14 @@ var LANGUAGES = { en: 'English', fa: 'فارسی', zh: '简体中文', ru: 'Ру
 var CATALOGS = { zh: zh.strings, ru: ru.strings };
 
 var FA = {
+	'Enter the Amnezia verification code shown below.': 'کد تایید امنزیا در تصویر زیر را وارد کنید.',
+	'Amnezia verification code': 'کد تایید امنزیا',
+	'Verification code': 'کد تایید',
+	'This Amnezia API key is obsolete. Create a new connection in AmneziaVPN, or use amnezia://free?country=ir.': 'این کلید API امنزیا قدیمی است. در برنامه امنزیا اتصال جدید بسازید، یا لینک amnezia://free?country=ir را وارد کنید.',
+	'Amnezia gateway and its fallback routes are unreachable.': 'ارتباط با درگاه امنزیا و مسیرهای جایگزین آن برقرار نشد.',
+	'The Amnezia importer is not installed.': 'واردکننده امنزیا نصب نیست.',
+	'Amnezia configuration must be refreshed online.': 'کانفیگ امنزیا باید از اینترنت به‌روز شود.',
+	'No complete AmneziaWG client profile was returned.': 'کانفیگ کامل اتصال AmneziaWG دریافت نشد.',
 	'Choose a config added manually on the Configs page. L2TP creates an independent connection for these devices, even when the main config is another L2TP account. Devices assigned the same L2TP account share one connection. Requires the L2TP dependencies under Router requirements. If the private connection fails, these devices do not switch to the main config. Separate hysteria2 and tuic connections are not supported here; those use the main config.': 'یکی از کانفیگ‌های دستی صفحه کانفیگ‌ها را انتخاب کنید. برای L2TP اتصال مستقل همین دستگاه‌ها ساخته می‌شود، حتی اگر کانفیگ اصلی یک اکانت L2TP دیگر باشد. دستگاه‌های دارای اکانت L2TP یکسان، یک اتصال مشترک دارند. پیش‌نیازهای L2TP را از نیازمندی‌های روتر نصب کنید. اگر اتصال اختصاصی قطع شود، این دستگاه‌ها به کانفیگ اصلی منتقل نمی‌شوند. اتصال مستقل hysteria2 و tuic در این بخش پشتیبانی نمی‌شود و این دو از کانفیگ اصلی استفاده می‌کنند.',
 	'The routing data does not contain the required country or advertising lists. Connected with country bypass and ad blocking off. Download the full routing files on the App Update page.': 'داده‌های مسیریابی، فهرست کشورها یا تبلیغات مورد نیاز را ندارند. اتصال با عبور مستقیم کشورها و مسدودکردن تبلیغات خاموش برقرار شد. فایل‌های کامل مسیریابی را از صفحه به‌روزرسانی دریافت کنید.',
 	'Routing data is missing. Country bypass and ad blocking need geoip.dat and geosite.dat; download them on the App Update page. Country traffic uses the tunnel until the data is available.': 'داده‌های مسیریابی موجود نیست. عبور مستقیم کشورها و مسدودکردن تبلیغات به geoip.dat و geosite.dat نیاز دارد؛ آن‌ها را از صفحه به‌روزرسانی دریافت کنید. تا آن زمان ترافیک کشورها از تونل عبور می‌کند.',

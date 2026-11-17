@@ -5,6 +5,14 @@
 'require baseclass';
 
 return baseclass.extend({ strings: {
+	"Enter the Amnezia verification code shown below.": "请输入下图中的 Amnezia 验证码。",
+	"Amnezia verification code": "Amnezia 验证码",
+	"Verification code": "验证码",
+	"This Amnezia API key is obsolete. Create a new connection in AmneziaVPN, or use amnezia://free?country=ir.": "此 Amnezia API 密钥已过时。请在 AmneziaVPN 中创建新连接，或使用 amnezia://free?country=ir。",
+	"Amnezia gateway and its fallback routes are unreachable.": "无法连接 Amnezia 网关及其备用路径。",
+	"The Amnezia importer is not installed.": "尚未安装 Amnezia 导入工具。",
+	"Amnezia configuration must be refreshed online.": "需要联网更新 Amnezia 配置。",
+	"No complete AmneziaWG client profile was returned.": "未返回完整的 AmneziaWG 客户端配置。",
 	"Choose a config added manually on the Configs page. L2TP creates an independent connection for these devices, even when the main config is another L2TP account. Devices assigned the same L2TP account share one connection. Requires the L2TP dependencies under Router requirements. If the private connection fails, these devices do not switch to the main config. Separate hysteria2 and tuic connections are not supported here; those use the main config.": "选择在节点页面手动添加的配置。L2TP 为这些设备建立独立连接，即使主配置是另一个 L2TP 账号。同一 L2TP 账号的设备共用一个连接。请在路由器需求中安装 L2TP 依赖。专用连接失败时，这些设备不会切换到主配置。此处不支持独立 hysteria2 或 tuic 连接，它们使用主配置。",
 	"The routing data does not contain the required country or advertising lists. Connected with country bypass and ad blocking off. Download the full routing files on the App Update page.": "路由数据缺少所需国家或广告列表。已关闭按国家直连和广告拦截以建立连接。请在更新页面下载完整路由文件。",
 	"Routing data is missing. Country bypass and ad blocking need geoip.dat and geosite.dat; download them on the App Update page. Country traffic uses the tunnel until the data is available.": "缺少路由数据。按国家直连和广告拦截需要 geoip.dat 与 geosite.dat；请在更新页面下载。在数据可用之前，这些国家的流量经过隧道。",

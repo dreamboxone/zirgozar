@@ -8,8 +8,8 @@
 #
 #   ./build/build-apk.sh [openwrt-arch] [path-to-apk-binary]
 #
-# Neither package compiles anything, so the only thing an OpenWrt SDK is
-# really needed for is `apk mkpkg`. This performs the same steps
+# The cores are prebuilt and the Amnezia importer is cross-compiled with Go;
+# the OpenWrt SDK supplies `apk mkpkg`. This performs the same steps
 # include/package-pack.mk performs - file list, conffiles and checksums,
 # install and removal scripts - and then calls it.
 
@@ -46,6 +46,7 @@ fi
 
 CORE="$ROOT/prebuilt/$ARCH/xray"
 ensure_xray "$ROOT" "$ARCH"
+sh "$ROOT/build/build-amnezia.sh" "$ARCH"
 [ -f "$CORE" ] || { echo "missing xray: $CORE (run build/build-core.sh)"; exit 1; }
 
 echo ">>> apk tool : $APK"
