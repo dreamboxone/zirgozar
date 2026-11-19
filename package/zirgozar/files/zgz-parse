@@ -547,14 +547,12 @@ function do_vmess(body,   j, k, v, o, label) {
 	# One link must never inherit the previous one's xhttp settings.
 	XEXTRA = ""
 	split("", o)
-	# a flat object, so a plain key scan needs no JSON parser
-	while (match(j, /"[A-Za-z0-9_-]+"[ \t]*:[ \t]*("[^"]*"|-?[0-9.]+|true|false|null)/)) {
+	while (match(j, /"[A-Za-z0-9_-]+"[ \t]*:[ \t]*("([^"\\]|\\.)*"|-?[0-9.]+|true|false|null)/)) {
 		k = substr(j, RSTART, RLENGTH)
 		v = k
 		sub(/^"/, "", k); sub(/".*/, "", k)
 		sub(/^[^:]*:[ \t]*/, "", v)
-		gsub(/^"|"$/, "", v)
-		o[k] = v
+		o[k] = junq(v)
 		j = substr(j, RSTART + RLENGTH)
 	}
 	HOST = o["add"]; PORT = o["port"] + 0

@@ -22,4 +22,19 @@ for (const label of labels) {
  assert.equal(fields.length, 6);
  assert.equal(fields[1], label, 'parser preserves flags, suffixes and long names');
 }
+const vmessLabel = '🇩🇪⇯🇮🇷 ▸ "آلمان" ⚡';
+const vmessJson = JSON.stringify({
+ ps: vmessLabel,
+ add: 'example.com',
+ port: 443,
+ id: '11111111-2222-3333-4444-555555555555'
+}).replace(/[^\x00-\x7F]/g, char => '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0'));
+const vmessLink = 'vmess://' + Buffer.from(vmessJson).toString('base64');
+const vmessResult = spawnSync('awk', ['-f', path.join(root, 'package/zirgozar/files/zgz-parse')], {
+ input: vmessLink + '\n', encoding: 'utf8', env: { ...process.env, LC_ALL: 'C' }
+});
+assert.equal(vmessResult.status, 0, vmessResult.stderr || String(vmessResult.error));
+const vmessFields = vmessResult.stdout.trimEnd().split('\t');
+assert.equal(JSON.parse('"' + vmessFields[1] + '"'), vmessLabel);
+assert.deepEqual(vmessFields.slice(2, 5), ['vmess', 'example.com', '443']);
 console.log('Node labels: complete Unicode remarks survive form and parser');

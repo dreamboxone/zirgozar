@@ -10,7 +10,7 @@
 # VERSION follows the Solar Hijri date: 1405/08/26 becomes 5.8.26.
 # RELEASE starts at 1 each day and increases for further releases that day.
 # The main zirgozar package always includes the complete LuCI interface.
-VERSION=5.8.26
+VERSION=5.8.28
 RELEASE=1
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
