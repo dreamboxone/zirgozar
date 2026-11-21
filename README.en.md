@@ -129,24 +129,32 @@ release from GitHub automatically and uses OpenWrt's `jsonfilter` utility.
 (
   set -eu
   . /etc/openwrt_release
-  tag="$(wget -qO- https://api.github.com/repos/dreamboxone/zirgozar/releases/latest | jsonfilter -e '@.tag_name')"
+  install_dir="$(mktemp -d /tmp/zirgozar-install.XXXXXX)"
+  trap 'rm -f "$install_dir"/*; rmdir "$install_dir"' EXIT
+  wget -4 -O "$install_dir/release.json" https://api.github.com/repos/dreamboxone/zirgozar/releases/latest
+  tag="$(jsonfilter -i "$install_dir/release.json" -e '@.tag_name')"
   case "$tag" in
     v[0-9]*) ;;
     *) echo 'Could not determine the latest release.' >&2; exit 1 ;;
   esac
   version="${tag#v}"
-  base="https://github.com/dreamboxone/zirgozar/releases/download/$tag"
-  install_dir="/tmp/zirgozar-install-$version"
-  mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
     main="zirgozar-$version.$DISTRIB_ARCH.apk"
-    wget -O "$install_dir/$main" "$base/$main"
-    apk update
+    if ! asset_url="$(jsonfilter -i "$install_dir/release.json" -e "@.assets[@.name=\"$main\"].url")" || [ -z "$asset_url" ]; then
+      echo "Package $main was not found in release $tag." >&2
+      exit 1
+    fi
+    wget -4 -T 90 --header="Accept: application/octet-stream" -O "$install_dir/$main" "$asset_url"
+    apk update || echo "Warning: Could not refresh all package feeds." >&2
     apk add --allow-untrusted --upgrade "$install_dir/$main"
   elif command -v opkg >/dev/null 2>&1; then
     main="zirgozar_${version}_${DISTRIB_ARCH}.ipk"
-    wget -O "$install_dir/$main" "$base/$main"
-    opkg update
+    if ! asset_url="$(jsonfilter -i "$install_dir/release.json" -e "@.assets[@.name=\"$main\"].url")" || [ -z "$asset_url" ]; then
+      echo "Package $main was not found in release $tag." >&2
+      exit 1
+    fi
+    wget -4 -T 90 --header="Accept: application/octet-stream" -O "$install_dir/$main" "$asset_url"
+    opkg update || echo "Warning: Could not refresh all package feeds." >&2
     opkg install "$install_dir/$main"
   else
     echo 'apk or opkg was not found.' >&2
