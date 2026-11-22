@@ -24,6 +24,12 @@
   <a href="https://t.me/routekernel1">💬 <b>پشتیبانی در تلگرام</b></a>
 </p>
 
+## آموزش‌های ویدیویی زیرگذر
+
+- [آموزش اول](https://www.youtube.com/watch?v=uj5KoTtG9Eo)
+- [آموزش دوم](https://www.youtube.com/watch?v=lqiDbsb49Zc)
+- [آموزش سوم](https://www.youtube.com/watch?v=NYmpwVU2oNg)
+
 ## ✨ ویژگی‌ها
 
 - **چهار زبان رابط:** فارسی، انگلیسی، چینی ساده (简体中文) و روسی (Русский)، با انتخاب زبان از بالای صفحه.
