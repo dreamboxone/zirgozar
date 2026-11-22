@@ -23,7 +23,7 @@ FAIL=0
 echo "== every shell script parses"
 for f in "$ROOT"/package/zirgozar/files/zgz-* "$ROOT"/package/zirgozar/files/zirgozar.init "$ROOT"/package/zirgozar/files/zirgozar-led.init "$ROOT"/package/zirgozar/files/zirgozar-dns.init "$ROOT"/package/zirgozar/files/zirgozar-server.init \
          "$ROOT"/package/zirgozar/files/zirgozar-killswitch.init "$ROOT"/package/zirgozar/files/zirgozar-killswitch.hotplug \
-         "$ROOT"/package/zirgozar/files/luci.zirgozar "$ROOT"/build/*.sh "$ROOT"/test/*.sh; do
+         "$ROOT"/package/zirgozar/files/luci.zirgozar "$ROOT"/package/zirgozar/files/luci.zirgozar_clients "$ROOT"/package/zirgozar/files/zirgozar-clients.init "$ROOT"/build/*.sh "$ROOT"/test/*.sh; do
 	case "$f" in *zgz-parse|*zgz-sbconfig|*zgz-sbstats|*zgz-l2tpconfig|*zgz-ikev2config|*zgz-delta-plan|*zgz-aether-scan-result) continue ;; esac
 	if sh -n "$f" 2>/dev/null; then
 		ok "$(basename "$f")"
@@ -200,6 +200,13 @@ done
 MISSING=""
 for f in $LUCI_FILES; do
 	[ -f "$ROOT/package/luci-app-zirgozar/root/$f" ] || MISSING="$MISSING $f(not in the tree)"
+	case "$f" in
+		www/luci-static/resources/view/zirgozar/users/*.js)
+			grep -Fq "${f%/*}/*.js" "$ROOT/package/zirgozar/Makefile" || MISSING="$MISSING $f(Makefile)"
+			grep -Fq "${f%/*}/\"*.js" "$ROOT/build/packages.inc.sh" || MISSING="$MISSING $f(packages.inc.sh)"
+			continue
+			;;
+	esac
 	grep -qw "$(basename "$f")" "$ROOT/package/zirgozar/Makefile" || MISSING="$MISSING $f(Makefile)"
 	# Without the extension: the shell builder installs the three views from a
 	# loop over their names, so the file name never appears in it whole.
@@ -221,9 +228,8 @@ echo "== the staged web package contains every application module"
 	stage_luci "$_stage" "$ROOT"
 	[ ! -e "$_stage/luci-app-zirgozar/www" ] || exit 1
 	cmp -s "$ROOT/LICENSE" "$_stage/luci-app-zirgozar/usr/share/doc/luci-app-zirgozar/LICENSE" || exit 1
-	for _source in "$ROOT"/package/luci-app-zirgozar/root/www/luci-static/resources/zirgozar/*.js; do
-		_module="$(basename "$_source")"
-		cmp -s "$_source" "$_stage/zirgozar/www/luci-static/resources/zirgozar/$_module" || exit 1
+	for _file in $LUCI_FILES; do
+		cmp -s "$ROOT/package/luci-app-zirgozar/root/$_file" "$_stage/zirgozar/$_file" || exit 1
 	done
 ) && ok 'all application modules reach the staged package unchanged' || bad 'an application module is missing or changed in the staged package'
 
