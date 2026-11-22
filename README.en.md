@@ -849,6 +849,12 @@ not the tunnel does.
 v2rayNG, NekoBox and the like. To connect from outside, the router has to be
 reachable from the internet: a public IP, or a port forward on the modem.
 
+### 👥 4.11 User Management
+
+In 5.9.1 and later, open **Services → Zirgozar → User Management** to find connected devices, monitor their traffic and manage internet or WiFi access per device. To set a bandwidth limit, open a device from **Devices**, enter the download and upload limits, and select **Save**. Use **Remove Limit** to clear a saved limit. The download limit applies to IPv4 traffic.
+
+---
+
 ## 🎯 5. How a config is chosen
 
 You do not need to know this, but if you are curious: choosing happens in **two
@@ -1034,6 +1040,8 @@ If you run a modified version on a router whose web page other people use over t
 ---
 
 ## 🙏 10. Thanks
+
+Thanks to **Tuhin Garai (nightcodex7)** for developing and publishing [luci-app-client-manager](https://github.com/nightcodex7/luci-app-client-manager). Zirgozar’s User Management section adapts that project under the Apache-2.0 license.
 
 Thanks to [patterniha](https://github.com/patterniha) for developing
 [their Xray-core build](https://github.com/patterniha/Xray-core) and
