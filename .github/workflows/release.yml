@@ -703,7 +703,11 @@ jobs:
           # shipped without its executable bit is a package that installs
           # perfectly and then does nothing at all.
           for base in verify/apk verify/ipk/data; do
-            test -x "$base/usr/libexec/zirgozar/xray"
+            test ! -e "$base/usr/libexec/zirgozar/xray"
+            test ! -e "$base/usr/libexec/zirgozar/sing-box"
+            test -x "$base/etc/init.d/zirgozar-clients"
+            test -x "$base/usr/libexec/rpcd/luci.zirgozar_clients"
+            test -s "$base/etc/config/zirgozar_clients"
             test -x "$base/etc/init.d/zirgozar"
             test -x "$base/etc/init.d/zirgozar-dns"
             test -x "$base/usr/libexec/rpcd/luci.zirgozar"
@@ -714,7 +718,6 @@ jobs:
             test -s "$base/etc/zirgozar/version"
           done
           echo "== every shipped helper is executable in both formats"
-          file verify/apk/usr/libexec/zirgozar/xray
 
           # The version the web interface shows has to be the version that
           # was built, not one somebody forgot to bump.
