@@ -479,6 +479,10 @@ Add 中选 WARP，通过 [warp-plus](https://github.com/bepass-org/warp-plus) �
 
 每行可显示链接和二维码，供 v2rayNG/NekoBox 等使用。外部接入需要公网可达地址或上级调制解调器端口转发。
 
+### 👥 4.11 用户管理
+
+从 5.9.1 起，在 **服务 → Zirgozar → 用户管理** 中可以查找已连接的设备、查看流量，并分别管理互联网或 WiFi 访问权限。要限速，请在 **设备** 中打开目标设备，填写下载和上传速率上限，再点 **保存**。用 **移除限速** 清除已保存的限制。下载限速适用于 IPv4 流量。
+
 ## 🎯 5. 自动选择原理
 
 先并行 TCP 握手（默认 30），排除不可连接项；再按初筛延迟顺序，每批 10 个发完整网页请求，找到低于阈值（默认 1 秒）的配置就停止。结果缓存，故障时尝试后续候选，而非总是从头测。Ping 常由 CDN 边缘回复，也有正常服务器不回应 ICMP，因此默认不是 Ping。选用其他预筛选或前置代理时行为按对应设置调整。
@@ -559,6 +563,8 @@ rm -rf /etc/config/zirgozar /etc/config/zirgozar_server /etc/zirgozar
 GNU AGPL v3 或更新版本（AGPL-3.0-or-later），全文见 [LICENSE](LICENSE)。Xray-core 由其作者按 MPL-2.0 授权。若修改后的版本通过网络供他人使用，AGPL 要求提供该版本对应源代码。
 
 ## 🙏 10. 致谢
+
+感谢 **Tuhin Garai (nightcodex7)** 开发并发布 [luci-app-client-manager](https://github.com/nightcodex7/luci-app-client-manager)。Zirgozar 的用户管理功能是基于该 Apache-2.0 许可项目改编的。
 
 感谢 [patterniha](https://github.com/patterniha) 的 [Xray-core](https://github.com/patterniha/Xray-core) 和 [PattN](https://github.com/patterniha/PattN)，它们使核心及链接参数兼容成为可能。默认免费公共配置为 [@Raydikalx](https://t.me/raydikalx) 维护的 **TOP 100**；伊朗路由数据来自 [Chocolate4U/Iran-v2ray-rules](https://github.com/Chocolate4U/Iran-v2ray-rules)，查询使用 [Geoview](https://github.com/snowie2000/geoview)，WARP 使用 [warp-plus](https://github.com/bepass-org/warp-plus)。本项目不运营自己的代理服务器，只测试和选择这些来源在你所在网络可用的配置。
 
