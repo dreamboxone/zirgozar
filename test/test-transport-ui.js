@@ -25,10 +25,15 @@ delete nodes[2].fallback_no_ip; nodes[2].chain_proxy='1'; nodes[2].preproxy_node
 assert.notEqual(transport.validateFallback(nodes,'a','b',read),true,'fallback through pre-proxy cycle rejected');
 delete nodes[1].fallback_failed; delete nodes[2].chain_proxy;
 const fields={};
-transport.addFields({option(type,key,label,description){return fields[key]={type,label,description,choices:[],value(v,l){this.choices.push(v);}}},formvalue:()=>undefined},x=>x,x=>x,'a');
+transport.addFields({option(type,key,label,description){return fields[key]={type,label,description,choices:[],dependencies:[],value(v,l){this.choices.push(v);},depends(key,value){this.dependencies.push([key,value]);}}},formvalue:()=>undefined},x=>x,x=>x,'a');
 assert.equal(fields.tcp_handshake_timeout.datatype,'and(uinteger,range(0,2147483647))');
 assert.equal(fields.tcp_keepalive_count.datatype,'and(uinteger,range(0,127))');
 assert.deepEqual(fields.happy_eyeballs_success.choices,['','tcpConnected','tlsHandshakeComplete']);
+assert.equal(fields.happy_eyeballs_interleave.datatype, 'range(1,32)');
+assert.deepEqual(fields.happy_eyeballs_assure.choices, ['', '1', '0']);
+assert.deepEqual(fields.happy_eyeballs_assure.dependencies, [['happy_eyeballs', '1']]);
+assert.deepEqual(fields.fallback_pass_address.choices, ['', '1', '0']);
+assert.equal(fields.fallback_pass_address.dependencies[0][1].test('_none'), false);
 assert.deepEqual(fields.fallback_failed.choices,['','_none','b','c','json']);
 assert.equal(fields.fallback_failed.validate('a','b'),true);
 console.log('Transport form: timeout ranges, native config choices, deleted targets and fallback/proxy cycles passed');

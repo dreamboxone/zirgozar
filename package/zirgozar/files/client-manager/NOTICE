@@ -1,0 +1,6 @@
+Client Manager for OpenWrt
+Copyright (C) 2026 Tuhin Garai <tuhin@nightcode.org>
+https://github.com/nightcodex7/luci-app-client-manager
+Upstream revision 4615230ff99755c25023e0779035b8e139e4dea9
+Licensed under the Apache License, Version 2.0.
+Modified for Zirgozar navigation, packaging and RPC access.

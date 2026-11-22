@@ -5,7 +5,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zirgozar
-PKG_VERSION:=5.8.28
+PKG_VERSION:=5.9.1
 PKG_RELEASE:=1
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
@@ -23,7 +23,7 @@ define Package/zirgozar
   CATEGORY:=Network
   TITLE:=Transparent proxy client built on Xray
   URL:=https://github.com/dreamboxone/zirgozar
-  DEPENDS:=+dnsmasq-full +jshn +libubox +curl +ca-bundle +nftables +kmod-nft-tproxy +kmod-nft-socket +ip-full +unzip +ucode +ucode-mod-fs +luci-base
+  DEPENDS:=+dnsmasq-full +jshn +libubox +curl +ca-bundle +nftables +kmod-nft-tproxy +kmod-nft-socket +ip-full +unzip +ucode +ucode-mod-fs +luci-base +rpcd-mod-iwinfo +conntrack
 endef
 
 define Package/zirgozar/description
@@ -38,6 +38,7 @@ endef
 define Package/zirgozar/conffiles
 /etc/config/zirgozar
 /etc/config/zirgozar_server
+/etc/config/zirgozar_clients
 endef
 
 define Build/Compile
@@ -45,12 +46,11 @@ endef
 
 define Package/zirgozar/install
 	$(INSTALL_DIR) $(1)/usr/libexec/zirgozar
-	$(INSTALL_BIN) ./files/../../../prebuilt/$(ARCH_PACKAGES)/xray $(1)/usr/libexec/zirgozar/xray
-	$(INSTALL_BIN) ./files/../../../prebuilt/$(ARCH_PACKAGES)/sing-box $(1)/usr/libexec/zirgozar/sing-box
 	$(INSTALL_BIN) ./files/../../../prebuilt/$(ARCH_PACKAGES)/zgz-amnezia $(1)/usr/libexec/zirgozar/zgz-amnezia
 
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_DATA) ./files/zirgozar.config $(1)/etc/config/zirgozar
+	$(INSTALL_DATA) ./files/zirgozar_clients.config $(1)/etc/config/zirgozar_clients
 	$(INSTALL_DATA) ./files/zirgozar_server.config $(1)/etc/config/zirgozar_server
 	$(INSTALL_DIR) $(1)/usr/share/zirgozar
 	$(INSTALL_DATA) ./files/zirgozar.config $(1)/usr/share/zirgozar/zirgozar.config
@@ -59,6 +59,7 @@ define Package/zirgozar/install
 
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/zirgozar.init $(1)/etc/init.d/zirgozar
+	$(INSTALL_BIN) ./files/zirgozar-clients.init $(1)/etc/init.d/zirgozar-clients
 	$(INSTALL_BIN) ./files/zirgozar-led.init $(1)/etc/init.d/zirgozar-led
 	$(INSTALL_BIN) ./files/zirgozar-dns.init $(1)/etc/init.d/zirgozar-dns
 	$(INSTALL_BIN) ./files/zirgozar-server.init $(1)/etc/init.d/zirgozar-server
@@ -72,11 +73,17 @@ define Package/zirgozar/install
 
 	$(INSTALL_DIR) $(1)/usr/libexec/rpcd
 	$(INSTALL_BIN) ./files/luci.zirgozar $(1)/usr/libexec/rpcd/luci.zirgozar
+	$(INSTALL_BIN) ./files/luci.zirgozar_clients $(1)/usr/libexec/rpcd/luci.zirgozar_clients
+	$(INSTALL_DIR) $(1)/usr/share/zirgozar/client-manager
+	$(INSTALL_DATA) ./files/client-manager/LICENSE ./files/client-manager/NOTICE $(1)/usr/share/zirgozar/client-manager/
 
 	$(INSTALL_DIR) $(1)/etc/zirgozar/geo
 	echo "$(PKG_VERSION)-r$(PKG_RELEASE)" > $(1)/etc/zirgozar/version
 
 	$(INSTALL_DIR) $(1)/www/luci-static/resources/view/zirgozar
+	$(INSTALL_DIR) $(1)/www/luci-static/resources/view/zirgozar/users
+	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/view/zirgozar/users/*.js \
+		$(1)/www/luci-static/resources/view/zirgozar/users/
 	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/view/zirgozar/subscribe.js \
 		$(1)/www/luci-static/resources/view/zirgozar/subscribe.js
 	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/view/zirgozar/geoview.js \
@@ -103,6 +110,8 @@ define Package/zirgozar/install
 		$(1)/www/luci-static/resources/view/zirgozar/server.js
 
 	$(INSTALL_DIR) $(1)/www/luci-static/resources/zirgozar
+	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/clients.js \
+		$(1)/www/luci-static/resources/zirgozar/clients.js
 	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/i18n.js \
 		$(1)/www/luci-static/resources/zirgozar/i18n.js
 	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/lang_zh.js \
@@ -163,29 +172,13 @@ endef
 define Package/zirgozar/preinst
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] && exit 0
-# An Xray the reader chose on App Update - a version picked from the list, or
-# any install they asked for - is theirs, and a new release of this program
-# does not replace it with the one it ships. It is moved aside here, out of
-# the package manager's way, and put back once the new files are in.
+# Preserve cores from older packages and from manual installs across upgrades.
 D=/usr/libexec/zirgozar
-if [ -x "$$D/xray" ]; then
-	have="$$("$$D/xray" version 2>/dev/null | awk 'NR == 1 { print $$2 }')"
-	shipped="$$(cat /etc/zirgozar/xray-version 2>/dev/null)"
-	if [ -f /etc/zirgozar/xray-chosen ] || { [ -n "$$have" ] && [ -n "$$shipped" ] && [ "$$have" != "$${shipped#v}" ]; }; then
-		mv -f "$$D/xray" "$$D/xray.keep"
-		[ -f /etc/zirgozar/xray-chosen ] || echo "$$have" > /etc/zirgozar/xray-chosen
+for core in xray sing-box; do
+	if [ -x "$$D/$$core" ]; then
+		mv -f "$$D/$$core" "$$D/$$core.keep" || exit 1
 	fi
-fi
-# sing-box the same way. One that came before this program shipped its own
-# was the reader's, installed on App Update, and is kept too.
-if [ -x "$$D/sing-box" ]; then
-	have="$$("$$D/sing-box" version 2>/dev/null | awk 'NR == 1 { print $$3 }')"
-	shipped="$$(cat /etc/zirgozar/sing-box-version 2>/dev/null)"
-	if [ -f /etc/zirgozar/sing-box-chosen ] || [ -z "$$shipped" ] || { [ -n "$$have" ] && [ "$$have" != "$${shipped#v}" ]; }; then
-		mv -f "$$D/sing-box" "$$D/sing-box.keep"
-		[ -f /etc/zirgozar/sing-box-chosen ] || echo "$$have" > /etc/zirgozar/sing-box-chosen
-	fi
-fi
+done
 exit 0
 endef
 
@@ -266,6 +259,8 @@ bounded 15 /usr/libexec/zgz-router schedule sync >/dev/null 2>&1 || true
 /usr/libexec/zgz-rpc ensure >/dev/null 2>&1 || true
 # Always in the boot sequence; the main switch decides whether it runs.
 /etc/init.d/zirgozar enable >/dev/null 2>&1
+/etc/init.d/zirgozar-clients enable >/dev/null 2>&1
+/etc/init.d/zirgozar-clients start >/dev/null 2>&1
 /etc/init.d/zirgozar-led enable >/dev/null 2>&1
 /etc/init.d/zirgozar-led restart >/dev/null 2>&1
 /etc/init.d/zirgozar-server enable >/dev/null 2>&1
@@ -288,6 +283,8 @@ define Package/zirgozar/prerm
 # open it again.
 /usr/libexec/zgz-rules ks down >/dev/null 2>&1
 /etc/init.d/zirgozar-killswitch disable >/dev/null 2>&1
+/etc/init.d/zirgozar-clients stop >/dev/null 2>&1
+/etc/init.d/zirgozar-clients disable >/dev/null 2>&1
 /etc/init.d/zirgozar-led stop >/dev/null 2>&1
 /etc/init.d/zirgozar-led disable >/dev/null 2>&1
 /etc/init.d/zirgozar-server stop >/dev/null 2>&1

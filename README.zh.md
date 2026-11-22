@@ -34,11 +34,10 @@
 
 | 资源 | 最低要求 | 建议 |
 |---|---|---|
-| 基础安装可用存储 | 约 120 MB | 至少 160 MB |
 | RAM | 128 MB | 256 MB 或更多 |
 | CPU | 有对应 Xray 构建的架构 | 双核或更多 |
 
-主包同时包含 Xray 和 sing-box。在 `arm_cortex-a7_neon-vfpv4` 参考路由器上，主包安装后约占 105 MB，界面不足 1 MB。已安装其他 `xray-core` 不会省去主包自带副本；压缩包大小也不等于安装占用。
+主软件包包含 Zirgozar 和 LuCI 界面。安装软件包后，请在应用更新页安装 Xray。如需使用 sing-box，请另行安装并在基本设置中选择。所需空间取决于核心、架构和依赖项。
 
 安装全部列出的核心、工具和完整路由数据约需 400 MB，建议至少准备 1 GB 可用存储。此测量包含 Xray、patterniha Xray、sing-box、sing-box-lx、Geoview、warp-plus、Vwarp、Aether 及其辅助文件、Mihomo、shadowsocks-rust、OpenVPN 和 HAProxy。更新缓存另约 38 MB；完整路由数据约 24 MB，精简版两文件约 2 MB。订阅、历史、后续版本和临时解压还会增加占用；完整安装适合 USB 或 extroot。
 
@@ -47,9 +46,7 @@ df -h /overlay /tmp
 du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 ```
 
-32/64 MB 总闪存装不下当前基础包；128 MB 总闪存也不代表有 120 MB 可写空间。仅把下载目录改为 USB，不会移动初始包自带的两个核心。
-
-运行核心通常占用 40–80 MB RAM。小内存设备可将配置页的 **Checked at once** 从 30 降到 10，降低并行握手压力。参考设备为四核 Cortex-A7、717 MHz，实测隧道约 1.6 MB/s，98 个配置的选择约 8.8 秒；这些不是所有设备的性能保证。
+运行核心通常占用 40–80 MB RAM。自动选择的两个阶段都按路由器内存限制并发数，配置页面会显示上限。参考设备为四核 Cortex-A7、717 MHz，实测隧道约 1.6 MB/s，98 个配置的选择约 8.8 秒；这些不是所有设备的性能保证。
 
 ## 📦 2. 安装
 
@@ -72,24 +69,32 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 (
   set -eu
   . /etc/openwrt_release
-  tag="$(wget -qO- https://api.github.com/repos/dreamboxone/zirgozar/releases/latest | jsonfilter -e '@.tag_name')"
+  install_dir="$(mktemp -d /tmp/zirgozar-install.XXXXXX)"
+  trap 'rm -f "$install_dir"/*; rmdir "$install_dir"' EXIT
+  wget -4 -O "$install_dir/release.json" https://api.github.com/repos/dreamboxone/zirgozar/releases/latest
+  tag="$(jsonfilter -i "$install_dir/release.json" -e '@.tag_name')"
   case "$tag" in
     v[0-9]*) ;;
     *) echo 'Could not determine the latest release.' >&2; exit 1 ;;
   esac
   version="${tag#v}"
-  base="https://github.com/dreamboxone/zirgozar/releases/download/$tag"
-  install_dir="/tmp/zirgozar-install-$version"
-  mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
     main="zirgozar-$version.$DISTRIB_ARCH.apk"
-    wget -O "$install_dir/$main" "$base/$main"
-    apk update
+    if ! asset_url="$(jsonfilter -i "$install_dir/release.json" -e "@.assets[@.name=\"$main\"].url")" || [ -z "$asset_url" ]; then
+      echo "Package $main was not found in release $tag." >&2
+      exit 1
+    fi
+    wget -4 -T 90 --header="Accept: application/octet-stream" -O "$install_dir/$main" "$asset_url"
+    apk update || echo "Warning: Could not refresh all package feeds." >&2
     apk add --allow-untrusted --upgrade "$install_dir/$main"
   elif command -v opkg >/dev/null 2>&1; then
     main="zirgozar_${version}_${DISTRIB_ARCH}.ipk"
-    wget -O "$install_dir/$main" "$base/$main"
-    opkg update
+    if ! asset_url="$(jsonfilter -i "$install_dir/release.json" -e "@.assets[@.name=\"$main\"].url")" || [ -z "$asset_url" ]; then
+      echo "Package $main was not found in release $tag." >&2
+      exit 1
+    fi
+    wget -4 -T 90 --header="Accept: application/octet-stream" -O "$install_dir/$main" "$asset_url"
+    opkg update || echo "Warning: Could not refresh all package feeds." >&2
     opkg install "$install_dir/$main"
   else
     echo 'apk or opkg was not found.' >&2

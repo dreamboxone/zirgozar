@@ -29,6 +29,7 @@ var nameFromLink = nodelink.nameFromLink;
 var withBrowse = nodelink.withBrowse;
 
 
+var callProbeLimits = rpc.declare({ object: 'luci.zirgozar', method: 'probelimits', expect: { '': {} } });
 var callNodes  = rpc.declare({ object: 'luci.zirgozar', method: 'nodes', expect: { '': {} } });
 var callTests  = rpc.declare({ object: 'luci.zirgozar', method: 'tests', expect: { '': {} } });
 var callInuse  = rpc.declare({ object: 'luci.zirgozar', method: 'inuse', expect: { '': {} } });
@@ -718,7 +719,7 @@ return view.extend({
 	__init__: function() { return pui.mount(this); },
 	load: function() {
 		return Promise.all([
-			Promise.resolve({}),
+			callProbeLimits().catch(function() { return {}; }),
 			Promise.resolve({}),
 			uci.load('zirgozar').catch(function() { return null; })
 		]);
@@ -1014,10 +1015,31 @@ return view.extend({
 			return _('Two passes. A quick handshake to every node, then a real request through the ones that answered — %d at a time (at most %d batches), best first, stopping at the first node faster than %d ms. Connecting therefore takes seconds, not a minute. WireGuard has no TCP port and skips the first pass; hysteria2, tuic and OpenVPN are not part of the automatic choice.')
 				.format(batch, most, good);
 		}
-		var selectionDescription = selectionText(parseInt(uci.get('zirgozar', 'config', 'batch_size')) || 30,
+		var probeLimit = Number(data[0] && data[0].parallel) || 3;
+		var batchLimit = Math.min(probeLimit, 50);
+
+		function limitProbeOption(option, limit) {
+			option.description += ' ' + _('This router’s RAM allows at most %d configs at once.').format(limit);
+			option.datatype = 'uinteger';
+			option.default = String(Math.min(30, limit));
+			option.cfgvalue = function(section) {
+				var saved = form.Value.prototype.cfgvalue.call(this, section);
+				return Number(saved) > limit ? String(limit) : saved;
+			};
+			option.validate = function(section, value) {
+				if (Number(value) < 1)
+					return _('positive integer value');
+				return Number(value) > limit
+					? _('This router’s RAM allows at most %d configs at once.').format(limit)
+					: true;
+			};
+		}
+
+		var selectionDescription = selectionText(Math.min(parseInt(uci.get('zirgozar', 'config', 'batch_size')) || 30, batchLimit),
 				parseInt(uci.get('zirgozar', 'config', 'good_ms')) || 1000,
 				parseInt(uci.get('zirgozar', 'config', 'max_batches')) || 5);
 		s = m.section(form.NamedSection, 'config', 'zirgozar', _('How the fastest node is chosen'), selectionDescription);
+		pui.collapseSection(s, 'fastest-node');
 		s.anonymous = true;
 
 		o = s.option(form.ListValue, 'prefilter', _('First pass'),
@@ -1034,8 +1056,7 @@ return view.extend({
 
 		o = s.option(form.Value, 'batch_size', _('Measured at a time'),
 			_('How many nodes are measured properly in one go.'));
-		o.datatype = 'range(1,50)';
-		o.default = '30';
+		limitProbeOption(o, batchLimit);
 
 		o = s.option(form.Value, 'max_batches', _('Batches at most'),
 			_('How far down the list to keep going when nothing is fast enough.'));
@@ -1043,9 +1064,8 @@ return view.extend({
 		o.default = '5';
 
 		o = s.option(form.Value, 'sift_parallel', _('Checked at once'),
-			_('How many handshakes run in parallel in the first pass. If your router has little RAM, lower this number.'));
-		o.datatype = 'range(1,100)';
-		o.default = '30';
+			_('How many handshakes run in parallel in the first pass.'));
+		limitProbeOption(o, probeLimit);
 
 		return m.render().then(function(mapEl) {
 			mapEl.querySelectorAll('.cbi-section-descr').forEach(function(desc) {

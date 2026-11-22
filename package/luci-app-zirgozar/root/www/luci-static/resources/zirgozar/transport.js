@@ -49,6 +49,24 @@ function addFields(section, xr, tlsOnly, sid) {
 	var option = xr(section.option(form.ListValue, 'happy_eyeballs_success', _('Happy Eyeballs success criterion'),
 		_('Choose whether an IP wins after TCP connects or only after TLS completes. Existing Happy Eyeballs tuning is preserved. Requires Xray-patterniha 26.11.20 or newer.')));
 	option.value('', _('Default')); option.value('tcpConnected', _('TCP connected')); option.value('tlsHandshakeComplete', _('TLS handshake complete'));
+	function booleanOverride(key, label, help, dependency) {
+		var field = section.option(form.ListValue, key, _(label), _(help));
+		field.depends(dependency[0], dependency[1]);
+		field.retain = true;
+		field.value('', _('Default')); field.value('1', _('On')); field.value('0', _('Off'));
+	}
+	var interleave = section.option(form.Value, 'happy_eyeballs_interleave', _('Addresses per Happy Eyeballs group'),
+		_('Number of addresses to try from each IP family before alternating. Empty preserves the imported value.'));
+	interleave.depends('happy_eyeballs', '1');
+	interleave.retain = true;
+	interleave.datatype = 'range(1,32)';
+	interleave.placeholder = _('Default');
+	booleanOverride('happy_eyeballs_assure', 'Fill the first Happy Eyeballs group',
+		'Repeat addresses when the first group for an IP family has too few. Requires Xray-patterniha 26.11.22 or newer.',
+		['happy_eyeballs', '1']);
+	booleanOverride('fallback_pass_address', 'Use the first connection address for fallback',
+		'Use the primary connection’s IP and port for the no-response fallback. Requires Xray-patterniha 26.11.21 or newer.',
+		['fallback_no_response', /^(?!_none$).+/]);
 	// All fields use the same protocol visibility as the existing Happy Eyeballs switch.
 	var nodes = uci.sections('zirgozar', 'node');
 	[

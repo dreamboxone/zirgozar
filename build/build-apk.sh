@@ -44,10 +44,7 @@ fi
 	exit 1
 }
 
-CORE="$ROOT/prebuilt/$ARCH/xray"
-ensure_xray "$ROOT" "$ARCH"
 sh "$ROOT/build/build-amnezia.sh" "$ARCH"
-[ -f "$CORE" ] || { echo "missing xray: $CORE (run build/build-core.sh)"; exit 1; }
 
 echo ">>> apk tool : $APK"
 echo ">>> arch     : $ARCH"
@@ -156,7 +153,7 @@ finalize() {
 	echo ">>> built $(basename "$out") ($(du -h "$out" | cut -f1))"
 }
 
-stage_zgz "$WORK" "$ROOT" "$CORE"
+stage_zgz "$WORK" "$ROOT" "$ROOT/prebuilt/$ARCH/zgz-amnezia"
 stage_luci_assets "$WORK" "$ROOT"
 finalize zirgozar "$ARCH" "$ZGZ_DEPS" "$ZGZ_DESC"
 

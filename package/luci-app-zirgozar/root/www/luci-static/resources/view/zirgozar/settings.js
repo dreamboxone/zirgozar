@@ -848,6 +848,10 @@ return view.extend({
 		o.depends('direct_dns_protocol', 'udp');
 		o.depends('direct_dns_protocol', 'tcp');
 
+		o = s.taboption('dns', form.Flag, 'direct_dns_native_udp', _('Use Xray local UDP DNS'),
+			_('Use udp+local for direct DNS on port 53. Remote DNS stays on its configured route. Requires Xray-patterniha 26.11.22 or newer.'));
+		o.depends('direct_dns_protocol', 'udp');
+
 		o = s.taboption('dns', form.ListValue, 'direct_dns_query_strategy', _('Direct Query Strategy'));
 		o.value('UseIP');
 		o.value('UseIPv4');

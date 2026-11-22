@@ -34,11 +34,10 @@
 
 | Ресурс | Минимум | Рекомендуется |
 |---|---|---|
-| Свободное место для базовой установки | около 120 MB | не менее 160 MB |
 | RAM | 128 MB | 256 MB и больше |
 | CPU | архитектура со сборкой Xray | два ядра и больше |
 
-Основной пакет включает Xray и sing-box. На эталонном `arm_cortex-a7_neon-vfpv4` он занимает около 105 MB после установки, интерфейс — менее 1 MB. Наличие другого пакета `xray-core` не убирает встроенную копию; размер архива не равен установленному размеру.
+Основной пакет содержит Zirgozar и интерфейс LuCI. Установите Xray на странице обновлений. При необходимости установите sing-box отдельно и выберите его в основных настройках. Требуемое место зависит от ядра, архитектуры и зависимостей.
 
 Все перечисленные ядра, инструменты и полные данные маршрутизации занимают около 400 MB; для полной установки рекомендуется не менее 1 GB доступного хранилища. Замер включает Xray, Xray от patterniha, sing-box, sing-box-lx, Geoview, warp-plus, Vwarp, Aether с помощниками, Mihomo, shadowsocks-rust, OpenVPN и HAProxy. Кеш обновлений добавляет около 38 MB, полные геоданные — около 24 MB, облегчённая пара — около 2 MB. Подписки, история, новые версии и временная распаковка увеличивают расход; подойдут USB или extroot.
 
@@ -47,9 +46,7 @@ df -h /overlay /tmp
 du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 ```
 
-Роутеры с 32/64 MB общей flash-памяти не вмещают текущий базовый пакет. Даже 128 MB общей flash не означают 120 MB свободного записываемого места. Перенос только каталога загрузки ядер на USB не переносит два ядра из начального пакета.
-
-Работающее ядро обычно занимает 40–80 MB RAM. На маломощном роутере уменьшите **Checked at once** с 30 до 10: это снижает число параллельных рукопожатий. На эталонном устройстве с четырьмя Cortex-A7 по 717 MHz измерено 1,6 MB/s через туннель и 8,8 секунды на выбор из 98 конфигураций. Это ориентир, а не гарантия скорости.
+Работающее ядро обычно занимает 40–80 MB RAM. Лимит одновременных проверок в обоих этапах автовыбора зависит от RAM и отображается на странице конфигураций. На эталонном устройстве с четырьмя Cortex-A7 по 717 MHz измерено 1,6 MB/s через туннель и 8,8 секунды на выбор из 98 конфигураций. Это ориентир, а не гарантия скорости.
 
 ## 📦 2. Установка
 
@@ -72,24 +69,32 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 (
   set -eu
   . /etc/openwrt_release
-  tag="$(wget -qO- https://api.github.com/repos/dreamboxone/zirgozar/releases/latest | jsonfilter -e '@.tag_name')"
+  install_dir="$(mktemp -d /tmp/zirgozar-install.XXXXXX)"
+  trap 'rm -f "$install_dir"/*; rmdir "$install_dir"' EXIT
+  wget -4 -O "$install_dir/release.json" https://api.github.com/repos/dreamboxone/zirgozar/releases/latest
+  tag="$(jsonfilter -i "$install_dir/release.json" -e '@.tag_name')"
   case "$tag" in
     v[0-9]*) ;;
     *) echo 'Could not determine the latest release.' >&2; exit 1 ;;
   esac
   version="${tag#v}"
-  base="https://github.com/dreamboxone/zirgozar/releases/download/$tag"
-  install_dir="/tmp/zirgozar-install-$version"
-  mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
     main="zirgozar-$version.$DISTRIB_ARCH.apk"
-    wget -O "$install_dir/$main" "$base/$main"
-    apk update
+    if ! asset_url="$(jsonfilter -i "$install_dir/release.json" -e "@.assets[@.name=\"$main\"].url")" || [ -z "$asset_url" ]; then
+      echo "Package $main was not found in release $tag." >&2
+      exit 1
+    fi
+    wget -4 -T 90 --header="Accept: application/octet-stream" -O "$install_dir/$main" "$asset_url"
+    apk update || echo "Warning: Could not refresh all package feeds." >&2
     apk add --allow-untrusted --upgrade "$install_dir/$main"
   elif command -v opkg >/dev/null 2>&1; then
     main="zirgozar_${version}_${DISTRIB_ARCH}.ipk"
-    wget -O "$install_dir/$main" "$base/$main"
-    opkg update
+    if ! asset_url="$(jsonfilter -i "$install_dir/release.json" -e "@.assets[@.name=\"$main\"].url")" || [ -z "$asset_url" ]; then
+      echo "Package $main was not found in release $tag." >&2
+      exit 1
+    fi
+    wget -4 -T 90 --header="Accept: application/octet-stream" -O "$install_dir/$main" "$asset_url"
+    opkg update || echo "Warning: Could not refresh all package feeds." >&2
     opkg install "$install_dir/$main"
   else
     echo 'apk or opkg was not found.' >&2

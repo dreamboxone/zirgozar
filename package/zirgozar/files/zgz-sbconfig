@@ -95,8 +95,13 @@ if (type(X) != 'object') {
 }
 if (X.dns?.skipHostsWhenFakeEnable || length(filter(X.outbounds ?? [], o => type(o.settings?.close) == 'object')))
 	die('Freedom close and skipHostsWhenFakeEnable require Xray-patterniha.\n');
+if (length(filter(X.dns?.servers ?? [], server => match(type(server) == 'string' ? server : server.address ?? '', /^udp\+local:\/\//))))
+	die('Local UDP DNS requires Xray-patterniha 26.11.22 or newer.\n');
 for (let outbound in X.outbounds ?? []) {
 	let stream = outbound.streamSettings ?? {}, sock = stream.sockopt ?? {}, mask = stream.finalmask ?? {};
+	if (length(outbound.settings?.firewall ?? []) || sock.happyEyeballs?.assuranceFirstInterleave ||
+		length(filter([...(mask.tcp ?? []), ...(mask.tcp4 ?? []), ...(mask.tcp6 ?? [])], m => m.type == 'borrow' || m.type == 'proxy-protocol')))
+		die('These advanced settings require a compatible Xray core.\n');
 	if (sock.tcpHandshakeTimeout != null || sock.tcpKeepAliveCount != null || sock.fallback != null ||
 		stream.tlsSettings?.tlsHandshakeTimeout != null || sock.happyEyeballs?.successDefinition != null ||
 		mask.tcp4 != null || mask.tcp6 != null || mask.udp4 != null || mask.udp6 != null || match(sock.dialMode ?? '', /oob[46]\./))

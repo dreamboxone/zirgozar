@@ -1,0 +1,634 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (C) 2026 Tuhin Garai <tuhin@nightcode.org>
+
+CLIENT_CONFIG=zirgozar_clients
+CLIENT_CONFIG_DIR="${ZGZ_CLIENT_CONFIG_DIR:-/etc/config}"
+CLIENT_TABLE=zirgozar_clients
+CLIENT_UCI_DIR="${ZGZ_RUN:-/var/run/zirgozar}/clients/uci"
+
+client_error() { printf '{"error":"%s"}\n' "$1"; return 1; }
+client_arg() { printf '%s' "$INPUT" | jsonfilter -e "@.$1" 2>/dev/null; }
+client_uci() {
+	if [ -d "$CLIENT_UCI_DIR" ]; then
+		uci -q -c "$CLIENT_CONFIG_DIR" -t "$CLIENT_UCI_DIR" "$@"
+	else
+		uci -q -c "$CLIENT_CONFIG_DIR" "$@"
+	fi
+}
+client_mac() {
+	[ "${#1}" = 17 ] || return 1
+	printf '%s\n' "$1" | tr '[:lower:]-' '[:upper:]:' |
+		grep -Ex '([0-9A-F]{2}:){5}[0-9A-F]{2}' | grep -v '^00:00:00:00:00:00$'
+}
+client_ipv4() {
+	awk -v value="$1" 'BEGIN {
+		if (split(value, octets, /\./) != 4) exit 1
+		for (i=1; i<=4; i++)
+			if (octets[i] !~ /^(0|[1-9][0-9]?[0-9]?)$/ || octets[i] > 255) exit 1
+	}'
+}
+client_sections() {
+	client_uci show "$CLIENT_CONFIG" |
+		sed -n "s/^$CLIENT_CONFIG\.\([a-zA-Z0-9_]*\)=$1$/\1/p"
+}
+client_rate() {
+	case "$2" in
+		Mbps) factor=125000 ;;
+		MBps) factor=1000000 ;;
+		Kbps) factor=125 ;;
+		KBps) factor=1000 ;;
+		*) return 1 ;;
+	esac
+	awk -v value="$1" -v factor="$factor" 'BEGIN {
+		if (value !~ /^[0-9]+(\.[0-9]+)?$/ || value * factor > 10000000000) exit 1
+		bytes = int(value * factor)
+		if (value > 0 && bytes == 0) exit 1
+		printf "%.0f", bytes
+	}'
+}
+client_lan() {
+	. "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
+	lan_devices
+}
+client_nft_rules() {
+	local dir_list devices device mac key addr upload download
+	dir_list=
+	devices="$(client_lan)"
+	for device in $devices; do
+		case "$device" in ''|*[!a-zA-Z0-9_.:@-]*) continue ;; esac
+		dir_list="${dir_list:+$dir_list, }\"$device\""
+	done
+	[ -n "$dir_list" ] || return 1
+	printf 'table inet %s {\nset lan { type ifname; elements = { %s }; }\n' "$CLIENT_TABLE" "$dir_list"
+	printf 'chain from_client { type filter hook prerouting priority -160; policy accept;\n'
+	printf 'iifname != @lan return\nfib daddr type { local, broadcast, multicast } return\nfib daddr oifname @lan return\n'
+	for key in $(client_sections block); do
+		mac="$(client_mac "$(client_uci get "$CLIENT_CONFIG.$key.mac")")" || continue
+		printf 'ether saddr %s counter drop\n' "$mac"
+	done
+	for key in $(client_sections limit); do
+		mac="$(client_mac "$(client_uci get "$CLIENT_CONFIG.$key.mac")")" || continue
+		upload="$(client_rate "$(client_uci get "$CLIENT_CONFIG.$key.upload_val")" "$(client_uci get "$CLIENT_CONFIG.$key.upload_unit")")" || continue
+		[ "$upload" -gt 0 ] || continue
+		printf 'ether saddr %s limit rate over %s bytes/second counter drop\n' "$mac" "$upload"
+	done
+	printf '}\nchain to_client { type filter hook postrouting priority -10; policy accept;\n'
+	printf 'oifname != @lan return\nfib saddr type local return\n'
+	for key in $(client_sections limit); do
+		addr="$(client_uci get "$CLIENT_CONFIG.$key.ip")"
+		client_ipv4 "$addr" || continue
+		download="$(client_rate "$(client_uci get "$CLIENT_CONFIG.$key.download_val")" "$(client_uci get "$CLIENT_CONFIG.$key.download_unit")")" || continue
+		[ "$download" -gt 0 ] || continue
+		printf 'ip daddr %s limit rate over %s bytes/second counter drop\n' "$addr" "$download"
+	done
+	printf '}\n}\n'
+}
+client_apply() {
+	local rules
+	[ -n "$(client_sections block)$(client_sections limit)" ] ||
+		{ client_clear; return $?; }
+	rules="$(client_nft_rules)" || return 1
+	{
+		nft list table inet "$CLIENT_TABLE" >/dev/null 2>&1 && printf 'delete table inet %s\n' "$CLIENT_TABLE"
+		printf '%s\n' "$rules"
+	} | nft -f -
+}
+client_clear() {
+	if nft list table inet "$CLIENT_TABLE" >/dev/null 2>&1; then
+		nft delete table inet "$CLIENT_TABLE"
+	fi
+}
+client_commit() {
+	if ! client_apply >&2; then
+		client_uci revert "$CLIENT_CONFIG"
+		client_error 'Could not apply client rules.'
+		return 1
+	fi
+	if ! client_uci commit "$CLIENT_CONFIG"; then
+		client_uci revert "$CLIENT_CONFIG"
+		client_apply >&2
+		client_error 'Could not save client rules.'
+		return 1
+	fi
+	printf '{"success":true}\n'
+}
+client_start_write() {
+	. "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
+	# Reuse the existing lock implementation with a dedicated lock directory.
+	ZGZ_RUN="$ZGZ_RUN/clients"
+	mkdir -p "$CLIENT_UCI_DIR" || return 1
+	pkg_lock || return 1
+	trap pkg_unlock EXIT
+	trap 'exit 1' INT TERM
+}
+client_check_offload() {
+	[ "$(client_uci get 'firewall.@defaults[0].flow_offloading')" != 1 ] &&
+		[ "$(client_uci get 'firewall.@defaults[0].flow_offloading_hw')" != 1 ]
+}
+client_edit_policy() {
+	local kind="$1" action="$2" mac key
+	mac="$(client_mac "$(client_arg mac)")" || { client_error 'Invalid MAC address.'; return; }
+	client_start_write || { client_error 'Client settings are busy.'; return; }
+	if [ "$action" = set ] && ! client_check_offload; then
+		client_error 'Disable firewall flow offloading before applying client policies.'
+		return
+	fi
+	key="$kind$(printf '%s' "$mac" | tr -d ':')"
+	[ -f "$CLIENT_CONFIG_DIR/$CLIENT_CONFIG" ] ||
+		touch "$CLIENT_CONFIG_DIR/$CLIENT_CONFIG" || { client_error 'Could not save client rules.'; return; }
+	if [ "$action" = delete ]; then
+		client_uci delete "$CLIENT_CONFIG.$key" || true
+	elif ! {
+		client_uci set "$CLIENT_CONFIG.$key=$kind" &&
+		client_uci set "$CLIENT_CONFIG.$key.mac=$mac" &&
+		{ [ "$kind" != limit ] || client_set_rates "$key" "$mac"; }
+	}; then
+		client_uci revert "$CLIENT_CONFIG"
+		client_error 'Invalid bandwidth limit or missing IPv4 address.'
+		return
+	fi
+	client_commit
+}
+client_set_rates() {
+	local key="$1" mac="$2" addr down up down_unit up_unit dl_rate ul_rate
+	addr="$(client_arg ip)"
+	[ -n "$addr" ] || addr="$(awk -v mac="$mac" 'toupper($2) == mac {print $3; exit}' /tmp/dhcp.leases 2>/dev/null)"
+	[ -n "$addr" ] || addr="$(awk -v mac="$mac" 'toupper($4) == mac {print $1; exit}' /proc/net/arp 2>/dev/null)"
+	down="$(client_arg download_val)"; up="$(client_arg upload_val)"
+	down_unit="$(client_arg download_unit)"; up_unit="$(client_arg upload_unit)"
+	down="${down:-0}"; up="${up:-0}"; down_unit="${down_unit:-Mbps}"; up_unit="${up_unit:-Mbps}"
+	dl_rate="$(client_rate "$down" "$down_unit")" && ul_rate="$(client_rate "$up" "$up_unit")" || return 1
+	if [ "$dl_rate" = 0 ] && [ "$ul_rate" = 0 ]; then
+		client_uci delete "$CLIENT_CONFIG.$key"
+		return $?
+	fi
+	if [ -n "$addr" ] || [ "$dl_rate" != 0 ]; then client_ipv4 "$addr" || return 1; fi
+	client_uci set "$CLIENT_CONFIG.$key.ip=$addr" &&
+		client_uci set "$CLIENT_CONFIG.$key.download_val=$down" &&
+		client_uci set "$CLIENT_CONFIG.$key.download_unit=$down_unit" &&
+		client_uci set "$CLIENT_CONFIG.$key.upload_val=$up" &&
+		client_uci set "$CLIENT_CONFIG.$key.upload_unit=$up_unit"
+}
+
+client_wifi_edit() {
+	local sec mac action mode entry
+	sec="$(client_arg section)"; action="$(client_arg action)"
+	mac="$(client_mac "$(client_arg mac)")" || { client_error 'Invalid MAC address.'; return; }
+	case "$sec" in ''|*[!a-zA-Z0-9_@\[\]-]*) client_error 'Invalid WiFi interface.'; return ;; esac
+	case "$action" in add|remove) ;; *) client_error 'Invalid WiFi action.'; return ;; esac
+	client_start_write || { client_error 'Client settings are busy.'; return; }
+	[ "$(client_uci get "wireless.$sec")" = wifi-iface ] &&
+		[ "$(client_uci get "wireless.$sec.mode")" = ap ] ||
+		{ client_error 'Invalid WiFi interface.'; return; }
+	mode="$(client_uci get "wireless.$sec.macfilter")"
+	case "$mode:$action" in
+		allow:add|deny:remove) entry=add ;;
+		allow:remove|deny:add) entry=delete ;;
+		*:add) printf '{"success":true}\n'; return ;;
+		*:remove)
+			client_uci set "wireless.$sec.macfilter=deny" ||
+				{ client_error 'Could not save WiFi filter.'; return; }
+			client_uci delete "wireless.$sec.maclist" || true
+			entry=add ;;
+	esac
+	for saved in $(client_uci get "wireless.$sec.maclist"); do
+		if [ "$(client_mac "$saved")" = "$mac" ]; then
+			client_uci del_list "wireless.$sec.maclist=$saved" || true
+		fi
+	done
+	if { [ "$entry" = add ] && ! client_uci add_list "wireless.$sec.maclist=$mac"; } ||
+	   ! client_uci commit wireless; then
+		client_uci revert wireless
+		client_error 'Could not save WiFi filter.'
+		return
+	fi
+	wifi reload </dev/null >/dev/null 2>&1 &
+	printf '{"success":true}\n'
+}
+client_json() {
+	. /usr/share/libubox/jshn.sh
+	json_init
+}
+case "$1" in
+	apply|clear)
+		client_start_write || exit 1
+		if [ "$1" = apply ]; then client_apply; else client_clear; fi
+		exit $? ;;
+esac
+
+# Handle rpcd "list" call
+if [ "$1" = "list" ]; then
+cat <<'EOF'
+{
+	"getStatus": {},
+	"getClients": {},
+	"getClientDetail": { "mac": "" },
+	"getWifiInterfaces": {},
+	"setMacFilter": { "section": "", "mac": "", "action": "" },
+	"setFirewallRule": { "mac": "", "action": "" },
+	"getFirewallRules": {},
+	"deleteFirewallRule": { "mac": "" },
+	"getBandwidth": {},
+	"getSpeedLimits": {},
+	"setSpeedLimit": { "mac": "", "ip": "", "download_val": "", "download_unit": "", "upload_val": "", "upload_unit": "" },
+	"deleteSpeedLimit": { "mac": "" }
+}
+EOF
+	exit 0
+fi
+
+# Handle rpcd "call"
+if [ "$1" = "call" ]; then
+	METHOD="$2"
+	INPUT=$(cat)
+
+	case "$METHOD" in
+		getStatus)
+			MEM_TOTAL=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo 2>/dev/null || echo 0)
+			MEM_FREE=$(awk '/^MemAvailable:/ {print int($2/1024); exit}' /proc/meminfo 2>/dev/null || echo 0)
+			LOW_RES="false"
+			if [ "$MEM_TOTAL" -gt 0 ] && [ "$MEM_TOTAL" -lt 128 ]; then
+				LOW_RES="true"
+			fi
+			printf "{\"version\":\"0.1.0\",\"mem_total_mb\":%s,\"mem_free_mb\":%s,\"low_resource\":%s}\n" \
+				"$MEM_TOTAL" "${MEM_FREE:-0}" "$LOW_RES"
+			;;
+
+		getClients)
+			TMP="$(mktemp -d /tmp/zgz-clients.XXXXXX)" || { client_error 'Could not read clients.'; exit 0; }
+			trap 'rm -f "$TMP/"*; rmdir "$TMP"' EXIT
+			trap 'exit 1' INT TERM
+			TMP_SSID="$TMP/ssid"
+			TMP_WL="$TMP/wifi"
+			TMP_IP6="$TMP/ip6"
+			TMP_UCI="$TMP/static"
+			TMP_FILE="$TMP/result"
+
+			if command -v ubus >/dev/null 2>&1; then
+				# Method 1: iwinfo ubus
+				DEVS=$(ubus call iwinfo devices 2>/dev/null | jsonfilter -e '@.devices[*]' 2>/dev/null || true)
+				for d in $DEVS; do
+					INFO=$(ubus call iwinfo info "{\"device\":\"$d\"}" 2>/dev/null || true)
+					S_NAME=$(echo "$INFO" | jsonfilter -e '@.ssid' 2>/dev/null || true)
+					S_FREQ=$(echo "$INFO" | jsonfilter -e '@.frequency' 2>/dev/null || true)
+					[ -n "$S_NAME" ] && echo "$d | $S_NAME | $S_FREQ" >> "$TMP_SSID"
+
+					ubus call iwinfo assoclist "{\"device\":\"$d\"}" 2>/dev/null | \
+						jsonfilter -e "@.results[*]" -e "mac=@.mac" -e "sig=@.signal" -e "noise=@.noise" 2>/dev/null | \
+						awk -v dev="$d" '
+							/mac=/ { mac=toupper(substr($0, 5)) }
+							/sig=/ { sig=substr($0, 5) }
+							/noise=/ { noise=substr($0, 7) }
+							{
+								if (mac && sig) {
+									print mac " " dev " " sig " " (noise ? noise : "-95")
+									mac=""; sig=""; noise=""
+								}
+							}
+						' >> "$TMP_WL" 2>/dev/null || true
+				done
+
+				# Method 2: hostapd ubus
+				HDEVS=$(ubus list 2>/dev/null | grep '^hostapd\.' | cut -d. -f2- || true)
+				for hd in $HDEVS; do
+					ubus call "hostapd.$hd" get_clients 2>/dev/null | \
+						jsonfilter -e '@.clients[*]' 2>/dev/null | \
+						awk -v dev="$hd" '
+							/mac=/ { mac=toupper(substr($0, 5)) }
+							/signal=/ { sig=substr($0, 8) }
+							{
+								if (mac && sig) {
+									print mac " " dev " " sig " -95"
+									mac=""; sig=""
+								}
+							}
+						' >> "$TMP_WL" 2>/dev/null || true
+				done
+			fi
+
+			# Method 3: uci wireless SSID mapping
+			if command -v uci >/dev/null 2>&1; then
+				for s in $(uci -q show wireless 2>/dev/null | grep -E "=['\"]?wifi-iface['\"]?" | cut -d. -f2 | cut -d= -f1 | tr -d "'\""); do
+					wiface=$(uci -q get wireless.$s.ifname 2>/dev/null || uci -q get wireless.$s.device 2>/dev/null || true)
+					wssid=$(uci -q get wireless.$s.ssid 2>/dev/null || true)
+					if [ -n "$wssid" ]; then
+						[ -n "$wiface" ] && echo "$wiface | $wssid | " >> "$TMP_SSID"
+						echo "$s | $wssid | " >> "$TMP_SSID"
+					fi
+				done
+			fi
+
+			# Method 4: iw station dump
+			if command -v iw >/dev/null 2>&1; then
+				IW_DEVS=$(iw dev 2>/dev/null | awk '$1=="Interface"{print $2}')
+				for id in $IW_DEVS; do
+					iw dev "$id" station dump 2>/dev/null | awk -v dev="$id" '
+						/^Station/ { mac=toupper($2) }
+						/signal:/ {
+							sig=$2
+							if (mac && sig) {
+								print mac " " dev " " sig " -95"
+								mac=""; sig=""
+							}
+						}
+					' >> "$TMP_WL" 2>/dev/null || true
+				done
+			fi
+
+			# Gather IPv6 addresses
+			TMP_IP6="/tmp/cm_ip6_$$.txt"
+			rm -f "$TMP_IP6"
+			if command -v ip >/dev/null 2>&1; then
+				ip -6 neighbor show 2>/dev/null | awk -v lan="$(client_lan)" '
+					$1 ~ /^[0-9a-fA-F:]+$/ && $1 !~ /^fe80/ && index(" " lan " ", " " $3 " ") {
+						for (i=1; i<=NF; i++) {
+							if ($i == "lladdr" && (i+1) <= NF) {
+								mac = toupper($(i+1))
+								if (length(mac) == 17) print mac " " $1
+							}
+						}
+					}
+				' >> "$TMP_IP6" 2>/dev/null || true
+			fi
+			if [ -f /tmp/hosts/odhcpd ] || [ -f /var/etc/odhcpd.leases ]; then
+				cat /tmp/hosts/odhcpd /var/etc/odhcpd.leases 2>/dev/null | awk '
+					$1 ~ /^[0-9a-fA-F:]+$/ && $1 !~ /^fe80/ {
+						for (i=1; i<=NF; i++) {
+							if ($(i) ~ /^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$/) {
+								print toupper($(i)) " " $1
+							}
+						}
+					}
+				' >> "$TMP_IP6" 2>/dev/null || true
+			fi
+
+			# Gather static lease hostnames/IPs from UCI dhcp
+			if command -v uci >/dev/null 2>&1; then
+				for s in $(uci -q show dhcp 2>/dev/null | grep -E "=['\"]?host['\"]?" | cut -d. -f2 | cut -d= -f1 | tr -d "'\""); do
+					dmac=$(uci -q get dhcp.$s.mac 2>/dev/null | tr 'a-z' 'A-Z')
+					dip=$(uci -q get dhcp.$s.ip 2>/dev/null || true)
+					dname=$(uci -q get dhcp.$s.name 2>/dev/null || true)
+					if [ -n "$dmac" ]; then
+						for m in $dmac; do
+							echo "$m $dip $dname" >> "$TMP_UCI"
+						done
+					fi
+				done
+			fi
+
+			DEF_IFACE="br-lan"
+			if command -v uci >/dev/null 2>&1; then
+				D_IF=$(uci -q get network.lan.device 2>/dev/null || uci -q get network.lan.ifname 2>/dev/null || true)
+				[ -n "$D_IF" ] && DEF_IFACE="$D_IF"
+			fi
+
+			NOW=$(date +%s)
+			LAN="$(client_lan)"
+			LEASE_FILE="/tmp/dhcp.leases"
+			ARP_FILE="/proc/net/arp"
+			[ -f "$LEASE_FILE" ] || LEASE_FILE="/dev/null"
+			[ -f "$ARP_FILE" ] || ARP_FILE="/dev/null"
+
+			awk -v lease_file="$LEASE_FILE" -v wl_file="$TMP_WL" -v ssid_file="$TMP_SSID" -v ip6_file="$TMP_IP6" -v uci_file="$TMP_UCI" -v def_if="$DEF_IFACE" -v lan="$LAN" -v now="$NOW" '
+			function jsonstr(v,   i,c,out) {
+				gsub(/[[:cntrl:]]/, " ", v)
+				out = ""
+				for (i = 1; i <= length(v); i++) {
+					c = substr(v, i, 1)
+					if (c == "\\" || c == "\"") out = out "\\"
+					out = out c
+				}
+				return out
+			}
+			BEGIN {
+				print "{\"clients\":["
+				first = 1
+
+				if (ssid_file != "") {
+					while ((getline < ssid_file) > 0) {
+						n = split($0, parts, "|")
+						if (n >= 2) {
+							d = parts[1]; gsub(/^[ \t]+|[ \t]+$/, "", d)
+							s = parts[2]; gsub(/^[ \t]+|[ \t]+$/, "", s)
+							f = (n >= 3) ? parts[3] : ""; gsub(/^[ \t]+|[ \t]+$/, "", f)
+							if (d != "") {
+								if (s != "") ssid_map[d] = s
+								if (f != "") freq_map[d] = f
+							}
+						}
+					}
+					close(ssid_file)
+				}
+
+				if (wl_file != "") {
+					while ((getline < wl_file) > 0) {
+						m = toupper($1)
+						if (m != "") {
+							if (!wl_if[m]) wl_if[m] = $2
+							if (!wl_sig[m]) wl_sig[m] = $3
+							if (!wl_noise[m]) wl_noise[m] = $4
+							wl_is[m] = 1
+							seen[m] = 1
+						}
+					}
+					close(wl_file)
+				}
+
+				if (ip6_file != "") {
+					while ((getline < ip6_file) > 0) {
+						m = toupper($1)
+						if (m != "") {
+							if (!ip6[m]) ip6[m] = $2
+							seen[m] = 1
+						}
+					}
+					close(ip6_file)
+				}
+
+				if (uci_file != "") {
+					while ((getline < uci_file) > 0) {
+						m = toupper($1)
+						if (m != "") {
+							if ($2 != "") ip[m] = $2
+							if ($3 != "") host[m] = $3
+							seen[m] = 1
+						}
+					}
+					close(uci_file)
+				}
+			}
+
+			FILENAME == lease_file {
+				mac = toupper($2)
+				if (length(mac) == 17 && mac ~ /^[0-9A-FA-F:]+$/) {
+					ip[mac] = $3
+					if ($4 != "*") host[mac] = $4
+					lease_exp[mac] = $1
+					seen[mac] = 1
+				}
+				next
+			}
+
+			{
+				mac = toupper($4)
+				if (length(mac) == 17 && mac ~ /^[0-9A-FA-F:]+$/ && mac != "00:00:00:00:00:00" && $3 != "0x0" && index(" " lan " ", " " $6 " ")) {
+					if (!ip[mac]) ip[mac] = $1
+					if (!iface[mac]) iface[mac] = $6
+					arp_active[mac] = 1
+					seen[mac] = 1
+				}
+			}
+
+			END {
+				for (m in seen) {
+					if (m == "" || m == "00:00:00:00:00:00") continue
+					if (!first) printf ","
+					first = 0
+
+					if_name = iface[m] ? iface[m] : (wl_if[m] ? wl_if[m] : def_if)
+					if (if_name ~ /^(phy|wlan|ra|ath)[0-9]/) if_name = def_if
+
+					is_wl = wl_is[m] ? "true" : "false"
+					sig_str = wl_sig[m] ? wl_sig[m] : "null"
+					noise_str = wl_noise[m] ? wl_noise[m] : "null"
+
+					is_conn = (wl_is[m] || arp_active[m] || (lease_exp[m] && lease_exp[m] > now)) ? "true" : "false"
+					raw_wlif = wl_if[m] ? wl_if[m] : if_name
+					c_ssid = ssid_map[raw_wlif] ? ssid_map[raw_wlif] : (ssid_map[if_name] ? ssid_map[if_name] : "")
+					c_freq = freq_map[raw_wlif] ? freq_map[raw_wlif] : (freq_map[if_name] ? freq_map[if_name] : "")
+
+					h = jsonstr(host[m])
+					ms = jsonstr(c_ssid)
+					mf = jsonstr(c_freq)
+
+					printf "{\"mac\":\"%s\",\"ip\":\"%s\",\"ip6\":\"%s\",\"hostname\":\"%s\",\"expires\":%s,\"interface\":\"%s\",\"ssid\":\"%s\",\"freq\":\"%s\",\"wireless\":%s,\"signal\":%s,\"noise\":%s,\"connected\":%s}",
+						m, ip[m], ip6[m], h,
+						(lease_exp[m] ~ /^[0-9]+$/ ? lease_exp[m]+0 : 0), jsonstr(if_name), ms, mf, is_wl, sig_str, noise_str, is_conn
+				}
+				print "]}"
+			}
+			' "$LEASE_FILE" "$ARP_FILE" > "$TMP_FILE" 2>/dev/null
+
+			rm -f "$TMP_WL" "$TMP_SSID" "$TMP_IP6" "$TMP_UCI"
+
+			if [ -s "$TMP_FILE" ]; then
+				cat "$TMP_FILE"
+				rm -f "$TMP_FILE"
+			else
+				echo '{"clients":[]}'
+			fi
+			;;
+
+		getClientDetail)
+			MAC="$(client_mac "$(client_arg mac)")" || { client_error 'Invalid MAC address.'; exit 0; }
+			"$0" call getClients </dev/null | ucode -e '
+				import { readfile } from "fs";
+				let clients = json(readfile("/dev/stdin")).clients;
+				for (let c in clients) if (c.mac == ARGV[0]) { printf("%J\n", c); exit(0); }
+				printf("%J\n", { mac: ARGV[0] });
+			' "$MAC"
+			;;
+
+		getWifiInterfaces)
+			client_json
+			json_add_array interfaces
+			for sec in $(client_uci show wireless | sed -n 's/^wireless\.\([^.=]*\)=wifi-iface$/\1/p'); do
+				[ "$(client_uci get "wireless.$sec.mode")" = ap ] || continue
+				json_add_object
+				for field in device mode ssid disabled macfilter; do
+					json_add_string "$field" "$(client_uci get "wireless.$sec.$field")"
+				done
+				json_add_string section "$sec"
+				json_add_array maclist
+				for mac in $(client_uci get "wireless.$sec.maclist"); do
+					json_add_string "" "$mac"
+				done
+				json_close_array
+				json_close_object
+			done
+			json_close_array
+			json_dump
+			;;
+		setMacFilter) client_wifi_edit ;;
+		setFirewallRule)
+			case "$(client_arg action)" in
+				block) client_edit_policy block set ;;
+				unblock|allow) client_edit_policy block delete ;;
+				*) client_error 'Invalid firewall action.' ;;
+			esac
+			;;
+		getFirewallRules)
+			client_json
+			json_add_array rules
+			for sec in $(client_sections block); do
+				json_add_object
+				json_add_string section "$sec"
+				json_add_string src_mac "$(client_uci get "$CLIENT_CONFIG.$sec.mac")"
+				json_add_string target REJECT
+				json_close_object
+			done
+			json_close_array
+			json_dump
+			;;
+		deleteFirewallRule) client_edit_policy block delete ;;
+
+		getBandwidth)
+			{
+				if command -v conntrack >/dev/null 2>&1; then
+					conntrack -L -o extended 2>/dev/null
+				elif [ -r /proc/net/nf_conntrack ]; then
+					cat /proc/net/nf_conntrack
+				fi
+			} | awk '
+				{
+					src = ""
+					n = 0
+					tx = rx = 0
+					for (i = 1; i <= NF; i++) {
+						if (src == "" && $i ~ /^src=/) src = substr($i, 5)
+						else if ($i ~ /^bytes=[0-9]+$/) {
+							if (++n == 1) tx = substr($i, 7) + 0
+							else if (n == 2) rx = substr($i, 7) + 0
+						}
+					}
+					if (src ~ /^[0-9a-fA-F:.]+$/ && (tx || rx)) {
+						sent[src] += tx
+						received[src] += rx
+					}
+				}
+				END {
+					printf "{\"bandwidth\":["
+					for (ip in sent)
+						printf "%s{\"ip\":\"%s\",\"tx\":%.0f,\"rx\":%.0f,\"bytes\":%.0f}", (first++ ? "," : ""), ip,
+							sent[ip], received[ip], sent[ip] + received[ip]
+					print "]}"
+				}'
+			;;
+
+		getSpeedLimits)
+			client_json
+			json_add_array limits
+			for sec in $(client_sections limit); do
+				json_add_object
+				for field in mac ip download_val download_unit upload_val upload_unit; do
+					json_add_string "$field" "$(client_uci get "$CLIENT_CONFIG.$sec.$field")"
+				done
+				json_add_string section "$sec"
+				json_close_object
+			done
+			json_close_array
+			json_dump
+			;;
+		setSpeedLimit) client_edit_policy limit set ;;
+		deleteSpeedLimit) client_edit_policy limit delete ;;
+
+		*)
+			echo '{"error":"Method not found"}'
+			;;
+	esac
+	exit 0
+fi
+
+echo '{"error":"Invalid argument"}'
+exit 1

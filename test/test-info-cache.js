@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../package/luci-app-zirgozar/root/www/luci-static/resources/zirgozar/ui.js'), 'utf8');
-const helpers = source.slice(source.indexOf('var infoRequests ='), source.indexOf('function tabs()'));
+const helpers = source.slice(source.indexOf('var infoRequests ='), source.indexOf('function sidebar('));
 const saved = new Map();
 let now = 1000, count = 0;
 const cache = new Function('window','Date','uci', helpers + '; return {loadInfo,infoRevision};')(

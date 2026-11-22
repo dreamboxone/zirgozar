@@ -56,7 +56,7 @@ function validate(text) {
 	} catch (e) { return false; }
 }
 var maskTypes = {
-	tcp: ['fragment', 'merge', 'filter', 'header-custom', 'sudoku', 'xmc'],
+	tcp: ['fragment', 'merge', 'filter', 'header-custom', 'sudoku', 'xmc', 'borrow', 'proxy-protocol'],
 	udp: ['noise', 'salamander', 'sudoku', 'udphop', 'xdns', 'xicmp', 'realm', 'filter', 'header-custom', 'mkcp-legacy']
 };
 ['tcp4','tcp6','udp4','udp6'].forEach(function(family) {
@@ -65,11 +65,15 @@ var maskTypes = {
 var maskDefaults = {
 	fragment: {packets: 'tlshello', lengths: ['100-200'], delays: ['0-1']},
 	merge: {times: 1, delayMs: 30, maxBytes: 16384},
+	'proxy-protocol': {version: 2},
 	noise: {reset: '0', noise: [{rand: '16-32', delay: '0'}]}
 };
 var maskFields = {
 	fragment: [['packets','Packets','text'], ['lengths','Fragment lengths','list'], ['delays','Fragment delays','list'], ['maxSplit','Maximum splits','text']],
 	merge: [['times','Merge count','number',0], ['delayMs','Merge delay (ms)','number',0], ['maxBytes','Maximum buffered bytes','number',0]],
+	borrow: [['borrowBytesHex','Borrow bytes (hex)','text']],
+	'proxy-protocol': [['version','PROXY protocol version','number',1,2]],
+	xmc: [['noPadding','Disable XMC padding','boolean']],
 	salamander: [['password','Password','password']],
 	udphop: [['mode','Hop mode','text'], ['interval','Hop interval (seconds)','text'], ['remoteIPs','Remote IPs','list'], ['remotePorts','Remote ports','text']],
 	xicmp: [['dgram','Datagram socket','boolean'], ['ips','Remote IPs','list']]
@@ -192,6 +196,8 @@ function maskEditor(option, section, box, initial) {
 				var grid=E('div',{'class':'pwp-mask-grid'});
 				(maskFields[mask.type] || []).forEach(function(spec){field(grid,spec,settings[spec[0]],function(v){change(function(r){var s=r[family][index].settings=r[family][index].settings || {};if(v===undefined)delete s[spec[0]];else s[spec[0]]=v;});});});
 				row.appendChild(grid);
+				if (mask.type == 'xmc')
+					row.appendChild(E('p', {}, _('XMC requires compatible core versions at both ends. Edit the padding schedule in Additional mask settings.')));
 				if (mask.type == 'noise' && !settings.script) {
 					field(grid,['reset','Noise reset','text'],settings.reset,function(v){change(function(r){var s=r[family][index].settings=r[family][index].settings || {};if(v===undefined)delete s.reset;else s.reset=v;});});
 					var noises=Array.isArray(settings.noise) ? settings.noise : [];

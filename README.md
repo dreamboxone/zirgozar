@@ -24,6 +24,12 @@
   <a href="https://t.me/routekernel1">💬 <b>پشتیبانی در تلگرام</b></a>
 </p>
 
+## آموزش‌های ویدیویی زیرگذر
+
+- [آموزش اول](https://www.youtube.com/watch?v=uj5KoTtG9Eo)
+- [آموزش دوم](https://www.youtube.com/watch?v=lqiDbsb49Zc)
+- [آموزش سوم](https://www.youtube.com/watch?v=NYmpwVU2oNg)
+
 ## ✨ ویژگی‌ها
 
 - **چهار زبان رابط:** فارسی، انگلیسی، چینی ساده (简体中文) و روسی (Русский)، با انتخاب زبان از بالای صفحه.
@@ -50,26 +56,14 @@
 
 | | حداقل | راحت |
 |---|---|---|
-| **فضای خالی نصب پایه** | حدود ۱۲۰ مگابایت | دست کم ۱۶۰ مگابایت |
 | **رم** | ۱۲۸ مگابایت | ۲۵۶ مگابایت به بالا |
 | **پردازنده** | هر معماری‌ای که Xray برایش بیلد دارد | دو هسته به بالا |
 
 **بسته‌بندی.** رابط LuCI و خود زیرگذر همیشه در یک بسته اصلی `zirgozar` منتشر می‌شوند و با هم نصب و به‌روزرسانی می‌شوند. بسته `luci-app-zirgozar` فقط برای سازگاری با به‌روزرسان‌های قدیمی است؛ نصب جداگانه رابط لازم نیست.
 
-**فضای نصب.** بسته اصلی اکنون هر دو هسته Xray و sing-box را همراه دارد.
-روی روتر مرجع `arm_cortex-a7_neon-vfpv4`، اندازه نصب شده بسته اصلی حدود
-۱۰۵ مگابایت و رابط وب کمتر از ۱ مگابایت است. برای نصب پایه حدود **۱۲۰ مگابایت فضای خالی**
-در نظر بگیرید؛ **۱۶۰ مگابایت یا بیشتر** برای وابستگی ها و حاشیه نصب مناسب تر است.
-وجود Xray در یک بسته دیگر باعث حذف نسخه همراه زیرگذر از بسته نمی شود.
-اندازه فایل دانلودی فشرده با فضای نصب شده برابر نیست. این اعداد برای معماری
-مرجع هستند و با نسخه هسته ها، معماری، فایل سیستم و وابستگی های موجود تغییر می کنند.
+**فضای نصب.** بستهٔ اصلی شامل زیرگذر و رابط LuCI است. پس از نصب، در صفحهٔ **به‌روزرسانی** هستهٔ Xray را نصب کنید. اگر به sing-box نیاز دارید، آن را جداگانه نصب و در **تنظیمات پایه ← هستهٔ فعال** انتخاب کنید. فضای لازم به هسته، معماری و وابستگی‌ها بستگی دارد.
 
-| حالت نصب | فضای تقریبی روی روتر مرجع | فضای پیشنهادی |
-|---|---|---|
-| برنامه و رابط با Xray و sing-box همراه | حدود ۱۰۶ مگابایت، بدون وابستگی های اضافی | دست کم ۱۶۰ مگابایت فضای خالی پیش از نصب |
-| همه هسته ها و ابزارهای فهرست هسته ها، همراه داده کامل مسیریابی | حدود ۴۰۰ مگابایت، بدون کش به روزرسانی و فایل های موقت | دست کم ۱ گیگابایت فضای قابل استفاده |
-
-اندازه حالت کامل با نصب Xray، Xray پترنی ها، sing-box، sing-box-lx، Geoview،
+نصب کامل روی روتر مرجع حدود ۴۰۰ مگابایت فضا گرفت. اندازه حالت کامل با نصب Xray، Xray پترنی ها، sing-box، sing-box-lx، Geoview،
 warp-plus، Vwarp، Aether و فایل های همراه آن، Mihomo، shadowsocks-rust،
 OpenVPN و HAProxy اندازه گیری شده است. کش فعلی به روزرسانی حدود ۳۸ مگابایت دیگر
 مصرف می کند. داده کامل مسیریابی حدود ۲۴ مگابایت و جفت lite حدود ۲ مگابایت است.
@@ -84,15 +78,7 @@ df -h /overlay /tmp
 du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 ```
 
-> روتر با فلش اسمی ۳۲ یا ۶۴ مگابایت برای بسته فعلی جا ندارد. حتی فلش اسمی
-> ۱۲۸ مگابایت به معنی ۱۲۰ مگابایت فضای خالی نیست؛ فضای آزاد واقعی را بررسی کنید.
-> انتقال فقط پوشه دانلود هسته ها به USB جای نصب اولیه دو هسته همراه را آزاد نمی کند؛
-> برای نصب روی روتر کم فضا ابتدا extroot یا فضای نصب کافی فراهم کنید.
-
-**رم.** هسته در حال اجرا بین ۴۰ تا ۸۰ مگابایت می‌گیرد. روی روتر ۱۲۸ مگابایتی کار
-می‌کند، ولی اگر اشتراک صد کانفیگی دارید، در صفحه **کانفیگ‌ها** گزینه
-**بررسی همزمان کانفیگ** را از ۳۰ بیاورید روی ۱۰. آن عدد یعنی چند هندشیک هم‌زمان
-زده شود، و روی رم کم همان چیزی است که روتر را تحت فشار می‌گذارد — نه خود تونل.
+**رم.** سقف بررسی هم‌زمان در هر دو مرحلهٔ انتخاب خودکار بر اساس رم گزارش‌شدهٔ روتر تعیین می‌شود. روی روتر با حداکثر ۳۲، ۶۴، ۱۲۸ یا ۲۵۶ MiB رم، سقف به‌ترتیب ۳، ۵، ۱۰ یا ۲۰ کانفیگ است. صفحهٔ **کانفیگ‌ها** سقف دستگاه را نشان می‌دهد و مقدار بالاتر را نمی‌پذیرد. مقدارهای قدیمی هنگام اجرا محدود می‌شوند. اندازهٔ دستهٔ کوچک‌تر می‌تواند تعداد کانفیگ‌هایی را که در تعداد دسته‌های تنظیم‌شده به مرحلهٔ دوم می‌رسند کم کند. رم موردنیاز هستهٔ در حال اجرا جداگانه به تنظیمات و بار روتر بستگی دارد.
 
 **پردازنده.** سرعت را رمزنگاری TLS تعیین می‌کند، نه تعداد هسته‌های پردازنده. روی
 روتر مرجع — چهار هسته Cortex-A7 با ۷۱۷ مگاهرتز — اندازه گرفته شده: **۱.۶ مگابایت
@@ -137,15 +123,19 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 (
   set -eu
   . /etc/openwrt_release
-  tag="$(wget -qO- https://api.github.com/repos/dreamboxone/zirgozar/releases/latest | jsonfilter -e '@.tag_name')"
+  install_dir="$(mktemp -d /tmp/zirgozar-install.XXXXXX)"
+  trap 'rm -f "$install_dir"/*; rmdir "$install_dir"' EXIT
+  wget -4 -O "$install_dir/release.json" https://api.github.com/repos/dreamboxone/zirgozar/releases/latest
+  tag="$(jsonfilter -i "$install_dir/release.json" -e '@.tag_name')"
   case "$tag" in v[0-9]*) ;; *) echo 'Could not determine the latest release.' >&2; exit 1 ;; esac
   version="${tag#v}"
-  base="https://github.com/dreamboxone/zirgozar/releases/download/$tag"
-  install_dir="/tmp/zirgozar-install-$version"
-  mkdir -p "$install_dir"
   main="zirgozar-$version.$DISTRIB_ARCH.apk"
-  wget -O "$install_dir/$main" "$base/$main"
-  apk update
+  if ! asset_url="$(jsonfilter -i "$install_dir/release.json" -e "@.assets[@.name=\"$main\"].url")" || [ -z "$asset_url" ]; then
+    echo "Package $main was not found in release $tag." >&2
+    exit 1
+  fi
+  wget -4 -T 90 --header="Accept: application/octet-stream" -O "$install_dir/$main" "$asset_url"
+  apk update || echo "Warning: Could not refresh all package feeds." >&2
   apk add --allow-untrusted --upgrade "$install_dir/$main"
 )
 ```
@@ -160,15 +150,19 @@ du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 (
   set -eu
   . /etc/openwrt_release
-  tag="$(wget -qO- https://api.github.com/repos/dreamboxone/zirgozar/releases/latest | jsonfilter -e '@.tag_name')"
+  install_dir="$(mktemp -d /tmp/zirgozar-install.XXXXXX)"
+  trap 'rm -f "$install_dir"/*; rmdir "$install_dir"' EXIT
+  wget -4 -O "$install_dir/release.json" https://api.github.com/repos/dreamboxone/zirgozar/releases/latest
+  tag="$(jsonfilter -i "$install_dir/release.json" -e '@.tag_name')"
   case "$tag" in v[0-9]*) ;; *) echo 'Could not determine the latest release.' >&2; exit 1 ;; esac
   version="${tag#v}"
-  base="https://github.com/dreamboxone/zirgozar/releases/download/$tag"
-  install_dir="/tmp/zirgozar-install-$version"
-  mkdir -p "$install_dir"
   main="zirgozar_${version}_${DISTRIB_ARCH}.ipk"
-  wget -O "$install_dir/$main" "$base/$main"
-  opkg update
+  if ! asset_url="$(jsonfilter -i "$install_dir/release.json" -e "@.assets[@.name=\"$main\"].url")" || [ -z "$asset_url" ]; then
+    echo "Package $main was not found in release $tag." >&2
+    exit 1
+  fi
+  wget -4 -T 90 --header="Accept: application/octet-stream" -O "$install_dir/$main" "$asset_url"
+  opkg update || echo "Warning: Could not refresh all package feeds." >&2
   opkg install "$install_dir/$main"
 )
 ```
@@ -470,7 +464,7 @@ Node List: از کدام کانفیگ‌ها استفاده شود و چطور �
 | **به‌قدر کافی خوب (م‌ثانیه)** | `good_ms` | 1000 | اولین کانفیگی که اندازه‌اش از این کمتر دربیاید همان استفاده می‌شود. عدد کمتر یعنی کانفیگ بهتر و انتظار بیشتر |
 | **اندازه‌گیری همزمان کانفیگ** | `batch_size` | 10 | در هر نوبت چند کانفیگ به‌طور کامل اندازه‌گیری شوند |
 | **حداکثر تعداد دسته** | `max_batches` | 5 | وقتی هیچ‌کدام به‌قدر کافی سریع نیستند، تا کجای فهرست ادامه داده شود |
-| **بررسی همزمان کانفیگ** | `sift_parallel` | 30 | در مرحله اول چند هندشیک هم‌زمان اجرا شود. **روی روتر کم‌رم این عدد را کم کنید** |
+| **بررسی همزمان کانفیگ** | `sift_parallel` | 30 | در مرحله اول چند هندشیک هم‌زمان اجرا شود. حداکثر مقدار به رم روتر بستگی دارد |
 
 **ورود دستی کانفیگ‌ها** — هر ردیف یک بخش `config node`. بالای جدول، این دکمه‌ها:
 

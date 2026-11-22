@@ -393,6 +393,9 @@ function renderState(st) {
 	/* Anything the user has to act on - and only that. The cross puts it away:
 	   a stored message is cleared, and one worked out fresh each time is
 	   remembered as dismissed so it does not come straight back. */
+	var missingXray = !st.stale && st.xray_missing === true;
+	var setup = byId('pwp-xray-setup');
+	if (setup) setup.style.display = missingXray ? 'flex' : 'none';
 	var msg = byId('pwp-msg');
 	if (msg) {
 		var text = statusMessage(st);
@@ -421,7 +424,7 @@ function renderState(st) {
 	   it only holds back Choose the fastest, which would run into it. */
 	var busy = (st.status == 'selecting' || st.status == 'starting');
 	var reselect = byId('pwp-reselect');
-	if (reselect) reselect.disabled = busy || !!st.job;
+	if (reselect) reselect.disabled = missingXray || busy || !!st.job;
 
 	/* Two passes, and they measure different things, so one bar that silently
 	   changes meaning half way through would be a lie told twice. */
@@ -546,6 +549,10 @@ return baseclass.extend({
 		]);
 
 		var status = pui.card(_('Status'), 'pulse', '#10b981', E('div', {}, [
+			E('div', { 'id': 'pwp-xray-setup', 'class': 'mk-alert', 'role': 'status', 'style': 'display:none' }, [
+				E('span', { 'style': 'flex:1 1 200px' }, _('Install Xray to start the Zirgozar tunnel.')),
+				E('a', { 'class': 'mk-btn soft-blue', 'href': L.url('admin', 'services', 'zirgozar', 'update') + '#pwp-cores' }, _('Go to core installation'))
+			]),
 			E('div', { 'id': 'pwp-msg', 'class': 'mk-alert', 'style': 'display:none' }, [
 				E('span', { 'id': 'pwp-msg-text', 'style': 'flex:1 1 200px' }, ''),
 				E('div', { 'id': 'pwp-msg-act', 'style': 'flex:1 1 100%;order:3' }),

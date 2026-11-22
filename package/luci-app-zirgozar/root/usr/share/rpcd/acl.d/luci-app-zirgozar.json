@@ -3,8 +3,9 @@
 		"description": "Grant access to Zirgozar",
 		"read": {
 			"ubus": {
-				"luci.zirgozar": [ "health", "led", "state", "traffic", "nodes", "nodeorigins", "balancingnodes", "subs", "subnodes", "system", "tests", "inuse", "log", "lan", "check", "geo", "geoview", "nodeconfig", "server", "warp" ],
-				"luci-rpc": [ "getHostHints" ]
+				"luci.zirgozar": [ "health", "led", "state", "traffic", "nodes", "probelimits", "nodeorigins", "balancingnodes", "subs", "subnodes", "system", "tests", "inuse", "log", "lan", "check", "geo", "geoview", "nodeconfig", "server", "warp" ],
+				"luci-rpc": [ "getHostHints" ],
+				"luci.zirgozar_clients": [ "getStatus", "getClients", "getClientDetail", "getWifiInterfaces", "getFirewallRules", "getBandwidth", "getSpeedLimits" ]
 			},
 			"file": {
 				"/tmp/zirgozar-backup.tar": [ "read" ]
@@ -13,7 +14,8 @@
 		},
 		"write": {
 			"ubus": {
-				"luci.zirgozar": [ "action" ]
+				"luci.zirgozar": [ "action" ],
+				"luci.zirgozar_clients": [ "setMacFilter", "setFirewallRule", "deleteFirewallRule", "setSpeedLimit", "deleteSpeedLimit" ]
 			},
 			"file": {
 				"/tmp/zirgozar-restore": [ "write" ]

@@ -163,7 +163,6 @@ install_xray() {
 		_url="https://github.com/$XRAY_REPO/releases/latest/download/Xray-linux-$_asset.zip"
 	fi
 	log "installing Xray ${_xtag:-latest}"
-	_zip="$ZGZ_RUN/xray.zip"
 
 	command -v unzip >/dev/null 2>&1 || {
 		say_message "unzip is needed to install Xray and is not on this router. Press Install dependencies on the settings page."
@@ -174,18 +173,24 @@ install_xray() {
 	# the archive, plus the binary that comes out of it
 	need_room $((_size * 2)) || return 1
 
-	download_checked "$_url" "$_zip" "$_size" || return 1
+	# Stage the archive and executable on the disk checked above.
+	(
+		if ! mkdir -p "$DIR" || ! _xray_stage="$(mktemp -d "$DIR/.xray-install.XXXXXX")"; then
+			say_message "Could not write $DIR."
+			exit 1
+		fi
+		trap 'rm -f "$_xray_stage/xray.zip" "$_xray_stage/xray.zip.part" "$_xray_stage/xray" "$ZGZ_RUN/download"; rmdir "$_xray_stage"' EXIT
+		trap 'exit 1' INT TERM
 
-	rm -rf "$ZGZ_RUN/xtract"
-	mkdir -p "$ZGZ_RUN/xtract"
-	if ! unzip -o -q "$_zip" xray -d "$ZGZ_RUN/xtract" 2>/dev/null; then
-		rm -f "$_zip"
-		rm -rf "$ZGZ_RUN/xtract"
-		say_message "The Xray download did not contain a program - the address or the release may have changed."
-		return 1
-	fi
-	rm -f "$_zip"
-	install_binary "$ZGZ_RUN/xtract/xray" "$DIR/xray" xray || return $?
+		download_checked "$_url" "$_xray_stage/xray.zip" "$_size" || exit 1
+		if ! unzip -p "$_xray_stage/xray.zip" xray > "$_xray_stage/xray"; then
+			warn "Could not extract Xray to $DIR."
+			say_message "Could not extract Xray to $DIR. Check free space and try again."
+			exit 1
+		fi
+		rm -f "$_xray_stage/xray.zip"
+		install_binary "$_xray_stage/xray" "$DIR/xray" xray
+	) || return $?
 	# Chosen here, so a new release of this program leaves it in place.
 	[ "$DIR" = /usr/libexec/zirgozar ] && core_version "$DIR/xray" > "$ZGZ_ETC/xray-chosen" 2>/dev/null
 	# A version picked from the list is the one wanted, not merely one more

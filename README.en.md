@@ -45,26 +45,14 @@
 
 | | Minimum | Comfortable |
 |---|---|---|
-| **Free storage for base install** | about 120 MB | at least 160 MB |
 | **RAM** | 128 MB | 256 MB or more |
 | **CPU** | any architecture Xray publishes a build for | two cores or more |
 
 **Packaging.** Install one `zirgozar` package for your router architecture. The application and complete LuCI interface are installed and updated together; no separate interface package is needed.
 
-**Storage.** The main package now includes both Xray and sing-box. On the
-`arm_cortex-a7_neon-vfpv4` reference router, the installed main package uses
-about **105 MB**, plus less than **1 MB** for the web interface. Budget about
-**120 MB free for the base installation**, preferably **160 MB or more** for
-missing dependencies and installation headroom. An existing `xray-core` package
-does not remove Zirgozar's bundled copy. Compressed download size is not installed
-size. Figures vary with architecture, core versions, filesystem and dependencies.
+**Storage.** The main package contains Zirgozar and its LuCI interface. After installation, install Xray from **App Update**. If you need sing-box, install it separately and select it under **Basic Settings → Active core**. Storage needs depend on the core, architecture, and dependencies.
 
-| Installation | Reference router footprint | Storage budget |
-|---|---|---|
-| Application and UI, including Xray and sing-box | about 106 MB before extra dependencies | at least 160 MB free before installation |
-| All listed cores and tools, plus full routing data | about 400 MB before update cache and temporary files | at least 1 GB usable storage |
-
-The full measurement includes Xray, patterniha's Xray, sing-box, sing-box-lx,
+A full installation on the reference router used about 400 MB. The measurement includes Xray, patterniha's Xray, sing-box, sing-box-lx,
 Geoview, warp-plus, Vwarp, Aether and its supporting files, Mihomo,
 shadowsocks-rust, OpenVPN and HAProxy. The current update cache adds about
 38 MB. Full routing data adds about 24 MB; the lite pair is about 2 MB.
@@ -79,16 +67,7 @@ df -h /overlay /tmp
 du -sh /usr/libexec/zirgozar /etc/zirgozar /www/luci-static/resources/zirgozar
 ```
 
-> Routers with 32 or 64 MB of total flash cannot hold the current base package.
-> Even 128 MB total flash does not mean 120 MB free: check the writable filesystem.
-> Changing only the core download folder to USB does not relocate the two cores
-> bundled in the initial package; arrange extroot or enough installation space first.
-
-**RAM.** The running core takes 40–80 MB. It works on a 128 MB router, but if
-you use a hundred-config subscription, turn **Checked at once** on the **Node
-List** page down from 30 to 10. That number is how many handshakes go out at
-once, and on a small router it is what puts it under pressure — not the tunnel
-itself.
+**RAM.** The Configs page shows the router’s concurrency limit for both passes of automatic selection and rejects higher values. The limits are 3, 5, 10, and 20 configs for routers reporting up to 32, 64, 128, and 256 MiB of RAM respectively. Previously saved values are capped at runtime. Smaller batches can reduce the number of configs reached within the configured batch count. The running core has its own memory requirements.
 
 **CPU.** Throughput is decided by TLS, not by core count. Measured on the
 reference router — four Cortex-A7 cores at 717 MHz — **1.6 MB/s** through the
@@ -129,24 +108,32 @@ release from GitHub automatically and uses OpenWrt's `jsonfilter` utility.
 (
   set -eu
   . /etc/openwrt_release
-  tag="$(wget -qO- https://api.github.com/repos/dreamboxone/zirgozar/releases/latest | jsonfilter -e '@.tag_name')"
+  install_dir="$(mktemp -d /tmp/zirgozar-install.XXXXXX)"
+  trap 'rm -f "$install_dir"/*; rmdir "$install_dir"' EXIT
+  wget -4 -O "$install_dir/release.json" https://api.github.com/repos/dreamboxone/zirgozar/releases/latest
+  tag="$(jsonfilter -i "$install_dir/release.json" -e '@.tag_name')"
   case "$tag" in
     v[0-9]*) ;;
     *) echo 'Could not determine the latest release.' >&2; exit 1 ;;
   esac
   version="${tag#v}"
-  base="https://github.com/dreamboxone/zirgozar/releases/download/$tag"
-  install_dir="/tmp/zirgozar-install-$version"
-  mkdir -p "$install_dir"
   if command -v apk >/dev/null 2>&1; then
     main="zirgozar-$version.$DISTRIB_ARCH.apk"
-    wget -O "$install_dir/$main" "$base/$main"
-    apk update
+    if ! asset_url="$(jsonfilter -i "$install_dir/release.json" -e "@.assets[@.name=\"$main\"].url")" || [ -z "$asset_url" ]; then
+      echo "Package $main was not found in release $tag." >&2
+      exit 1
+    fi
+    wget -4 -T 90 --header="Accept: application/octet-stream" -O "$install_dir/$main" "$asset_url"
+    apk update || echo "Warning: Could not refresh all package feeds." >&2
     apk add --allow-untrusted --upgrade "$install_dir/$main"
   elif command -v opkg >/dev/null 2>&1; then
     main="zirgozar_${version}_${DISTRIB_ARCH}.ipk"
-    wget -O "$install_dir/$main" "$base/$main"
-    opkg update
+    if ! asset_url="$(jsonfilter -i "$install_dir/release.json" -e "@.assets[@.name=\"$main\"].url")" || [ -z "$asset_url" ]; then
+      echo "Package $main was not found in release $tag." >&2
+      exit 1
+    fi
+    wget -4 -T 90 --header="Accept: application/octet-stream" -O "$install_dir/$main" "$asset_url"
+    opkg update || echo "Warning: Could not refresh all package feeds." >&2
     opkg install "$install_dir/$main"
   else
     echo 'apk or opkg was not found.' >&2

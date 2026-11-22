@@ -232,6 +232,23 @@ cfg() {
 	return 0
 }
 
+# Share the same memory ceiling between probes and the configuration form.
+probe_parallel_limit() {
+	local limit
+	limit="$(awk '
+		$1 == "MemTotal:" { kib = $2; exit }
+		END {
+			if (kib <= 32768) print 3
+			else if (kib <= 65536) print 5
+			else if (kib <= 131072) print 10
+			else if (kib <= 262144) print 20
+			else if (kib <= 524288) print 50
+			else print 100
+		}
+	' "${1:-/proc/meminfo}" 2>/dev/null)" || limit=3
+	printf '%s\n' "$limit"
+}
+
 cfg_bool() {
 	case "$(cfg "$1" "$2")" in
 		1|on|true|yes|enabled) echo 1 ;;
@@ -292,8 +309,34 @@ zgz_version() {
 # patterniha's build - see zgz-cores - is one more Xray among them, offered
 # every configuration like the others.
 xray_paths() {
-	echo "$ZGZ_OWN_DIR/xray /usr/bin/xray /usr/local/bin/xray $(core_dir)/xray-patterniha"
+	local dir
+	dir="$(core_dir)"
+	[ "$dir" = "$ZGZ_OWN_DIR" ] || printf '%s\n' "$dir/xray"
+	printf '%s\n' "$ZGZ_OWN_DIR/xray" /usr/bin/xray /usr/local/bin/xray "$dir/xray-patterniha"
 	return 0
+}
+
+# Check availability without launching a core.
+xray_executable() {
+	local configured path
+	configured="$(cfg core_xray '')"
+	if [ -n "$configured" ] && [ -x "$configured" ]; then
+		printf '%s\n' "$configured"
+		return 0
+	fi
+	for path in $(xray_paths); do
+		[ -x "$path" ] || continue
+		printf '%s\n' "$path"
+		return 0
+	done
+	return 1
+}
+
+require_client_xray() {
+	xray_executable >/dev/null && return 0
+	say_status failed
+	log "Xray is required to start the tunnel. Install it on the App Update page."
+	return 1
 }
 
 # The Xray the settings insist on: the path on the Update page, or
@@ -322,6 +365,8 @@ find_xray() {
 		if grep -q '"skipHostsWhenFakeEnable"[[:space:]]*:[[:space:]]*true' "$_cfg"; then _pattern_min=26.11.9; fi
 		if grep -q '"close"[[:space:]]*:[[:space:]]*{' "$_cfg"; then _pattern_min=26.11.12; fi
 		if grep -qE '"(tcpHandshakeTimeout|tlsHandshakeTimeout|tcpKeepAliveCount|successDefinition|tcp4|tcp6|udp4|udp6|removeHeaderSpace)"|"(failedDialFallbackDialerProxy|noResponseFallbackDialerProxy|noIPFallbackDialerProxy)"|"dialMode"[[:space:]]*:[[:space:]]*"[^"]*oob[46]\.' "$_cfg"; then _pattern_min=26.11.20; fi
+		if grep -qE '"passPrimaryConnAddress"[[:space:]]*:[[:space:]]*true|"type"[[:space:]]*:[[:space:]]*"borrow"' "$_cfg"; then _pattern_min=26.11.21; fi
+		if grep -qE '"assuranceFirstInterleave"[[:space:]]*:[[:space:]]*true|"type"[[:space:]]*:[[:space:]]*"proxy-protocol"|"firewall"[[:space:]]*:[[:space:]]*\[|"address"[[:space:]]*:[[:space:]]*"udp\+local://' "$_cfg"; then _pattern_min=26.11.22; fi
 	fi
 	if [ -n "$_pattern_min" ]; then
 		_xpool="$(core_dir)/xray-patterniha"
@@ -1587,6 +1632,7 @@ direct_dns() {
 				_dd_a="${_dd_v%%#*}"; _dd_port="53"
 				case "$_dd_v" in
 					*#*) _dd_port="${_dd_v#*#}" ;;
+					\[*\]:*) _dd_a="${_dd_v%%]*}"; _dd_a="${_dd_a#\[}"; _dd_port="${_dd_v##*:}" ;;
 					*.*.*.*:*) _dd_a="${_dd_v%:*}"; _dd_port="${_dd_v##*:}" ;;
 				esac
 				case "$_dd_port" in ''|*[!0-9]*) _dd_port=53 ;; esac
@@ -1997,7 +2043,7 @@ node_domain_strategy() {
 # as the lines zgz-parse reads them from: "#!zgz-x.<key>=<value>". A
 # certificate keeps its lines with a bar between them, a JSON object loses its
 # line breaks. Nothing at all for a node that has none.
-NODE_EXTRA_KEYS="ech ech_repack tls_pin cert_name tls_pem cipher_suites tls_session_resumption tls_handshake_timeout tcp_handshake_timeout tcp_keepalive_count happy_eyeballs_success fallback_failed fallback_no_response fallback_no_ip fallback_wait_ms fallback_buffer_size user_agent finalmask dial_mode tcp_fast_open tcp_mptcp domain_strategy happy_eyeballs warpplus ws_heartbeat grpc_idle grpc_health grpc_window grpc_permit kcp_mtu kcp_tti kcp_uplink kcp_downlink kcp_read kcp_write kcp_congestion sb_mux sb_mux_streams sb_mux_padding sb_brutal_up sb_brutal_down wg_system ssrust hy_portmap"
+NODE_EXTRA_KEYS="ech ech_repack tls_pin cert_name tls_pem cipher_suites tls_session_resumption tls_handshake_timeout tcp_handshake_timeout tcp_keepalive_count happy_eyeballs_success happy_eyeballs_interleave happy_eyeballs_assure fallback_failed fallback_no_response fallback_pass_address fallback_no_ip fallback_wait_ms fallback_buffer_size user_agent finalmask dial_mode tcp_fast_open tcp_mptcp domain_strategy happy_eyeballs warpplus ws_heartbeat grpc_idle grpc_health grpc_window grpc_permit kcp_mtu kcp_tti kcp_uplink kcp_downlink kcp_read kcp_write kcp_congestion sb_mux sb_mux_streams sb_mux_padding sb_brutal_up sb_brutal_down wg_system ssrust hy_portmap"
 
 node_extras() {
 	for _nk in $NODE_EXTRA_KEYS; do

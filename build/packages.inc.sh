@@ -10,7 +10,7 @@
 # VERSION follows the Solar Hijri date: 1405/08/26 becomes 5.8.26.
 # RELEASE starts at 1 each day and increases for further releases that day.
 # The main zirgozar package always includes the complete LuCI interface.
-VERSION=5.8.28
+VERSION=5.9.1
 RELEASE=1
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
@@ -33,7 +33,7 @@ MAINTAINER="routekernel <https://t.me/routekernel1>"
 # another program pulled it in - needs nothing, and this finds it. Depending on it
 # would drag a second copy onto routers that do not need one, and refusing to
 # install alongside it would be worse still.
-ZGZ_DEPS="dnsmasq-full jshn libubox curl ca-bundle nftables kmod-nft-tproxy kmod-nft-socket ip-full unzip ucode ucode-mod-fs luci-base"
+ZGZ_DEPS="dnsmasq-full jshn libubox curl ca-bundle nftables kmod-nft-tproxy kmod-nft-socket ip-full unzip ucode ucode-mod-fs luci-base rpcd-mod-iwinfo conntrack"
 LUCI_DEPS="zirgozar"
 
 ZGZ_DESC="Transparent proxy client for OpenWrt built on Xray, for Iran. Reads its server list every quarter of an hour, sifts a hundred servers with one handshake each and then measures only the ones that answered, ten at a time, until it finds one fast enough. Optional Iran routing split, per-day traffic accounting, and both nftables and iptables."
@@ -51,7 +51,7 @@ CRON_STATS='*/5 * * * * /usr/libexec/zgz-stats sample >/dev/null 2>&1'
 
 ZGZ_SCRIPTS="zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-dns-local zgz-stats zgz-led zgz-test zgz-geo zgz-cores zgz-delta zgz-delta-plan zgz-deps zgz-bridge zgz-openvpn zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-aether-scan zgz-aether-scan-result zgz-l2tp zgz-l2tpconfig zgz-pppvpn zgz-ikev2 zgz-ikev2config zgz-finalmask-check zgz-doh-bootstrap zgz-lb zgz-balancing zgz-acl-tunnel zgz-rpc"
 
-# Direct package builds must not silently ship an old local prebuilt core.
+# Fetch the expected Xray build for live tests.
 ensure_xray() {
 	local root="$1" arch="$2" expected have
 	expected="$(sh "$root/build/xray-version.sh")" || return 1
@@ -61,24 +61,17 @@ ensure_xray() {
 	fi
 }
 
-# stage_zgz <staging-root> <source-root> <xray-binary>
+# stage_zgz <staging-root> <source-root> <amnezia-binary>
 stage_zgz() {
-	work="$1"; root="$2"; core="$3"
+	work="$1"; root="$2"; amnezia="$3"
 	f="$root/package/zirgozar/files"
 	i="$work/zirgozar"
 
-	# Our own copy of the core lives under /usr/libexec/zirgozar. /usr/bin/xray
-	# belongs to OpenWrt's xray-core package, which other programs pull
-	# in, and claiming that path makes this package refuse to install on any
-	# router that already has one.
 	install -d "$i/usr/libexec/zirgozar" "$i/etc/config" "$i/etc/init.d" \
 	           "$i/usr/libexec/rpcd" "$i/etc/zirgozar" "$i/etc/zirgozar/geo"
-	install -m 0755 "$core"            "$i/usr/libexec/zirgozar/xray"
-	install -m 0755 "$(dirname "$core")/zgz-amnezia" "$i/usr/libexec/zirgozar/zgz-amnezia"
-	# sing-box ships beside it: the rest of the helpers are installed only
-	# when the reader asks for them, on App Update.
-	[ -f "$(dirname "$core")/sing-box" ] && install -m 0755 "$(dirname "$core")/sing-box" "$i/usr/libexec/zirgozar/sing-box"
+	install -m 0755 "$amnezia" "$i/usr/libexec/zirgozar/zgz-amnezia"
 	install -m 0644 "$f/zirgozar.config"   "$i/etc/config/zirgozar"
+	install -m 0644 "$f/zirgozar_clients.config" "$i/etc/config/zirgozar_clients"
 	install -m 0644 "$f/zirgozar_server.config" "$i/etc/config/zirgozar_server"
 	# An untouched copy, for Restore defaults in Basic Settings: the one in
 	# /etc/config is the reader's from the first save on.
@@ -87,6 +80,7 @@ stage_zgz() {
 	install -d "$i/usr/share/zirgozar/ikev2-intermediates"
 	install -m 0644 "$f"/ikev2-intermediates/*.pem "$i/usr/share/zirgozar/ikev2-intermediates/"
 	install -m 0755 "$f/zirgozar.init"     "$i/etc/init.d/zirgozar"
+	install -m 0755 "$f/zirgozar-clients.init" "$i/etc/init.d/zirgozar-clients"
 	install -m 0755 "$f/zirgozar-led.init" "$i/etc/init.d/zirgozar-led"
 	install -m 0755 "$f/zirgozar-dns.init" "$i/etc/init.d/zirgozar-dns"
 	install -m 0755 "$f/zirgozar-server.init" "$i/etc/init.d/zirgozar-server"
@@ -95,6 +89,9 @@ stage_zgz() {
 	install -m 0755 "$f/zirgozar-killswitch.hotplug" "$i/etc/hotplug.d/firewall/90-zirgozar-killswitch"
 	install -m 0644 "$f/zgz-common.sh" "$i/usr/libexec/zgz-common.sh"
 	install -m 0755 "$f/luci.zirgozar"     "$i/usr/libexec/rpcd/luci.zirgozar"
+	install -m 0755 "$f/luci.zirgozar_clients" "$i/usr/libexec/rpcd/luci.zirgozar_clients"
+	install -d "$i/usr/share/zirgozar/client-manager"
+	install -m 0644 "$f/client-manager/LICENSE" "$f/client-manager/NOTICE" "$i/usr/share/zirgozar/client-manager/"
 
 	for s in $ZGZ_SCRIPTS; do
 		install -m 0755 "$f/$s" "$i/usr/libexec/$s"
@@ -106,12 +103,7 @@ stage_zgz() {
 	printf '%s\n' "$PKGVER" > "$i/etc/zirgozar/version"
 	chmod 0644 "$i/etc/zirgozar/version"
 
-	ver="$(dirname "$core")/xray-version.txt"
-	[ -s "$ver" ] && install -m 0644 "$ver" "$i/etc/zirgozar/xray-version"
-	ver="$(dirname "$core")/sing-box-version.txt"
-	[ -s "$ver" ] && install -m 0644 "$ver" "$i/etc/zirgozar/sing-box-version"
-
-	printf '%s\n' /etc/config/zirgozar /etc/config/zirgozar_server > "$work/zirgozar.conffiles"
+	printf '%s\n' /etc/config/zirgozar /etc/config/zirgozar_server /etc/config/zirgozar_clients > "$work/zirgozar.conffiles"
 
 	cat > "$work/zirgozar.postinst" <<EOF
 # 'timeout' is not on every OpenWrt image - a stock 25.12 does not have it,
@@ -210,6 +202,8 @@ bounded 15 /etc/init.d/cron reload >/dev/null 2>&1 || true
 bounded 40 /usr/libexec/zgz-rpc ensure >/dev/null 2>&1 || true
 # Always in the boot sequence; the main switch decides whether it runs.
 bounded 15 /etc/init.d/zirgozar enable >/dev/null 2>&1 || true
+bounded 15 /etc/init.d/zirgozar-clients enable >/dev/null 2>&1 || true
+bounded 15 /etc/init.d/zirgozar-clients start >/dev/null 2>&1 || true
 bounded 15 /etc/init.d/zirgozar-led enable >/dev/null 2>&1 || true
 bounded 15 /etc/init.d/zirgozar-led restart >/dev/null 2>&1 || true
 bounded 15 /etc/init.d/zirgozar-server enable >/dev/null 2>&1 || true
@@ -223,29 +217,13 @@ exit 0
 EOF
 
 	cat > "$work/zirgozar.preinst" <<'EOF'
-# An Xray the reader chose on App Update - a version picked from the list, or
-# any install they asked for - is theirs, and a new release of this program
-# does not replace it with the one it ships. It is moved aside here, out of
-# the package manager's way, and put back once the new files are in.
+# Preserve cores from older packages and from manual installs across upgrades.
 D=/usr/libexec/zirgozar
-if [ -x "$D/xray" ]; then
-	have="$("$D/xray" version 2>/dev/null | awk 'NR == 1 { print $2 }')"
-	shipped="$(cat /etc/zirgozar/xray-version 2>/dev/null)"
-	if [ -f /etc/zirgozar/xray-chosen ] || { [ -n "$have" ] && [ -n "$shipped" ] && [ "$have" != "${shipped#v}" ]; }; then
-		mv -f "$D/xray" "$D/xray.keep"
-		[ -f /etc/zirgozar/xray-chosen ] || echo "$have" > /etc/zirgozar/xray-chosen
+for core in xray sing-box; do
+	if [ -x "$D/$core" ]; then
+		mv -f "$D/$core" "$D/$core.keep" || exit 1
 	fi
-fi
-# sing-box the same way. One that came before this program shipped its own
-# was the reader's, installed on App Update, and is kept too.
-if [ -x "$D/sing-box" ]; then
-	have="$("$D/sing-box" version 2>/dev/null | awk 'NR == 1 { print $3 }')"
-	shipped="$(cat /etc/zirgozar/sing-box-version 2>/dev/null)"
-	if [ -f /etc/zirgozar/sing-box-chosen ] || [ -z "$shipped" ] || { [ -n "$have" ] && [ "$have" != "${shipped#v}" ]; }; then
-		mv -f "$D/sing-box" "$D/sing-box.keep"
-		[ -f /etc/zirgozar/sing-box-chosen ] || echo "$have" > /etc/zirgozar/sing-box-chosen
-	fi
-fi
+done
 exit 0
 EOF
 
@@ -262,6 +240,8 @@ bounded() {
 # open it again.
 bounded 15 /usr/libexec/zgz-rules ks down >/dev/null 2>&1 || true
 bounded 15 /etc/init.d/zirgozar-killswitch disable >/dev/null 2>&1 || true
+bounded 15 /etc/init.d/zirgozar-clients stop >/dev/null 2>&1 || true
+bounded 15 /etc/init.d/zirgozar-clients disable >/dev/null 2>&1 || true
 bounded 20 /etc/init.d/zirgozar-led stop >/dev/null 2>&1 || true
 bounded 15 /etc/init.d/zirgozar-led disable >/dev/null 2>&1 || true
 bounded 20 /etc/init.d/zirgozar-server stop >/dev/null 2>&1 || true
@@ -292,6 +272,11 @@ stage_luci_assets() {
 	# three blank pages - it ships beside them, not as an extra.
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/i18n.js" \
 		"$i/www/luci-static/resources/zirgozar/i18n.js"
+	install -d "$i/www/luci-static/resources/view/zirgozar/users"
+	install -m 0644 "$l/www/luci-static/resources/view/zirgozar/users/"*.js \
+		"$i/www/luci-static/resources/view/zirgozar/users/"
+	install -m 0644 "$l/www/luci-static/resources/zirgozar/clients.js" \
+		"$i/www/luci-static/resources/zirgozar/clients.js"
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/lang_zh.js" \
 		"$i/www/luci-static/resources/zirgozar/lang_zh.js"
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/lang_ru.js" \

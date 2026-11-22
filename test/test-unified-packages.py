@@ -21,6 +21,14 @@ version = (ROOT / 'build/packages.inc.sh').read_text().split('VERSION=', 1)[1].s
 revision = (ROOT / 'build/packages.inc.sh').read_text().split('RELEASE=', 1)[1].splitlines()[0]
 version += '-r' + revision
 ui = 'www/luci-static/resources/zirgozar/i18n.js'
+optional_core_files = {
+    f'{directory}/{name}'
+    for directory, names in (
+        ('usr/libexec/zirgozar', ('xray', 'sing-box')),
+        ('etc/zirgozar', ('xray-version', 'sing-box-version')),
+    )
+    for name in names
+}
 
 def command(*values):
     result = subprocess.run([str(v) for v in values], capture_output=True, text=True, timeout=120)
@@ -100,6 +108,8 @@ with tempfile.TemporaryDirectory(prefix='zgz-unified-managers-') as directory:
              '--no-scripts', '--no-network']
     command(*fresh, '--initdb', 'add', dependency, main_apk)
     assert (work / 'apk-fresh' / ui).exists()
+    for filename in optional_core_files:
+        assert not (work / 'apk-fresh' / filename).exists(), filename
     print('PASS: real apk fresh installation needs only the main application package')
 
     with tarfile.open(DIST / f'zirgozar_{version}_{args.arch}.ipk', 'r:gz') as outer:
@@ -107,7 +117,8 @@ with tempfile.TemporaryDirectory(prefix='zgz-unified-managers-') as directory:
             assert b'Replaces: luci-app-zirgozar' in controls.extractfile('./control').read()
         with tarfile.open(fileobj=io.BytesIO(outer.extractfile('./data.tar.gz').read()), mode='r:gz') as payload:
             assert payload.extractfile('./' + ui).read() == (ROOT / 'package/luci-app-zirgozar/root' / ui).read_bytes()
-    print('PASS: IPK contains complete UI and replacement metadata')
+            assert optional_core_files.isdisjoint(name.removeprefix('./') for name in payload.getnames())
+    print('PASS: IPK contains complete UI and replacement metadata, without bundled cores')
     if args.opkg:
         opkg_root = work / 'opkg-root'
         opkg_root.mkdir()

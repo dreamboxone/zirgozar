@@ -57,6 +57,15 @@ if [ -n "$_fc" ]; then
 	case "$_fc" in \{*\}) : ;; *) echo 'Freedom close must be a JSON object.' >&2; exit 1 ;; esac
 	freedom_close=",\"close\":$_fc"
 fi
+freedom_firewall=''
+_fw_rules="$(cfg freedom_firewall '')"
+if [ -n "$_fw_rules" ]; then
+	_fw_rules="$(printf '%s' "$_fw_rules" | ucode -e 'import { readfile } from "fs"; let r=json(readfile("/dev/stdin")); if (type(r)!="array") exit(1); for (let v in r) if (type(v)!="object") exit(1); printf("%J",r);' 2>/dev/null)" ||
+		{ echo 'Freedom firewall must be a JSON array of rules.' >&2; exit 1; }
+	if [ "$_fw_rules" != '[]' ]; then
+		freedom_firewall=",\"firewall\":$_fw_rules"
+	fi
+fi
 dns_skip_hosts=''
 if [ "$(cfg_bool dns_skip_hosts_when_fake 0)" = 1 ]; then
 	dns_skip_hosts=',"skipHostsWhenFakeEnable":true'
@@ -1334,6 +1343,16 @@ done
 
 if [ "$dd_proto" = "tcp" ]; then
 	direct_server="\"address\":\"tcp://$dd_addr:$dd_port\""
+elif [ "$(cfg direct_dns_protocol '')" = udp ] && [ "$(cfg_bool direct_dns_native_udp 0)" = 1 ]; then
+	# The core's local UDP socket does not carry Zirgozar's bypass mark.
+	[ "$dd_port" -eq 53 ] 2>/dev/null || config_error 'Xray local UDP DNS requires port 53.'
+	_udp_host="$dd_addr"
+	case "$_udp_host" in
+		\[*\]) ;;
+		*:*) _udp_host="[$_udp_host]" ;;
+	esac
+	dd_port=53
+	direct_server="\"address\":\"udp+local://$_udp_host:$dd_port\""
 else
 	direct_server="\"address\":\"$dd_addr\",\"port\":$dd_port"
 fi
@@ -1481,7 +1500,7 @@ ${shunt_outbounds}
 ${chain_outs}
     $_aether_entry
     $dns_tls_out
-    { "tag": "direct", "protocol": "freedom", "settings": { "domainStrategy": "UseIP"${freedom_close} }, "streamSettings": { "sockopt": { "mark": ${ZGZ_OUT_MARK} } } },
+    { "tag": "direct", "protocol": "freedom", "settings": { "domainStrategy": "UseIP"${freedom_close}${freedom_firewall} }, "streamSettings": { "sockopt": { "mark": ${ZGZ_OUT_MARK} } } },
     { "tag": "dns-out", "protocol": "dns", "streamSettings": { "sockopt": { "mark": ${ZGZ_OUT_MARK} } } },
     { "tag": "block", "protocol": "blackhole" }
   ],

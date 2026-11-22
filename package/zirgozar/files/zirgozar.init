@@ -132,6 +132,8 @@ start_service() {
 		return 0
 	fi
 
+	require_client_xray || return 1
+
 	mkdir -p "$ZGZ_RUN" /var/etc "$ZGZ_ETC"
 	# DNS isolation and the Iranian direct path are available before a node
 	# connects, including while a selected node is unreachable.
@@ -246,6 +248,8 @@ start_service() {
 			tail -8 "$ZGZ_RUN/config-check.err" | while IFS= read -r _reason; do
 				[ -z "$_reason" ] || warn "core rejected configuration: $_reason"
 			done
+		else
+			warn "Install Xray or sing-box on the App Update page, then choose the active core in Basic Settings."
 		fi
 		return 1
 	fi

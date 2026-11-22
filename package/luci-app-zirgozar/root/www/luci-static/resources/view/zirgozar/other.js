@@ -65,6 +65,7 @@ return view.extend({
 
 		/* ------------------------------------------------ Delay Settings */
 		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Delay Settings'));
+		pui.collapseSection(s, 'delay');
 		s.anonymous = true;
 
 		o = s.option(form.Flag, 'start_daemon', _('Open and close Daemon'),
@@ -119,6 +120,7 @@ return view.extend({
 
 		/* ------------------------------------------- Forwarding Settings */
 		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Forwarding Settings'));
+		pui.collapseSection(s, 'forwarding');
 		s.anonymous = true;
 
 		o = s.option(form.Value, 'tcp_no_redir_ports', _('Do not forward these TCP ports'));
@@ -198,6 +200,7 @@ return view.extend({
 
 		/* ---------------------------------------------- sing-box-lx Settings */
 		s = m.section(form.NamedSection, 'config', 'zirgozar', 'sing-box-lx');
+		pui.collapseSection(s, 'singbox-lx');
 		s.anonymous = true;
 		o = s.option(form.ListValue, 'lx_decoy_mode', _('QUIC anti-sniff paths'),
 			_('Requires sing-box-lx 1.14.4-lx.33 or newer. Retry sends a decoy only after a failed attempt.'));
@@ -233,6 +236,7 @@ return view.extend({
 
 		/* -------------------------------------------------- Xray Settings */
 		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Xray Settings'));
+		pui.collapseSection(s, 'xray');
 		s.anonymous = true;
 
 		o = s.option(form.TextValue, 'freedom_close', 'Freedom close (JSON)',
@@ -243,6 +247,20 @@ return view.extend({
 			if (!value) return true;
 			try { var v = JSON.parse(value); if (v && typeof v == 'object' && !Array.isArray(v)) return true; } catch (e) {}
 			return _('Enter a JSON object.');
+		};
+
+		o = s.option(form.TextValue, 'freedom_firewall', _('Freedom firewall (JSON)'),
+			_('Rules for the direct Xray outbound, optionally with a reply. Enter a JSON array. Requires Xray-patterniha 26.11.22 or newer.'));
+		o.rows = 5; o.monospace = true; o.placeholder = '[]';
+		o.validate = function(section_id, value) {
+			if (!value || !value.trim()) return true;
+			try {
+				var rules = JSON.parse(value);
+				if (Array.isArray(rules) && rules.every(function(rule) {
+					return rule && typeof rule === 'object' && !Array.isArray(rule);
+				})) return true;
+			} catch (e) {}
+			return _('Enter a JSON array of firewall rules.');
 		};
 
 		o = s.option(form.Flag, 'fragment', _('Fragment'),

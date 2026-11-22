@@ -624,7 +624,7 @@ return view.extend({
 		   insist on a particular Xray. The routing data is on Rule Manage, as
 		   it is elsewhere. */
 		m = new form.Map('zirgozar');
-		s = m.section(form.NamedSection, 'config', 'zirgozar', _('App Path'));
+		s = m.section(form.NamedSection, 'config', 'zirgozar');
 		s.anonymous = true;
 
 		o = s.option(form.Value, 'core_dir', _('Core download folder'),
@@ -677,6 +677,7 @@ return view.extend({
 
 
 		return m.render().then(function(mapEl) {
+			var paths = E('div', { 'id': 'zgz-core-path-fields' }, mapEl);
 			var content = [
 				pui.card(_('App Update'), 'download', '#1e88e5', E('div', { 'id': 'pwp-app' })),
 				pui.card(_('Cores'), 'cpu', '#8b5cf6', E('div', {}, [
@@ -691,7 +692,10 @@ return view.extend({
 					E('div', { 'id': 'pwp-cores' })
 				])),
 				pui.card(_('Router requirements'), 'shield', '#f59e0b', E('div', { 'id': 'zgz-deps' })),
-				mapEl
+				pui.card(_('App Path'), null, '#3b82f6', E('div', {}, [
+					pui.detailsToggle(paths),
+					paths
+				]))
 			];
 			/* Asked at once, and then every ten seconds while the page is open -
 			   often enough to see a download finish. */

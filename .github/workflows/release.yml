@@ -598,12 +598,14 @@ jobs:
       - name: Build the Amnezia importer
         run: sh build/build-amnezia.sh ${{ matrix.openwrt_arch }}
 
-      - name: Fetch the Xray core for ${{ matrix.name }}
+      - name: Fetch Xray for the live smoke test
+        if: matrix.name == 'x86_64'
         env:
           XRAY_VERSION: ${{ needs.test.outputs.xray_version }}
         run: |
           set -euo pipefail
-          sh ./build/build-core.sh ${{ matrix.name }}
+          . ./build/packages.inc.sh
+          ensure_xray "$PWD" x86_64
           ls -l prebuilt/${{ matrix.openwrt_arch }}/xray
           file prebuilt/${{ matrix.openwrt_arch }}/xray
 

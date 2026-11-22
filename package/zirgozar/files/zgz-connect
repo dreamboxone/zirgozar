@@ -26,6 +26,12 @@ RULES="${ZGZ_LIB:-/usr/libexec}/zgz-rules"
 
 MODE="${1:-connect}"
 
+if [ "$MODE" = prepare ]; then
+	xray_executable >/dev/null || exit 0
+else
+	require_client_xray || exit 1
+fi
+
 if ! zgz_lock; then
 	# Something is already choosing. Two measurements at once would fight over
 	# the same listening ports and both would come back wrong.

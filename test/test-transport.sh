@@ -84,4 +84,23 @@ rm -f "$RIG/core/xray-patterniha"
 printf '#!/bin/sh\necho "Xray 26.11.15"\n' > "$RIG/core/xray-patterniha"
 chmod +x "$RIG/core/xray-patterniha"
 find_xray "$WORK/config.json" >/dev/null 2>&1 && bad 'old core ignored new settings' || ok 'old core rejected before settings can be ignored'
+rig_set a.happy_eyeballs_assure 1
+rig_set a.happy_eyeballs_interleave 4
+rig_set a.fallback_pass_address 1
+node_records a | cut -f6- > "$WORK/advanced.json"
+rig_set a.fallback_no_response _none
+node_records a | cut -f6- > "$WORK/advanced-disabled.json"
+python3 - "$WORK" <<'PY'
+import json, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+def sockopt(name):
+    return json.loads((root / name).read_text())['streamSettings']['sockopt']
+on = sockopt('advanced.json')
+assert on['happyEyeballs']['assuranceFirstInterleave'] is True
+assert on['happyEyeballs']['interleave'] == 4
+assert on['happyEyeballs']['tryDelayMs'] == 91
+assert on['fallback']['passPrimaryConnAddress'] is True
+assert 'passPrimaryConnAddress' not in sockopt('advanced-disabled.json')['fallback']
+PY
+[ "$?" = 0 ] && ok 'new race and fallback options are generated without changing imported tuning' || bad 'new transport options'
 rig_report

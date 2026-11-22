@@ -485,6 +485,7 @@ return view.extend({
 
 		/* ------------------------------------------------------ rebind */
 		s = m.section(form.NamedSection, 'config', 'zirgozar', _('Sites with a rebind weakness'));
+		pui.collapseSection(s, 'rebind');
 		s.anonymous = true;
 
 		o = s.option(form.DynamicList, 'rebind_domain', _('Domains'));

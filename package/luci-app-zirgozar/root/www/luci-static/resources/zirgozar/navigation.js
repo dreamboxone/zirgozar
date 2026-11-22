@@ -25,10 +25,10 @@ function route(value) {
 
 function markTabs(destination) {
 	var selected = destination.page === 'node' ? 'nodes' : destination.page === 'shunt_rule' ? 'traffic' : destination.page;
-	document.querySelectorAll('.mk-tabs a').forEach(function(link) {
+	document.querySelectorAll('.mk-sidebar-link').forEach(function(link) {
 		var target = route(link.href), active = target && target.page === selected;
-		link.classList.toggle('mk-tab-on', !!active);
-		link.setAttribute('aria-selected', String(!!active));
+		if (active) link.setAttribute('aria-current', 'page');
+		else link.removeAttribute('aria-current');
 	});
 }
 

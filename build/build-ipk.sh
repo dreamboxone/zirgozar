@@ -30,10 +30,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="${ZGZ_WORK:-${TMPDIR:-/tmp}/zirgozar-ipk-build}"
 DIST="$ROOT/dist"
 
-CORE="$ROOT/prebuilt/$ARCH/xray"
-ensure_xray "$ROOT" "$ARCH"
 sh "$ROOT/build/build-amnezia.sh" "$ARCH"
-[ -f "$CORE" ] || { echo "missing xray: $CORE (run build/build-core.sh)"; exit 1; }
 
 echo ">>> arch    : $ARCH"
 echo ">>> version : $PKGVER"
@@ -124,7 +121,7 @@ finalize() {
 	echo ">>> built $(basename "$out") ($(du -h "$out" | cut -f1))"
 }
 
-stage_zgz "$WORK" "$ROOT" "$CORE"
+stage_zgz "$WORK" "$ROOT" "$ROOT/prebuilt/$ARCH/zgz-amnezia"
 stage_luci_assets "$WORK" "$ROOT"
 finalize zirgozar "$ARCH" "$ZGZ_DEPS" "$ZGZ_DESC"
 

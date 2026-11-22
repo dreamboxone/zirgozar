@@ -478,10 +478,15 @@ function node_extras(p,   ss, sec, t, sock, net, ws, k, v, pem, n, a, i, arr, h)
 		if (h == "" || h == "null") h="{\"tryDelayMs\":250,\"prioritizeIPv6\":false,\"interleave\":1,\"maxConcurrentTry\":4}"
 		if (NX["happy_eyeballs_success"] ~ /^(tcpConnected|tlsHandshakeComplete)$/)
 			h = jset(h, "successDefinition", "\"" NX["happy_eyeballs_success"] "\"")
+		if (NX["happy_eyeballs_interleave"] ~ /^[0-9]+$/ &&
+		    NX["happy_eyeballs_interleave"]+0 >= 1 && NX["happy_eyeballs_interleave"]+0 <= 32)
+			h = jset(h, "interleave", NX["happy_eyeballs_interleave"]+0)
+		if (NX["happy_eyeballs_assure"] ~ /^(0|1)$/)
+			h = jset(h, "assuranceFirstInterleave", NX["happy_eyeballs_assure"] == "1" ? "true" : "false")
 		sock = jset(sock, "happyEyeballs", h)
 	}
 	if (NX["fallback_failed"] != "" || NX["fallback_no_response"] != "" || NX["fallback_no_ip"] != "" ||
-	    ((NX["fallback_wait_ms"] != "" || NX["fallback_buffer_size"] != "") && jraw(sock,"fallback") != "")) {
+	    ((NX["fallback_wait_ms"] != "" || NX["fallback_buffer_size"] != "" || NX["fallback_pass_address"] != "") && jraw(sock,"fallback") != "")) {
 		h=jraw(sock,"fallback"); if (h == "" || h == "null") h="{}"
 		if (NX["fallback_failed"] == "_none") h=jdrop(h,"failedDialFallbackDialerProxy")
 		else if (NX["fallback_failed"] ~ /^[A-Za-z0-9_]+$/) h=jset(h,"failedDialFallbackDialerProxy","\"chain-" NX["fallback_failed"] "\"")
@@ -492,6 +497,10 @@ function node_extras(p,   ss, sec, t, sock, net, ws, k, v, pem, n, a, i, arr, h)
 		if (jstr(h,"failedDialFallbackDialerProxy") != "" || jstr(h,"noResponseFallbackDialerProxy") != "" || jstr(h,"noIPFallbackDialerProxy") != "") {
 			if (NX["fallback_wait_ms"] ~ /^[0-9]+$/) h=jset(h,"waitMs",NX["fallback_wait_ms"]+0)
 			if (NX["fallback_buffer_size"] ~ /^[0-9]+$/) h=jset(h,"maxBufferSize",NX["fallback_buffer_size"]+0)
+			if (jstr(h,"noResponseFallbackDialerProxy") != "") {
+				if (NX["fallback_pass_address"] ~ /^(0|1)$/)
+					h=jset(h,"passPrimaryConnAddress",NX["fallback_pass_address"] == "1" ? "true" : "false")
+			} else h=jdrop(h,"passPrimaryConnAddress")
 			sock=jset(sock,"fallback",h)
 		} else sock=jdrop(sock,"fallback")
 	}

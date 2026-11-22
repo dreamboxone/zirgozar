@@ -5,8 +5,7 @@
  *
  * The frame every page is drawn in, built the way Makhzan builds its own -
  * the same author's other LuCI application - out of Makhzan's stylesheet and
- * Makhzan's pieces: the banner with the logo and the version, a tab bar under
- * it, cards, metrics, buttons, and the footer with the Telegram group. Light
+ * Makhzan's pieces: the banner with the logo and the version, a collapsible sidebar, cards, metrics, buttons, and the footer with the Telegram group. Light
  * and dark follow the LuCI theme until the reader picks one.
  */
 
@@ -22,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.8.28-r1';
+var BUILD = '5.9.1-r1';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -30,12 +29,15 @@ var callState = rpc.declare({ object: 'luci.zirgozar', method: 'state', expect: 
 
 /* Makhzan's icon set, and the few this program needs besides. */
 var ICONS = {
+	menu:     '<path d="M4 6h16M4 12h16M4 18h16"/>',
+	pin:      '<path d="m15 4 5 5-3 1-3 3v4l-3-3-5 5 5-5-3-3h4l3-3z"/>',
+	close:    '<path d="m6 6 12 12M18 6 6 18"/>',
 	home:     '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
 	server:   '<rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01M11 6.5h6M11 17.5h6"/>',
 	shield:   '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
 	users:    '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 20a6 6 0 0 0-3-5.2"/>',
 	wrench:   '<path d="M14.5 4.5a4.5 4.5 0 0 0 5 6.2L11 19.2a2.1 2.1 0 0 1-3-3l8.5-8.5a4.5 4.5 0 0 1-2-3.2z"/>',
-	/* Settings as three sliders: it stays legible at the tab bar's size,
+	/* Settings as three sliders: it stays legible at small sizes,
 	   where the wrench's thin diagonal broke up into a smudge. */
 	sliders:  '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
 	grid:     '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
@@ -99,7 +101,8 @@ var OWN_FILES = [ 'zirgozar/ui', 'zirgozar/navigation', 'zirgozar/i18n', 'zirgoz
 	'view/zirgozar/settings', 'view/zirgozar/nodes', 'view/zirgozar/node', 'view/zirgozar/server', 'view/zirgozar/subscribe', 'view/zirgozar/other',
 	'view/zirgozar/shunt_rule',
 	'view/zirgozar/update', 'view/zirgozar/traffic', 'view/zirgozar/geoview', 'view/zirgozar/acl',
-	'view/zirgozar/log' ];
+	'view/zirgozar/log', 'zirgozar/clients', 'view/zirgozar/users/dashboard', 'view/zirgozar/users/details',
+	'view/zirgozar/users/wifi', 'view/zirgozar/users/firewall', 'view/zirgozar/users/bandwidth' ];
 
 /* The version is not enough on its own: a file replaced on the router without
    a new version - a fix put in place by hand - left the browser with the old
@@ -211,6 +214,36 @@ function card(title, ico, colour, body) {
 		]) : '',
 		body
 	]);
+}
+
+function detailsToggle(panel) {
+	panel.hidden = true;
+	var details = btn(_('Details'), 'soft-blue mk-small', function() {
+		panel.hidden = !panel.hidden;
+		details.setAttribute('aria-expanded', String(!panel.hidden));
+		details.lastElementChild.textContent = panel.hidden ? _('Details') : _('Hide details');
+		details.replaceChild(icon(panel.hidden ? 'chevron-down' : 'chevron-up'), details.firstElementChild);
+	}, 'chevron-down');
+	details.setAttribute('aria-expanded', 'false');
+	details.setAttribute('aria-controls', panel.id);
+	return E('div', { 'class': 'zgz-details-toggle' }, details);
+}
+
+function collapseSection(section, id) {
+	var render = section.render;
+	section.render = function() {
+		return Promise.resolve(render.apply(this, arguments)).then(function(node) {
+			var fields = node.querySelector(':scope > .cbi-section-node');
+			if (!fields) return node;
+			var description = node.querySelector(':scope > .cbi-section-descr');
+			var panel = E('div', { 'id': 'zgz-details-' + id });
+			node.insertBefore(detailsToggle(panel), description || fields);
+			node.insertBefore(panel, description || fields);
+			if (description) panel.appendChild(description);
+			panel.appendChild(fields);
+			return node;
+		});
+	};
 }
 
 /* Makhzan's metric: an icon tile, a title, and a big value under it. */
@@ -624,9 +657,7 @@ function hero(root, version) {
 	]);
 }
 
-/* Makhzan's tab bar, under the banner, for this program's pages. LuCI's own
-   row of tabs above the page says the same thing and is hidden by the
-   stylesheet, so there is one way between pages and it looks like Makhzan's. */
+/* Navigation shared by all Zirgozar pages. */
 var PAGES = [
 	[ 'settings',  'home',     'Home' ],
 	[ 'nodes',     'server',   'Configs' ],
@@ -637,6 +668,7 @@ var PAGES = [
 	[ 'geoview',   'globe',    'Geoview' ],
 	[ 'server',    'cpu',      'Server-Side' ],
 	[ 'acl',      'users',    'Access Control' ],
+	[ 'users',    'users',    'User Management' ],
 	[ 'log',      'book',     'Runtime Logs' ]
 ];
 
@@ -669,22 +701,81 @@ function loadInfo(key, request, revision) {
 	return pending;
 }
 
-function tabs() {
-	var colours = { settings: '#3b82f6', nodes: '#8b5cf6', subscribe: '#ea580c', other: '#64748b',
-		update: '#0284c7', traffic: '#16a34a', geoview: '#0d9488', server: '#9333ea', acl: '#db2777', log: '#b45309' };
+function sidebar(root) {
 	var here = (L.env.dispatchpath || [])[3] || 'settings';
-	if (here === 'overview') here = 'settings';
-	if (here === 'node') here = 'nodes';
-	if (here === 'shunt_rule') here = 'traffic';
-	return E('nav', { 'class': 'mk-tabs', 'role': 'tablist' }, PAGES.map(function(p) {
-		return E('a', {
-			'class': 'mk-tab' + (p[0] === here ? ' mk-tab-on' : ''),
-			'style': '--tab-icon-colour:' + colours[p[0]],
-			'role': 'tab',
-			'aria-selected': String(p[0] === here),
-			'href': L.url('admin', 'services', 'zirgozar', p[0])
-		}, [ icon(p[1]), E('span', {}, _(p[2])) ]);
-	}));
+	here = ({ overview: 'settings', node: 'nodes', shunt_rule: 'traffic' })[here] || here;
+	var storageKey = 'zirgozar.sidebar.pinned';
+	var pinned = false;
+	try { pinned = window.localStorage.getItem(storageKey) === '1'; } catch (e) {}
+
+	var pin = E('button', { 'type': 'button', 'class': 'mk-sidebar-button mk-sidebar-pin',
+		'aria-label': _('Pin sidebar'), 'title': _('Pin sidebar') }, icon('pin'));
+	function setPinned(value) {
+		pinned = value;
+		root.classList.toggle('mk-sidebar-pinned', value);
+		pin.setAttribute('aria-pressed', String(value));
+	}
+	setPinned(pinned);
+	pin.addEventListener('click', function() {
+		setPinned(!pinned);
+		try { window.localStorage.setItem(storageKey, pinned ? '1' : '0'); } catch (e) {}
+	});
+
+	var toggle = E('button', { 'type': 'button', 'class': 'mk-sidebar-button mk-sidebar-toggle',
+		'aria-controls': 'zgz-sidebar-panel', 'aria-expanded': 'false', 'aria-label': _('Open menu') }, icon('menu'));
+	var close = E('button', { 'type': 'button', 'class': 'mk-sidebar-button mk-sidebar-close',
+		'aria-label': _('Close menu') }, icon('close'));
+	var backdrop = E('div', { 'class': 'mk-sidebar-backdrop', 'aria-hidden': 'true' });
+	var panel = E('aside', { 'id': 'zgz-sidebar-panel', 'class': 'mk-sidebar-panel' }, [
+		E('div', { 'class': 'mk-sidebar-brand' }, [
+			logoImg('logo.png', 29, 'mk-sidebar-logo-dark'),
+			logoImg('logo-light.png', 29, 'mk-sidebar-logo-light'),
+			E('span', { 'class': 'mk-sidebar-label' }, i18n.get() === 'fa' ? 'زیرگذر' : 'Zirgozar'),
+			pin, close
+		]),
+		E('nav', { 'class': 'mk-sidebar-links', 'aria-label': _('Zirgozar navigation') }, PAGES.map(function(p) {
+			var label = _(p[2]);
+			return E('a', {
+				'class': 'mk-sidebar-link',
+				'aria-current': p[0] === here ? 'page' : null,
+				'aria-label': label,
+				'title': label,
+				'href': L.url('admin', 'services', 'zirgozar', p[0])
+			}, [ icon(p[1]), E('span', { 'class': 'mk-sidebar-label' }, label) ]);
+		}))
+	]);
+	function setOpen(open, restoreFocus) {
+		if (!open && !root.classList.contains('mk-sidebar-open')) return;
+		root.classList.toggle('mk-sidebar-open', open);
+		toggle.setAttribute('aria-expanded', String(open));
+		if (open) window.requestAnimationFrame(function() {
+			if (root.classList.contains('mk-sidebar-open')) close.focus();
+		});
+		else if (restoreFocus) toggle.focus();
+	}
+	root.zgzCloseMenu = function() { setOpen(false, true); };
+	toggle.addEventListener('click', function() { setOpen(true); });
+	close.addEventListener('click', root.zgzCloseMenu);
+	backdrop.addEventListener('click', root.zgzCloseMenu);
+	panel.addEventListener('keydown', function(ev) {
+		if (!root.classList.contains('mk-sidebar-open')) return;
+		if (ev.key === 'Escape') {
+			ev.preventDefault();
+			root.zgzCloseMenu();
+		}
+		if (ev.key === 'Tab') {
+			var lastLink = panel.querySelector('.mk-sidebar-link:last-child');
+			if (ev.shiftKey && ev.target === close) {
+				ev.preventDefault();
+				lastLink.focus();
+			}
+			else if (!ev.shiftKey && ev.target === lastLink) {
+				ev.preventDefault();
+				close.focus();
+			}
+		}
+	});
+	return E('div', { 'class': 'mk-sidebar' }, [toggle, backdrop, panel]);
 }
 
 function footer() {
@@ -703,8 +794,7 @@ function footer() {
 
 /* page(children, { version: '1.1.0' })
 
-   Everything a view returns goes in here: Makhzan's root, banner, tab bar
-   and footer around it. The right-to-left box for Persian is i18n's, inside
+   The shared shell places the sidebar next to the banner, view and footer. The right-to-left box for Persian is i18n's, inside
    this one. */
 function optionHelp(root) {
 	var active = null, connected = false;
@@ -792,6 +882,7 @@ function optionHelp(root) {
 var sharedFrame = null, sharedContent = null;
 function page(children, opts) {
 	if (sharedFrame && sharedFrame.isConnected && sharedContent) {
+		sharedFrame.zgzCloseMenu();
 		var content = E('div', {'class':'zgz-page-content'}, i18n.page(children));
 		sharedContent.replaceWith(content);
 		sharedContent = content;
@@ -804,7 +895,7 @@ function page(children, opts) {
 	   a page of full-size icons and bare text for a moment, which reads as
 	   broken rather than as loading. A stylesheet that never comes still lets
 	   the page be seen after a second and a half. */
-	var root = E('div', { 'class': 'mk', 'lang': i18n.get(), 'dir': fa ? 'rtl' : 'ltr', 'style': 'visibility:hidden' });
+	var root = E('div', { 'class': 'mk mk-page-shell', 'lang': i18n.get(), 'dir': fa ? 'rtl' : 'ltr', 'style': 'visibility:hidden' });
 	function show() { root.style.visibility = ''; }
 	root.appendChild(E('link', {
 		'rel': 'stylesheet',
@@ -820,11 +911,9 @@ function page(children, opts) {
 	document.body.classList.toggle('pwp-dark', dark);
 	document.body.classList.toggle('pwp-fa', fa);
 	document.body.classList.add('pwp-active');
-	root.appendChild(hero(root, opts.version));
-	root.appendChild(tabs());
 	sharedContent = E('div', {'class':'zgz-page-content'}, i18n.page(children));
-	root.appendChild(sharedContent);
-	root.appendChild(footer());
+	root.appendChild(sidebar(root));
+	root.appendChild(E('div', { 'class': 'mk-page-main' }, [hero(root, opts.version), sharedContent, footer()]));
 	root.zgzSyncTheme = followTheme(root);
 	optionHelp(sharedContent);
 	sharedFrame = root;
@@ -1024,6 +1113,8 @@ return baseclass.extend({
 	copyBtn: copyBtn,
 	copyText: copyText,
 	card: card,
+	detailsToggle: detailsToggle,
+	collapseSection: collapseSection,
 	metric: metric,
 	bytes: bytes,
 	ms: ms,
