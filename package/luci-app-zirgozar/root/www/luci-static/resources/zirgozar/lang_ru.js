@@ -1821,6 +1821,7 @@ return baseclass.extend({ strings: {
 	"Invalid bandwidth limit or missing IPv4 address.": "Недопустимое ограничение скорости или отсутствует адрес IPv4.",
 	"Disable firewall flow offloading before applying client policies.": "Отключите ускорение потоков межсетевого экрана перед применением правил для устройств.",
 	"Open firewall settings": "Открыть настройки межсетевого экрана",
+	"Disable hardware flow offloading before applying client policies.": "Отключите аппаратное ускорение потоков перед применением правил для устройств.",
 	"No device selected.": "Устройство не выбрано.",
 	"No active connected clients available.": "Нет активных подключённых устройств.",
 	"Manage which SSIDs a device is allowed to connect to using MAC filtering.": "Настройте доступ устройств к беспроводным сетям с помощью фильтрации MAC-адресов.",

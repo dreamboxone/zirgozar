@@ -59,7 +59,8 @@ function checkResult(result) {
 	if (!result || result.success !== true) {
 		var reason = result && result.error || 'Could not apply client settings.';
 		var error = new Error(i18n.tr(reason));
-		error.firewallSettings = reason === 'Disable firewall flow offloading before applying client policies.';
+		error.firewallSettings = reason === 'Disable firewall flow offloading before applying client policies.' ||
+			reason === 'Disable hardware flow offloading before applying client policies.';
 		throw error;
 	}
 	return result;

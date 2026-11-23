@@ -6,6 +6,8 @@ CLIENT_CONFIG=zirgozar_clients
 CLIENT_CONFIG_DIR="${ZGZ_CLIENT_CONFIG_DIR:-/etc/config}"
 CLIENT_TABLE=zirgozar_clients
 CLIENT_UCI_DIR="${ZGZ_RUN:-/var/run/zirgozar}/clients/uci"
+CLIENT_FLOW_CHAIN=zirgozar_client_flow
+CLIENT_FLOW_HOOK=/usr/libexec/zgz-clients-firewall
 
 client_error() { printf '{"error":"%s"}\n' "$1"; return 1; }
 client_arg() { printf '%s' "$INPUT" | jsonfilter -e "@.$1" 2>/dev/null; }
@@ -18,7 +20,7 @@ client_uci() {
 }
 client_mac() {
 	[ "${#1}" = 17 ] || return 1
-	printf '%s\n' "$1" | tr '[:lower:]-' '[:upper:]:' |
+	printf '%s\n' "$1" | tr 'abcdef-' 'ABCDEF:' |
 		grep -Ex '([0-9A-F]{2}:){5}[0-9A-F]{2}' | grep -v '^00:00:00:00:00:00$'
 }
 client_ipv4() {
@@ -51,15 +53,121 @@ client_lan() {
 	. "${ZGZ_LIB:-/usr/libexec}/zgz-common.sh"
 	lan_devices
 }
-client_nft_rules() {
-	local dir_list devices device mac key addr upload download
-	dir_list=
-	devices="$(client_lan)"
-	for device in $devices; do
+client_lan_elements() {
+	local device elements=
+	for device in $(client_lan); do
 		case "$device" in ''|*[!a-zA-Z0-9_.:@-]*) continue ;; esac
-		dir_list="${dir_list:+$dir_list, }\"$device\""
+		elements="${elements:+$elements, }\"$device\""
 	done
-	[ -n "$dir_list" ] || return 1
+	[ -n "$elements" ] && printf '%s\n' "$elements"
+}
+
+# A software flow can bypass both limit hooks in both directions. Allow
+# flows with a LAN endpoint into the cache only from the LAN-facing packet,
+# where the actual source MAC is available, even for an inbound connection.
+client_flow_commands() {
+	local active="$1" chain entry handle next mode flow lan macs ips key kind mac ip guard position=
+	chain="$(nft -a list chain inet fw4 forward 2>/dev/null)" || {
+		[ "$active" = 0 ] || [ "$(client_uci get 'firewall.@defaults[0].flow_offloading')" != 1 ]
+		return $?
+	}
+	case "$active:$chain" in
+		0:*" jump $CLIENT_FLOW_CHAIN "*) ;;
+		0:*) return 0 ;;
+	esac
+	entry="$(printf '%s\n' "$chain" | awk -v managed="$CLIENT_FLOW_CHAIN" '
+		/flow (add|offload) @ft([[:space:]]|$)/ || $0 ~ (" jump " managed " # handle ") {
+			count++; handle=$NF; mode=index($0, " jump " managed " ") ? "managed" : "stock"
+			if (mode=="stock" && $0 !~ /^[[:space:]]*meta l4proto \{ tcp, udp \} flow (add|offload) @ft # handle [0-9]+$/) invalid=1
+			follow=1; next
+		}
+		follow && /# handle [0-9]+$/ { after=$NF; follow=0 }
+		END {
+			if (count > 1 || invalid) exit 1
+			if (count == 1) print handle, mode, after
+		}')" || return 1
+	if [ -z "$entry" ]; then
+		! nft list flowtable inet fw4 ft >/dev/null 2>&1
+		return $?
+	fi
+	read -r handle mode next <<EOF
+$entry
+EOF
+	[ "$active" = 1 ] || [ "$mode" = managed ] || return 0
+	flow="$(nft -nn -s list flowtable inet fw4 ft 2>/dev/null | awk '
+		$1=="flowtable" && $2=="ft" { inside=1; print "add flowtable inet fw4 ft {"; next }
+		inside && $1=="}" { print "}"; complete=1; inside=0; next }
+		inside { print $0 ";" }
+		END { if (!complete) exit 1 }')" || return 1
+	case "$flow" in
+		*'flags offload'*) [ "$active" = 0 ] || return 1 ;;
+	esac
+	[ -z "$next" ] || position="position $next "
+	printf 'delete rule inet fw4 forward handle %s\n' "$handle"
+	if nft list chain inet fw4 "$CLIENT_FLOW_CHAIN" >/dev/null 2>&1; then
+		printf 'flush chain inet fw4 %s\ndelete chain inet fw4 %s\n' "$CLIENT_FLOW_CHAIN" "$CLIENT_FLOW_CHAIN"
+	fi
+	# Recreate the flowtable in the same batch so existing cached flows
+	# cannot keep bypassing a newly installed policy.
+	printf 'delete flowtable inet fw4 ft\n%s\n' "$flow"
+	if [ "$active" = 0 ]; then
+		printf 'insert rule inet fw4 forward %smeta l4proto { tcp, udp } flow add @ft\n' "$position"
+		return
+	fi
+	lan="$(client_lan_elements)" || return 1
+	macs=; ips=
+	for kind in block limit; do
+		for key in $(client_sections "$kind"); do
+			mac="$(client_mac "$(client_uci get "$CLIENT_CONFIG.$key.mac")")" || continue
+			macs="${macs:+$macs, }$mac"
+			ip="$(client_uci get "$CLIENT_CONFIG.$key.ip")"
+			client_ipv4 "$ip" && ips="${ips:+$ips, }$ip"
+		done
+	done
+	[ -n "$macs" ] || return 1
+	macs="$(printf '%s\n' "$macs" | awk -F ', *' '{ for(i=1;i<=NF;i++) if(!seen[$i]++) printf "%s%s", n++ ? ", " : "", $i }')"
+	guard=
+	if [ -n "$ips" ]; then
+		ips="$(printf '%s\n' "$ips" | awk -F ', *' '{ for(i=1;i<=NF;i++) if(!seen[$i]++) printf "%s%s", n++ ? ", " : "", $i }')"
+		guard=" ip saddr != { $ips } ip daddr != { $ips }"
+	fi
+	printf 'add chain inet fw4 %s\n' "$CLIENT_FLOW_CHAIN"
+	printf 'add rule inet fw4 %s iifname != { %s } oifname != { %s } flow add @ft\n' "$CLIENT_FLOW_CHAIN" "$lan" "$lan"
+	printf 'add rule inet fw4 %s iifname { %s } ether saddr != { %s } meta nfproto ipv6 flow add @ft\n' "$CLIENT_FLOW_CHAIN" "$lan" "$macs"
+	printf 'add rule inet fw4 %s iifname { %s } ether saddr != { %s } meta nfproto ipv4%s flow add @ft\n' "$CLIENT_FLOW_CHAIN" "$lan" "$macs" "$guard"
+	printf 'insert rule inet fw4 forward %smeta l4proto { tcp, udp } jump %s\n' "$position" "$CLIENT_FLOW_CHAIN"
+}
+
+client_flow_include() {
+	local mode="$1" section=firewall.zirgozar_clients_flow
+	if [ "$mode" = remove ]; then
+		[ "$(client_uci get "$section.path")" = "$CLIENT_FLOW_HOOK" ] || return 0
+		client_uci delete "$section" && client_uci commit firewall || { client_uci revert firewall; return 1; }
+		return
+	fi
+	[ "$(client_uci get "$section.path")" != "$CLIENT_FLOW_HOOK" ] || return 0
+	if ! { [ -z "$(client_uci get "$section")" ] &&
+		client_uci set "$section=include" &&
+		client_uci set "$section.type=script" &&
+		client_uci set "$section.path=$CLIENT_FLOW_HOOK" &&
+		client_uci set "$section.fw4_compatible=1" &&
+		client_uci commit firewall; }; then
+		client_uci revert firewall
+		return 1
+	fi
+}
+
+client_with_fw4_lock() {
+	if command -v fw4 >/dev/null 2>&1; then
+		(flock -x 9 && "$@") 9>/var/run/fw4.lock
+	else
+		"$@"
+	fi
+}
+
+client_nft_rules() {
+	local dir_list mac key addr upload download
+	dir_list="$(client_lan_elements)" || return 1
 	printf 'table inet %s {\nset lan { type ifname; elements = { %s }; }\n' "$CLIENT_TABLE" "$dir_list"
 	printf 'chain from_client { type filter hook prerouting priority -160; policy accept;\n'
 	printf 'iifname != @lan return\nfib daddr type { local, broadcast, multicast } return\nfib daddr oifname @lan return\n'
@@ -84,20 +192,37 @@ client_nft_rules() {
 	done
 	printf '}\n}\n'
 }
-client_apply() {
-	local rules
+client_apply_rules() {
+	local rules flow=
 	[ -n "$(client_sections block)$(client_sections limit)" ] ||
 		{ client_clear; return $?; }
 	rules="$(client_nft_rules)" || return 1
+	if command -v fw4 >/dev/null 2>&1 && [ "$(client_uci get 'firewall.@defaults[0].flow_offloading_hw')" != 1 ]; then
+		flow="$(client_flow_commands 1)" || return 1
+	fi
 	{
 		nft list table inet "$CLIENT_TABLE" >/dev/null 2>&1 && printf 'delete table inet %s\n' "$CLIENT_TABLE"
-		printf '%s\n' "$rules"
+		printf '%s\n%s\n' "$rules" "$flow"
 	} | nft -f -
 }
-client_clear() {
-	if nft list table inet "$CLIENT_TABLE" >/dev/null 2>&1; then
-		nft delete table inet "$CLIENT_TABLE"
+client_apply() {
+	if command -v fw4 >/dev/null 2>&1 &&
+	   [ "$(client_uci get 'firewall.@defaults[0].flow_offloading_hw')" != 1 ] &&
+	   [ -n "$(client_sections block)$(client_sections limit)" ]; then
+		client_flow_include add || return 1
 	fi
+	client_apply_rules
+}
+client_clear() {
+	local flow
+	flow="$(client_flow_commands 0)" || return 1
+	{
+		nft list table inet "$CLIENT_TABLE" >/dev/null 2>&1 && printf 'delete table inet %s\n' "$CLIENT_TABLE"
+		printf '%s\n' "$flow"
+	} | nft -f -
+}
+client_stop() {
+	client_clear && client_flow_include remove
 }
 client_commit() {
 	if ! client_apply >&2; then
@@ -123,14 +248,18 @@ client_start_write() {
 	trap 'exit 1' INT TERM
 }
 client_check_offload() {
-	[ "$(client_uci get 'firewall.@defaults[0].flow_offloading')" != 1 ] &&
-		[ "$(client_uci get 'firewall.@defaults[0].flow_offloading_hw')" != 1 ]
+	[ "$(client_uci get 'firewall.@defaults[0].flow_offloading')" != 1 ] ||
+		{ [ "$1" = limit ] && command -v fw4 >/dev/null 2>&1; }
 }
 client_edit_policy() {
 	local kind="$1" action="$2" mac key
 	mac="$(client_mac "$(client_arg mac)")" || { client_error 'Invalid MAC address.'; return; }
 	client_start_write || { client_error 'Client settings are busy.'; return; }
-	if [ "$action" = set ] && ! client_check_offload; then
+	if [ "$action" = set ] && [ "$(client_uci get 'firewall.@defaults[0].flow_offloading_hw')" = 1 ]; then
+		client_error 'Disable hardware flow offloading before applying client policies.'
+		return
+	fi
+	if [ "$action" = set ] && ! client_check_offload "$kind"; then
 		client_error 'Disable firewall flow offloading before applying client policies.'
 		return
 	fi
@@ -148,7 +277,7 @@ client_edit_policy() {
 		client_error 'Invalid bandwidth limit or missing IPv4 address.'
 		return
 	fi
-	client_commit
+	client_with_fw4_lock client_commit
 }
 client_set_rates() {
 	local key="$1" mac="$2" addr down up down_unit up_unit dl_rate ul_rate
@@ -211,9 +340,19 @@ client_json() {
 	json_init
 }
 case "$1" in
+	firewall-reloaded)
+		# fw4 runs this include while holding its lock. Read committed settings
+		# only, even if a device policy is being edited at the same time.
+		CLIENT_UCI_DIR=/dev/null
+		client_apply_rules
+		exit $? ;;
 	apply|clear)
 		client_start_write || exit 1
-		if [ "$1" = apply ]; then client_apply; else client_clear; fi
+		if [ "$1" = apply ]; then
+			client_with_fw4_lock client_apply
+		else
+			client_with_fw4_lock client_stop
+		fi
 		exit $? ;;
 esac
 

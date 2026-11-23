@@ -6,7 +6,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zirgozar
 PKG_VERSION:=5.9.4
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
 PKG_LICENSE:=AGPL-3.0-or-later
@@ -74,6 +74,7 @@ define Package/zirgozar/install
 	$(INSTALL_DIR) $(1)/usr/libexec/rpcd
 	$(INSTALL_BIN) ./files/luci.zirgozar $(1)/usr/libexec/rpcd/luci.zirgozar
 	$(INSTALL_BIN) ./files/luci.zirgozar_clients $(1)/usr/libexec/rpcd/luci.zirgozar_clients
+	$(INSTALL_BIN) ./files/zgz-clients-firewall $(1)/usr/libexec/zgz-clients-firewall
 	$(INSTALL_DIR) $(1)/usr/share/zirgozar/client-manager
 	$(INSTALL_DATA) ./files/client-manager/LICENSE ./files/client-manager/NOTICE $(1)/usr/share/zirgozar/client-manager/
 

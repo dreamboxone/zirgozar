@@ -11,7 +11,7 @@
 # RELEASE starts at 1 each day and increases for further releases that day.
 # The main zirgozar package always includes the complete LuCI interface.
 VERSION=5.9.4
-RELEASE=1
+RELEASE=2
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -90,6 +90,7 @@ stage_zgz() {
 	install -m 0644 "$f/zgz-common.sh" "$i/usr/libexec/zgz-common.sh"
 	install -m 0755 "$f/luci.zirgozar"     "$i/usr/libexec/rpcd/luci.zirgozar"
 	install -m 0755 "$f/luci.zirgozar_clients" "$i/usr/libexec/rpcd/luci.zirgozar_clients"
+	install -m 0755 "$f/zgz-clients-firewall" "$i/usr/libexec/zgz-clients-firewall"
 	install -d "$i/usr/share/zirgozar/client-manager"
 	install -m 0644 "$f/client-manager/LICENSE" "$f/client-manager/NOTICE" "$i/usr/share/zirgozar/client-manager/"
 

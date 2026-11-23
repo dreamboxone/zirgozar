@@ -1062,6 +1062,7 @@ var FA = {
 	"Invalid bandwidth limit or missing IPv4 address.": "محدودیت سرعت معتبر نیست یا نشانی IPv4 مشخص نشده است.",
 	"Disable firewall flow offloading before applying client policies.": "برای اعمال قوانین دستگاه‌ها، شتاب‌دهی جریان فایروال (Flow Offloading) را خاموش کنید.",
 	"Open firewall settings": "باز کردن تنظیمات فایروال",
+	"Disable hardware flow offloading before applying client policies.": "برای اعمال قوانین دستگاه‌ها، شتاب‌دهی سخت‌افزاری جریان را در فایروال خاموش کنید.",
 	"No device selected.": "دستگاهی انتخاب نشده است.",
 	"No active connected clients available.": "دستگاه فعالی پیدا نشد.",
 	"Manage which SSIDs a device is allowed to connect to using MAC filtering.": "با فیلتر MAC تعیین کنید دستگاه به کدام شبکه‌های وای‌فای دسترسی دارد.",

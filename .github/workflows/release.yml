@@ -707,6 +707,7 @@ jobs:
             test ! -e "$base/usr/libexec/zirgozar/sing-box"
             test -x "$base/etc/init.d/zirgozar-clients"
             test -x "$base/usr/libexec/rpcd/luci.zirgozar_clients"
+            test -x "$base/usr/libexec/zgz-clients-firewall"
             test -s "$base/etc/config/zirgozar_clients"
             test -x "$base/etc/init.d/zirgozar"
             test -x "$base/etc/init.d/zirgozar-dns"
