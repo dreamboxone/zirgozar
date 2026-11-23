@@ -59,7 +59,8 @@ client_lan_elements() {
 		case "$device" in ''|*[!a-zA-Z0-9_.:@-]*) continue ;; esac
 		elements="${elements:+$elements, }\"$device\""
 	done
-	[ -n "$elements" ] && printf '%s\n' "$elements"
+	[ -n "$elements" ] || return 1
+	printf '%s\n' "$elements"
 }
 
 # A software flow can bypass both limit hooks in both directions. Allow

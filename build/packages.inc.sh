@@ -49,7 +49,7 @@ LUCI_DESC="Compatibility package for older updaters; the web interface is includ
 CRON_LIST='*/15 * * * * /usr/libexec/zgz-refresh >/dev/null 2>&1'
 CRON_STATS='*/5 * * * * /usr/libexec/zgz-stats sample >/dev/null 2>&1'
 
-ZGZ_SCRIPTS="zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-dns-local zgz-stats zgz-led zgz-test zgz-geo zgz-cores zgz-delta zgz-delta-plan zgz-deps zgz-bridge zgz-openvpn zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-aether-scan zgz-aether-scan-result zgz-l2tp zgz-l2tpconfig zgz-pppvpn zgz-ikev2 zgz-ikev2config zgz-finalmask-check zgz-doh-bootstrap zgz-lb zgz-balancing zgz-acl-tunnel zgz-rpc"
+ZGZ_SCRIPTS="zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-dns-local zgz-stats zgz-led zgz-test zgz-geo zgz-cores zgz-delta zgz-delta-plan zgz-deps zgz-bridge zgz-openvpn zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-aether-scan zgz-aether-scan-result zgz-l2tp zgz-l2tpconfig zgz-pppvpn zgz-ikev2 zgz-ikev2config zgz-finalmask-check zgz-doh-bootstrap zgz-lb zgz-balancing zgz-acl-tunnel zgz-rpc zgz-clients-firewall"
 
 # Fetch the expected Xray build for live tests.
 ensure_xray() {
@@ -90,7 +90,6 @@ stage_zgz() {
 	install -m 0644 "$f/zgz-common.sh" "$i/usr/libexec/zgz-common.sh"
 	install -m 0755 "$f/luci.zirgozar"     "$i/usr/libexec/rpcd/luci.zirgozar"
 	install -m 0755 "$f/luci.zirgozar_clients" "$i/usr/libexec/rpcd/luci.zirgozar_clients"
-	install -m 0755 "$f/zgz-clients-firewall" "$i/usr/libexec/zgz-clients-firewall"
 	install -d "$i/usr/share/zirgozar/client-manager"
 	install -m 0644 "$f/client-manager/LICENSE" "$f/client-manager/NOTICE" "$i/usr/share/zirgozar/client-manager/"
 

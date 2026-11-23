@@ -16,7 +16,7 @@ include $(INCLUDE_DIR)/package.mk
 # Kept in step with build/packages.inc.sh, which is what the release builds
 # use. A helper that reaches one of them and not the other is a helper that
 # is missing on exactly half of the installations.
-ZGZ_SCRIPTS:=zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-dns-local zgz-stats zgz-led zgz-test zgz-geo zgz-cores zgz-delta zgz-delta-plan zgz-deps zgz-bridge zgz-openvpn zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-aether-scan zgz-aether-scan-result zgz-l2tp zgz-l2tpconfig zgz-pppvpn zgz-ikev2 zgz-ikev2config zgz-finalmask-check zgz-doh-bootstrap zgz-lb zgz-balancing zgz-acl-tunnel zgz-rpc
+ZGZ_SCRIPTS:=zgz-nodes zgz-probe zgz-connect zgz-refresh zgz-parse zgz-mkconfig zgz-rules zgz-dns zgz-dns-local zgz-stats zgz-led zgz-test zgz-geo zgz-cores zgz-delta zgz-delta-plan zgz-deps zgz-bridge zgz-openvpn zgz-router zgz-sbconfig zgz-sbstats zgz-server zgz-warp zgz-aether zgz-aether-scan zgz-aether-scan-result zgz-l2tp zgz-l2tpconfig zgz-pppvpn zgz-ikev2 zgz-ikev2config zgz-finalmask-check zgz-doh-bootstrap zgz-lb zgz-balancing zgz-acl-tunnel zgz-rpc zgz-clients-firewall
 
 define Package/zirgozar
   SECTION:=net
@@ -74,7 +74,6 @@ define Package/zirgozar/install
 	$(INSTALL_DIR) $(1)/usr/libexec/rpcd
 	$(INSTALL_BIN) ./files/luci.zirgozar $(1)/usr/libexec/rpcd/luci.zirgozar
 	$(INSTALL_BIN) ./files/luci.zirgozar_clients $(1)/usr/libexec/rpcd/luci.zirgozar_clients
-	$(INSTALL_BIN) ./files/zgz-clients-firewall $(1)/usr/libexec/zgz-clients-firewall
 	$(INSTALL_DIR) $(1)/usr/share/zirgozar/client-manager
 	$(INSTALL_DATA) ./files/client-manager/LICENSE ./files/client-manager/NOTICE $(1)/usr/share/zirgozar/client-manager/
 
