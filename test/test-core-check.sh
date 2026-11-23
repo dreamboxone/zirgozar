@@ -47,4 +47,23 @@ check "$(cat "$ZGZ_CONFIG_JSON")" original 'failed fallback preserves original c
 engine_singbox_path() { echo "$RIG/core/sing-box"; }
 check "$(core_label singbox "$RIG/core/sing-box-lx")" sing-box-lx 'core label follows actual executable, not configured preference'
 check "$(core_label singbox "$RIG/core/sing-box")" sing-box 'official native core is labeled accurately'
+
+eval "$(sed -n '/^asset_for() {/,/^}/p' "$RIG_SRC/package/zirgozar/files/zgz-cores")"
+CPUINFO="$RIG/cpuinfo"
+arch_assets() { printf '%s\n' "$TEST_ARCH_ASSETS"; }
+eval "$(sed -n '/^arm_vfp_level() {/,/^}/p' "$RIG_SRC/package/zirgozar/files/zgz-cores" | sed '1s/arm_vfp_level/fixture_vfp_level/')"
+arm_vfp_level() { fixture_vfp_level "$CPUINFO"; }
+TEST_ARCH_ASSETS='arm32-v7a armv7 arm'
+printf 'Features : half thumb fastmult edsp tls\n' > "$CPUINFO"
+check "$(asset_for warp-plus)" arm-softfloat 'ARMv7 without VFP gets soft-float warp-plus'
+check "$(asset_for sing-box)" armv5 'ARMv7 without VFP keeps the existing sing-box fallback'
+printf 'Features : vfp\n' > "$CPUINFO"
+check "$(asset_for warp-plus)" arm-softfloat 'VFP alone is insufficient for warp-plus arm7'
+check "$(asset_for xray)" arm32-v6 'ARMv7 with only VFP uses the lower Xray baseline'
+printf 'Features : vfp vfpv3d16\nFeatures : vfp vfpv4\n' > "$CPUINFO"
+check "$(asset_for warp-plus)" arm7 'VFPv3-D16 and VFPv4 allow the upstream warp-plus arm7 build'
+printf 'Features : thumb tls\n' >> "$CPUINFO"
+check "$(asset_for warp-plus)" arm-softfloat 'the core must be compatible with every reported CPU'
+TEST_ARCH_ASSETS='arm64-v8a arm64 arm64'
+check "$(asset_for warp-plus)" arm64 'ARM64 still uses the upstream artifact'
 rig_report

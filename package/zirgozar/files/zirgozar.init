@@ -226,14 +226,16 @@ start_service() {
 	# whole file. Connected without the split beats not connected, as long as
 	# the page says which of the two happened.
 	if [ "$ENGINE" = "xray" ] && [ -z "$PROG" ] && grep -qE 'geoip:(ir|ru|cn)|geosite:(ir|cn|category-ru|category-ads-all)' "$ZGZ_CONFIG_JSON" 2>/dev/null; then
-		if "$MKCONFIG" nogeo > "$ZGZ_CONFIG_JSON.nogeo" 2>/dev/null &&
-		   PROG="$(ZGZ_XRAY_CHECK_LOG="$ZGZ_RUN/config-check.err" find_xray "$ZGZ_CONFIG_JSON.nogeo")"; then
-			mv -f "$ZGZ_CONFIG_JSON.nogeo" "$ZGZ_CONFIG_JSON"
+		# Xray infers the configuration format from the final extension.
+		_nogeo_cfg="${ZGZ_CONFIG_JSON%.json}.nogeo.json"
+		if (umask 077; "$MKCONFIG" nogeo > "$_nogeo_cfg" 2>/dev/null) &&
+		   PROG="$(ZGZ_XRAY_CHECK_LOG="$ZGZ_RUN/config-check.err" find_xray "$_nogeo_cfg")"; then
+			mv -f "$_nogeo_cfg" "$ZGZ_CONFIG_JSON"
 			chmod 600 "$ZGZ_CONFIG_JSON"
 			log "the core would not read the routing data - connected with country bypass and ad blocking off"
 			say_message "The routing data does not contain the required country or advertising lists. Connected with country bypass and ad blocking off. Download the full routing files on the App Update page."
 		else
-			rm -f "$ZGZ_CONFIG_JSON.nogeo"
+			rm -f "$_nogeo_cfg"
 			PROG=""
 		fi
 	fi

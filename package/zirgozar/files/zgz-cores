@@ -45,6 +45,7 @@ GEOVIEW_REPO=snowie2000/geoview
 # Cloudflare WARP for a WARP node: registers its own account, scans for an
 # address that answers, and can put WARP or Psiphon behind it.
 WARPPLUS_REPO=bepass-org/warp-plus
+WARPPLUS_SOFTFLOAT_TAG=v1.2.6
 # warp-plus with more in it: WARP over MASQUE, and noize to disguise the
 # first packets. Carries the WARP nodes that ask for either.
 VWARP_REPO=voidr3aper-anon/Vwarp
@@ -60,16 +61,31 @@ MIHOMO_REPO=MetaCubeX/mihomo
 # shadowsocks-rust's own client, for the Shadowsocks nodes set to use it.
 SSRUST_REPO=shadowsocks/shadowsocks-rust
 
+arm_vfp_level() {
+	awk '/^Features[[:space:]]*:/ {
+		level=0
+		for (i=1;i<=NF;i++) {
+			if ($i ~ /^vfpv[34](d16)?$/) level=3
+			else if ($i ~ /^(vfp|vfpv2)$/ && level < 1) level=1
+		}
+		if (!seen++ || level < lowest) lowest=level
+	} END { print seen ? lowest : -1 }' "${1:-/proc/cpuinfo}"
+}
+
 asset_for() {
+	local _a _vfp
 	_a="$(arch_assets)"
 	case "$1:$_a" in
+		warp-plus:arm32-v[56]*) echo arm-softfloat; return 0 ;;
+		warp-plus:arm32-v7*)
+			[ "$(arm_vfp_level)" = 3 ] && echo arm7 || echo arm-softfloat
+			return 0 ;;
 		xray:arm32-v[67]*|xray-patterniha:arm32-v[67]*|sing-box:arm32-v[67]*|sing-box-lx:arm32-v[67]*|mihomo:arm32-v[67]*|sslocal:arm32-v[67]*|geoview:arm32-v[67]*)
-			# ARMv7 alone does not imply that the kernel exposes VFP.
-			if awk '/^Features[[:space:]]*:/ {
-				seen=1
-				for (i=1;i<=NF;i++) if ($i ~ /^vfp([0-9]+)?$/) vfp=1
-			} END { exit !(seen && !vfp) }' /proc/cpuinfo; then
+			_vfp="$(arm_vfp_level)"
+			if [ "$_vfp" = 0 ]; then
 				_a='arm32-v5 armv5 armv5'
+			elif [ "$_vfp" = 1 ] && [ "${_a%% *}" = arm32-v7a ]; then
+				_a='arm32-v6 armv6 armv5'
 			fi
 			;;
 	esac
@@ -112,8 +128,7 @@ asset_for() {
 			esac ;;
 		# Geoview names its builds the way sing-box does, but for "i386".
 		geoview)  echo "$_a" | awk '{ print ($2 == "386") ? "i386" : $2 }' ;;
-		# warp-plus: arm7 rather than armv7, soft-float MIPS spelled without a
-		# dash, and nothing for 32-bit x86 or ARM older than v7.
+		# Upstream WARP releases use arm7 and spell soft-float MIPS without a dash.
 		# OpenVPN comes from the router's own packages, built for it already.
 		openvpn|haproxy) [ "$(ovpn_pkg_manager)" != "none" ] && echo pkg || echo - ;;
 		warp-plus|vwarp) echo "$_a" | awk '{ s = $2
@@ -552,13 +567,14 @@ install_sslocal() {
 # install_warpplus [warp-plus|vwarp]: the two are built and published the same
 # way, a zip of one program with its checksum beside it.
 install_warpplus() {
+	local _local_tag
 	_wk="${1:-warp-plus}"
 	if [ "$_wk" = "vwarp" ]; then
 		_wrepo="$VWARP_REPO"; _target="$(vwarp_path)"
 	else
 		_wrepo="$WARPPLUS_REPO"; _target="$(warpplus_path)"
 	fi
-	_asset="$(asset_for warp-plus)"
+	_asset="$(asset_for "$_wk")"
 	[ "$_asset" != "-" ] && [ -n "$_asset" ] || {
 		say_message "$_wk publishes no build for this router's processor."
 		return 1
@@ -568,6 +584,10 @@ install_warpplus() {
 		return 1
 	}
 	_url="https://github.com/$_wrepo/releases/latest/download/${_wk}_linux-$_asset.zip"
+	if [ "$_asset" = arm-softfloat ]; then
+		_local_tag="v$(zgz_version)"
+		_url="https://github.com/$SELF_REPO/releases/download/$_local_tag/warp-plus_linux-arm-softfloat.zip"
+	fi
 	_zip="$(dirname "$_target")/$_wk.zip"
 	_size="$(remote_size "$_url")"
 	# The program is nearly three times the size of the zip it comes in.
@@ -578,6 +598,7 @@ install_warpplus() {
 		sed -n 's/^SHA2-256=[[:space:]]*\([0-9a-fA-F]\{64\}\).*/\1/p' | head -1 | tr 'A-F' 'a-f')"
 	_got="$(sha256sum "$_zip" 2>/dev/null | awk '{ print $1 }')"
 	if [ "${#_want}" != 64 ]; then
+		rm -f "$_zip"
 		say_message "The release checksum could not be retrieved or is invalid. Nothing was installed."
 		return 1
 	fi
@@ -1042,7 +1063,11 @@ cmd_latest() {
 		[ -n "$_repo" ] || continue
 		# The tag is all that is wanted. A source that will not answer
 		# leaves the previous answer in place rather than blanking it.
-		_tag="$(latest_tag "$_repo")"
+		if [ "$_c" = warp-plus ] && [ "$(asset_for warp-plus)" = arm-softfloat ]; then
+			_tag="$WARPPLUS_SOFTFLOAT_TAG"
+		else
+			_tag="$(latest_tag "$_repo")"
+		fi
 		if [ -n "$_tag" ]; then
 			printf '%s\t%s\n' "$_c" "$(tag_version "$_tag")" >> "$_tmp"
 		else
