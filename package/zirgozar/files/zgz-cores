@@ -62,6 +62,17 @@ SSRUST_REPO=shadowsocks/shadowsocks-rust
 
 asset_for() {
 	_a="$(arch_assets)"
+	case "$1:$_a" in
+		xray:arm32-v[67]*|xray-patterniha:arm32-v[67]*|sing-box:arm32-v[67]*)
+			# ARMv7 alone does not imply that the kernel exposes VFP.
+			if awk '/^Features[[:space:]]*:/ {
+				seen=1
+				for (i=1;i<=NF;i++) if ($i ~ /^vfp([0-9]+)?$/) vfp=1
+			} END { exit !(seen && !vfp) }' /proc/cpuinfo; then
+				_a='arm32-v5 armv5 armv5'
+			fi
+			;;
+	esac
 	case "$1" in
 		aether)
 			case "$(printf '%s\n' "$_a" | awk '{print $2}')" in

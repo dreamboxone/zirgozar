@@ -1820,6 +1820,7 @@ return baseclass.extend({ strings: {
 	"Could not save WiFi filter.": "无法保存 WiFi 过滤器。",
 	"Invalid bandwidth limit or missing IPv4 address.": "限速值无效或缺少 IPv4 地址。",
 	"Disable firewall flow offloading before applying client policies.": "应用设备规则前请关闭防火墙流量卸载。",
+	"Open firewall settings": "打开防火墙设置",
 	"No device selected.": "未选择设备。",
 	"No active connected clients available.": "没有活跃的已连接设备。",
 	"Manage which SSIDs a device is allowed to connect to using MAC filtering.": "通过 MAC 地址过滤设置设备可连接的 WiFi 网络。",

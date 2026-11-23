@@ -56,13 +56,21 @@ function scrollTable(table, label) {
 }
 
 function checkResult(result) {
-	if (!result || result.success !== true)
-		throw new Error(i18n.tr(result && result.error || 'Could not apply client settings.'));
+	if (!result || result.success !== true) {
+		var reason = result && result.error || 'Could not apply client settings.';
+		var error = new Error(i18n.tr(reason));
+		error.firewallSettings = reason === 'Disable firewall flow offloading before applying client policies.';
+		throw error;
+	}
 	return result;
 }
 
 function showError(error) {
-	ui.addNotification(null, E('p', {}, error.message), 'danger');
+	var content = [error.message];
+	if (error.firewallSettings) {
+		content.push(' ', E('a', { 'href': L.url('admin', 'network', 'firewall') }, i18n.tr('Open firewall settings')));
+	}
+	ui.addNotification(null, E('p', {}, content), 'danger');
 }
 
 return baseclass.extend({ url: url, view: clientView, scrollTable: scrollTable, tr: i18n.tr, checkResult: checkResult, showError: showError });
