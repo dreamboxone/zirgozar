@@ -63,7 +63,7 @@ SSRUST_REPO=shadowsocks/shadowsocks-rust
 asset_for() {
 	_a="$(arch_assets)"
 	case "$1:$_a" in
-		xray:arm32-v[67]*|xray-patterniha:arm32-v[67]*|sing-box:arm32-v[67]*)
+		xray:arm32-v[67]*|xray-patterniha:arm32-v[67]*|sing-box:arm32-v[67]*|sing-box-lx:arm32-v[67]*|mihomo:arm32-v[67]*|sslocal:arm32-v[67]*|geoview:arm32-v[67]*)
 			# ARMv7 alone does not imply that the kernel exposes VFP.
 			if awk '/^Features[[:space:]]*:/ {
 				seen=1
@@ -366,7 +366,7 @@ install_singbox() {
 	fi
 	_asset="$(asset_for "$_kind")"
 	[ "$_asset" != "-" ] && [ -n "$_asset" ] || {
-		say_message "sing-box publishes no build for this router's processor."
+		core_install_error "$_kind" "no release build is available for this router architecture" "" "$(openwrt_arch) $(uname -m)"
 		return 1
 	}
 	_tag="${2:-}"
