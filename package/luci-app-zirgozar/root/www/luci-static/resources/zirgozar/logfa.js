@@ -28,7 +28,7 @@ var T = [
 	[ 'could not refresh the country firewall sets', 'به‌روزرسانی مجموعه آدرس کشورهای فایروال ناموفق بود.' ],
 	/* ------------------------------------------------------ start and stop */
 	[ 'Start running...', 'شروع اجرا...' ],
-	[ 'core rejected configuration: {}', 'هسته پیکربندی را رد کرد: {1}' ],
+	[ 'Recovering the LuCI RPC interface; the tunnel is left running.', 'رابط RPC در LuCI در حال بازیابی است و تونل همچنان فعال است.' ],
 	[ 'Xray rejected this configuration - using a compatible sing-box', 'Xray این پیکربندی را رد کرد؛ از sing-box سازگار استفاده می‌شود' ],
 	[ 'Running complete!', 'اجرا کامل شد!' ],
 	[ 'Clearing and closing related programs complete.', 'پاک‌سازی و بستن برنامه‌های مرتبط کامل شد.' ],
@@ -304,6 +304,8 @@ var RX = T.map(function(t) {
 });
 
 function sentence(s) {
+	var rejected = /^core rejected configuration: (.*)$/.exec(s);
+	if (rejected) return 'هسته پیکربندی را رد کرد: ' + coreLine(rejected[1]);
 	for (var i = 0; i < RX.length; i++) {
 		var m = RX[i][0].exec(s);
 		if (m) return RX[i][1].replace(/\{(\d+)\}/g, function(w, n) { return m[+n] != null ? m[+n] : ''; });
@@ -361,8 +363,13 @@ var LEVEL = { Debug: 'اشکال‌زدایی', Info: 'اطلاعات', Warning:
 
 var CORE = [
 	[ 'core: Xray {} started', 'هسته: Xray {1} شروع به کار کرد' ],
-	[ 'infra/conf/serial: Reading config: &{Name:{} Format:json}', 'خواندن کانفیگ: {1}' ],
+	[ 'Xray {} (Xray, Penetrates Everything.) {} (go{} {})', 'Xray {1}، شناسه ساخت {2}، Go {3} ({4})' ],
+	[ 'infra/conf/serial: Reading config: &{Name:{} Format:json}', 'خواندن کانفیگ: {1} (فرمت JSON)' ],
 	[ 'A unified platform for anti-censorship.', 'یک بستر یکپارچه برای مقابله با سانسور.' ],
+	[ 'Failed to start: main: failed to load config files: [{}] > infra/conf: failed to build outbound config with tag {} > infra/conf: vless without TLS or other encryption is prohibited unless the server address is a private IP or domain',
+	  'راه‌اندازی ناموفق بود. خروجی «{2}» در کانفیگ {1} رد شد: Xray استفاده از VLESS بدون TLS یا رمزنگاری دیگر را فقط برای IP یا دامنه خصوصی مجاز می‌داند.' ],
+	[ 'Failed to start: main: failed to load config files: [{}] > core: Failed to get format of {}',
+	  'راه‌اندازی ناموفق بود. هنگام بارگذاری {1}، Xray نتوانست فرمت فایل {2} را تشخیص دهد.' ],
 	[ 'infra/conf: The "{}" setting is deprecated and will be removed. {}', 'تنظیم «{1}» منسوخ شده و حذف خواهد شد. {2}' ],
 	[ 'inbound/{}[{}]: inbound connection from {}', 'ورودی {2}: اتصال ورودی از {3}' ],
 	[ 'inbound/{}[{}]: inbound packet connection from {}', 'ورودی {2}: اتصال بسته‌ای ورودی از {3}' ],
@@ -396,7 +403,12 @@ function coreSentence(s) {
 function coreLine(l) {
 	l = l.replace(/\x1b\[[0-9;]*m/g, '');
 	var m = /^\w{3} (\w{3}) +(\d+) (\d{2}:\d{2}:\d{2}) (\d{4}) [a-z]+\.[a-z]+ ([^\s:]+?)(?:\[\d+\])?: (.*)$/.exec(l);
-	if (!m) return coreSentence(l);
+	if (!m) {
+		var standalone = /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)? \[(Debug|Info|Warning|Error)\] (.*)$/.exec(l);
+		if (!standalone) return coreSentence(l);
+		var translated = coreSentence(standalone[2]);
+		return translated == standalone[2] ? l : '[' + LEVEL[standalone[1]] + '] ' + translated;
+	}
 	var date = MONTHS[m[1]] ? jalali(+m[4], MONTHS[m[1]], +m[2]) + ' ' + m[3] : m[1] + ' ' + m[2] + ' ' + m[3];
 	var who = m[5], s = m[6];
 	/* The core's own date after the system log's: Xray's in UTC, sing-box's

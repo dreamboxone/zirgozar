@@ -523,6 +523,8 @@ return baseclass.extend({ strings: {
 	"the router could not execute the file. Check permissions and mount options": "路由器无法执行该文件。请检查权限和挂载选项",
 	"the executable or its loader could not be found. Check the required libraries": "找不到可执行文件或其加载器。请检查所需的库",
 	"the version check ended with an illegal instruction (SIGILL). Check CPU compatibility": "版本检查因非法指令（SIGILL）中止。请检查 CPU 兼容性",
+	"Illegal instruction": "非法指令",
+	"The Aether ARMv7 release requires VFPv3. No compatible soft-float build is available.": "Aether 的 ARMv7 版本需要 VFPv3。目前没有兼容的软件浮点版本。",
 	"the version check crashed with a bus error (SIGBUS). Check the kernel log": "版本检查因总线错误（SIGBUS）崩溃。请检查内核日志",
 	"the version check was killed (SIGKILL). Check the kernel log for an out-of-memory event": "版本检查进程被强制终止（SIGKILL）。请检查内核日志中是否有内存不足记录",
 	"the version check crashed with a segmentation fault (SIGSEGV)": "版本检查因段错误（SIGSEGV）崩溃",

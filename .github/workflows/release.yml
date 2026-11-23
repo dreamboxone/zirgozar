@@ -797,37 +797,13 @@ jobs:
           go-version: '1.22.10'
           cache: false
 
-      - name: Build and test warp-plus without hardware floating point
+      - name: Build and test WARP cores without hardware floating point
         run: |
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y qemu-user
-          tag=$(sed -n 's/^WARPPLUS_SOFTFLOAT_TAG=//p' package/zirgozar/files/zgz-cores)
-          git clone --depth 1 --branch "$tag" https://github.com/bepass-org/warp-plus.git "$RUNNER_TEMP/warp-plus"
-          test "$(git -C "$RUNNER_TEMP/warp-plus" rev-parse HEAD)" = 94c33060b277bb872c5173e201fc6802ddbeca63
-          mkdir -p "$PWD/release" "$RUNNER_TEMP/warp-plus-dist"
-          archive="$PWD/release/warp-plus_linux-arm-softfloat.zip"
-          (
-            cd "$RUNNER_TEMP/warp-plus"
-            go mod vendor
-            cat > build-arm-softfloat.sh <<'SH'
-          #!/bin/sh
-          set -eu
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=5 go build -mod=vendor -trimpath \
-            -ldflags "-s -w -X main.version=$1" -o "$2" ./cmd/warp-plus
-          SH
-            sh build-arm-softfloat.sh "$tag" "$RUNNER_TEMP/warp-plus-dist/warp-plus"
-            cp LICENSE "$RUNNER_TEMP/warp-plus-dist/"
-            cp vendor/github.com/Psiphon-Labs/psiphon-tunnel-core/LICENSE "$RUNNER_TEMP/warp-plus-dist/LICENSE.psiphon"
-          )
-          (
-            cd "$RUNNER_TEMP/warp-plus-dist"
-            test "$(qemu-arm -cpu arm926 ./warp-plus version 2>&1)" = "$tag"
-            test "$(qemu-arm -cpu cortex-a9,vfp=off,vfp-d32=off,neon=off ./warp-plus version 2>&1)" = "$tag"
-            zip -q "$archive" warp-plus LICENSE LICENSE.psiphon
-          )
-          tar --exclude=.git -czf release/warp-plus_arm-softfloat-source.tar.gz -C "$RUNNER_TEMP" warp-plus
-          printf 'SHA2-256= %s\n' "$(sha256sum "$archive" | cut -d ' ' -f 1)" > "$archive.dgst"
+          sh build/build-warp-softfloat.sh warp-plus release
+          sh build/build-warp-softfloat.sh vwarp release
 
       - name: Lay the files out for the release
         run: |

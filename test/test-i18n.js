@@ -66,6 +66,9 @@ for (const [language, catalog] of Object.entries({ fa: dictionaries, zh: zh.stri
 			catalog['Details: %s'].replace('%s', () => 'write error at $&/%s'));
 	}
 }
+i18n.setLang('fa');
+assert.match(i18n.tr('Core installation failed for vwarp: the version check ended with an illegal instruction (SIGILL). Check CPU compatibility (exit status 132). Details: Illegal instruction'),
+	/دستور نامعتبر پردازنده$/);
 i18n.setLang('en');
 const rawFailure = 'Core installation failed for xray: the executable failed its version check (exit status 1). Details: invalid config';
 assert.equal(i18n.tr(rawFailure), rawFailure);

@@ -555,6 +555,8 @@ var FA = {
 	'Core installation failed for %s: %s.': 'نصب %s ناموفق بود: %s.',
 	'Exit status: %s.': 'کد خروج: %s.',
 	'Details: %s': 'جزییات: %s',
+	'Illegal instruction': 'دستور نامعتبر پردازنده',
+	'The Aether ARMv7 release requires VFPv3. No compatible soft-float build is available.': 'نسخه ARMv7 هسته Aether به VFPv3 نیاز دارد. ساخت سازگار با محاسبات نرم‌افزاری در دسترس نیست.',
 	'no release build is available for this router architecture': 'برای معماری این روتر نسخه‌ای منتشر نشده است',
 	'unzip is missing. Use Install dependencies to add it': 'ابزار unzip موجود نیست. از گزینه نصب پیش‌نیازها استفاده کنید',
 	'could not create a temporary directory for the download': 'ساخت پوشه موقت دانلود ممکن نشد',
@@ -2284,7 +2286,10 @@ function tr(s) {
 		var fields = [failure[1], catalog[failure[2]] || failure[2]];
 		var message = catalog['Core installation failed for %s: %s.'].replace(/%s/g, function() { return fields.shift(); });
 		if (failure[3]) message += ' ' + catalog['Exit status: %s.'].replace('%s', failure[3]);
-		if (failure[4]) message += ' ' + catalog['Details: %s'].replace('%s', function() { return failure[4]; });
+		if (failure[4]) {
+			var detail = Object.prototype.hasOwnProperty.call(catalog, failure[4]) ? catalog[failure[4]] : failure[4];
+			message += ' ' + catalog['Details: %s'].replace('%s', function() { return detail; });
+		}
 		return message;
 	}
 	if (CATALOGS[LANG]) return Object.prototype.hasOwnProperty.call(CATALOGS[LANG], s) ? CATALOGS[LANG][s] : s;

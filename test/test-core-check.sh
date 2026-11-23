@@ -56,14 +56,33 @@ arm_vfp_level() { fixture_vfp_level "$CPUINFO"; }
 TEST_ARCH_ASSETS='arm32-v7a armv7 arm'
 printf 'Features : half thumb fastmult edsp tls\n' > "$CPUINFO"
 check "$(asset_for warp-plus)" arm-softfloat 'ARMv7 without VFP gets soft-float warp-plus'
+check "$(asset_for vwarp)" arm-softfloat 'ARMv7 without VFP gets soft-float Vwarp'
+check "$(asset_for aether)" - 'ARMv7 without VFP cannot use the Aether hard-float release'
 check "$(asset_for sing-box)" armv5 'ARMv7 without VFP keeps the existing sing-box fallback'
 printf 'Features : vfp\n' > "$CPUINFO"
 check "$(asset_for warp-plus)" arm-softfloat 'VFP alone is insufficient for warp-plus arm7'
 check "$(asset_for xray)" arm32-v6 'ARMv7 with only VFP uses the lower Xray baseline'
 printf 'Features : vfp vfpv3d16\nFeatures : vfp vfpv4\n' > "$CPUINFO"
 check "$(asset_for warp-plus)" arm7 'VFPv3-D16 and VFPv4 allow the upstream warp-plus arm7 build'
+check "$(asset_for vwarp)" arm7 'ARMv7 with VFPv3 uses the upstream Vwarp build'
+check "$(asset_for aether)" armv7-musl 'ARMv7 with VFPv3 uses the Aether musl release'
 printf 'Features : thumb tls\n' >> "$CPUINFO"
 check "$(asset_for warp-plus)" arm-softfloat 'the core must be compatible with every reported CPU'
 TEST_ARCH_ASSETS='arm64-v8a arm64 arm64'
 check "$(asset_for warp-plus)" arm64 'ARM64 still uses the upstream artifact'
+check "$(asset_for vwarp)" arm64 'ARM64 still uses the upstream Vwarp artifact'
+check "$(asset_for aether)" aarch64-musl 'ARM64 still uses the upstream Aether artifact'
+
+eval "$(sed -n '/^install_warpplus() {/,/^}/p' "$RIG_SRC/package/zirgozar/files/zgz-cores")"
+SELF_REPO=dreamboxone/zirgozar
+VWARP_REPO=voidr3aper-anon/Vwarp
+zgz_version() { echo 1.2.3-r4; }
+remote_size() { echo 100; }
+need_room() { :; }
+download_checked() { printf '%s\n' "$1"; return 1; }
+TEST_ARCH_ASSETS='arm32-v7a armv7 arm'
+printf 'Features : thumb tls\n' > "$CPUINFO"
+check "$(install_warpplus vwarp || :)" \
+	'https://github.com/dreamboxone/zirgozar/releases/download/v1.2.3-r4/vwarp_linux-arm-softfloat.zip' \
+	'Vwarp downloads its own soft-float archive from the installed Zirgozar release'
 rig_report

@@ -523,6 +523,8 @@ return baseclass.extend({ strings: {
 	"the router could not execute the file. Check permissions and mount options": "маршрутизатор не смог запустить файл. Проверьте права доступа и параметры монтирования",
 	"the executable or its loader could not be found. Check the required libraries": "исполняемый файл или его загрузчик не найден. Проверьте наличие необходимых библиотек",
 	"the version check ended with an illegal instruction (SIGILL). Check CPU compatibility": "проверка версии завершилась из-за недопустимой инструкции (SIGILL). Проверьте совместимость процессора",
+	"Illegal instruction": "Недопустимая инструкция",
+	"The Aether ARMv7 release requires VFPv3. No compatible soft-float build is available.": "Версия Aether для ARMv7 требует VFPv3. Совместимой сборки с программной обработкой чисел с плавающей точкой нет.",
 	"the version check crashed with a bus error (SIGBUS). Check the kernel log": "проверка версии завершилась из-за ошибки шины (SIGBUS). Проверьте журнал ядра",
 	"the version check was killed (SIGKILL). Check the kernel log for an out-of-memory event": "процесс проверки версии принудительно завершён (SIGKILL). Проверьте, зафиксирована ли в журнале ядра нехватка памяти",
 	"the version check crashed with a segmentation fault (SIGSEGV)": "проверка версии аварийно завершилась из-за ошибки сегментации (SIGSEGV)",

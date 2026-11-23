@@ -49,6 +49,7 @@ WARPPLUS_SOFTFLOAT_TAG=v1.2.6
 # warp-plus with more in it: WARP over MASQUE, and noize to disguise the
 # first packets. Carries the WARP nodes that ask for either.
 VWARP_REPO=voidr3aper-anon/Vwarp
+VWARP_SOFTFLOAT_TAG=v2.2.2
 # Xray with one change, for Iran: VLESS and Trojan without TLS may go to a
 # public address, which the official build has refused since 26.7 - and that
 # is the shape of a config sent over Cloudflare's plain-HTTP ports, which
@@ -76,9 +77,12 @@ asset_for() {
 	local _a _vfp
 	_a="$(arch_assets)"
 	case "$1:$_a" in
-		warp-plus:arm32-v[56]*) echo arm-softfloat; return 0 ;;
-		warp-plus:arm32-v7*)
+		warp-plus:arm32-v[56]*|vwarp:arm32-v[56]*) echo arm-softfloat; return 0 ;;
+		warp-plus:arm32-v7*|vwarp:arm32-v7*)
 			[ "$(arm_vfp_level)" = 3 ] && echo arm7 || echo arm-softfloat
+			return 0 ;;
+		aether:arm32-v7*)
+			[ "$(arm_vfp_level)" = 3 ] && echo armv7-musl || echo -
 			return 0 ;;
 		xray:arm32-v[67]*|xray-patterniha:arm32-v[67]*|sing-box:arm32-v[67]*|sing-box-lx:arm32-v[67]*|mihomo:arm32-v[67]*|sslocal:arm32-v[67]*|geoview:arm32-v[67]*)
 			_vfp="$(arm_vfp_level)"
@@ -93,7 +97,6 @@ asset_for() {
 		aether)
 			case "$(printf '%s\n' "$_a" | awk '{print $2}')" in
 				arm64) echo aarch64-musl ;;
-				armv7) echo armv7-musl ;;
 				amd64) echo x86_64-musl ;;
 				*) echo - ;;
 			esac ;;
@@ -278,7 +281,13 @@ install_xray() {
 # complete archive before replacing any of the installed programs.
 install_aether() {
 	_asset="$(asset_for aether)"
-	[ "$_asset" != - ] || { say_message "Aether has no supported build for $(openwrt_arch)."; return 1; }
+	if [ "$_asset" = - ]; then
+		case "$(arch_assets)" in
+			arm32-v7*) say_message 'The Aether ARMv7 release requires VFPv3. No compatible soft-float build is available.' ;;
+			*) say_message "Aether has no supported build for $(openwrt_arch)." ;;
+		esac
+		return 1
+	fi
 	_tag="$(latest_tag "$AETHER_REPO")"
 	[ -n "$_tag" ] || return 1
 	_url="https://github.com/$AETHER_REPO/releases/download/$_tag/aether-linux-$_asset.tar.gz"
@@ -586,7 +595,7 @@ install_warpplus() {
 	_url="https://github.com/$_wrepo/releases/latest/download/${_wk}_linux-$_asset.zip"
 	if [ "$_asset" = arm-softfloat ]; then
 		_local_tag="v$(zgz_version)"
-		_url="https://github.com/$SELF_REPO/releases/download/$_local_tag/warp-plus_linux-arm-softfloat.zip"
+		_url="https://github.com/$SELF_REPO/releases/download/$_local_tag/${_wk}_linux-arm-softfloat.zip"
 	fi
 	_zip="$(dirname "$_target")/$_wk.zip"
 	_size="$(remote_size "$_url")"
@@ -1063,8 +1072,10 @@ cmd_latest() {
 		[ -n "$_repo" ] || continue
 		# The tag is all that is wanted. A source that will not answer
 		# leaves the previous answer in place rather than blanking it.
-		if [ "$_c" = warp-plus ] && [ "$(asset_for warp-plus)" = arm-softfloat ]; then
+		if [ "$_c" = warp-plus ] && [ "$(asset_for "$_c")" = arm-softfloat ]; then
 			_tag="$WARPPLUS_SOFTFLOAT_TAG"
+		elif [ "$_c" = vwarp ] && [ "$(asset_for "$_c")" = arm-softfloat ]; then
+			_tag="$VWARP_SOFTFLOAT_TAG"
 		else
 			_tag="$(latest_tag "$_repo")"
 		fi

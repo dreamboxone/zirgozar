@@ -41,6 +41,14 @@ for (const [file, pattern, prefix] of [
 assert.equal(logfa.line('2026-10-17 16:00:33: DNS is isolated from the system upstream settings (port 1054)'),
 	'1405/07/25 16:00:33: DNS از تنظیمات سرورهای بالادستی سیستم جدا شده است (پورت 1054)');
 assert.equal(logfa.sentence('update: unknown diagnostic 192.0.2.1:443'), 'به‌روزرسانی: unknown diagnostic 192.0.2.1:443');
+assert.equal(logfa.line('2026-11-23 21:20:40: core rejected configuration: 2026/11/23 17:50:37.629748 [Info] infra/conf/serial: Reading config: &{Name:/var/etc/zirgozar.nogeo.json Format:json}'),
+	'1405/09/02 21:20:40: هسته پیکربندی را رد کرد: [اطلاعات] خواندن کانفیگ: /var/etc/zirgozar.nogeo.json (فرمت JSON)');
+assert.equal(logfa.sentence('core rejected configuration: Failed to start: main: failed to load config files: [/var/etc/zirgozar.nogeo.json] > infra/conf: failed to build outbound config with tag proxy > infra/conf: vless without TLS or other encryption is prohibited unless the server address is a private IP or domain'),
+	'هسته پیکربندی را رد کرد: راه‌اندازی ناموفق بود. خروجی «proxy» در کانفیگ /var/etc/zirgozar.nogeo.json رد شد: Xray استفاده از VLESS بدون TLS یا رمزنگاری دیگر را فقط برای IP یا دامنه خصوصی مجاز می‌داند.');
+assert.equal(logfa.sentence('core rejected configuration: Xray 26.11.9 (Xray, Penetrates Everything.) 676eaf6 (go1.27.3 linux/arm)'),
+	'هسته پیکربندی را رد کرد: Xray 26.11.9، شناسه ساخت 676eaf6، Go 1.27.3 (linux/arm)');
+assert.equal(logfa.sentence('core rejected configuration: 2026/11/23 17:50:37.629748 [Warning] unfamiliar diagnostic'),
+	'هسته پیکربندی را رد کرد: 2026/11/23 17:50:37.629748 [Warning] unfamiliar diagnostic');
 console.log('Persian runtime logs passed: DNS protection and update failures');
 
 const logSource = fs.readFileSync(path.join(resources, 'view/zirgozar/log.js'), 'utf8');
