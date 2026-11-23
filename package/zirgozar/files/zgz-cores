@@ -138,6 +138,17 @@ need_room() {
 	return $?
 }
 
+core_install_error() {
+	local message detail
+	message="Core installation failed for $1: $2"
+	[ -z "${3:-}" ] || message="$message (exit status $3)"
+	message="$message."
+	detail="$(printf '%s\n' "${4:-}" | awk 'NF { print; exit }' | cut -c 1-320)"
+	[ -z "$detail" ] || message="$message Details: $detail"
+	say_message "$message"
+	warn "$message"
+}
+
 # ------------------------------------------------------------------- xray
 
 install_xray() {
@@ -154,7 +165,7 @@ install_xray() {
 	[ "$_xtag" != "v" ] || _xtag=""
 	_asset="$(asset_for xray)"
 	[ "$_asset" != "-" ] && [ -n "$_asset" ] || {
-		say_message "Xray publishes no build for this router's processor ($(openwrt_arch)$(uname -m))."
+		core_install_error xray "no release build is available for this router architecture" "" "$(openwrt_arch) $(uname -m)"
 		return 1
 	}
 	if [ -n "$_xtag" ]; then
@@ -165,7 +176,7 @@ install_xray() {
 	log "installing Xray ${_xtag:-latest}"
 
 	command -v unzip >/dev/null 2>&1 || {
-		say_message "unzip is needed to install Xray and is not on this router. Press Install dependencies on the settings page."
+		core_install_error xray "unzip is missing. Use Install dependencies to add it"
 		return 1
 	}
 
@@ -175,17 +186,45 @@ install_xray() {
 
 	# Stage the archive and executable on the disk checked above.
 	(
-		if ! mkdir -p "$DIR" || ! _xray_stage="$(mktemp -d "$DIR/.xray-install.XXXXXX")"; then
-			say_message "Could not write $DIR."
+		_xray_stage="$( { mkdir -p "$DIR" && mktemp -d "$DIR/.xray-install.XXXXXX"; } 2>&1 )" || {
+			core_install_error xray "could not create a temporary directory for the download" "$?" "$_xray_stage"
 			exit 1
-		fi
+		}
 		trap 'rm -f "$_xray_stage/xray.zip" "$_xray_stage/xray.zip.part" "$_xray_stage/xray" "$ZGZ_RUN/download"; rmdir "$_xray_stage"' EXIT
 		trap 'exit 1' INT TERM
 
-		download_checked "$_url" "$_xray_stage/xray.zip" "$_size" || exit 1
-		if ! unzip -p "$_xray_stage/xray.zip" xray > "$_xray_stage/xray"; then
-			warn "Could not extract Xray to $DIR."
-			say_message "Could not extract Xray to $DIR. Check free space and try again."
+		if ! _xdownload_error="$(download_checked "$_url" "$_xray_stage/xray.zip" "$_size" 2>&1)"; then
+			core_install_error xray "the archive download failed" "" "$_xdownload_error"
+			exit 1
+		fi
+		if _xdigest="$(curl -fsSL --connect-timeout 15 --max-time 60 "$_url.dgst" 2>&1)"; then
+			_xwant="$(printf '%s\n' "$_xdigest" |
+				sed -n 's/^SHA2-256=[[:space:]]*\([0-9a-fA-F]\{64\}\)[[:space:]]*$/\1/p' | head -1 | tr 'A-F' 'a-f')"
+		else
+			core_install_error xray "could not download the release SHA-256 checksum" "$?" "$_xdigest"
+			exit 1
+		fi
+		if [ -z "$_xwant" ]; then
+			core_install_error xray "the release checksum file has no valid SHA-256 value"
+			exit 1
+		fi
+		if _xgot="$(sha256sum "$_xray_stage/xray.zip" 2>&1)"; then
+			_xgot="${_xgot%% *}"
+		else
+			core_install_error xray "could not calculate SHA-256 for the downloaded archive" "$?" "$_xgot"
+			exit 1
+		fi
+		if [ "$_xwant" != "$_xgot" ]; then
+			core_install_error xray "the downloaded archive does not match the release SHA-256 checksum"
+			exit 1
+		fi
+		if _xunzip_error="$(unzip -p "$_xray_stage/xray.zip" xray 2>&1 > "$_xray_stage/xray")"; then
+			if [ ! -s "$_xray_stage/xray" ]; then
+				core_install_error xray "the archive contains an empty executable"
+				exit 1
+			fi
+		else
+			core_install_error xray "could not extract the executable from the verified archive" "$?" "$_xunzip_error"
 			exit 1
 		fi
 		rm -f "$_xray_stage/xray.zip"
@@ -612,39 +651,44 @@ same_arch() {
 }
 
 install_binary() {
+	local _src _dst _name _vflag _probe_output _probe_status _why _file_error _file_status
 	_src="$1"; _dst="$2"; _name="$3"
-	mkdir -p "$(dirname "$_dst")"
-	chmod 0755 "$_src" 2>/dev/null || true
+	_file_error="$(mkdir -p "$(dirname "$_dst")" 2>&1)" || {
+		core_install_error "$_name" "could not create the installation directory" "$?" "$_file_error"
+		return 1
+	}
+	_file_error="$(chmod 0755 "$_src" 2>&1)" || {
+		core_install_error "$_name" "could not set the executable permission" "$?" "$_file_error"
+		return 1
+	}
 
 	# Geoview answers -version; the cores answer version.
 	_vflag=version
 	[ "$_name" = "geoview" ] && _vflag=-version
 	[ "$_name" = "mihomo" ] && _vflag=-v
 	[ "$_name" = "sslocal" ] && _vflag=--version
-	if ! "$_src" "$_vflag" >/dev/null 2>&1; then
-		# Three different things used to be reported as one, and the one was a
-		# guess: "probably built for a different processor". It is the least
-		# likely of the three, because the address the file came from is
-		# chosen from this router's own architecture - and saying it sends the
-		# reader looking for a build that is already the right build.
+	_probe_status=0
+	_probe_output="$( { "$_src" "$_vflag"; } 2>&1 )" || _probe_status=$?
+	if [ "$_probe_status" != 0 ]; then
 		if ! is_elf "$_src"; then
-			_why="what came back is not a program at all - the address may have moved, or answered with an error page"
+			_why="the downloaded file is not an ELF executable"
 		elif ! same_arch "$_src"; then
-			_why="it is built for a different processor than this router"
+			_why="the executable architecture does not match this router"
 		else
-			_said="$("$_src" "$_vflag" 2>&1 | head -1)"
-			if [ -n "$_said" ]; then
-				_why="it is built for this processor but would not start: $_said"
-			else
-				# Nothing at all: it was killed the moment it ran, which is
-				# what a file cut off part way through its download does.
-				_why="it stopped the moment it was started, without a word - the download was most likely cut off part way; try again"
-			fi
+			case "$_probe_status" in
+				126) _why="the router could not execute the file. Check permissions and mount options" ;;
+				127) _why="the executable or its loader could not be found. Check the required libraries" ;;
+				132) _why="the version check ended with an illegal instruction (SIGILL). Check CPU compatibility" ;;
+				135) _why="the version check crashed with a bus error (SIGBUS). Check the kernel log" ;;
+				137) _why="the version check was killed (SIGKILL). Check the kernel log for an out-of-memory event" ;;
+				139) _why="the version check crashed with a segmentation fault (SIGSEGV)" ;;
+				143) _why="the version check was terminated (SIGTERM)" ;;
+				*)   _why="the executable failed its version check" ;;
+			esac
 		fi
 		rm -f "$_src"
 		rm -rf "$ZGZ_RUN/xtract"
-		say_message "The $_name that was downloaded could not be installed - $_why."
-		warn "$_name downloaded but will not run here: $_why"
+		core_install_error "$_name" "$_why" "$_probe_status" "$_probe_output"
 		return 1
 	fi
 
@@ -653,17 +697,19 @@ install_binary() {
 	if [ -e "$_dst" ]; then
 		mv -f "$_dst" "$_dst.old" 2>/dev/null || true
 	fi
-	if mv -f "$_src" "$_dst" 2>/dev/null || cp -f "$_src" "$_dst"; then
+	if _file_error="$( { mv -f "$_src" "$_dst" 2>/dev/null || cp -f "$_src" "$_dst"; } 2>&1 )"; then
 		chmod 0755 "$_dst"
 		rm -f "$_dst.old"
 		rm -rf "$ZGZ_RUN/xtract"
 		log "$_name $(core_version "$_dst") installed in $_dst"
 		return 0
+	else
+		_file_status=$?
 	fi
 	# put back what was there
 	[ -e "$_dst.old" ] && mv -f "$_dst.old" "$_dst" 2>/dev/null || true
 	rm -rf "$ZGZ_RUN/xtract"
-	say_message "Could not write $_dst."
+	core_install_error "$_name" "could not write the executable to the installation path" "$_file_status" "${_file_error:-$_dst}"
 	return 1
 }
 

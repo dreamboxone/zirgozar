@@ -49,4 +49,24 @@ assert.equal(original._('Save'), 'host:Save');
 i18n.setLang('unknown');
 assert.equal(i18n.get(), 'en');
 assert.deepEqual(Object.keys(i18n.languages()), ['en', 'fa', 'zh', 'ru']);
+
+const installReasons = [
+	'the downloaded archive does not match the release SHA-256 checksum',
+	'the version check was killed (SIGKILL). Check the kernel log for an out-of-memory event',
+	'could not write the executable to the installation path'
+];
+for (const [language, catalog] of Object.entries({ fa: dictionaries, zh: zh.strings, ru: ru.strings })) {
+	i18n.setLang(language);
+	for (const reason of installReasons) {
+		const summary = catalog['Core installation failed for %s: %s.'].replace('%s', 'xray').replace('%s', catalog[reason]);
+		const message = 'Core installation failed for xray: ' + reason;
+		assert.equal(i18n.tr(message + '.'), summary);
+		assert.equal(i18n.tr(message + ' (exit status 137). Details: write error at $&/%s'),
+			summary + ' ' + catalog['Exit status: %s.'].replace('%s', '137') + ' ' +
+			catalog['Details: %s'].replace('%s', () => 'write error at $&/%s'));
+	}
+}
+i18n.setLang('en');
+const rawFailure = 'Core installation failed for xray: the executable failed its version check (exit status 1). Details: invalid config';
+assert.equal(i18n.tr(rawFailure), rawFailure);
 console.log('Languages: complete Chinese/Russian catalogs, formatting, language switching, LuCI controls and Persian direction passed');

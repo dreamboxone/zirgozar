@@ -552,6 +552,32 @@ var FA = {
 		'OpenVPN نصب نشد: ماژول کرنلی که لازم دارد برای فریم‌ور این روتر وجود ندارد. فریم‌ور را به آخرین نسخه رسمی OpenWrt به‌روز کنید.',
 	'OpenVPN could not be installed: the official source of kernel modules (kmods) is missing from this router\'s package sources, so no kernel module can be installed. The line to add is on the Runtime Logs page.':
 		'OpenVPN نصب نشد: منبع رسمی ماژول‌های کرنل (kmods) در فهرست منبع‌های بسته این روتر نیست، پس هیچ ماژول کرنلی نصب نمی‌شود. خطی که باید اضافه شود در صفحه «گزارش‌ها» نوشته شده.',
+	'Core installation failed for %s: %s.': 'نصب %s ناموفق بود: %s.',
+	'Exit status: %s.': 'کد خروج: %s.',
+	'Details: %s': 'جزییات: %s',
+	'no release build is available for this router architecture': 'برای معماری این روتر نسخه‌ای منتشر نشده است',
+	'unzip is missing. Use Install dependencies to add it': 'ابزار unzip موجود نیست. از گزینه نصب پیش‌نیازها استفاده کنید',
+	'could not create a temporary directory for the download': 'ساخت پوشه موقت دانلود ممکن نشد',
+	'the archive download failed': 'دانلود فایل فشرده ناموفق بود',
+	'could not download the release SHA-256 checksum': 'دریافت مقدار SHA-256 نسخه منتشرشده ممکن نشد',
+	'the release checksum file has no valid SHA-256 value': 'فایل بررسی صحت نسخه منتشرشده مقدار SHA-256 معتبر ندارد',
+	'could not calculate SHA-256 for the downloaded archive': 'محاسبه SHA-256 فایل فشرده دانلودشده ممکن نشد',
+	'the downloaded archive does not match the release SHA-256 checksum': 'مقدار SHA-256 فایل دانلودشده با مقدار رسمی نسخه همخوانی ندارد',
+	'the archive contains an empty executable': 'فایل اجرایی داخل فایل فشرده خالی است',
+	'could not extract the executable from the verified archive': 'استخراج فایل اجرایی از فایل فشرده تاییدشده ممکن نشد',
+	'could not create the installation directory': 'ساخت پوشه نصب ممکن نشد',
+	'could not set the executable permission': 'تنظیم مجوز اجرای فایل ممکن نشد',
+	'the downloaded file is not an ELF executable': 'فایل دانلودشده یک فایل اجرایی ELF نیست',
+	'the executable architecture does not match this router': 'معماری فایل اجرایی با معماری این روتر سازگار نیست',
+	'the router could not execute the file. Check permissions and mount options': 'روتر نتوانست فایل را اجرا کند. مجوز فایل و گزینه‌های mount را بررسی کنید',
+	'the executable or its loader could not be found. Check the required libraries': 'فایل اجرایی یا بارگذار آن پیدا نشد. کتابخانه‌های لازم را بررسی کنید',
+	'the version check ended with an illegal instruction (SIGILL). Check CPU compatibility': 'بررسی نسخه با دستور پردازنده نامعتبر (SIGILL) متوقف شد. سازگاری پردازنده را بررسی کنید',
+	'the version check crashed with a bus error (SIGBUS). Check the kernel log': 'بررسی نسخه با خطای SIGBUS متوقف شد. گزارش کرنل را بررسی کنید',
+	'the version check was killed (SIGKILL). Check the kernel log for an out-of-memory event': 'فرایند بررسی نسخه با SIGKILL متوقف شد. گزارش کرنل را برای رویداد کمبود حافظه بررسی کنید',
+	'the version check crashed with a segmentation fault (SIGSEGV)': 'بررسی نسخه با خطای دسترسی به حافظه (SIGSEGV) متوقف شد',
+	'the version check was terminated (SIGTERM)': 'فرایند بررسی نسخه با SIGTERM متوقف شد',
+	'the executable failed its version check': 'اجرای آزمایشی فایل برای بررسی نسخه ناموفق بود',
+	'could not write the executable to the installation path': 'نوشتن فایل اجرایی در مسیر نصب ممکن نشد',
 	'The %s that was downloaded could not be installed - %s.': '%s که دانلود شد نصب نشد - %s.',
 	'what came back is not a program at all - the address may have moved, or answered with an error page':
 		'چیزی که دانلود شد اصلا برنامه نیست - ممکن است آدرس عوض شده باشد یا یک صفحه خطا برگشته باشد',
@@ -2249,6 +2275,16 @@ function nodeWord(s) {
 }
 
 function tr(s) {
+	var failure = /^Core installation failed for (\S+): (.*?)(?: \(exit status (\d+)\))?\.(?: Details: (.*))?$/.exec(s);
+	if (failure) {
+		var catalog = LANG === 'fa' ? FA : CATALOGS[LANG];
+		if (!catalog) return s;
+		var fields = [failure[1], catalog[failure[2]] || failure[2]];
+		var message = catalog['Core installation failed for %s: %s.'].replace(/%s/g, function() { return fields.shift(); });
+		if (failure[3]) message += ' ' + catalog['Exit status: %s.'].replace('%s', failure[3]);
+		if (failure[4]) message += ' ' + catalog['Details: %s'].replace('%s', function() { return failure[4]; });
+		return message;
+	}
 	if (CATALOGS[LANG]) return Object.prototype.hasOwnProperty.call(CATALOGS[LANG], s) ? CATALOGS[LANG][s] : s;
 	if (LANG !== 'fa') return nodeWord(s);
 	var v = FA[s];

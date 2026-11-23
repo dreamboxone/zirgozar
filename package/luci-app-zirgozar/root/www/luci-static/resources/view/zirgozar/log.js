@@ -81,7 +81,10 @@ return view.extend({
 
 		function draw(d) {
 			d = d || {};
-			fill(runtime, said('text', d.text), _('Nothing has been logged yet.'));
+			var text = String(said('text', d.text) || '').replace(
+				/^((?:.*?: )?)(Core installation failed for .+)$/gm,
+				function(line, prefix, message) { return prefix + _(message); });
+			fill(runtime, text, _('Nothing has been logged yet.'));
 			fill(core, said('core', d.core), uci.get('zirgozar', 'config', 'log_node') === '0'
 				? _('The node log is switched off in Settings → Log.')
 				: _('The core has not said anything yet.'));
