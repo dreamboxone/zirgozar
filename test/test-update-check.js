@@ -99,14 +99,15 @@ assert.equal(selector('sing-box-lx',[],'').actions.length,0);
 console.log('LX versions: stable and prerelease selections target the matching core and survive redraws');
 
 const installSource = source.slice(source.indexOf('var target = c.name;'), source.indexOf("\n\t\t\t	}, 'download', d));",source.indexOf('var target = c.name;')));
-const installTarget = new Function('c','act','downloadText', installSource);
+const installTarget = new Function('c','act','downloadText','cores', installSource);
 for (const name of ['sing-box-lx','xray']) {
  const version = name == 'sing-box-lx' ? '1.14.3-lx.24-rc.1' : '26.10.21';
- const reinstall = installTarget({name,version,installed:true,update:false,latest:'v1.14.3-lx.23'}, (...args)=>args[2],()=> '');
+ const reinstall = installTarget({name,version,installed:true,update:false,latest:'v1.14.3-lx.23'}, (...args)=>args[2],()=> '',{});
  assert.equal(reinstall,name+'@v'+version);
- const update = installTarget({name,version,installed:true,update:true,latest:'newer'}, (...args)=>args[2],()=> '');
+ const update = installTarget({name,version,installed:true,update:true,latest:'newer'}, (...args)=>args[2],()=> '',{});
  assert.equal(update,name);
 }
+assert.equal(installTarget({name:'sing-box-lx',version:'1.14.4-lx.36',installed:true,update:false}, (...args)=>args[2],()=> '',{singbox_lx_softfloat:true}), 'sing-box-lx');
 console.log('Reinstall preserves the installed LX prerelease; explicit version selection remains available');
 
 const recentXray = [{tag:'v26.11.2',pre:true},{tag:'v26.11.1',pre:true},{tag:'v26.10.31',pre:false},{tag:'v26.10.30',pre:false},{tag:'v26.1.23',pre:false}];

@@ -46,8 +46,8 @@ var CATALOGS = { zh: zh.strings, ru: ru.strings };
 
 var FA = {
 	'Enter the Amnezia verification code shown below.': 'کد تایید امنزیا در تصویر زیر را وارد کنید.',
-	'Amnezia verification is required. Import the same link again from Configs to enter the code.': 'امنزیا برای تمدید به کد تأیید نیاز دارد. همان لینک را دوباره از صفحهٔ «کانفیگ‌ها» وارد کنید تا بتوانید کد را بزنید.',
-	'The Amnezia configuration could not be loaded. Import the same link again from Configs.': 'کانفیگ امنزیا خوانده نشد. همان لینک را دوباره از صفحهٔ «کانفیگ‌ها» وارد کنید.',
+	'Amnezia verification is required. Import the same link again from Configs to enter the code.': 'امنزیا برای تمدید به کد تایید نیاز دارد. همان لینک را دوباره از صفحه «کانفیگ‌ها» وارد کنید تا بتوانید کد را بزنید.',
+	'The Amnezia configuration could not be loaded. Import the same link again from Configs.': 'کانفیگ امنزیا خوانده نشد. همان لینک را دوباره از صفحه «کانفیگ‌ها» وارد کنید.',
 	'Amnezia verification code': 'کد تایید امنزیا',
 	'Verification code': 'کد تایید',
 	'This Amnezia API key is obsolete. Create a new connection in AmneziaVPN, or use amnezia://free?country=ir.': 'این کلید API امنزیا قدیمی است. در برنامه امنزیا اتصال جدید بسازید، یا لینک amnezia://free?country=ir را وارد کنید.',
