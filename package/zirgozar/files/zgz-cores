@@ -191,7 +191,8 @@ core_archive_checksum() {
 	local want got
 	want="$(curl -fsSL --connect-timeout 15 --max-time 45 "$1.sha256" | awk 'NR == 1 {print $1}')"
 	got="$(sha256sum "$2" | awk '{print $1}')"
-	[ "${#want}" = 64 ] && [ "$want" = "$got" ]
+	[ "${#want}" = 64 ] && [ "$want" = "$got" ] || return 1
+	return 0
 }
 
 # ------------------------------------------------------------------- xray
