@@ -600,6 +600,13 @@ return view.extend({
 		};
 
 		return m.render().then(function(mapEl) {
+			var table = mapEl.querySelector('.cbi-section-table');
+			if (table) {
+				var scroll = E('div', { 'class': 'zgz-sub-table-scroll', 'role': 'region',
+					'aria-label': _('Subscriptions'), 'tabindex': '0' });
+				table.parentNode.insertBefore(scroll, table);
+				scroll.appendChild(table);
+			}
 			var create = mapEl.querySelector('.cbi-section-create');
 			var toolbar = mapEl.querySelector('#zgz-subscription-toolbar');
 			var add = create && create.querySelector('.cbi-button-add');

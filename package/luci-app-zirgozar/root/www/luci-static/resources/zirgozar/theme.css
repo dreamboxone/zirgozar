@@ -47,6 +47,7 @@
 .mk bdi{unicode-bidi:isolate;direction:ltr}
 
 /* Icons and logo */
+.zgz-icon-paint{position:absolute;inline-size:0;block-size:0;overflow:hidden;pointer-events:none}
 .mk-ico{display:inline-flex;width:18px;height:18px;flex:none;vertical-align:middle}
 .mk-ico svg{width:100%;height:100%}
 .mk-wordmark{display:inline-flex;flex:none;line-height:0}
@@ -77,7 +78,7 @@
 .mk-btn:active:not(:disabled){transform:translateY(0)}
 .mk-btn:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
 .mk-btn:disabled{opacity:.55;cursor:not-allowed}
-.mk select.mk-language{box-sizing:border-box;margin:0!important;width:auto;min-width:118px;max-width:100%;min-height:0!important;height:44px;appearance:auto;direction:ltr;font-family:Tahoma,"Microsoft YaHei",sans-serif!important}
+.mk select.mk-language{box-sizing:border-box;margin:0!important;width:auto;min-width:118px;max-width:100%;min-height:0!important;height:44px;direction:ltr}
 .mk select.mk-language option{background:var(--panel);color:var(--text)}
 .mk-btn.mk-running .mk-ico{animation:mk-spin 1s linear infinite}
 /* LuCI's own busy spinner, should anything still put it on one of these: the
@@ -226,7 +227,8 @@
 }
 .mk.mk-page-shell.mk-sidebar-pinned,
 .mk.mk-page-shell:has(.mk-sidebar-panel :focus-visible){--sidebar-column:var(--sidebar-expanded)}
-.mk-page-main{min-width:0}
+.mk-page-main{--dashboard-width:1240px;min-width:0}
+.mk-page-main:has(.pwp-status-row)>.mk-hero{max-width:var(--dashboard-width);margin-inline:auto}
 .mk-sidebar{position:sticky;top:12px;z-index:10;min-width:0}
 .mk-sidebar-panel{
 	position:relative;
@@ -615,7 +617,7 @@ body.pwp-fa #modal_overlay:where(body.pwp-active *)>.modal textarea,body.pwp-fa 
 .mk .pwp-node-message[dir=ltr]>.td,.mk .pwp-node-message[dir=ltr] .pwp-note{direction:ltr;text-align:left!important}
 /* A core tile's title is the word and the core's name, on one line. */
 #pwp-core-t,#pwp-bridge-t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mk-grid.pwp-status-row{grid-template-columns:minmax(0,2fr) repeat(4,minmax(0,1fr));align-items:stretch;width:100%;max-width:1240px;margin-inline:auto}
+.mk-grid.pwp-status-row{grid-template-columns:minmax(0,2fr) repeat(4,minmax(0,1fr));align-items:stretch;width:100%;max-width:var(--dashboard-width,1240px);margin-inline:auto}
 .pwp-status-row .mk-card{margin-bottom:0;padding:16px}
 .pwp-status-row .mk-metric{min-width:0;padding:16px;display:grid;grid-template-columns:40px minmax(0,1fr);grid-template-rows:56px minmax(72px,1fr);gap:12px;align-items:center}
 .pwp-status-row .mk-metric-ico{width:40px;height:40px;border-radius:12px}
@@ -750,7 +752,7 @@ body.pwp-fa #modal_overlay:where(body.pwp-active *)>.modal textarea,body.pwp-fa 
 .mk-follow .mk-seg{background:var(--soft);border:1px solid var(--line);border-radius:var(--zgz-action-radius);backdrop-filter:none}
 .mk-follow .mk-seg .mk-btn.glass{color:var(--muted);background:transparent;border-radius:var(--zgz-action-radius)}
 .mk-follow .mk-seg .mk-btn.glass.mk-seg-on{background:var(--zgz-accent);color:var(--zgz-on-accent,#fff);box-shadow:none}
-:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) :is(input:not([type=checkbox]),select,textarea,.cbi-dropdown){border-radius:var(--zgz-field-radius)!important;background:var(--zgz-control-bg)!important;border-color:var(--zgz-control-line)!important;color:var(--text);box-shadow:none}
+:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) :is(input:not([type=checkbox]),select:not(.mk-language),textarea,.cbi-dropdown){border-radius:var(--zgz-field-radius)!important;background:var(--zgz-control-bg)!important;border-color:var(--zgz-control-line)!important;color:var(--text);box-shadow:none}
 :is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) :is(input,select,textarea):focus{outline:2px solid var(--zgz-accent);outline-offset:1px;box-shadow:none}
 .mk.mk-follow :is(.cbi-button,.cbi-button-neutral,.cbi-button-edit){border-radius:var(--zgz-action-radius)!important;box-shadow:none!important;background:var(--zgz-accent)!important;color:var(--zgz-on-accent,#fff)!important;font-weight:var(--zgz-button-weight,500)!important;transform:none!important}
 .mk.mk-follow :is(.cbi-button-apply,.cbi-button-save,.cbi-button-add,.cbi-button-edit){background:var(--zgz-accent)!important;color:var(--zgz-on-accent,#fff)!important;border-color:transparent!important}
@@ -830,8 +832,10 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 .mk.mk-follow .pwp-usage-down>strong{color:var(--zgz-accent-ink,var(--zgz-accent))}
 .pwp-usage-periods{position:absolute;inset-block:0;inset-inline-end:0;width:31px;display:flex;flex-direction:column;gap:0;align-self:stretch;padding:0;border-radius:0;overflow:visible;background:transparent;isolation:isolate}
 .mk .pwp-usage-periods button{font:inherit;position:relative;font-size:11px;min-width:31px;min-height:32px;flex:1;padding:8px 6px;border:1px solid var(--line);border-inline-end:0;border-radius:9px 0 0 9px;background:linear-gradient(105deg,var(--soft),var(--panel));color:var(--muted);cursor:pointer;white-space:nowrap;margin:0;box-shadow:2px -2px 5px #00000010;z-index:1}
-.mk .pwp-usage-periods button:first-child{border-top:0}.mk .pwp-usage-periods button:last-child{border-bottom:0}.mk .pwp-usage-periods button+button{margin-top:-6px}.mk .pwp-usage-periods button:nth-child(2){z-index:2;background:color-mix(in srgb,var(--zgz-accent,#3b82f6) 6%,var(--panel))}.mk .pwp-usage-periods button:nth-child(3){z-index:3;background:color-mix(in srgb,var(--zgz-accent,#3b82f6) 12%,var(--panel))}
-.mk .pwp-usage-periods button[aria-selected=true]{background:var(--zgz-accent,#3b82f6);color:var(--zgz-on-accent,#fff);font-weight:700;border-color:color-mix(in srgb,var(--zgz-accent,#3b82f6) 70%,var(--line));box-shadow:3px 0 8px #00000022;margin-inline-start:-5px;z-index:5}
+.mk .pwp-usage-periods button+button{margin-top:-6px}
+.mk .pwp-usage-periods button:nth-child(2){z-index:2}
+.mk .pwp-usage-periods button:nth-child(3){z-index:3}
+.mk .pwp-usage-periods button[aria-selected=true]{font-weight:700;margin-inline-start:-5px;z-index:5}
 
 .mk[dir=ltr] .pwp-usage-periods button{border-radius:0 9px 9px 0;box-shadow:none}.mk[dir=ltr] .pwp-usage-periods button[aria-selected=true]{box-shadow:none}
 @media(max-width:900px){.mk-grid.pwp-status-row{grid-template-columns:repeat(2,minmax(0,1fr))}.pwp-status-row .pwp-social-card{grid-column:1/-1;grid-row:3}.pwp-status-row .pwp-usage-card{grid-column:2;grid-row:2}}
@@ -842,13 +846,6 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 
 /* Normal left corners, reverse right corners where the tab joins its sheet. */
 .mk .pwp-usage-periods button{--tab-paper:var(--panel);background:var(--tab-paper);border:0;border-radius:9px 0 0 9px;box-shadow:none;color:var(--muted)}
-.mk .pwp-usage-periods button:first-child{--tab-paper:var(--panel);background:var(--tab-paper);color:#df458e}
-.mk .pwp-usage-periods button:nth-child(2){--tab-paper:var(--panel);background:var(--tab-paper);color:#ec693c}
-.mk .pwp-usage-periods button:nth-child(3){--tab-paper:var(--panel);background:var(--tab-paper);color:#329dc2}
-.mk .pwp-usage-periods button[aria-selected=true]{--tab-paper:var(--panel);background:var(--tab-paper);color:color-mix(in srgb,var(--zgz-accent,#3b82f6) 65%,var(--text));border-color:transparent;box-shadow:none;font-weight:700}
-.mk .pwp-usage-periods button:first-child[aria-selected=true]{--tab-paper:var(--panel);color:#df458e}
-.mk .pwp-usage-periods button:nth-child(2)[aria-selected=true]{--tab-paper:var(--panel);color:#ec693c}
-.mk .pwp-usage-periods button:nth-child(3)[aria-selected=true]{--tab-paper:var(--panel);color:#329dc2}
 .mk .pwp-usage-periods button::before,.mk .pwp-usage-periods button::after{content:"";position:absolute;right:0;width:9px;height:9px;pointer-events:none;transform:none}
 .mk .pwp-usage-periods button::before{top:-9px;bottom:auto;background:radial-gradient(circle at top left,transparent 8.5px,var(--tab-paper) 9px)}
 .mk .pwp-usage-periods button::after{top:auto;bottom:-9px;background:radial-gradient(circle at bottom left,transparent 8.5px,var(--tab-paper) 9px)}
@@ -1030,3 +1027,357 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 .mk .zgz-client-content .zgz-client-limit input[type=number]{inline-size:min(100%,162px)}
 .mk .zgz-client-content .zgz-client-limit select{inline-size:min(100%,104px)}
 .mk .zgz-client-content button{max-inline-size:100%;white-space:normal}
+
+/* Frosted surfaces. The existing layouts and native theme sizing still
+   control the geometry. The palette follows the resolved light/dark mode. */
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal,.cbi-page-actions:where(body.pwp-active *)){
+	--glass-page:#ccd9ee;
+	--glass-panel:#eff5fc;
+	--glass-soft:#e7effa;
+	--glass-ink:#102442;
+	--glass-muted:#425978;
+	--glass-line:#8ca5ce;
+	--glass-edge:#fffc;
+	--glass-bevel:#89add580;
+	--glass-rim:#4877c480;
+	--glass-cast:#17376f5c;
+	--glass-sheen:#fffffff5;
+	--glass-tint:#b7ccee;
+	--glass-cobalt:radial-gradient(ellipse at 18% 0%,#669fff85,transparent 65%),
+		linear-gradient(155deg,#1b52c4,#082e96 52%,#081d62);
+	--glass-on-cobalt:#fff;
+	--glass-button-highlight:#91c3ff;
+	--glass-button-rim:#40c9f4;
+	--glass-button-side:#2e70dd;
+	--glass-button-cast:#102d7a;
+	/* A bright corner and a cool lower reflection give the panes depth
+	   while leaving the centre quiet enough for labels and values. */
+	--glass-finish:radial-gradient(ellipse at 0% 0%,var(--glass-sheen),transparent 55%),
+		radial-gradient(ellipse at 100% 100%,var(--glass-edge),transparent 48%),
+		linear-gradient(157deg,var(--glass-tint),var(--glass-panel) 52%,var(--glass-tint));
+	--glass-depth:inset 0 0 0 1px var(--glass-edge),
+		inset 0 3px 4px -2px var(--glass-sheen),
+		inset 0 -5px 0 -2px var(--glass-rim),
+		inset 0 0 0 2px var(--glass-bevel),
+		inset 0 -6px 2px -3px var(--glass-edge),
+		inset 0 0 0 3px var(--glass-edge),
+		0 3px 0 -1px var(--glass-rim),0 9px 18px -7px var(--glass-cast);
+	--glass-focus:#1d57ad;
+	--glass-connected:#087257;
+	--glass-icon-light:#2864c1;
+	--glass-icon-mid:#174da9;
+	--glass-icon-glint:#457acf;
+	--glass-icon-deep:#0b2868;
+	--glass-icon-highlight:#fffc;
+}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal,.cbi-page-actions:where(body.pwp-active *)),
+:where(.mk,body.pwp-active #modal_overlay>.modal,body.pwp-active .cbi-page-actions)
+	:is(.mk-btn.success,.mk-btn.danger,.cbi-button-positive,.cbi-button-add,
+		.cbi-button-remove,.cbi-button-negative,.cbi-button-reset){
+	--glass-button-shadow:inset 0 0 0 1px color-mix(in srgb,var(--glass-button-highlight) 70%,transparent),
+		inset 0 2px 2px color-mix(in srgb,var(--glass-button-highlight) 65%,white),
+		inset 0 -3px var(--glass-button-rim),inset 0 -5px var(--glass-button-side),
+		0 5px 11px color-mix(in srgb,var(--glass-button-cast) 40%,transparent);
+}
+:is(.mk.mk-dark,body.pwp-dark #modal_overlay:where(body.pwp-active *)>.modal,
+	body.pwp-dark .cbi-page-actions){
+	--glass-page:#111d31;
+	--glass-panel:#202f47;
+	--glass-soft:#19273d;
+	--glass-ink:#eff5ff;
+	--glass-muted:#adc2dd;
+	--glass-line:#4b6384;
+	--glass-edge:#c6dfff52;
+	--glass-bevel:#0a1429b3;
+	--glass-rim:#528bea75;
+	--glass-cast:#0009;
+	--glass-sheen:#a5c9ff3b;
+	--glass-tint:#172643;
+	--glass-focus:#a6d1ff;
+	--glass-connected:#71e5ba;
+	--glass-icon-light:#eff8ff;
+	--glass-icon-mid:#a7d6ff;
+	--glass-icon-glint:#e1f3ff;
+	--glass-icon-deep:#80adf3;
+	--glass-icon-highlight:#06152a;
+}
+.mk:not(.mk-follow),
+body:not(.pwp-follow) #modal_overlay:where(body.pwp-active *)>.modal{
+	--bg:var(--glass-page);
+	--panel:var(--glass-panel);
+	--text:var(--glass-ink);
+	--muted:var(--glass-muted);
+	--line:var(--glass-line);
+	--soft:var(--glass-soft);
+	--shadow:var(--glass-depth);
+}
+.mk.mk-page-shell{
+	background-image:radial-gradient(ellipse at 14% 0%,var(--glass-sheen),transparent 60%),
+		linear-gradient(155deg,var(--glass-panel),var(--glass-page) 74%);
+}
+.mk.mk-page-shell.mk-follow{background-color:var(--glass-page)}
+
+.mk :is(.mk-hero,.mk-sidebar-panel,.mk-card,.mk-metric){
+	background-image:var(--glass-finish);
+	border-color:var(--glass-line);
+	box-shadow:var(--glass-depth);
+	color:var(--glass-ink);
+}
+.mk :is(.mk-hero,.mk-sidebar-panel,.mk-card,.mk-metric):not(.zgz-connection-card){
+	border-radius:18px;
+}
+.mk .mk-metric-title{color:var(--glass-muted)}
+.mk .mk-hero::after,.mk .mk-metric::after{background:none}
+.mk .mk-card::before,.mk .cbi-section::before,.mk .pwp-status-row .mk-metric::before{
+	background:linear-gradient(90deg,transparent,var(--glass-edge),transparent);
+	-webkit-mask-size:100% 1px;
+	mask-size:100% 1px;
+}
+.mk .cbi-section{
+	background-image:var(--glass-finish)!important;
+	border-color:var(--glass-line)!important;
+	box-shadow:var(--glass-depth);
+}
+.mk .cbi-section:not(.cbi-section .cbi-section){border-radius:18px!important}
+.mk :is(.cbi-section .cbi-section,#zgz-core-path-fields .cbi-section){
+	background-image:none!important;
+	box-shadow:none;
+}
+body.pwp-active #modal_overlay>.modal{
+	background-image:var(--glass-finish)!important;
+	border-color:var(--glass-line);
+	box-shadow:var(--glass-depth),0 24px 54px -22px #07152a9c!important;
+}
+
+.mk .mk-hero :is(h2,p,.mk-uptime){color:var(--glass-ink)}
+.mk .mk-hero .mk-version,
+.mk .mk-hero .mk-seg{
+	background:var(--glass-soft);
+	border-color:var(--glass-line);
+	color:var(--glass-ink);
+	box-shadow:inset 0 1px var(--glass-edge);
+}
+.mk .mk-hero .mk-seg{backdrop-filter:none}
+.mk .mk-hero :is(.mk-seg,.mk-seg .mk-btn.glass){border-radius:10px!important}
+.mk .mk-hero select.mk-language{
+	appearance:none;
+	padding-inline-end:28px;
+	border-radius:10px!important;
+	border-color:transparent!important;
+	background:linear-gradient(45deg,transparent 50%,var(--glass-on-cobalt) 51%) right 14px center / 6px 6px no-repeat,
+		linear-gradient(135deg,var(--glass-on-cobalt) 50%,transparent 51%) right 8px center / 6px 6px no-repeat,
+		var(--glass-cobalt)!important;
+	color:var(--glass-on-cobalt)!important;
+	font-family:inherit!important;
+	font-size:14px;
+	font-weight:700;
+	line-height:1.2;
+	box-shadow:var(--glass-button-shadow)!important;
+	backdrop-filter:none;
+}
+.mk.mk-follow .mk-hero select.mk-language{
+	font-size:var(--zgz-button-size,14px);
+	font-weight:var(--zgz-button-weight,500);
+}
+.mk.mk-dark .mk-hero select.mk-language{color-scheme:dark}
+.mk .mk-hero select.mk-language:focus-visible{outline:2px solid var(--glass-focus);outline-offset:2px}
+@media(forced-colors:active){
+	.mk .mk-hero select.mk-language{appearance:auto;background:Field!important;color:FieldText!important}
+}
+.mk .mk-hero .mk-btn.glass:not(.mk-seg-on){color:var(--glass-muted)}
+.mk .mk-hero .mk-btn.glass:hover:not(.mk-seg-on){background:var(--glass-panel)}
+.mk:not(.mk-dark) .zgz-logo-normal{display:block}
+.mk:not(.mk-dark) .zgz-logo-inverse{display:none}
+.mk .zgz-hero-logo img{filter:drop-shadow(0 2px 2px var(--glass-cast))}
+.mk .mk-sidebar-panel :is(.mk-sidebar-link,.mk-sidebar-button){color:var(--glass-muted)}
+.mk .mk-sidebar-panel :is(.mk-sidebar-link,.mk-sidebar-button):hover{
+	background:var(--glass-soft);
+	color:var(--glass-ink);
+}
+
+.mk.mk-page-shell :is(.mk-btn.primary,.mk-btn.glass.mk-seg-on,
+	.mk-sidebar-link[aria-current=page],.mk-sidebar-pin[aria-pressed=true]){
+	background:var(--glass-cobalt);
+	color:var(--glass-on-cobalt);
+	box-shadow:var(--glass-button-shadow);
+}
+.mk .mk-sidebar-link[aria-current=page]{border-radius:10px}
+
+/* The same glass and cobalt colours run through the SVG marks and controls. */
+.zgz-icon-light{stop-color:var(--glass-icon-light)}
+.zgz-icon-mid{stop-color:var(--glass-icon-mid)}
+.zgz-icon-glint{stop-color:var(--glass-icon-glint)}
+.zgz-icon-deep{stop-color:var(--glass-icon-deep)}
+.mk :is(.mk-badge-ico,.mk-metric-ico,.mk-service-ico,.pwp-social-icon,.zgz-country-orb,
+	.mk-sidebar-link,.mk-sidebar-button,.mk-icobtn,.mk-seg .mk-btn.glass){
+	--icon-paint:url(#zgz-icon-cobalt) currentColor;
+}
+.mk :is(.mk-sidebar-link[aria-current=page],.mk-sidebar-pin[aria-pressed=true],.mk-seg .mk-seg-on,
+	.mk-btn.primary,#pwp-reselect,.zgz-country-orb:not([data-cc])){
+	--icon-paint:url(#zgz-icon-ice) currentColor;
+}
+.mk .mk-ico [stroke="currentColor"],.mk .mk-ico svg[stroke="currentColor"]{
+	stroke:var(--icon-paint,currentColor);
+}
+.mk .mk-ico svg[fill="currentColor"]{fill:var(--icon-paint,currentColor)}
+.mk :is(.mk-badge-ico,.mk-metric-ico,.mk-service-ico,.pwp-social-icon){
+	background:transparent;
+	box-shadow:none;
+	color:var(--glass-icon-mid);
+}
+.mk :is(.mk-badge-ico,.mk-metric-ico,.mk-service-ico,.pwp-social-icon,.zgz-country-orb) .mk-ico{
+	filter:drop-shadow(0 1px var(--glass-icon-highlight));
+}
+.mk :is(.mk-badge-ico,.mk-metric-ico,.mk-service-ico,.zgz-country-orb) .mk-ico svg{
+	stroke-width:1.65;
+}
+.mk .pwp-social-icon img{filter:saturate(.6)}
+.mk .pwp-social-check{
+	background:color-mix(in srgb,var(--glass-panel) 42%,transparent);
+	box-shadow:inset 0 0 0 1px var(--glass-bevel),inset 0 1px var(--glass-edge);
+	color:var(--glass-ink);
+}
+.mk .pwp-social-check:hover{background:var(--glass-panel)}
+.mk .mk-sidebar-toggle,.mk .mk-icobtn:not(.done){
+	background:var(--glass-finish);
+	border-color:var(--glass-line);
+	color:var(--glass-icon-mid);
+	box-shadow:inset 0 1px var(--glass-edge),inset 0 -2px var(--glass-rim);
+}
+.mk .mk-icobtn:not(.done):hover{color:var(--glass-focus);border-color:var(--glass-focus)}
+.mk .mk-icobtn.done{--icon-paint:initial}
+.mk .zgz-connection-card,.mk.mk-dark .zgz-connection-card{
+	--connection-accent:var(--glass-connected);
+	background:var(--glass-finish);
+	border-color:var(--glass-line);
+	color:var(--glass-ink);
+	box-shadow:var(--glass-depth);
+}
+.mk .zgz-connection-card #pwp-reselect{
+	background:var(--glass-cobalt);
+	border-color:var(--glass-focus);
+	color:#fff;
+	box-shadow:var(--glass-button-shadow);
+}
+.mk .zgz-connection-card .zgz-country-orb{
+	background:var(--glass-finish);
+	border-color:var(--glass-bevel);
+	outline-color:color-mix(in srgb,var(--flag-ring) 64%,var(--glass-line));
+	color:var(--glass-icon-mid);
+	box-shadow:var(--glass-depth);
+}
+.mk .zgz-connection-card .zgz-country-orb:not([data-cc]){
+	background:var(--glass-cobalt);
+	border-color:var(--glass-line);
+	color:#fff;
+	box-shadow:var(--glass-button-shadow);
+}
+.mk .zgz-country-orb:not([data-cc]) .mk-ico{filter:drop-shadow(0 1px 1px #081d62)}
+.mk .zgz-country-orb[data-cc]::after{
+	content:"";
+	position:absolute;
+	inset:0;
+	border-radius:inherit;
+	box-shadow:inset 0 2px 5px var(--glass-edge),inset 0 -4px 8px var(--glass-cast);
+	pointer-events:none;
+}
+.mk .zgz-connection-card #pwp-state .ok{box-shadow:none}
+.mk .zgz-connection-card .zgz-connection-art{
+	background-image:radial-gradient(circle,var(--glass-bevel) 1px,transparent 2px);
+}
+.mk .zgz-connection-art .zgz-orbit{
+	border-color:var(--glass-bevel);
+	box-shadow:0 1px var(--glass-icon-highlight);
+}
+
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal,.cbi-page-actions:where(body.pwp-active *))
+	:is(.cbi-button-apply,.cbi-button-save){
+	background:var(--glass-cobalt)!important;
+	color:#fff!important;
+	box-shadow:var(--glass-button-shadow)!important;
+}
+.mk :is(.mk-btn,.mk-sidebar-link,.mk-sidebar-button):focus-visible{
+	outline-color:var(--glass-focus);
+}
+
+/* Let the section's finish show through its LuCI tab content. */
+:is(.mk,body.pwp-active #modal_overlay>.modal) .cbi-section-node>[data-tab]{
+	background:transparent!important;
+}
+:is(.mk,body.pwp-active #modal_overlay>.modal)
+	.cbi-value-field :is(input:not([type=checkbox],[type=radio],[type=hidden],[type=button],[type=submit]),
+	select:not(.mk-language),textarea,.cbi-dropdown){
+	background:var(--glass-finish)!important;
+	color:var(--glass-ink);
+	border-color:var(--glass-line)!important;
+	box-shadow:inset 0 1px var(--glass-edge),inset 0 -2px var(--glass-rim);
+}
+:is(.mk,body.pwp-active #modal_overlay>.modal) .cbi-tabmenu{
+	background:var(--glass-finish)!important;
+	box-shadow:var(--glass-depth);
+}
+:is(.mk,body.pwp-active #modal_overlay>.modal) .cbi-tabmenu>li>a{
+	border-radius:10px!important;
+	color:var(--glass-icon-mid)!important;
+}
+:is(.mk,body.pwp-active #modal_overlay>.modal) .cbi-tabmenu>li.cbi-tab{
+	background:var(--glass-cobalt)!important;
+	border-radius:10px;
+	box-shadow:var(--glass-button-shadow);
+}
+:is(.mk,body.pwp-active #modal_overlay>.modal) .cbi-tabmenu>li.cbi-tab>a{color:#fff!important}
+
+.mk .pwp-usage-periods button:first-child{--period-active:#a0275c;--period-ink:#842043;--period-tint:#f5d2e2}
+.mk .pwp-usage-periods button:nth-child(2){--period-active:#a44415;--period-ink:#82350f;--period-tint:#ffe0c5}
+.mk .pwp-usage-periods button:nth-child(3){--period-active:#126988;--period-ink:#125b77;--period-tint:#c8eef8}
+.mk .pwp-usage-periods button{
+	--tab-paper:var(--period-tint,var(--glass-soft));
+	background:linear-gradient(145deg,#ffffff70,transparent 60%),var(--tab-paper);
+	color:var(--period-ink,var(--glass-ink));
+}
+.mk[dir] .pwp-usage-periods button[aria-selected=true]{
+	--tab-paper:var(--period-active,var(--glass-focus));
+	color:#fff;
+	box-shadow:inset 0 1px var(--glass-edge),inset 0 -2px #0003;
+}
+
+:is(.mk,body.pwp-active #modal_overlay>.modal,body.pwp-active .cbi-page-actions)
+	:is(.mk-btn.success,.cbi-button-positive,.cbi-button-add){
+	--glass-button-highlight:#99f9d6;
+	--glass-button-rim:#40e7a5;
+	--glass-button-side:#24996d;
+	--glass-button-cast:#074634;
+	--glass-action:radial-gradient(ellipse at 18% 0%,#5bd8a46b,transparent 65%),
+		linear-gradient(155deg,#08765b,#07583f 52%,#063927);
+}
+:is(.mk,body.pwp-active #modal_overlay>.modal,body.pwp-active .cbi-page-actions)
+	:is(.mk-btn.danger,.cbi-button-remove,.cbi-button-negative,.cbi-button-reset){
+	--glass-button-highlight:#ffacb1;
+	--glass-button-rim:#ff7a9a;
+	--glass-button-side:#da3d5b;
+	--glass-button-cast:#6c1527;
+	--glass-action:radial-gradient(ellipse at 18% 0%,#ff8b9d80,transparent 65%),
+		linear-gradient(155deg,#c32248,#a41d37 52%,#74142c);
+}
+:is(.mk,body.pwp-active #modal_overlay>.modal,body.pwp-active .cbi-page-actions)
+	:is(.mk-btn.success,.mk-btn.danger,.cbi-button-positive,.cbi-button-add,
+		.cbi-button-remove,.cbi-button-negative,.cbi-button-reset){
+	background:var(--glass-action)!important;
+	color:#fff!important;
+	box-shadow:var(--glass-button-shadow)!important;
+}
+
+.mk .zgz-sub-table-scroll{
+	min-inline-size:0;
+	max-inline-size:100%;
+	overflow-x:auto;
+	border-radius:14px;
+}
+.mk .zgz-sub-table-scroll:focus-visible{outline:2px solid var(--glass-focus);outline-offset:2px}
+.mk .zgz-sub-table-scroll .cbi-section-table{margin:0!important}
+.mk #zgz-subscription-toolbar .mk-btn{
+	max-inline-size:100%;
+	height:auto!important;
+	white-space:normal;
+	overflow-wrap:anywhere;
+}

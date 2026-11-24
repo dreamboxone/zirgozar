@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.9.4-r5';
+var BUILD = '5.9.4-r6';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -35,6 +35,7 @@ var ICONS = {
 	home:     '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
 	server:   '<rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01M11 6.5h6M11 17.5h6"/>',
 	shield:   '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+	lock:     '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 4v3"/>',
 	users:    '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 20a6 6 0 0 0-3-5.2"/>',
 	wrench:   '<path d="M14.5 4.5a4.5 4.5 0 0 0 5 6.2L11 19.2a2.1 2.1 0 0 1-3-3l8.5-8.5a4.5 4.5 0 0 1-2-3.2z"/>',
 	/* Settings as three sliders: it stays legible at small sizes,
@@ -77,6 +78,23 @@ function icon(name, cls) {
 	s.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
 		'stroke-linecap="round" stroke-linejoin="round">' + (ICONS[name] || '') + '</svg>';
 	return s;
+}
+
+function iconPaint() {
+	var paint = E('span', { 'class': 'zgz-icon-paint', 'aria-hidden': 'true' });
+	/* Use viewBox coordinates so the reflection aligns across separate paths. */
+	paint.innerHTML = '<svg width="0" height="0" focusable="false" xmlns="http://www.w3.org/2000/svg"><defs>' +
+		'<linearGradient id="zgz-icon-cobalt" gradientUnits="userSpaceOnUse" x1="3" y1="1" x2="20" y2="23">' +
+			'<stop offset="0" class="zgz-icon-light"/><stop offset=".32" class="zgz-icon-mid"/>' +
+			'<stop offset=".41" class="zgz-icon-glint"/><stop offset=".64" class="zgz-icon-mid"/>' +
+			'<stop offset="1" class="zgz-icon-deep"/>' +
+		'</linearGradient>' +
+		'<linearGradient id="zgz-icon-ice" gradientUnits="userSpaceOnUse" x1="3" y1="1" x2="20" y2="23">' +
+			'<stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#f0f7ff"/>' +
+			'<stop offset="1" stop-color="#90ddff"/>' +
+		'</linearGradient>' +
+	'</defs></svg>';
+	return paint;
 }
 
 /* The artwork, transparent, at the height asked for - sixty on the banner, as
@@ -660,14 +678,14 @@ function hero(root, version) {
 /* Navigation shared by all Zirgozar pages. */
 var PAGES = [
 	[ 'settings',  'home',     'Home' ],
-	[ 'nodes',     'server',   'Configs' ],
+	[ 'nodes',     'layers',   'Configs' ],
 	[ 'subscribe', 'rss',      'Subscriptions' ],
 	[ 'other',     'grid',     'Other Settings' ],
 	[ 'update',    'download', 'App Update' ],
 	[ 'traffic',   'shield',   'Rule Manage' ],
 	[ 'geoview',   'globe',    'Geoview' ],
-	[ 'server',    'cpu',      'Server-Side' ],
-	[ 'acl',      'users',    'Access Control' ],
+	[ 'server',    'server',   'Server-Side' ],
+	[ 'acl',      'lock',     'Access Control' ],
 	[ 'users',    'users',    'User Management' ],
 	[ 'log',      'book',     'Runtime Logs' ]
 ];
@@ -903,6 +921,7 @@ function page(children, opts) {
 		'load': show,
 		'error': show
 	}));
+	root.appendChild(iconPaint());
 	window.setTimeout(show, 1500);
 	var dark = themeMode() === 'dark';
 	if (dark) root.classList.add('mk-dark');

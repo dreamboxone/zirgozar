@@ -973,7 +973,7 @@ return view.extend({
 			}, 'download');
 			/* Not returned to the button: the file chooser can be closed
 			   without a word, and the button would turn for ever. */
-			var up = pui.btn(_('Restore'), 'soft-blue mk-small', function(ev) {
+			var up = pui.btn(_('Restore'), 'primary mk-small', function(ev) {
 				var b = ev.currentTarget;
 				backupRestore().then(function(r) {
 					if (!r) return;

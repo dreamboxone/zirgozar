@@ -939,7 +939,7 @@ return view.extend({
 				}, _('To Top')),
 				/* Not for the node Basic Settings already names. */
 				E('button', {
-					'class': 'btn cbi-button cbi-button-apply',
+					'class': 'btn cbi-button cbi-button-positive',
 					'disabled': uci.get('zirgozar', 'config', 'node') == section_id ? '' : null,
 					'title': uci.get('zirgozar', 'config', 'node') == section_id ? _('This is the node in use.') : null,
 					'click': function(ev) {
