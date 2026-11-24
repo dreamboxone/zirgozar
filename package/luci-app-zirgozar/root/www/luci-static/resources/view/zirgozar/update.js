@@ -561,7 +561,7 @@ function render(d, early) {
 					? (c.update && c.latest ? _('Update to %s').format(c.latest) : _('Reinstall'))
 					: _('Install'), 'primary mk-small', 'core:' + c.name, function() {
 					var target = c.name;
-					if ((c.name == 'xray' || c.name == 'sing-box-lx') && c.installed && !(c.update && c.latest))
+					if ((c.name == 'xray' || (c.name == 'sing-box-lx' && !cores.singbox_lx_softfloat)) && c.installed && !(c.update && c.latest))
 						target = c.name + '@v' + String(c.version).replace(/^v/, '');
 					return act('core:' + c.name, 'core_install', target, downloadText(c.name));
 				}, 'download', d));

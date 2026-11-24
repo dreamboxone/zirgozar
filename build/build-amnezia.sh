@@ -9,7 +9,8 @@ case "$target" in
 	aarch64_*) GOARCH=arm64 ;;
 	arm_arm926ej-s|arm_xscale) GOARCH=arm; GOARM=5 ;;
 	arm_arm1176jzf-s_vfp) GOARCH=arm; GOARM=6 ;;
-	arm_cortex-a*) GOARCH=arm; GOARM=7 ;;
+	# Some Cortex-A9 routers, including bcm53xx, have no VFP.
+	arm_cortex-a*) GOARCH=arm; GOARM=7,softfloat ;;
 	mips64el_*) GOARCH=mips64le; GOMIPS64=softfloat ;;
 	mips64_*) GOARCH=mips64; GOMIPS64=softfloat ;;
 	mipsel_*) GOARCH=mipsle; GOMIPS=softfloat ;;

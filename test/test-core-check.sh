@@ -57,7 +57,8 @@ TEST_ARCH_ASSETS='arm32-v7a armv7 arm'
 printf 'Features : half thumb fastmult edsp tls\n' > "$CPUINFO"
 check "$(asset_for warp-plus)" arm-softfloat 'ARMv7 without VFP gets soft-float warp-plus'
 check "$(asset_for vwarp)" arm-softfloat 'ARMv7 without VFP gets soft-float Vwarp'
-check "$(asset_for aether)" - 'ARMv7 without VFP cannot use the Aether hard-float release'
+check "$(asset_for aether)" arm-softfloat 'ARMv7 without VFP gets soft-float Aether'
+check "$(asset_for sing-box-lx)" arm-softfloat 'ARMv7 without VFP gets soft-float sing-box-lx'
 check "$(asset_for sing-box)" armv5 'ARMv7 without VFP keeps the existing sing-box fallback'
 printf 'Features : vfp\n' > "$CPUINFO"
 check "$(asset_for warp-plus)" arm-softfloat 'VFP alone is insufficient for warp-plus arm7'
@@ -66,6 +67,7 @@ printf 'Features : vfp vfpv3d16\nFeatures : vfp vfpv4\n' > "$CPUINFO"
 check "$(asset_for warp-plus)" arm7 'VFPv3-D16 and VFPv4 allow the upstream warp-plus arm7 build'
 check "$(asset_for vwarp)" arm7 'ARMv7 with VFPv3 uses the upstream Vwarp build'
 check "$(asset_for aether)" armv7-musl 'ARMv7 with VFPv3 uses the Aether musl release'
+check "$(asset_for sing-box-lx)" armv7 'ARMv7 with VFPv3 uses the upstream sing-box-lx release'
 printf 'Features : thumb tls\n' >> "$CPUINFO"
 check "$(asset_for warp-plus)" arm-softfloat 'the core must be compatible with every reported CPU'
 TEST_ARCH_ASSETS='arm64-v8a arm64 arm64'
@@ -85,4 +87,26 @@ printf 'Features : thumb tls\n' > "$CPUINFO"
 check "$(install_warpplus vwarp || :)" \
 	'https://github.com/dreamboxone/zirgozar/releases/download/v1.2.3-r4/vwarp_linux-arm-softfloat.zip' \
 	'Vwarp downloads its own soft-float archive from the installed Zirgozar release'
+
+for fn in softfloat_release_url install_aether install_singbox; do
+	eval "$(sed -n "/^$fn() {/,/^}/p" "$RIG_SRC/package/zirgozar/files/zgz-cores")"
+done
+eval "$(sed -n '/^LX_REPO=/p; /^AETHER_REPO=/p; /^LX_SOFTFLOAT_TAG=/p; /^AETHER_SOFTFLOAT_TAG=/p' "$RIG_SRC/package/zirgozar/files/zgz-cores")"
+DIR="$RIG/core"
+remote_size() { printf '%s\n' "$1" >&2; echo 100; }
+need_room() { return 1; }
+latest_tag() { echo v9.9.9; }
+check "$(install_aether 2>&1 || :)" \
+	'https://github.com/dreamboxone/zirgozar/releases/download/v1.2.3-r4/aether-linux-arm-softfloat.tar.gz' \
+	'Aether downloads the soft-float archive from Zirgozar'
+check "$(install_singbox sing-box-lx 2>&1 || :)" \
+	"https://github.com/dreamboxone/zirgozar/releases/download/v1.2.3-r4/sing-box-${LX_SOFTFLOAT_TAG#v}-linux-arm-softfloat.tar.gz" \
+	'sing-box-lx downloads the pinned soft-float archive from Zirgozar'
+printf 'Features : vfp vfpv3d16\n' > "$CPUINFO"
+check "$(install_aether 2>&1 || :)" \
+	"https://github.com/$AETHER_REPO/releases/download/v9.9.9/aether-linux-armv7-musl.tar.gz" \
+	'Aether keeps the upstream download on ARMv7 with VFPv3'
+check "$(install_singbox sing-box-lx 2>&1 || :)" \
+	"https://github.com/$LX_REPO/releases/download/v9.9.9/sing-box-9.9.9-linux-armv7.tar.gz" \
+	'sing-box-lx keeps the upstream download on ARMv7 with VFPv3'
 rig_report

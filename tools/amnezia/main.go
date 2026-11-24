@@ -477,8 +477,9 @@ func resolve(ctx context.Context, link, cache string, offline bool, g gateway) (
 			if e = os.WriteFile(target, challenge, 0600); e != nil {
 				return "", e
 			}
+			return "", errors.New("Enter the Amnezia verification code shown below.")
 		}
-		return "", errors.New("Enter the Amnezia verification code shown below.")
+		return "", errors.New("Amnezia verification is required. Import the same link again from Configs to enter the code.")
 	}
 	if status, ok := response["http_status"].(float64); ok && (status < 200 || status >= 300) {
 		return "", fmt.Errorf("Amnezia API rejected the request (status %d).", int(status))

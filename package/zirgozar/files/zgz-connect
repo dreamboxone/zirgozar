@@ -95,11 +95,13 @@ if [ "$MODE" = degraded ]; then
 fi
 if [ -n "$FIXED" ]; then
 	say_status starting
-	if ! "$PROBE" use "$FIXED" >/dev/null 2>&1; then
+	"$PROBE" use "$FIXED" >/dev/null 2>&1 || {
+		_use_status=$?
 		say_status failed
-		say_message "The node chosen in Basic Settings cannot be read. Choose another there, or set it back to Auto."
+		[ "$_use_status" = 2 ] ||
+			say_message "The node chosen in Basic Settings cannot be read. Choose another there, or set it back to Auto."
 		exit 0
-	fi
+	}
 	if [ "$MODE" = "prepare" ]; then
 		say_status idle
 		exit 0

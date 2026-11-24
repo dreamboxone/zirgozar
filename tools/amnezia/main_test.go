@@ -117,6 +117,18 @@ func fakeGateway(t *testing.T, respond func(object) (int, object)) (*httptest.Se
 	return s, pub
 }
 
+func TestCaptchaWhenSelectingSavedLink(t *testing.T) {
+	t.Setenv("ZGZ_AMNEZIA_CHALLENGE", "")
+	s, key := fakeGateway(t, func(p object) (int, object) {
+		return 402, object{"http_status": 402, "captcha_id": "challenge-1", "captcha_image": "aW1hZ2U="}
+	})
+	g := gateway{client: s.Client(), key: key, endpoint: s.URL}
+	_, err := resolve(context.Background(), "amnezia://free?country=ir", t.TempDir(), false, g)
+	if err == nil || !strings.Contains(err.Error(), "Import the same link again from Configs") {
+		t.Fatalf("expected renewal instructions outside the import dialog: %v", err)
+	}
+}
+
 func TestCaptchaAccountAndCache(t *testing.T) {
 	count := 0
 	pubkey, installation := "", ""

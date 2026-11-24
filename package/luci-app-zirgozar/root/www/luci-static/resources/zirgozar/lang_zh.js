@@ -10,6 +10,8 @@ return baseclass.extend({ strings: {
 	"Close menu": "关闭菜单",
 	"Zirgozar navigation": "Zirgozar 导航",
 	"Enter the Amnezia verification code shown below.": "请输入下图中的 Amnezia 验证码。",
+	"Amnezia verification is required. Import the same link again from Configs to enter the code.": "Amnezia 需要验证。请在配置页面重新导入同一链接以输入验证码。",
+	"The Amnezia configuration could not be loaded. Import the same link again from Configs.": "无法加载 Amnezia 配置。请在配置页面重新导入同一链接。",
 	"Amnezia verification code": "Amnezia 验证码",
 	"Verification code": "验证码",
 	"This Amnezia API key is obsolete. Create a new connection in AmneziaVPN, or use amnezia://free?country=ir.": "此 Amnezia API 密钥已过时。请在 AmneziaVPN 中创建新连接，或使用 amnezia://free?country=ir。",

@@ -2066,7 +2066,10 @@ node_extras() {
 # link that has none of its own.
 amnezia_resolve() {
 	local binary proxy
-	binary="${ZGZ_AMNEZIA_BIN:-$(core_dir)/zgz-amnezia}"
+	binary="${ZGZ_AMNEZIA_BIN:-$ZGZ_OWN_DIR/zgz-amnezia}"
+	if [ ! -x "$binary" ] && [ -z "${ZGZ_AMNEZIA_BIN:-}" ]; then
+		binary="$(core_dir)/zgz-amnezia"
+	fi
 	[ -x "$binary" ] || { echo 'The Amnezia importer is not installed.' >&2; return 1; }
 	proxy="$(cfg amnezia_proxy '')"
 	ZGZ_AMNEZIA_PROXY="$proxy" "$binary" -cache "$ZGZ_ETC/amnezia" "$@"

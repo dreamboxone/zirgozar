@@ -41,6 +41,7 @@ SINGBOX_REPO=SagerNet/sing-box
 # a sing-box like any other as far as running goes, kept in a file of its own
 # so that the helper copy of the official one is never replaced by it.
 LX_REPO=Leadaxe/sing-box-lx
+LX_SOFTFLOAT_TAG=v1.14.4-lx.36
 GEOVIEW_REPO=snowie2000/geoview
 # Cloudflare WARP for a WARP node: registers its own account, scans for an
 # address that answers, and can put WARP or Psiphon behind it.
@@ -57,6 +58,7 @@ VWARP_SOFTFLOAT_TAG=v2.2.2
 # accepts the configuration is the one run.
 PATTERNIHA_REPO=patterniha/Xray-core
 AETHER_REPO=CluvexStudio/Aether
+AETHER_SOFTFLOAT_TAG=v2.4.0
 # Mihomo carries the SSR nodes, which neither Xray nor sing-box speaks.
 MIHOMO_REPO=MetaCubeX/mihomo
 # shadowsocks-rust's own client, for the Shadowsocks nodes set to use it.
@@ -82,9 +84,12 @@ asset_for() {
 			[ "$(arm_vfp_level)" = 3 ] && echo arm7 || echo arm-softfloat
 			return 0 ;;
 		aether:arm32-v7*)
-			[ "$(arm_vfp_level)" = 3 ] && echo armv7-musl || echo -
+			[ "$(arm_vfp_level)" = 3 ] && echo armv7-musl || echo arm-softfloat
 			return 0 ;;
-		xray:arm32-v[67]*|xray-patterniha:arm32-v[67]*|sing-box:arm32-v[67]*|sing-box-lx:arm32-v[67]*|mihomo:arm32-v[67]*|sslocal:arm32-v[67]*|geoview:arm32-v[67]*)
+		sing-box-lx:arm32-v7*)
+			[ "$(arm_vfp_level)" = 3 ] && echo armv7 || echo arm-softfloat
+			return 0 ;;
+		xray:arm32-v[67]*|xray-patterniha:arm32-v[67]*|sing-box:arm32-v[67]*|mihomo:arm32-v[67]*|sslocal:arm32-v[67]*|geoview:arm32-v[67]*)
 			_vfp="$(arm_vfp_level)"
 			if [ "$_vfp" = 0 ]; then
 				_a='arm32-v5 armv5 armv5'
@@ -176,6 +181,17 @@ core_install_error() {
 	[ -z "$detail" ] || message="$message Details: $detail"
 	say_message "$message"
 	warn "$message"
+}
+
+softfloat_release_url() {
+	printf 'https://github.com/%s/releases/download/v%s/%s\n' "$SELF_REPO" "$(zgz_version)" "$1"
+}
+
+core_archive_checksum() {
+	local want got
+	want="$(curl -fsSL --connect-timeout 15 --max-time 45 "$1.sha256" | awk 'NR == 1 {print $1}')"
+	got="$(sha256sum "$2" | awk '{print $1}')"
+	[ "${#want}" = 64 ] && [ "$want" = "$got" ]
 }
 
 # ------------------------------------------------------------------- xray
@@ -282,23 +298,22 @@ install_xray() {
 install_aether() {
 	_asset="$(asset_for aether)"
 	if [ "$_asset" = - ]; then
-		case "$(arch_assets)" in
-			arm32-v7*) say_message 'The Aether ARMv7 release requires VFPv3. No compatible soft-float build is available.' ;;
-			*) say_message "Aether has no supported build for $(openwrt_arch)." ;;
-		esac
+		core_install_error aether "no release build is available for this router architecture" "" "$(openwrt_arch) $(uname -m)"
 		return 1
 	fi
-	_tag="$(latest_tag "$AETHER_REPO")"
-	[ -n "$_tag" ] || return 1
-	_url="https://github.com/$AETHER_REPO/releases/download/$_tag/aether-linux-$_asset.tar.gz"
+	if [ "$_asset" = arm-softfloat ]; then
+		_tag="$AETHER_SOFTFLOAT_TAG"
+		_url="$(softfloat_release_url aether-linux-arm-softfloat.tar.gz)"
+	else
+		_tag="$(latest_tag "$AETHER_REPO")"
+		[ -n "$_tag" ] || return 1
+		_url="https://github.com/$AETHER_REPO/releases/download/$_tag/aether-linux-$_asset.tar.gz"
+	fi
 	_stage="$ZGZ_RUN/aether-install"
 	mkdir -p "$_stage"
 	need_room "$(( $(remote_size "$_url") * 6 ))" "$DIR" || return 1
 	curl -fsSL --connect-timeout 15 --max-time 180 --retry 2 -o "$_stage/core.tar.gz" "$_url" || return 1
-	curl -fsSL --connect-timeout 15 --max-time 45 -o "$_stage/checksum" "$_url.sha256" || return 1
-	_want="$(awk '{print $1; exit}' "$_stage/checksum")"
-	_got="$(sha256sum "$_stage/core.tar.gz" | awk '{print $1}')"
-	[ "${#_want}" = 64 ] && [ "$_want" = "$_got" ] || { say_message 'The Aether download failed its checksum check.'; return 1; }
+	core_archive_checksum "$_url" "$_stage/core.tar.gz" || { say_message 'The Aether download failed its checksum check.'; return 1; }
 	tar -xzf "$_stage/core.tar.gz" -C "$_stage" aether pt/psiphon-tunnel-core pt/lyrebird || return 1
 	chmod 755 "$_stage/aether" "$_stage/pt/psiphon-tunnel-core" "$_stage/pt/lyrebird"
 	"$_stage/aether" --version >/dev/null 2>&1 || { say_message 'The downloaded Aether cannot run on this router.'; return 1; }
@@ -327,7 +342,7 @@ install_aether() {
 		chmod 755 "$_target/$_f.new"
 		mv -f "$_target/$_f.new" "$_target/$_f" || return 1
 	done
-	rm -f "$_stage/core.tar.gz" "$_stage/checksum" "$_stage/aether" "$_stage/pt/psiphon-tunnel-core" "$_stage/pt/lyrebird"
+	rm -f "$_stage/core.tar.gz" "$_stage/aether" "$_stage/pt/psiphon-tunnel-core" "$_stage/pt/lyrebird"
 	log "installed Aether $_tag"
 	return 0
 }
@@ -394,6 +409,13 @@ install_singbox() {
 		return 1
 	}
 	_tag="${2:-}"
+	if [ "$_asset" = arm-softfloat ]; then
+		if [ -n "$_tag" ] && [ "$_tag" != "$LX_SOFTFLOAT_TAG" ]; then
+			core_install_error "$_kind" "no release build is available for this router architecture" "" "$_tag"
+			return 1
+		fi
+		_tag="$LX_SOFTFLOAT_TAG"
+	fi
 	[ -n "$_tag" ] || _tag="$(latest_tag "$_repo")"
 	[ -n "$_tag" ] || {
 		say_message "Could not reach GitHub to find out which sing-box is current. Connect the tunnel first, then try again."
@@ -408,6 +430,9 @@ install_singbox() {
 	# cannot be fetched from the /latest/download/ path without asking first.
 	_name="sing-box-$_ver-linux-$_asset"
 	_url="https://github.com/$_repo/releases/download/$_tag/$_name.tar.gz"
+	if [ "$_asset" = arm-softfloat ]; then
+		_url="$(softfloat_release_url "$_name.tar.gz")"
+	fi
 	_size="$(remote_size "$_url")"
 	# The program is about three times the size of the archive it comes in.
 	# The archive and the program side by side for a moment, both on flash.
@@ -428,6 +453,7 @@ install_singbox() {
 		# never in memory, so that how far it has got can be shown.
 		printf '%s %s\n' "$_size" "$_target.tgz" > "$ZGZ_RUN/download" 2>/dev/null || true
 		curl -fsSL --connect-timeout 20 --max-time 900 -o "$_target.tgz" "$_url" 2>/dev/null &&
+			{ [ "$_asset" != arm-softfloat ] || core_archive_checksum "$_url" "$_target.tgz"; } &&
 			tar -xzO -f "$_target.tgz" "$_name/sing-box" > "$_bin" 2>/dev/null || true
 		rm -f "$_target.tgz" "$ZGZ_RUN/download"
 		# Over a megabyte is not enough to go on: a download cut off half
@@ -895,8 +921,28 @@ APP_MAX_AGE=3600            # an hour
 APP_CHECKED="$ZGZ_RUN/app.latest.checked"
 
 latest_of() {
+	local soft_tag
+	soft_tag="$(softfloat_tag "$1")"
+	if [ -n "$soft_tag" ]; then
+		tag_version "$soft_tag"
+		return 0
+	fi
 	sed -n "s/^$1	//p" "$LATEST_CACHE" 2>/dev/null | head -1
 	return 0
+}
+
+softfloat_tag() {
+	case "$1" in
+		warp-plus|vwarp|aether|sing-box-lx) ;;
+		*) return 0 ;;
+	esac
+	[ "$(asset_for "$1")" = arm-softfloat ] || return 0
+	case "$1" in
+		warp-plus) echo "$WARPPLUS_SOFTFLOAT_TAG" ;;
+		vwarp) echo "$VWARP_SOFTFLOAT_TAG" ;;
+		aether) echo "$AETHER_SOFTFLOAT_TAG" ;;
+		sing-box-lx) echo "$LX_SOFTFLOAT_TAG" ;;
+	esac
 }
 
 repo_of() {
@@ -1059,7 +1105,7 @@ cmd_latest() {
 		[ -n "$_old" ] && printf 'xray\t%s\n' "$_old" >> "$_tmp"
 	fi
 	fi
-	if [ -z "$_only" ] || [ "$_only" = sing-box-lx ]; then
+	if { [ -z "$_only" ] || [ "$_only" = sing-box-lx ]; } && [ "$(asset_for sing-box-lx)" != arm-softfloat ]; then
 		_lr="$(xray_releases "$LX_REPO")"
 		if [ -n "$_lr" ]; then
 			printf '%s\n' "$_lr" > "$LX_VERSIONS.new" && mv -f "$LX_VERSIONS.new" "$LX_VERSIONS"
@@ -1072,13 +1118,8 @@ cmd_latest() {
 		[ -n "$_repo" ] || continue
 		# The tag is all that is wanted. A source that will not answer
 		# leaves the previous answer in place rather than blanking it.
-		if [ "$_c" = warp-plus ] && [ "$(asset_for "$_c")" = arm-softfloat ]; then
-			_tag="$WARPPLUS_SOFTFLOAT_TAG"
-		elif [ "$_c" = vwarp ] && [ "$(asset_for "$_c")" = arm-softfloat ]; then
-			_tag="$VWARP_SOFTFLOAT_TAG"
-		else
-			_tag="$(latest_tag "$_repo")"
-		fi
+		_tag="$(softfloat_tag "$_c")"
+		[ -n "$_tag" ] || _tag="$(latest_tag "$_repo")"
 		if [ -n "$_tag" ]; then
 			printf '%s\t%s\n' "$_c" "$(tag_version "$_tag")" >> "$_tmp"
 		else
@@ -1206,8 +1247,12 @@ cmd_list() {
 	' "$( [ -s "$XRAY_VERSIONS" ] && echo "$XRAY_VERSIONS" || echo "$ZGZ_RUN/xray.versions.none" )"
 	rm -f "$ZGZ_RUN/xray.versions.none"
 	printf ']'
-	printf ',"singbox_lx_versions":['
-	if [ -s "$LX_VERSIONS" ]; then
+	_lx_softfloat=false
+	[ "$(asset_for sing-box-lx)" != arm-softfloat ] || _lx_softfloat=true
+	printf ',"singbox_lx_softfloat":%s,"singbox_lx_versions":[' "$_lx_softfloat"
+	if [ "$_lx_softfloat" = true ]; then
+		printf '{"tag":"%s","pre":false}' "$LX_SOFTFLOAT_TAG"
+	elif [ -s "$LX_VERSIONS" ]; then
 		awk 'NF == 2 && $1 ~ /^v[0-9][A-Za-z0-9.-]*$/ { printf "%s{\"tag\":\"%s\",\"pre\":%s}", (n++ ? "," : ""), $1, ($2 == "pre" ? "true" : "false") }' "$LX_VERSIONS"
 	fi
 	printf ']'

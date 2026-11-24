@@ -10,6 +10,8 @@ return baseclass.extend({ strings: {
 	"Close menu": "Закрыть меню",
 	"Zirgozar navigation": "Навигация Zirgozar",
 	"Enter the Amnezia verification code shown below.": "Введите код проверки Amnezia с изображения ниже.",
+	"Amnezia verification is required. Import the same link again from Configs to enter the code.": "Требуется проверка Amnezia. Импортируйте ту же ссылку заново на странице конфигураций, чтобы ввести код.",
+	"The Amnezia configuration could not be loaded. Import the same link again from Configs.": "Не удалось загрузить конфигурацию Amnezia. Импортируйте ту же ссылку заново на странице конфигураций.",
 	"Amnezia verification code": "Код проверки Amnezia",
 	"Verification code": "Код проверки",
 	"This Amnezia API key is obsolete. Create a new connection in AmneziaVPN, or use amnezia://free?country=ir.": "Этот ключ API Amnezia устарел. Создайте новое подключение в AmneziaVPN или используйте amnezia://free?country=ir.",
