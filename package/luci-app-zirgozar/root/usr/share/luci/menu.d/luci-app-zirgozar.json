@@ -55,6 +55,14 @@
 			"path": "zirgozar/other"
 		}
 	},
+	"admin/services/zirgozar/appearance": {
+		"title": "Apearance",
+		"order": 45,
+		"action": {
+			"type": "view",
+			"path": "zirgozar/appearance"
+		}
+	},
 	"admin/services/zirgozar/server": {
 		"title": "Server-Side",
 		"order": 75,

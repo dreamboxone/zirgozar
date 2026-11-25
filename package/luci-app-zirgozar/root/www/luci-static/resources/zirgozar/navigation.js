@@ -10,7 +10,7 @@
 
 var views = {}, installed = false, importing = false, pending = null, loadingData = false;
 var baseline = [], dirty = false, currentURL = '', historyIndex = 0, restoring = false;
-var pages = ['settings','nodes','node','subscribe','other','update','traffic','shunt_rule','geoview','server','acl','log'];
+var pages = ['settings','nodes','node','subscribe','other','appearance','update','traffic','shunt_rule','geoview','server','acl','log'];
 var _ = i18n.tr;
 
 function route(value) {
@@ -30,6 +30,8 @@ function markTabs(destination) {
 		if (active) link.setAttribute('aria-current', 'page');
 		else link.removeAttribute('aria-current');
 	});
+	var frame = document.querySelector('#view > .mk');
+	if (frame && frame.zgzRevealMenuLink) frame.zgzRevealMenuLink();
 }
 
 function busy(value) {

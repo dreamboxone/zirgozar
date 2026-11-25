@@ -45,5 +45,11 @@ api=new Function('baseclass','dom','poll','rpc','uci','ui','i18n','window','docu
  assert.equal(imports,1,'previously loaded view modules are reused');
  await api.navigate('/cgi-bin/luci/admin/services/zirgozar/settings');
  assert.equal(imports,1);assert.equal(unloads,3,'settings are refreshed on each accepted navigation');
+ const appearancePath='/cgi-bin/luci/admin/services/zirgozar/appearance';
+ assert.equal(api.route(appearancePath).page,'appearance');
+ await api.navigate(appearancePath);
+ assert.equal(imports,2);
+ assert.equal(L.env.dispatchpath[3],'appearance');
+ assert.equal(reloads,0,'appearance opens inside the shared frame');
  console.log('Navigation: internal routes, view reuse, fresh settings, poll cleanup and unsaved-form protection passed');
 })().catch(e=>{console.error(e);process.exitCode=1});

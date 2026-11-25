@@ -11,7 +11,7 @@
 # RELEASE starts at 1 each day and increases for further releases that day.
 # The main zirgozar package always includes the complete LuCI interface.
 VERSION=5.9.4
-RELEASE=6
+RELEASE=7
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -264,7 +264,7 @@ stage_luci_assets() {
 	install -d "$i/www/luci-static/resources/view/zirgozar" \
 	           "$i/www/luci-static/resources/zirgozar" \
 	           "$i/usr/share/luci/menu.d" "$i/usr/share/rpcd/acl.d"
-	for v in settings nodes node shunt_rule subscribe other server update traffic geoview acl log; do
+	for v in settings nodes node shunt_rule subscribe other appearance server update traffic geoview acl log; do
 		install -m 0644 "$l/www/luci-static/resources/view/zirgozar/$v.js" \
 			"$i/www/luci-static/resources/view/zirgozar/$v.js"
 	done

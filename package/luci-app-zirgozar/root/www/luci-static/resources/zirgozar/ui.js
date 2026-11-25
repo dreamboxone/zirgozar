@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.9.4-r6';
+var BUILD = '5.9.4-r7';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -117,7 +117,7 @@ function logoImg(file, height, cls) {
    reloaded, once. */
 var OWN_FILES = [ 'zirgozar/ui', 'zirgozar/navigation', 'zirgozar/i18n', 'zirgozar/lang_ru', 'zirgozar/lang_zh', 'zirgozar/status', 'zirgozar/qr', 'zirgozar/logfa', 'zirgozar/nodelink', 'zirgozar/presets', 'zirgozar/aetherscan',
 	'view/zirgozar/settings', 'view/zirgozar/nodes', 'view/zirgozar/node', 'view/zirgozar/server', 'view/zirgozar/subscribe', 'view/zirgozar/other',
-	'view/zirgozar/shunt_rule',
+	'view/zirgozar/shunt_rule', 'view/zirgozar/appearance',
 	'view/zirgozar/update', 'view/zirgozar/traffic', 'view/zirgozar/geoview', 'view/zirgozar/acl',
 	'view/zirgozar/log', 'zirgozar/clients', 'view/zirgozar/users/dashboard', 'view/zirgozar/users/details',
 	'view/zirgozar/users/wifi', 'view/zirgozar/users/firewall', 'view/zirgozar/users/bandwidth' ];
@@ -681,6 +681,7 @@ var PAGES = [
 	[ 'nodes',     'layers',   'Configs' ],
 	[ 'subscribe', 'rss',      'Subscriptions' ],
 	[ 'other',     'grid',     'Other Settings' ],
+	[ 'appearance','sliders', 'Apearance' ],
 	[ 'update',    'download', 'App Update' ],
 	[ 'traffic',   'shield',   'Rule Manage' ],
 	[ 'geoview',   'globe',    'Geoview' ],
@@ -762,6 +763,15 @@ function sidebar(root) {
 			}, [ icon(p[1]), E('span', { 'class': 'mk-sidebar-label' }, label) ]);
 		}))
 	]);
+	root.zgzRevealMenuLink = function() {
+		if (!root.classList.contains('mk-menu-horizontal')) return;
+		var current = panel.querySelector('[aria-current=page]');
+		if (!current) return;
+		var nav = current.parentElement;
+		if (nav.scrollWidth <= nav.clientWidth) return;
+		var linkBox = current.getBoundingClientRect(), navBox = nav.getBoundingClientRect();
+		nav.scrollLeft += Math.min(0, linkBox.left - navBox.left) + Math.max(0, linkBox.right - navBox.right);
+	};
 	function setOpen(open, restoreFocus) {
 		if (!open && !root.classList.contains('mk-sidebar-open')) return;
 		root.classList.toggle('mk-sidebar-open', open);
@@ -898,6 +908,23 @@ function optionHelp(root) {
 }
 
 var sharedFrame = null, sharedContent = null;
+var menuLayoutKey = 'zirgozar.menu.layout';
+var menuLayout = 'vertical';
+try {
+	if (window.localStorage.getItem(menuLayoutKey) === 'horizontal') menuLayout = 'horizontal';
+} catch (e) {}
+
+function setMenuLayout(layout) {
+	if (layout !== 'horizontal' && layout !== 'vertical') return;
+	menuLayout = layout;
+	try { window.localStorage.setItem(menuLayoutKey, layout); } catch (e) {}
+	if (sharedFrame) {
+		sharedFrame.zgzCloseMenu();
+		sharedFrame.classList.toggle('mk-menu-horizontal', layout === 'horizontal');
+		sharedFrame.zgzRevealMenuLink();
+	}
+}
+
 function page(children, opts) {
 	if (sharedFrame && sharedFrame.isConnected && sharedContent) {
 		sharedFrame.zgzCloseMenu();
@@ -914,7 +941,11 @@ function page(children, opts) {
 	   broken rather than as loading. A stylesheet that never comes still lets
 	   the page be seen after a second and a half. */
 	var root = E('div', { 'class': 'mk mk-page-shell', 'lang': i18n.get(), 'dir': fa ? 'rtl' : 'ltr', 'style': 'visibility:hidden' });
-	function show() { root.style.visibility = ''; }
+	root.classList.toggle('mk-menu-horizontal', menuLayout === 'horizontal');
+	function show() {
+		root.style.visibility = '';
+		if (root.zgzRevealMenuLink) root.zgzRevealMenuLink();
+	}
 	root.appendChild(E('link', {
 		'rel': 'stylesheet',
 		'href': L.resource('zirgozar/theme.css') + '?v=' + BUILD,
@@ -1142,5 +1173,7 @@ return baseclass.extend({
 	uptimeTicker: uptimeTicker,
 	note: note,
 	sortable: sortable,
+	getMenuLayout: function() { return menuLayout; },
+	setMenuLayout: setMenuLayout,
 	page: page
 });

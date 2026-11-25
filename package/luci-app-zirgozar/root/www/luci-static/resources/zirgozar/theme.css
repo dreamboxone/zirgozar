@@ -307,6 +307,20 @@
 	}
 	.mk-sidebar-open .mk-sidebar-backdrop{opacity:1;visibility:visible}
 }
+.mk.mk-page-shell.mk-menu-horizontal{display:block}
+.mk-menu-horizontal .mk-sidebar{margin-block-end:12px}
+.mk.mk-menu-horizontal .mk-sidebar-panel{
+	position:relative;inset:auto;inline-size:100%;max-block-size:none;
+	padding:7px;border-radius:var(--zgz-radius,18px);
+	visibility:visible;transform:none;transition:none;
+}
+.mk.mk-menu-horizontal :is(.mk-sidebar-brand,.mk-sidebar-toggle,.mk-sidebar-backdrop){display:none}
+.mk-menu-horizontal .mk-sidebar-links{display:flex;flex-wrap:wrap;scrollbar-width:thin}
+.mk-menu-horizontal .mk-sidebar-link{flex:none;padding-inline:12px}
+.mk-menu-horizontal .mk-sidebar-label{opacity:1}
+@media (max-width:960px){
+	.mk-menu-horizontal .mk-sidebar-links{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden}
+}
 @media (prefers-reduced-motion:reduce){
 	.mk.mk-page-shell,.mk .mk-sidebar-panel,.mk .mk-sidebar-label,.mk .mk-sidebar-backdrop{transition:none}
 	.mk.zgz-navigating .mk-sidebar-panel::after{animation:none}
@@ -710,8 +724,8 @@ body.pwp-fa #modal_overlay:where(body.pwp-active *)>.modal textarea,body.pwp-fa 
 /* Follow the host's component geometry as well as its palette. Sampled
    values come from native LuCI controls, not a second theme stylesheet. */
 .zgz-logo-normal{display:none}
-.mk-follow:not(.mk-dark) .zgz-logo-normal{display:block}
-.mk-follow:not(.mk-dark) .zgz-logo-inverse{display:none}
+.mk:not(.mk-dark) .zgz-logo-normal{display:block}
+.mk:not(.mk-dark) .zgz-logo-inverse{display:none}
 .mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal{
 	--shadow:var(--zgz-card-shadow,none);
 	--zgz-radius:var(--material3-card-radius,var(--zgz-card-radius,6px));
@@ -752,7 +766,8 @@ body.pwp-fa #modal_overlay:where(body.pwp-active *)>.modal textarea,body.pwp-fa 
 .mk-follow .mk-seg{background:var(--soft);border:1px solid var(--line);border-radius:var(--zgz-action-radius);backdrop-filter:none}
 .mk-follow .mk-seg .mk-btn.glass{color:var(--muted);background:transparent;border-radius:var(--zgz-action-radius)}
 .mk-follow .mk-seg .mk-btn.glass.mk-seg-on{background:var(--zgz-accent);color:var(--zgz-on-accent,#fff);box-shadow:none}
-:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) :is(input:not([type=checkbox]),select:not(.mk-language),textarea,.cbi-dropdown){border-radius:var(--zgz-field-radius)!important;background:var(--zgz-control-bg)!important;border-color:var(--zgz-control-line)!important;color:var(--text);box-shadow:none}
+:is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) :is(input:not([type=checkbox]),select,textarea,.cbi-dropdown){border-radius:var(--zgz-field-radius)!important;background:var(--zgz-control-bg)!important;border-color:var(--zgz-control-line)!important;color:var(--text);box-shadow:none}
+.mk.mk-follow select.mk-language{color:var(--text)}
 :is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) :is(input,select,textarea):focus{outline:2px solid var(--zgz-accent);outline-offset:1px;box-shadow:none}
 .mk.mk-follow :is(.cbi-button,.cbi-button-neutral,.cbi-button-edit){border-radius:var(--zgz-action-radius)!important;box-shadow:none!important;background:var(--zgz-accent)!important;color:var(--zgz-on-accent,#fff)!important;font-weight:var(--zgz-button-weight,500)!important;transform:none!important}
 .mk.mk-follow :is(.cbi-button-apply,.cbi-button-save,.cbi-button-add,.cbi-button-edit){background:var(--zgz-accent)!important;color:var(--zgz-on-accent,#fff)!important;border-color:transparent!important}
@@ -783,7 +798,7 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 :is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal) .cbi-value-description{opacity:1}
 :is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal,body.pwp-follow .cbi-page-actions) :is(.cbi-button,.btn){
 	background:var(--zgz-accent)!important;color:var(--zgz-on-accent)!important;
-	border-color:transparent!important;border-radius:var(--zgz-button-radius,6px)!important;
+	border-color:transparent!important;border-radius:var(--material3-button-radius,var(--zgz-button-radius,6px))!important;
 	box-shadow:none!important;transform:none!important;font-weight:var(--zgz-button-weight,500)!important;
 }
 :is(.mk.mk-follow,body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal,body.pwp-follow .cbi-page-actions) :is(.cbi-button-neutral,.cbi-button-default){background:var(--zgz-control-bg)!important;color:var(--zgz-text)!important;border-color:var(--zgz-control-line)!important}
@@ -1028,9 +1043,21 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 .mk .zgz-client-content .zgz-client-limit select{inline-size:min(100%,104px)}
 .mk .zgz-client-content button{max-inline-size:100%;white-space:normal}
 
-/* Frosted surfaces. The existing layouts and native theme sizing still
-   control the geometry. The palette follows the resolved light/dark mode. */
-:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal,.cbi-page-actions:where(body.pwp-active *)){
+.mk.mk-follow .zgz-connection-card{
+	--connection-accent:var(--zgz-success);
+	background:var(--panel);color:var(--text);border-color:var(--line);
+}
+.mk.mk-follow .zgz-connection-card #pwp-reselect{
+	background:var(--zgz-accent);color:var(--zgz-on-accent);border-color:transparent;
+	border-radius:var(--zgz-action-radius);
+}
+.mk.mk-follow .pwp-usage-periods button[aria-selected=true]{
+	--tab-paper:var(--zgz-accent);
+	color:var(--zgz-on-accent);
+}
+
+/* Frosted surfaces for the built-in Light and Dark modes. */
+:is(.mk:where(:not(body.pwp-follow *)),#modal_overlay:where(body.pwp-active:not(.pwp-follow) *)>.modal,.cbi-page-actions:where(body.pwp-active:not(.pwp-follow) *)){
 	--glass-page:#ccd9ee;
 	--glass-panel:#eff5fc;
 	--glass-soft:#e7effa;
@@ -1070,8 +1097,8 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 	--glass-icon-deep:#0b2868;
 	--glass-icon-highlight:#fffc;
 }
-:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal,.cbi-page-actions:where(body.pwp-active *)),
-:where(.mk,body.pwp-active #modal_overlay>.modal,body.pwp-active .cbi-page-actions)
+:is(.mk:where(:not(body.pwp-follow *)),#modal_overlay:where(body.pwp-active:not(.pwp-follow) *)>.modal,.cbi-page-actions:where(body.pwp-active:not(.pwp-follow) *)),
+:where(.mk:where(:not(body.pwp-follow *)),body.pwp-active:where(:not(.pwp-follow)) #modal_overlay>.modal,body.pwp-active:where(:not(.pwp-follow)) .cbi-page-actions)
 	:is(.mk-btn.success,.mk-btn.danger,.cbi-button-positive,.cbi-button-add,
 		.cbi-button-remove,.cbi-button-negative,.cbi-button-reset){
 	--glass-button-shadow:inset 0 0 0 1px color-mix(in srgb,var(--glass-button-highlight) 70%,transparent),
@@ -1079,8 +1106,8 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 		inset 0 -3px var(--glass-button-rim),inset 0 -5px var(--glass-button-side),
 		0 5px 11px color-mix(in srgb,var(--glass-button-cast) 40%,transparent);
 }
-:is(.mk.mk-dark,body.pwp-dark #modal_overlay:where(body.pwp-active *)>.modal,
-	body.pwp-dark .cbi-page-actions){
+:is(.mk:where(:not(body.pwp-follow *)).mk-dark,body.pwp-dark:where(:not(.pwp-follow)) #modal_overlay:where(body.pwp-active:not(.pwp-follow) *)>.modal,
+	body.pwp-dark:where(:not(.pwp-follow)) .cbi-page-actions){
 	--glass-page:#111d31;
 	--glass-panel:#202f47;
 	--glass-soft:#19273d;
@@ -1101,7 +1128,7 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 	--glass-icon-deep:#80adf3;
 	--glass-icon-highlight:#06152a;
 }
-.mk:not(.mk-follow),
+.mk:where(:not(body.pwp-follow *)),
 body:not(.pwp-follow) #modal_overlay:where(body.pwp-active *)>.modal{
 	--bg:var(--glass-page);
 	--panel:var(--glass-panel);
@@ -1111,55 +1138,54 @@ body:not(.pwp-follow) #modal_overlay:where(body.pwp-active *)>.modal{
 	--soft:var(--glass-soft);
 	--shadow:var(--glass-depth);
 }
-.mk.mk-page-shell{
+.mk:where(:not(body.pwp-follow *)).mk-page-shell{
 	background-image:radial-gradient(ellipse at 14% 0%,var(--glass-sheen),transparent 60%),
 		linear-gradient(155deg,var(--glass-panel),var(--glass-page) 74%);
 }
-.mk.mk-page-shell.mk-follow{background-color:var(--glass-page)}
 
-.mk :is(.mk-hero,.mk-sidebar-panel,.mk-card,.mk-metric){
+.mk:where(:not(body.pwp-follow *)) :is(.mk-hero,.mk-sidebar-panel,.mk-card,.mk-metric){
 	background-image:var(--glass-finish);
 	border-color:var(--glass-line);
 	box-shadow:var(--glass-depth);
 	color:var(--glass-ink);
 }
-.mk :is(.mk-hero,.mk-sidebar-panel,.mk-card,.mk-metric):not(.zgz-connection-card){
+.mk:where(:not(body.pwp-follow *)) :is(.mk-hero,.mk-sidebar-panel,.mk-card,.mk-metric):not(.zgz-connection-card){
 	border-radius:18px;
 }
-.mk .mk-metric-title{color:var(--glass-muted)}
-.mk .mk-hero::after,.mk .mk-metric::after{background:none}
-.mk .mk-card::before,.mk .cbi-section::before,.mk .pwp-status-row .mk-metric::before{
+.mk:where(:not(body.pwp-follow *)) .mk-metric-title{color:var(--glass-muted)}
+.mk:where(:not(body.pwp-follow *)) .mk-hero::after,.mk:where(:not(body.pwp-follow *)) .mk-metric::after{background:none}
+.mk:where(:not(body.pwp-follow *)) .mk-card::before,.mk:where(:not(body.pwp-follow *)) .cbi-section::before,.mk:where(:not(body.pwp-follow *)) .pwp-status-row .mk-metric::before{
 	background:linear-gradient(90deg,transparent,var(--glass-edge),transparent);
 	-webkit-mask-size:100% 1px;
 	mask-size:100% 1px;
 }
-.mk .cbi-section{
+.mk:where(:not(body.pwp-follow *)) .cbi-section{
 	background-image:var(--glass-finish)!important;
 	border-color:var(--glass-line)!important;
 	box-shadow:var(--glass-depth);
 }
-.mk .cbi-section:not(.cbi-section .cbi-section){border-radius:18px!important}
-.mk :is(.cbi-section .cbi-section,#zgz-core-path-fields .cbi-section){
+.mk:where(:not(body.pwp-follow *)) .cbi-section:not(.cbi-section .cbi-section){border-radius:18px!important}
+.mk:where(:not(body.pwp-follow *)) :is(.cbi-section .cbi-section,#zgz-core-path-fields .cbi-section){
 	background-image:none!important;
 	box-shadow:none;
 }
-body.pwp-active #modal_overlay>.modal{
+body.pwp-active:where(:not(.pwp-follow)) #modal_overlay>.modal{
 	background-image:var(--glass-finish)!important;
 	border-color:var(--glass-line);
 	box-shadow:var(--glass-depth),0 24px 54px -22px #07152a9c!important;
 }
 
-.mk .mk-hero :is(h2,p,.mk-uptime){color:var(--glass-ink)}
-.mk .mk-hero .mk-version,
-.mk .mk-hero .mk-seg{
+.mk:where(:not(body.pwp-follow *)) .mk-hero :is(h2,p,.mk-uptime){color:var(--glass-ink)}
+.mk:where(:not(body.pwp-follow *)) .mk-hero .mk-version,
+.mk:where(:not(body.pwp-follow *)) .mk-hero .mk-seg{
 	background:var(--glass-soft);
 	border-color:var(--glass-line);
 	color:var(--glass-ink);
 	box-shadow:inset 0 1px var(--glass-edge);
 }
-.mk .mk-hero .mk-seg{backdrop-filter:none}
-.mk .mk-hero :is(.mk-seg,.mk-seg .mk-btn.glass){border-radius:10px!important}
-.mk .mk-hero select.mk-language{
+.mk:where(:not(body.pwp-follow *)) .mk-hero .mk-seg{backdrop-filter:none}
+.mk:where(:not(body.pwp-follow *)) .mk-hero :is(.mk-seg,.mk-seg .mk-btn.glass){border-radius:10px!important}
+.mk:where(:not(body.pwp-follow *)) .mk-hero select.mk-language{
 	appearance:none;
 	padding-inline-end:28px;
 	border-radius:10px!important;
@@ -1175,105 +1201,99 @@ body.pwp-active #modal_overlay>.modal{
 	box-shadow:var(--glass-button-shadow)!important;
 	backdrop-filter:none;
 }
-.mk.mk-follow .mk-hero select.mk-language{
-	font-size:var(--zgz-button-size,14px);
-	font-weight:var(--zgz-button-weight,500);
-}
-.mk.mk-dark .mk-hero select.mk-language{color-scheme:dark}
-.mk .mk-hero select.mk-language:focus-visible{outline:2px solid var(--glass-focus);outline-offset:2px}
+.mk:where(:not(body.pwp-follow *)).mk-dark .mk-hero select.mk-language{color-scheme:dark}
+.mk:where(:not(body.pwp-follow *)) .mk-hero select.mk-language:focus-visible{outline:2px solid var(--glass-focus);outline-offset:2px}
 @media(forced-colors:active){
-	.mk .mk-hero select.mk-language{appearance:auto;background:Field!important;color:FieldText!important}
+	.mk:where(:not(body.pwp-follow *)) .mk-hero select.mk-language{appearance:auto;background:Field!important;color:FieldText!important}
 }
-.mk .mk-hero .mk-btn.glass:not(.mk-seg-on){color:var(--glass-muted)}
-.mk .mk-hero .mk-btn.glass:hover:not(.mk-seg-on){background:var(--glass-panel)}
-.mk:not(.mk-dark) .zgz-logo-normal{display:block}
-.mk:not(.mk-dark) .zgz-logo-inverse{display:none}
-.mk .zgz-hero-logo img{filter:drop-shadow(0 2px 2px var(--glass-cast))}
-.mk .mk-sidebar-panel :is(.mk-sidebar-link,.mk-sidebar-button){color:var(--glass-muted)}
-.mk .mk-sidebar-panel :is(.mk-sidebar-link,.mk-sidebar-button):hover{
+.mk:where(:not(body.pwp-follow *)) .mk-hero .mk-btn.glass:not(.mk-seg-on){color:var(--glass-muted)}
+.mk:where(:not(body.pwp-follow *)) .mk-hero .mk-btn.glass:hover:not(.mk-seg-on){background:var(--glass-panel)}
+.mk:where(:not(body.pwp-follow *)) .zgz-hero-logo img{filter:drop-shadow(0 2px 2px var(--glass-cast))}
+.mk:where(:not(body.pwp-follow *)) .mk-sidebar-panel :is(.mk-sidebar-link,.mk-sidebar-button){color:var(--glass-muted)}
+.mk:where(:not(body.pwp-follow *)) .mk-sidebar-panel :is(.mk-sidebar-link,.mk-sidebar-button):hover{
 	background:var(--glass-soft);
 	color:var(--glass-ink);
 }
 
-.mk.mk-page-shell :is(.mk-btn.primary,.mk-btn.glass.mk-seg-on,
+.mk:where(:not(body.pwp-follow *)).mk-page-shell :is(.mk-btn.primary,.mk-btn.glass.mk-seg-on,
 	.mk-sidebar-link[aria-current=page],.mk-sidebar-pin[aria-pressed=true]){
 	background:var(--glass-cobalt);
 	color:var(--glass-on-cobalt);
 	box-shadow:var(--glass-button-shadow);
 }
-.mk .mk-sidebar-link[aria-current=page]{border-radius:10px}
+.mk:where(:not(body.pwp-follow *)) .mk-sidebar-link[aria-current=page]{border-radius:10px}
 
 /* The same glass and cobalt colours run through the SVG marks and controls. */
-.zgz-icon-light{stop-color:var(--glass-icon-light)}
-.zgz-icon-mid{stop-color:var(--glass-icon-mid)}
-.zgz-icon-glint{stop-color:var(--glass-icon-glint)}
-.zgz-icon-deep{stop-color:var(--glass-icon-deep)}
-.mk :is(.mk-badge-ico,.mk-metric-ico,.mk-service-ico,.pwp-social-icon,.zgz-country-orb,
+.mk:where(:not(body.pwp-follow *)) .zgz-icon-light{stop-color:var(--glass-icon-light)}
+.mk:where(:not(body.pwp-follow *)) .zgz-icon-mid{stop-color:var(--glass-icon-mid)}
+.mk:where(:not(body.pwp-follow *)) .zgz-icon-glint{stop-color:var(--glass-icon-glint)}
+.mk:where(:not(body.pwp-follow *)) .zgz-icon-deep{stop-color:var(--glass-icon-deep)}
+.mk:where(:not(body.pwp-follow *)) :is(.mk-badge-ico,.mk-metric-ico,.mk-service-ico,.pwp-social-icon,.zgz-country-orb,
 	.mk-sidebar-link,.mk-sidebar-button,.mk-icobtn,.mk-seg .mk-btn.glass){
 	--icon-paint:url(#zgz-icon-cobalt) currentColor;
 }
-.mk :is(.mk-sidebar-link[aria-current=page],.mk-sidebar-pin[aria-pressed=true],.mk-seg .mk-seg-on,
+.mk:where(:not(body.pwp-follow *)) :is(.mk-sidebar-link[aria-current=page],.mk-sidebar-pin[aria-pressed=true],.mk-seg .mk-seg-on,
 	.mk-btn.primary,#pwp-reselect,.zgz-country-orb:not([data-cc])){
 	--icon-paint:url(#zgz-icon-ice) currentColor;
 }
-.mk .mk-ico [stroke="currentColor"],.mk .mk-ico svg[stroke="currentColor"]{
+.mk:where(:not(body.pwp-follow *)) .mk-ico [stroke="currentColor"],.mk:where(:not(body.pwp-follow *)) .mk-ico svg[stroke="currentColor"]{
 	stroke:var(--icon-paint,currentColor);
 }
-.mk .mk-ico svg[fill="currentColor"]{fill:var(--icon-paint,currentColor)}
-.mk :is(.mk-badge-ico,.mk-metric-ico,.mk-service-ico,.pwp-social-icon){
+.mk:where(:not(body.pwp-follow *)) .mk-ico svg[fill="currentColor"]{fill:var(--icon-paint,currentColor)}
+.mk:where(:not(body.pwp-follow *)) :is(.mk-badge-ico,.mk-metric-ico,.mk-service-ico,.pwp-social-icon){
 	background:transparent;
 	box-shadow:none;
 	color:var(--glass-icon-mid);
 }
-.mk :is(.mk-badge-ico,.mk-metric-ico,.mk-service-ico,.pwp-social-icon,.zgz-country-orb) .mk-ico{
+.mk:where(:not(body.pwp-follow *)) :is(.mk-badge-ico,.mk-metric-ico,.mk-service-ico,.pwp-social-icon,.zgz-country-orb) .mk-ico{
 	filter:drop-shadow(0 1px var(--glass-icon-highlight));
 }
-.mk :is(.mk-badge-ico,.mk-metric-ico,.mk-service-ico,.zgz-country-orb) .mk-ico svg{
+.mk:where(:not(body.pwp-follow *)) :is(.mk-badge-ico,.mk-metric-ico,.mk-service-ico,.zgz-country-orb) .mk-ico svg{
 	stroke-width:1.65;
 }
-.mk .pwp-social-icon img{filter:saturate(.6)}
-.mk .pwp-social-check{
+.mk:where(:not(body.pwp-follow *)) .pwp-social-icon img{filter:saturate(.6)}
+.mk:where(:not(body.pwp-follow *)) .pwp-social-check{
 	background:color-mix(in srgb,var(--glass-panel) 42%,transparent);
 	box-shadow:inset 0 0 0 1px var(--glass-bevel),inset 0 1px var(--glass-edge);
 	color:var(--glass-ink);
 }
-.mk .pwp-social-check:hover{background:var(--glass-panel)}
-.mk .mk-sidebar-toggle,.mk .mk-icobtn:not(.done){
+.mk:where(:not(body.pwp-follow *)) .pwp-social-check:hover{background:var(--glass-panel)}
+.mk:where(:not(body.pwp-follow *)) .mk-sidebar-toggle,.mk:where(:not(body.pwp-follow *)) .mk-icobtn:not(.done){
 	background:var(--glass-finish);
 	border-color:var(--glass-line);
 	color:var(--glass-icon-mid);
 	box-shadow:inset 0 1px var(--glass-edge),inset 0 -2px var(--glass-rim);
 }
-.mk .mk-icobtn:not(.done):hover{color:var(--glass-focus);border-color:var(--glass-focus)}
-.mk .mk-icobtn.done{--icon-paint:initial}
-.mk .zgz-connection-card,.mk.mk-dark .zgz-connection-card{
+.mk:where(:not(body.pwp-follow *)) .mk-icobtn:not(.done):hover{color:var(--glass-focus);border-color:var(--glass-focus)}
+.mk:where(:not(body.pwp-follow *)) .mk-icobtn.done{--icon-paint:initial}
+.mk:where(:not(body.pwp-follow *)) .zgz-connection-card,.mk:where(:not(body.pwp-follow *)).mk-dark .zgz-connection-card{
 	--connection-accent:var(--glass-connected);
 	background:var(--glass-finish);
 	border-color:var(--glass-line);
 	color:var(--glass-ink);
 	box-shadow:var(--glass-depth);
 }
-.mk .zgz-connection-card #pwp-reselect{
+.mk:where(:not(body.pwp-follow *)) .zgz-connection-card #pwp-reselect{
 	background:var(--glass-cobalt);
 	border-color:var(--glass-focus);
 	color:#fff;
 	box-shadow:var(--glass-button-shadow);
 }
-.mk .zgz-connection-card .zgz-country-orb{
+.mk:where(:not(body.pwp-follow *)) .zgz-connection-card .zgz-country-orb{
 	background:var(--glass-finish);
 	border-color:var(--glass-bevel);
 	outline-color:color-mix(in srgb,var(--flag-ring) 64%,var(--glass-line));
 	color:var(--glass-icon-mid);
 	box-shadow:var(--glass-depth);
 }
-.mk .zgz-connection-card .zgz-country-orb:not([data-cc]){
+.mk:where(:not(body.pwp-follow *)) .zgz-connection-card .zgz-country-orb:not([data-cc]){
 	background:var(--glass-cobalt);
 	border-color:var(--glass-line);
 	color:#fff;
 	box-shadow:var(--glass-button-shadow);
 }
-.mk .zgz-country-orb:not([data-cc]) .mk-ico{filter:drop-shadow(0 1px 1px #081d62)}
-.mk .zgz-country-orb[data-cc]::after{
+.mk:where(:not(body.pwp-follow *)) .zgz-country-orb:not([data-cc]) .mk-ico{filter:drop-shadow(0 1px 1px #081d62)}
+.mk:where(:not(body.pwp-follow *)) .zgz-country-orb[data-cc]::after{
 	content:"";
 	position:absolute;
 	inset:0;
@@ -1281,30 +1301,30 @@ body.pwp-active #modal_overlay>.modal{
 	box-shadow:inset 0 2px 5px var(--glass-edge),inset 0 -4px 8px var(--glass-cast);
 	pointer-events:none;
 }
-.mk .zgz-connection-card #pwp-state .ok{box-shadow:none}
-.mk .zgz-connection-card .zgz-connection-art{
+.mk:where(:not(body.pwp-follow *)) .zgz-connection-card #pwp-state .ok{box-shadow:none}
+.mk:where(:not(body.pwp-follow *)) .zgz-connection-card .zgz-connection-art{
 	background-image:radial-gradient(circle,var(--glass-bevel) 1px,transparent 2px);
 }
-.mk .zgz-connection-art .zgz-orbit{
+.mk:where(:not(body.pwp-follow *)) .zgz-connection-art .zgz-orbit{
 	border-color:var(--glass-bevel);
 	box-shadow:0 1px var(--glass-icon-highlight);
 }
 
-:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal,.cbi-page-actions:where(body.pwp-active *))
+:is(.mk:where(:not(body.pwp-follow *)),#modal_overlay:where(body.pwp-active:not(.pwp-follow) *)>.modal,.cbi-page-actions:where(body.pwp-active:not(.pwp-follow) *))
 	:is(.cbi-button-apply,.cbi-button-save){
 	background:var(--glass-cobalt)!important;
 	color:#fff!important;
 	box-shadow:var(--glass-button-shadow)!important;
 }
-.mk :is(.mk-btn,.mk-sidebar-link,.mk-sidebar-button):focus-visible{
+.mk:where(:not(body.pwp-follow *)) :is(.mk-btn,.mk-sidebar-link,.mk-sidebar-button):focus-visible{
 	outline-color:var(--glass-focus);
 }
 
 /* Let the section's finish show through its LuCI tab content. */
-:is(.mk,body.pwp-active #modal_overlay>.modal) .cbi-section-node>[data-tab]{
+:is(.mk:where(:not(body.pwp-follow *)),body.pwp-active:where(:not(.pwp-follow)) #modal_overlay>.modal) .cbi-section-node>[data-tab]{
 	background:transparent!important;
 }
-:is(.mk,body.pwp-active #modal_overlay>.modal)
+:is(.mk:where(:not(body.pwp-follow *)),body.pwp-active:where(:not(.pwp-follow)) #modal_overlay>.modal)
 	.cbi-value-field :is(input:not([type=checkbox],[type=radio],[type=hidden],[type=button],[type=submit]),
 	select:not(.mk-language),textarea,.cbi-dropdown){
 	background:var(--glass-finish)!important;
@@ -1312,36 +1332,36 @@ body.pwp-active #modal_overlay>.modal{
 	border-color:var(--glass-line)!important;
 	box-shadow:inset 0 1px var(--glass-edge),inset 0 -2px var(--glass-rim);
 }
-:is(.mk,body.pwp-active #modal_overlay>.modal) .cbi-tabmenu{
+:is(.mk:where(:not(body.pwp-follow *)),body.pwp-active:where(:not(.pwp-follow)) #modal_overlay>.modal) .cbi-tabmenu{
 	background:var(--glass-finish)!important;
 	box-shadow:var(--glass-depth);
 }
-:is(.mk,body.pwp-active #modal_overlay>.modal) .cbi-tabmenu>li>a{
+:is(.mk:where(:not(body.pwp-follow *)),body.pwp-active:where(:not(.pwp-follow)) #modal_overlay>.modal) .cbi-tabmenu>li>a{
 	border-radius:10px!important;
 	color:var(--glass-icon-mid)!important;
 }
-:is(.mk,body.pwp-active #modal_overlay>.modal) .cbi-tabmenu>li.cbi-tab{
+:is(.mk:where(:not(body.pwp-follow *)),body.pwp-active:where(:not(.pwp-follow)) #modal_overlay>.modal) .cbi-tabmenu>li.cbi-tab{
 	background:var(--glass-cobalt)!important;
 	border-radius:10px;
 	box-shadow:var(--glass-button-shadow);
 }
-:is(.mk,body.pwp-active #modal_overlay>.modal) .cbi-tabmenu>li.cbi-tab>a{color:#fff!important}
+:is(.mk:where(:not(body.pwp-follow *)),body.pwp-active:where(:not(.pwp-follow)) #modal_overlay>.modal) .cbi-tabmenu>li.cbi-tab>a{color:#fff!important}
 
-.mk .pwp-usage-periods button:first-child{--period-active:#a0275c;--period-ink:#842043;--period-tint:#f5d2e2}
-.mk .pwp-usage-periods button:nth-child(2){--period-active:#a44415;--period-ink:#82350f;--period-tint:#ffe0c5}
-.mk .pwp-usage-periods button:nth-child(3){--period-active:#126988;--period-ink:#125b77;--period-tint:#c8eef8}
-.mk .pwp-usage-periods button{
+.mk:where(:not(body.pwp-follow *)) .pwp-usage-periods button:first-child{--period-active:#a0275c;--period-ink:#842043;--period-tint:#f5d2e2}
+.mk:where(:not(body.pwp-follow *)) .pwp-usage-periods button:nth-child(2){--period-active:#a44415;--period-ink:#82350f;--period-tint:#ffe0c5}
+.mk:where(:not(body.pwp-follow *)) .pwp-usage-periods button:nth-child(3){--period-active:#126988;--period-ink:#125b77;--period-tint:#c8eef8}
+.mk:where(:not(body.pwp-follow *)) .pwp-usage-periods button{
 	--tab-paper:var(--period-tint,var(--glass-soft));
 	background:linear-gradient(145deg,#ffffff70,transparent 60%),var(--tab-paper);
 	color:var(--period-ink,var(--glass-ink));
 }
-.mk[dir] .pwp-usage-periods button[aria-selected=true]{
+.mk:where(:not(body.pwp-follow *))[dir] .pwp-usage-periods button[aria-selected=true]{
 	--tab-paper:var(--period-active,var(--glass-focus));
 	color:#fff;
 	box-shadow:inset 0 1px var(--glass-edge),inset 0 -2px #0003;
 }
 
-:is(.mk,body.pwp-active #modal_overlay>.modal,body.pwp-active .cbi-page-actions)
+:is(.mk:where(:not(body.pwp-follow *)),body.pwp-active:where(:not(.pwp-follow)) #modal_overlay>.modal,body.pwp-active:where(:not(.pwp-follow)) .cbi-page-actions)
 	:is(.mk-btn.success,.cbi-button-positive,.cbi-button-add){
 	--glass-button-highlight:#99f9d6;
 	--glass-button-rim:#40e7a5;
@@ -1350,7 +1370,7 @@ body.pwp-active #modal_overlay>.modal{
 	--glass-action:radial-gradient(ellipse at 18% 0%,#5bd8a46b,transparent 65%),
 		linear-gradient(155deg,#08765b,#07583f 52%,#063927);
 }
-:is(.mk,body.pwp-active #modal_overlay>.modal,body.pwp-active .cbi-page-actions)
+:is(.mk:where(:not(body.pwp-follow *)),body.pwp-active:where(:not(.pwp-follow)) #modal_overlay>.modal,body.pwp-active:where(:not(.pwp-follow)) .cbi-page-actions)
 	:is(.mk-btn.danger,.cbi-button-remove,.cbi-button-negative,.cbi-button-reset){
 	--glass-button-highlight:#ffacb1;
 	--glass-button-rim:#ff7a9a;
@@ -1359,7 +1379,7 @@ body.pwp-active #modal_overlay>.modal{
 	--glass-action:radial-gradient(ellipse at 18% 0%,#ff8b9d80,transparent 65%),
 		linear-gradient(155deg,#c32248,#a41d37 52%,#74142c);
 }
-:is(.mk,body.pwp-active #modal_overlay>.modal,body.pwp-active .cbi-page-actions)
+:is(.mk:where(:not(body.pwp-follow *)),body.pwp-active:where(:not(.pwp-follow)) #modal_overlay>.modal,body.pwp-active:where(:not(.pwp-follow)) .cbi-page-actions)
 	:is(.mk-btn.success,.mk-btn.danger,.cbi-button-positive,.cbi-button-add,
 		.cbi-button-remove,.cbi-button-negative,.cbi-button-reset){
 	background:var(--glass-action)!important;
@@ -1373,7 +1393,7 @@ body.pwp-active #modal_overlay>.modal{
 	overflow-x:auto;
 	border-radius:14px;
 }
-.mk .zgz-sub-table-scroll:focus-visible{outline:2px solid var(--glass-focus);outline-offset:2px}
+.mk .zgz-sub-table-scroll:focus-visible{outline:2px solid var(--glass-focus,var(--zgz-accent));outline-offset:2px}
 .mk .zgz-sub-table-scroll .cbi-section-table{margin:0!important}
 .mk #zgz-subscription-toolbar .mk-btn{
 	max-inline-size:100%;
