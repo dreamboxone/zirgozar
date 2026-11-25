@@ -162,7 +162,9 @@ function install() {
 		navigate(destination.url.href).catch(function() {});
 	});
 	function changed(event) {
-		if ((event.isTrusted || event.target === document.activeElement) && event.target.closest && event.target.closest('#view .cbi-map')) dirty = true;
+		var target = event.target;
+		if ((event.isTrusted || target === document.activeElement) && target.closest &&
+			target.closest('#view .cbi-map') && !target.closest('.pwp-check-sites')) dirty = true;
 	}
 	document.addEventListener('input', changed);
 	document.addEventListener('change', changed);

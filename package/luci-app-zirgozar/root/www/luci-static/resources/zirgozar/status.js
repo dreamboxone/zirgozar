@@ -544,7 +544,7 @@ return baseclass.extend({
 			].concat(selectedChecks.length ? selectedChecks.map(function(site) {
 				return socialCheck('pwp-chk-' + site.id, _(site.name), site.mark, site.colour, site.url,
 					site.mark ? null : site.id + (site.id == 'arvancloud' ? '.svg' : '.ico'));
-			}) : [E('a', { 'href': L.url('admin/services/zirgozar/other') }, _('Select test sites in Other Settings.'))])),
+			}) : [E('a', { 'href': L.url('admin/services/zirgozar/appearance') }, _('Select test sites in Apearance.'))])),
 			usageCard()
 		]);
 

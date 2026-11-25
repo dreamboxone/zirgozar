@@ -38,7 +38,7 @@ api=new Function('baseclass','dom','poll','rpc','uci','ui','i18n','window','docu
  assert.equal(imports,1);assert.equal(unloads,1);assert.equal(L.env.dispatchpath[3],'settings');
  assert.ok(poll.queue.some(e=>e.fn===oldPoll),'global polls survive');
  assert.equal(poll.queue.filter(e=>e.fn===newPoll).length,1,'old page polls are removed');
- events.input({isTrusted:true,target:{closest:()=>true}});confirms=false;
+ events.input({isTrusted:true,target:{closest:selector=>selector==='#view .cbi-map'}});confirms=false;
  const before=location.href;await api.navigate('/cgi-bin/luci/admin/services/zirgozar/nodes');
  assert.equal(location.href,before,'declining navigation preserves the current form');
  confirms=true;await api.navigate('/cgi-bin/luci/admin/services/zirgozar/nodes');
@@ -51,5 +51,9 @@ api=new Function('baseclass','dom','poll','rpc','uci','ui','i18n','window','docu
  assert.equal(imports,2);
  assert.equal(L.env.dispatchpath[3],'appearance');
  assert.equal(reloads,0,'appearance opens inside the shared frame');
+ confirms=false;
+ events.change({isTrusted:true,target:{closest:selector=>selector==='#view .cbi-map'||selector==='.pwp-check-sites'}});
+ await api.navigate('/cgi-bin/luci/admin/services/zirgozar/settings');
+ assert.equal(L.env.dispatchpath[3],'settings','automatically saved checkboxes do not mark the form as dirty');
  console.log('Navigation: internal routes, view reuse, fresh settings, poll cleanup and unsaved-form protection passed');
 })().catch(e=>{console.error(e);process.exitCode=1});

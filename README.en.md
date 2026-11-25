@@ -595,7 +595,7 @@ For an ECH node whose plain DNS key lookup is blocked, open the node editor and 
 
 ### 🧰 4.4 Other Settings
 
-**LED color**, at the end of the Other Settings form, is off by default and leaves the indicator under OpenWrt control. Supported indicators have three matching, independently dimmable RGB channels. While enabled, a URL test through the current connection runs every 15 seconds: below 200 ms green, 200–299 ms yellow, 300–499 ms orange, 500 ms and above red; a disconnected tunnel or failed test turns the indicator off. All three boundaries are editable. Each colour can be steady or blinking when supported. Disabling restores OpenWrt LED settings.
+**LED color**, on the Apearance page, is off by default and leaves the indicator under OpenWrt control. Supported indicators have three matching, independently dimmable RGB channels. While enabled, a URL test through the current connection runs every 15 seconds: below 200 ms green, 200–299 ms yellow, 300–499 ms orange, 500 ms and above red; a disconnected tunnel or failed test turns the indicator off. All three boundaries are editable. Each colour can be steady or blinking when supported. Disabling restores OpenWrt LED settings.
 
 Home renders without waiting for subscription processing; node choices are filled in afterwards. The traffic period is remembered in the same browser.
 

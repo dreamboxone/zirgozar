@@ -398,7 +398,7 @@ Add 中选 WARP，通过 [warp-plus](https://github.com/bepass-org/warp-plus) �
 
 **Traffic history：** `stats_flush_minutes=5` 控制写闪存频率；尚未写入的数据断电会丢失。Forget all recorded traffic 清空历史并重新计数。**Set router clock** 设置伊朗时间，错误时间会影响 TLS。
 
-**LED color：** 默认关闭，仅支持匹配的三路独立调光 RGB 指示灯。开启后每 15 秒做当前连接的 URL 测试：<200 ms 绿、200–299 黄、300–499 橙、≥500 红，失败/断开则熄灭。三条边界可改，各色可按硬件支持常亮/闪烁；禁用恢复 OpenWrt 设置。
+**LED color：** 位于外观设置页面，默认关闭，仅支持匹配的三路独立调光 RGB 指示灯。开启后每 15 秒做当前连接的 URL 测试：<200 ms 绿、200–299 黄、300–499 橙、≥500 红，失败/断开则熄灭。三条边界可改，各色可按硬件支持常亮/闪烁；禁用恢复 OpenWrt 设置。
 
 ### ⬆️ 4.5 App Update：更新
 

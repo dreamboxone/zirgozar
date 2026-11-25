@@ -170,7 +170,7 @@ return baseclass.extend({ strings: {
 	"The selected core could not validate FinalMask.": "所选核心无法验证 FinalMask。",
 	"The selected core rejected these FinalMask settings.": "所选核心拒绝了这些 FinalMask 设置。",
 	"Could not save settings.": "无法保存设置。",
-	"Select test sites in Other Settings.": "请在其他设置中选择测试网站。",
+	"Select test sites in Apearance.": "请在外观设置中选择测试网站。",
 	"Select up to four sites. Changes are saved automatically.": "最多选择四个网站。更改会自动保存。",
 	"Connection check settings": "连接检查设置",
 	"Test sites": "测试网站",

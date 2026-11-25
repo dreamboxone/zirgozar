@@ -170,7 +170,7 @@ return baseclass.extend({ strings: {
 	"The selected core could not validate FinalMask.": "Выбранное ядро не смогло проверить FinalMask.",
 	"The selected core rejected these FinalMask settings.": "Выбранное ядро отклонило эти настройки FinalMask.",
 	"Could not save settings.": "Не удалось сохранить настройки.",
-	"Select test sites in Other Settings.": "Выберите сайты для проверки в других настройках.",
+	"Select test sites in Apearance.": "Выберите сайты для проверки в настройках внешнего вида.",
 	"Select up to four sites. Changes are saved automatically.": "Выберите до четырёх сайтов. Изменения сохраняются автоматически.",
 	"Connection check settings": "Настройки проверки соединения",
 	"Test sites": "Сайты для проверки",
