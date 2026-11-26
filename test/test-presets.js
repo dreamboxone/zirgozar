@@ -67,6 +67,25 @@ idleTimeout.value='30';idleTimeout.dispatchEvent(new Event('input'));
 assert.equal(JSON.parse(text).quicParams.maxIdleTimeout,30,'numeric fields update the underlying mask while typing');
 const rawMerge=elements(formEditor).find(el=>el.tag==='textarea' && el['aria-label']==='Additional mask settings');
 assert.equal(JSON.parse(rawMerge.value).delayMs,50,'structured edits keep the advanced settings editor synchronized');
+text=JSON.stringify({
+ tcp:[{type:'xmc',settings:{paddings:[{direction:'s2c',length:'32-64'}],yggdrasil:{api:'https://example.test',extra:true}}}],
+ udp6:[{type:'xdns',settings:{domains:[{names:['example.test'],labelLimit:63}]}}]
+});
+const structured=editable.renderWidget('node',0,text);
+function setMaskField(label,value) {
+ const input=elements(structured).find(el=>el['aria-label']===label);
+ input.value=value;
+ input.dispatchEvent(new Event('change'));
+}
+setMaskField('Padding delay (ms)','20-50');
+setMaskField('Password',' secret ');
+setMaskField('XDNS alphabet','abcdefghijklmnopqrstuvwxyz234567');
+setMaskField('XDNS alphabet','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+assert.equal(JSON.parse(text).tcp[0].settings.paddings[0].delay,'20-50');
+assert.deepEqual(JSON.parse(text).tcp[0].settings.yggdrasil,{api:'https://example.test',extra:true,password:' secret '});
+assert.deepEqual(JSON.parse(text).udp6[0].settings.domains,[{names:['example.test'],labelLimit:63,alphabet:'abcdefghijklmnopqrstuvwxyz234567'}]);
+elements(structured).find(el=>el.tag==='button' && el.children==='Use default XMC padding').click();
+assert.equal(JSON.parse(text).tcp[0].settings.paddings,undefined);
 let savedMasks=0;
 const guarded=presets.withFinalMask({getUIElement:()=>widget,isActive:()=>true,formvalue:()=>text,parse:()=>{savedMasks++;return Promise.resolve();}});
 (async()=>{

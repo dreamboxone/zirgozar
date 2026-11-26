@@ -77,6 +77,18 @@ for mode in ['off', 'direct', 'detour', 'all']:
         assert paths.get('vless', 'never') == (label if mode in ['detour','all'] else 'never')
         assert guard['quic']['method'] == ('off' if mode == 'off' else 'decoy_first_byte')
 assert convert(plain, ['lxcore=1','lxversion=1.14.4-lx.33','lx='+json.dumps(options)])[2]['lx'] == options
+modern = ['lxcore=1','lxversion=1.14.4-lx.37']
+detour = convert(plain, modern+['lx='+json.dumps(options)])[2]['lx']
+assert 'mtu_align' not in detour
+assert detour['detour'] == {'mtu_align':'clamp','except_outbounds':['proxy']}
+configured = dict(options, detour={'strip':False,'mtu_align':'off'})
+assert convert(plain, modern+['lx='+json.dumps(configured)])[2]['lx']['detour'] == {
+    'strip':False,'mtu_align':'off','except_outbounds':['proxy']}
+assert convert(plain, modern+['lx='+json.dumps(dict(options, detour=False))])[2]['lx']['detour'] is False
+assert convert(plain, modern+['lx={"detour":true}'])[2]['lx'] == {'detour':True}
+try: convert(plain, ['lxcore=1','lxversion=1.14.4-lx.36','lx={"detour":false}'])
+except subprocess.CalledProcessError as error: assert '1.14.4-lx.37' in error.stderr
+else: raise AssertionError('new detour controls accepted by an older LX core')
 
 for old, expected in [('detour','detour'), (True,'all'), (False,'off')]:
     assert convert(plain, ['lxcore=1','lx='+json.dumps({'quic_sniff_decoy':old})])[2]['lx']['quic_sniff_decoy']=={'mode':expected}

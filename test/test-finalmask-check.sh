@@ -18,6 +18,7 @@ xray_by_version() { echo "$MASK_CORE_DIR/xray"; }
 bounded() { shift; "$@"; }
 core_version_cached() { echo "$MASK_VERSION"; }
 SH
+sed -n '/^finalmask_pattern_min() {/,/^}/p' "$root/package/zirgozar/files/zgz-common.sh" >> "$ZGZ_LIB/zgz-common.sh"
 cat > "$task/bin/jsonfilter" <<'SH'
 #!/bin/sh
 exec ucode -e 'import {readfile} from "fs"; let r=json(readfile(ARGV[0])); if(r.patterniha) print("true");' "$2"
@@ -46,6 +47,15 @@ MASK_VERSION=26.11.15; export MASK_VERSION
 check '{"mask":{"tcp4":[]},"patterniha":true}' false '26.11.20'
 MASK_VERSION=26.11.20; export MASK_VERSION
 check '{"mask":{"tcp4":[]},"patterniha":true}' true
+check '{"mask":{"tcp":[{"type":"xmc","settings":{"paddings":[]}}]},"patterniha":true}' false '26.11.22'
+MASK_VERSION=26.11.22; export MASK_VERSION
+check '{"mask":{"tcp":[{"type":"xmc","settings":{"paddings":[]}}]},"patterniha":true}' true
+check '{"mask":{"tcp":[{"type":"xmc","settings":{"yggdrasil":{"api":"https://example.test"}}}]},"patterniha":true}' false '26.11.23'
+check '{"mask":{"udp6":[{"type":"xdns","settings":{"domains":[{"names":["example.test"],"alphabet":"abc"}]}}]},"patterniha":true}' false '26.11.23'
+MASK_VERSION=26.11.23; export MASK_VERSION
+check '{"mask":{"tcp":[{"type":"xmc","settings":{"paddings":[],"yggdrasil":{"api":"https://example.test"}}}]},"patterniha":true}' true
+check '{"mask":{"udp":[{"type":"xdns","settings":{"domains":[{"names":["example.test"],"alphabet":"abc"}]}}]},"patterniha":true}' true
+check '{"mask":{"udp":[{"type":"other-mask","settings":{"alphabet":"abc"}}]}}' true
 check '{"mask":[]}' false 'Invalid'
 check 'not JSON' false 'Invalid'
 check '{"mask":{"tcp":[{"type":"unsupported-mask"}]}}' false 'not supported'

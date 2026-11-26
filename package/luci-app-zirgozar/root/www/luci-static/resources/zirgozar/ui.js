@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.9.4-r8';
+var BUILD = '5.9.5-r1';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -920,7 +920,7 @@ function setMenuLayout(layout) {
 	try { window.localStorage.setItem(menuLayoutKey, layout); } catch (e) {}
 	if (sharedFrame) {
 		sharedFrame.zgzCloseMenu();
-		sharedFrame.classList.toggle('mk-menu-horizontal', layout === 'horizontal');
+		sharedFrame.zgzPlaceMenu();
 		sharedFrame.zgzRevealMenuLink();
 	}
 }
@@ -941,7 +941,6 @@ function page(children, opts) {
 	   broken rather than as loading. A stylesheet that never comes still lets
 	   the page be seen after a second and a half. */
 	var root = E('div', { 'class': 'mk mk-page-shell', 'lang': i18n.get(), 'dir': fa ? 'rtl' : 'ltr', 'style': 'visibility:hidden' });
-	root.classList.toggle('mk-menu-horizontal', menuLayout === 'horizontal');
 	function show() {
 		root.style.visibility = '';
 		if (root.zgzRevealMenuLink) root.zgzRevealMenuLink();
@@ -962,8 +961,16 @@ function page(children, opts) {
 	document.body.classList.toggle('pwp-fa', fa);
 	document.body.classList.add('pwp-active');
 	sharedContent = E('div', {'class':'zgz-page-content'}, i18n.page(children));
-	root.appendChild(sidebar(root));
-	root.appendChild(E('div', { 'class': 'mk-page-main' }, [hero(root, opts.version), sharedContent, footer()]));
+	var menu = sidebar(root);
+	var main = E('div', { 'class': 'mk-page-main' }, [hero(root, opts.version), sharedContent, footer()]);
+	root.appendChild(main);
+	root.zgzPlaceMenu = function() {
+		var horizontal = menuLayout === 'horizontal';
+		root.classList.toggle('mk-menu-horizontal', horizontal);
+		if (horizontal) main.insertBefore(menu, sharedContent);
+		else root.insertBefore(menu, main);
+	};
+	root.zgzPlaceMenu();
 	root.zgzSyncTheme = followTheme(root);
 	optionHelp(sharedContent);
 	sharedFrame = root;

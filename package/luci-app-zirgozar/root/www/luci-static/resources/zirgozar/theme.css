@@ -823,7 +823,7 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 .mk .pwp-social-check{display:grid;grid-template-columns:32px minmax(0,1fr) minmax(0,auto);gap:9px;align-items:center;min-height:43px;width:100%;padding:7px 9px;border:0;border-radius:10px;color:var(--text);background:var(--soft);background:color-mix(in srgb,var(--site-colour) 10%,var(--panel));font:inherit;text-align:start;cursor:pointer}
 .mk .pwp-social-check:hover{background:color-mix(in srgb,var(--site-colour) 17%,var(--panel))}
 .mk .pwp-social-check:disabled{cursor:wait;opacity:.7}
-.mk .pwp-social-check:focus-visible,.mk .pwp-usage-periods button:focus-visible{outline:2px solid var(--zgz-accent,#3b82f6);outline-offset:2px}
+.mk .pwp-social-check:focus-visible{outline:2px solid var(--zgz-accent,#3b82f6);outline-offset:2px}
 .pwp-social-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;color:var(--site-colour);background:color-mix(in srgb,var(--site-colour) 15%,var(--panel))}
 .pwp-social-icon .mk-ico{width:18px;height:18px}
 .pwp-social-icon img{width:20px;height:20px;object-fit:contain}
@@ -845,31 +845,45 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 .pwp-usage-value>strong{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0;text-align:end}
 .pwp-usage-up>strong{color:#169c9a}.pwp-usage-down>strong{color:var(--zgz-accent,#3b82f6)}
 .mk.mk-follow .pwp-usage-down>strong{color:var(--zgz-accent-ink,var(--zgz-accent))}
-.pwp-usage-periods{position:absolute;inset-block:0;inset-inline-end:0;width:31px;display:flex;flex-direction:column;gap:0;align-self:stretch;padding:0;border-radius:0;overflow:visible;background:transparent;isolation:isolate}
-.mk .pwp-usage-periods button{font:inherit;position:relative;font-size:11px;min-width:31px;min-height:32px;flex:1;padding:8px 6px;border:1px solid var(--line);border-inline-end:0;border-radius:9px 0 0 9px;background:linear-gradient(105deg,var(--soft),var(--panel));color:var(--muted);cursor:pointer;white-space:nowrap;margin:0;box-shadow:2px -2px 5px #00000010;z-index:1}
-.mk .pwp-usage-periods button+button{margin-top:-6px}
-.mk .pwp-usage-periods button:nth-child(2){z-index:2}
-.mk .pwp-usage-periods button:nth-child(3){z-index:3}
-.mk .pwp-usage-periods button[aria-selected=true]{font-weight:700;margin-inline-start:-5px;z-index:5}
-
-.mk[dir=ltr] .pwp-usage-periods button{border-radius:0 9px 9px 0;box-shadow:none}.mk[dir=ltr] .pwp-usage-periods button[aria-selected=true]{box-shadow:none}
+.pwp-usage-periods{position:absolute;inset-block:4px;inset-inline-end:0;width:31px;display:flex;flex-direction:column;gap:0;align-self:stretch;padding:0;border-radius:0;overflow:visible;background:transparent;isolation:isolate}
+.mk .pwp-usage-periods button{font:inherit;position:relative;font-size:11px;min-width:31px;min-height:32px;flex:1;padding:8px 6px;border:0;border-radius:0;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap;margin:0;box-shadow:none}
 @media(max-width:900px){.mk-grid.pwp-status-row{grid-template-columns:repeat(2,minmax(0,1fr))}.pwp-status-row .pwp-social-card{grid-column:1/-1;grid-row:3}.pwp-status-row .pwp-usage-card{grid-column:2;grid-row:2}}
 @media(max-width:420px){.mk .pwp-social-check{padding:7px;column-gap:7px}.pwp-status-row .pwp-usage-card{--usage-padding:12px;padding:12px;padding-inline-end:42px}.pwp-usage-body{gap:7px}.pwp-usage-value>strong{font-size:17px}}
 @media(pointer:coarse){.mk .pwp-social-check{min-height:44px}.mk .pwp-usage-periods button{min-height:30px}}
 
 .pwp-status-row .pwp-usage-card::before{inset:-1px;border-radius:inherit;z-index:8}
 
-/* Normal left corners, reverse right corners where the tab joins its sheet. */
-.mk .pwp-usage-periods button{--tab-paper:var(--panel);background:var(--tab-paper);border:0;border-radius:9px 0 0 9px;box-shadow:none;color:var(--muted)}
-.mk .pwp-usage-periods button::before,.mk .pwp-usage-periods button::after{content:"";position:absolute;right:0;width:9px;height:9px;pointer-events:none;transform:none}
-.mk .pwp-usage-periods button::before{top:-9px;bottom:auto;background:radial-gradient(circle at top left,transparent 8.5px,var(--tab-paper) 9px)}
-.mk .pwp-usage-periods button::after{top:auto;bottom:-9px;background:radial-gradient(circle at bottom left,transparent 8.5px,var(--tab-paper) 9px)}
-.mk[dir=ltr] .pwp-usage-periods button::before,.mk[dir=ltr] .pwp-usage-periods button::after{right:auto;left:0}
-.mk[dir=ltr] .pwp-usage-periods button::before{background:radial-gradient(circle at top right,transparent 8.5px,var(--tab-paper) 9px)}
-.mk[dir=ltr] .pwp-usage-periods button::after{background:radial-gradient(circle at bottom right,transparent 8.5px,var(--tab-paper) 9px)}
 .mk.mk-dark .pwp-usage-periods{--usage-tab-shadow:#e8eeff55}
-.mk .pwp-usage-periods button{filter:drop-shadow(-2px 1px 2px var(--usage-tab-shadow,#0f172a24));clip-path:inset(-10px 0 -10px -10px)}
-.mk[dir=ltr] .pwp-usage-periods button{filter:drop-shadow(2px 1px 2px var(--usage-tab-shadow,#0f172a24));clip-path:inset(-10px -10px -10px 0)}
+/* Fade the shadow into the card at the open edge and into the frame at either end. */
+.mk .pwp-usage-periods button[aria-selected=true]{
+	--usage-shadow-direction:to left;
+	--usage-shadow-end:linear-gradient(#000,#000);
+	background:var(--panel);color:var(--text);font-weight:700;
+	border-radius:9px 0 0 9px;margin-inline-start:-5px;z-index:2;
+	filter:drop-shadow(0 -1px 1px var(--usage-tab-shadow,#0f172a24))
+		drop-shadow(0 1px 1.5px var(--usage-tab-shadow,#0f172a24));
+	mask-image:linear-gradient(var(--usage-shadow-direction),transparent 1px,#000 8px),var(--usage-shadow-end);
+	mask-size:100% calc(100% + 24px);
+	mask-position:center;
+	mask-repeat:no-repeat;
+	mask-clip:no-clip;
+	mask-composite:intersect;
+}
+.mk[dir=ltr] .pwp-usage-periods button[aria-selected=true]{
+	--usage-shadow-direction:to right;
+	border-radius:0 9px 9px 0;
+}
+.mk .pwp-usage-periods button[aria-selected=true]:first-child{--usage-shadow-end:linear-gradient(to bottom,transparent 15px,#000 24px)}
+.mk .pwp-usage-periods button[aria-selected=true]:last-child{--usage-shadow-end:linear-gradient(to top,transparent 15px,#000 24px)}
+.mk .pwp-usage-periods button[aria-selected=true]::before,.mk .pwp-usage-periods button[aria-selected=true]::after{
+	content:"";position:absolute;inset-inline-start:0;width:9px;height:9px;pointer-events:none;
+}
+.mk .pwp-usage-periods button[aria-selected=true]::before{top:-9px;background:radial-gradient(circle at top left,transparent 8.5px,var(--panel) 9px)}
+.mk .pwp-usage-periods button[aria-selected=true]::after{bottom:-9px;background:radial-gradient(circle at bottom left,transparent 8.5px,var(--panel) 9px)}
+.mk[dir=ltr] .pwp-usage-periods button[aria-selected=true]::before{background:radial-gradient(circle at top right,transparent 8.5px,var(--panel) 9px)}
+.mk[dir=ltr] .pwp-usage-periods button[aria-selected=true]::after{background:radial-gradient(circle at bottom right,transparent 8.5px,var(--panel) 9px)}
+.mk .pwp-usage-periods button:first-child::before,.mk .pwp-usage-periods button:last-child::after{display:none}
+.mk .pwp-usage-periods button:focus-visible{outline:2px solid var(--glass-focus,var(--zgz-accent,#3b82f6));outline-offset:-3px}
 
 .pwp-usage-card[data-enabled=false] .pwp-usage-value>strong{font-size:12px;color:var(--muted)}.mk .pwp-usage-periods button:disabled{cursor:default;opacity:.6}
 
@@ -1051,11 +1065,6 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 	background:var(--zgz-accent);color:var(--zgz-on-accent);border-color:transparent;
 	border-radius:var(--zgz-action-radius);
 }
-.mk.mk-follow .pwp-usage-periods button[aria-selected=true]{
-	--tab-paper:var(--zgz-accent);
-	color:var(--zgz-on-accent);
-}
-
 /* Frosted surfaces for the built-in Light and Dark modes. */
 :is(.mk:where(:not(body.pwp-follow *)),#modal_overlay:where(body.pwp-active:not(.pwp-follow) *)>.modal,.cbi-page-actions:where(body.pwp-active:not(.pwp-follow) *)){
 	--glass-page:#ccd9ee;
@@ -1149,6 +1158,7 @@ body:not(.pwp-follow) #modal_overlay:where(body.pwp-active *)>.modal{
 	box-shadow:var(--glass-depth);
 	color:var(--glass-ink);
 }
+.mk:where(:not(body.pwp-follow *)) .pwp-status-row .pwp-usage-card{background-image:none}
 .mk:where(:not(body.pwp-follow *)) :is(.mk-hero,.mk-sidebar-panel,.mk-card,.mk-metric):not(.zgz-connection-card){
 	border-radius:18px;
 }
@@ -1346,20 +1356,6 @@ body.pwp-active:where(:not(.pwp-follow)) #modal_overlay>.modal{
 	box-shadow:var(--glass-button-shadow);
 }
 :is(.mk:where(:not(body.pwp-follow *)),body.pwp-active:where(:not(.pwp-follow)) #modal_overlay>.modal) .cbi-tabmenu>li.cbi-tab>a{color:#fff!important}
-
-.mk:where(:not(body.pwp-follow *)) .pwp-usage-periods button:first-child{--period-active:#a0275c;--period-ink:#842043;--period-tint:#f5d2e2}
-.mk:where(:not(body.pwp-follow *)) .pwp-usage-periods button:nth-child(2){--period-active:#a44415;--period-ink:#82350f;--period-tint:#ffe0c5}
-.mk:where(:not(body.pwp-follow *)) .pwp-usage-periods button:nth-child(3){--period-active:#126988;--period-ink:#125b77;--period-tint:#c8eef8}
-.mk:where(:not(body.pwp-follow *)) .pwp-usage-periods button{
-	--tab-paper:var(--period-tint,var(--glass-soft));
-	background:linear-gradient(145deg,#ffffff70,transparent 60%),var(--tab-paper);
-	color:var(--period-ink,var(--glass-ink));
-}
-.mk:where(:not(body.pwp-follow *))[dir] .pwp-usage-periods button[aria-selected=true]{
-	--tab-paper:var(--period-active,var(--glass-focus));
-	color:#fff;
-	box-shadow:inset 0 1px var(--glass-edge),inset 0 -2px #0003;
-}
 
 :is(.mk:where(:not(body.pwp-follow *)),body.pwp-active:where(:not(.pwp-follow)) #modal_overlay>.modal,body.pwp-active:where(:not(.pwp-follow)) .cbi-page-actions)
 	:is(.mk-btn.success,.cbi-button-positive,.cbi-button-add){

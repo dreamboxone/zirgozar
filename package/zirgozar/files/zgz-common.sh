@@ -356,6 +356,29 @@ valid_dial_mode() {
 	CHECK_DIAL_MODE="$1" awk -v CHECK_DIAL_MODE="$1" -f "$ZGZ_LIB/zgz-parse" </dev/null
 }
 
+finalmask_pattern_min() {
+	grep -qE '"(paddings|yggdrasil|alphabet)"[[:space:]]*:' "$1" || return 0
+	ucode -e '
+		import { readfile } from "fs";
+		let cfg = json(readfile(ARGV[0])), padding = false;
+		for (let direction in ["inbounds", "outbounds"])
+			for (let endpoint in cfg[direction] ?? []) {
+				let mask = endpoint.streamSettings?.finalmask;
+				for (let family in ["tcp", "tcp4", "tcp6", "udp", "udp4", "udp6"])
+					for (let item in mask?.[family] ?? []) {
+						if (item.type == "xmc") {
+							if (item.settings?.yggdrasil != null) { print("26.11.23"); exit(0); }
+							if (item.settings?.paddings != null) padding = true;
+						}
+						if (item.type == "xdns")
+							for (let domain in item.settings?.domains ?? [])
+								if (domain.alphabet != null) { print("26.11.23"); exit(0); }
+					}
+			}
+		if (padding) print("26.11.22");
+	' "$1"
+}
+
 find_xray() {
 	_cfg="$1"
 	_pref="$(xray_preferred)"
@@ -367,6 +390,9 @@ find_xray() {
 		if grep -qE '"(tcpHandshakeTimeout|tlsHandshakeTimeout|tcpKeepAliveCount|successDefinition|tcp4|tcp6|udp4|udp6|removeHeaderSpace)"|"(failedDialFallbackDialerProxy|noResponseFallbackDialerProxy|noIPFallbackDialerProxy)"|"dialMode"[[:space:]]*:[[:space:]]*"[^"]*oob[46]\.' "$_cfg"; then _pattern_min=26.11.20; fi
 		if grep -qE '"passPrimaryConnAddress"[[:space:]]*:[[:space:]]*true|"type"[[:space:]]*:[[:space:]]*"borrow"' "$_cfg"; then _pattern_min=26.11.21; fi
 		if grep -qE '"assuranceFirstInterleave"[[:space:]]*:[[:space:]]*true|"type"[[:space:]]*:[[:space:]]*"proxy-protocol"|"firewall"[[:space:]]*:[[:space:]]*\[|"address"[[:space:]]*:[[:space:]]*"udp\+local://' "$_cfg"; then _pattern_min=26.11.22; fi
+		local _mask_min
+		_mask_min="$(finalmask_pattern_min "$_cfg")" || return 1
+		_pattern_min="${_mask_min:-$_pattern_min}"
 	fi
 	if [ -n "$_pattern_min" ]; then
 		_xpool="$(core_dir)/xray-patterniha"
@@ -678,18 +704,29 @@ sb_lx_config() {
 			if (ARGV[3]) lx.quic_sniff_decoy.detour_type=list(ARGV[3]);
 		}
 		if (ARGV[5] || ARGV[6]) {
-			let old=lx.mtu_align;
-			lx.mtu_align=type(old)=="object" ? old : {mode:old || "clamp"};
-			if (ARGV[5]) lx.mtu_align.mode=ARGV[5];
-			if (ARGV[6]) lx.mtu_align.except=list(ARGV[6]);
+			if (type(lx.detour) == "object") {
+				if (ARGV[5]) lx.detour.mtu_align=ARGV[5];
+				if (ARGV[6]) lx.detour.except_outbounds=list(ARGV[6]);
+			} else {
+				let old=lx.mtu_align;
+				lx.mtu_align=type(old)=="object" ? old : {mode:old || "clamp"};
+				if (ARGV[5]) lx.mtu_align.mode=ARGV[5];
+				if (ARGV[6]) lx.mtu_align.except=list(ARGV[6]);
+			}
 		}
 		if (ARGV[7]) lx.masque={...(lx.masque ?? {}),idle_timeout:ARGV[7]};
 		if (ARGV[8]) lx.trusttunnel={...(lx.trusttunnel ?? {}),idle_timeout:ARGV[8]};
+		if (ARGV[9] == "off") lx.detour=false;
+		else if (ARGV[9] == "on" || ARGV[10]) {
+			if (type(lx.detour) != "object") lx.detour={};
+			if (ARGV[10]) lx.detour.strip=ARGV[10] == "on";
+		}
 		printf("%J",lx);
 	' "$(cfg singbox_lx_options '')" "$(cfg lx_decoy_mode '')" \
 		"$(cfg lx_decoy_outbound '')" "$(cfg lx_decoy_detour '')" "$(cfg lx_decoy_send '')" \
 		"$(cfg lx_mtu_mode '')" "$(cfg lx_mtu_except '')" \
-		"$(cfg lx_masque_idle '')" "$(cfg lx_trusttunnel_idle '')"
+		"$(cfg lx_masque_idle '')" "$(cfg lx_trusttunnel_idle '')" \
+		"$(cfg lx_detour_mode '')" "$(cfg lx_detour_strip '')"
 }
 
 sb_is_lx() {

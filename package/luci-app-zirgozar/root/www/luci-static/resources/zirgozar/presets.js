@@ -78,6 +78,14 @@ var maskFields = {
 	udphop: [['mode','Hop mode','text'], ['interval','Hop interval (seconds)','text'], ['remoteIPs','Remote IPs','list'], ['remotePorts','Remote ports','text']],
 	xicmp: [['dgram','Datagram socket','boolean'], ['ips','Remote IPs','list']]
 };
+var xmcPaddingFields = [
+	['direction','Padding direction',['c2s','s2c','client-to-server','server-to-client']],
+	['length','Padding length','text'], ['delay','Padding delay (ms)','text']
+];
+var xmcLoginFields = [
+	['api','Yggdrasil API URL','text'], ['username','Username','text'],
+	['password','Password','password'], ['player','Minecraft player name','text']
+];
 var quicFields = [
 	['congestion','Congestion control',['bbr','reno','brutal','force-brutal']],
 	['bbrProfile','BBR profile',['conservative','standard','aggressive']],
@@ -155,9 +163,11 @@ function maskEditor(option, section, box, initial) {
 		function apply() {
 			try {
 				if (input.checkValidity && !input.checkValidity()) throw new Error(input.validationMessage);
-				var v = input.value.trim();
+				var v = kind == 'password' ? input.value : input.value.trim();
 				if (v !== '') v = kind == 'number' ? Number(v) : kind == 'boolean' ? v == 'true' : kind == 'list' ? v.split(',').map(function(s) {return s.trim();}).filter(Boolean) : v;
 				if (kind == 'number' && v !== '' && !Number.isSafeInteger(v)) throw new Error(_('Enter a whole number.'));
+				if (key == 'alphabet' && v && (!/^[a-z0-9]{32}$/i.test(v) || new Set(v.toLowerCase()).size != 32))
+					throw new Error(_('Enter 32 distinct letters or digits for the XDNS alphabet.'));
 				delete errors[errorKey]; save(v === '' ? undefined : v);
 			} catch(e) { errors[errorKey]=e.message; notice.textContent=e.message; }
 		}
@@ -173,6 +183,32 @@ function maskEditor(option, section, box, initial) {
 			catch(e) { errors[errorKey]=e.message; notice.textContent=e.message; }
 		});
 		parent.appendChild(E('details',{},[E('summary',{},_('Additional mask settings')),raw]));
+	}
+	function saveField(target, key, value) {
+		if (value === undefined) delete target[key];
+		else target[key] = value;
+	}
+	function settingsRows(parent, settings, edit, listKey, specs, label, initial) {
+		var items = Array.isArray(settings[listKey]) ? settings[listKey] : [];
+		items.forEach(function(item, index) {
+			if (!item || typeof item != 'object' || Array.isArray(item)) return;
+			var grid = E('div', {'class':'pwp-mask-grid'});
+			specs.forEach(function(spec) {
+				field(grid, spec, item[spec[0]], function(value) {
+					edit(function(s) { saveField(s[listKey][index], spec[0], value); });
+				});
+			});
+			grid.appendChild(button(_('Remove'), function() {
+				edit(function(s) { s[listKey].splice(index, 1); }, true);
+			}));
+			parent.appendChild(grid);
+		});
+		parent.appendChild(button(_(label), function() {
+			edit(function(s) {
+				if (!Array.isArray(s[listKey])) s[listKey] = [];
+				s[listKey].push(Object.assign({}, initial));
+			}, true);
+		}));
 	}
 	function render() {
 		editor.textContent=''; errors={}; rawBindings=[];
@@ -193,11 +229,44 @@ function maskEditor(option, section, box, initial) {
 				type.addEventListener('change',function(){change(function(r){r[family][index]={type:type.value,settings:JSON.parse(JSON.stringify(maskDefaults[type.value] || {}))};},true);});
 				row.appendChild(E('div',{'class':'pwp-mask-row-head'},[type,button(_('Remove'),function(){change(function(r){r[family].splice(index,1);if(!r[family].length)delete r[family];},true);})]));
 				var settings=mask.settings && typeof mask.settings == 'object' && !Array.isArray(mask.settings) ? mask.settings : {};
+				function editSettings(update, redraw) {
+					change(function(r) {
+						var current = r[family][index];
+						if (!current.settings || typeof current.settings != 'object' || Array.isArray(current.settings)) current.settings = {};
+						update(current.settings);
+					}, redraw);
+				}
 				var grid=E('div',{'class':'pwp-mask-grid'});
 				(maskFields[mask.type] || []).forEach(function(spec){field(grid,spec,settings[spec[0]],function(v){change(function(r){var s=r[family][index].settings=r[family][index].settings || {};if(v===undefined)delete s[spec[0]];else s[spec[0]]=v;});});});
 				row.appendChild(grid);
-				if (mask.type == 'xmc')
-					row.appendChild(E('p', {}, _('XMC requires compatible core versions at both ends. Edit the padding schedule in Additional mask settings.')));
+				if (mask.type == 'xmc') {
+					row.appendChild(E('p', {}, _('XMC requires compatible core versions at both ends.')));
+					settingsRows(row, settings, editSettings, 'paddings', xmcPaddingFields, 'Add padding turn', {direction:'c2s'});
+					if (Array.isArray(settings.paddings))
+						row.appendChild(button(_('Use default XMC padding'), function() {
+							editSettings(function(s) { delete s.paddings; }, true);
+						}));
+					if (settings.yggdrasil && typeof settings.yggdrasil == 'object' && !Array.isArray(settings.yggdrasil)) {
+						var login = E('div', {'class':'pwp-mask-grid'});
+						xmcLoginFields.forEach(function(spec) {
+							field(login, spec, settings.yggdrasil[spec[0]], function(value) {
+								editSettings(function(s) { saveField(s.yggdrasil, spec[0], value); });
+							});
+						});
+						login.appendChild(button(_('Remove Yggdrasil login'), function() {
+							editSettings(function(s) { delete s.yggdrasil; }, true);
+						}));
+						row.appendChild(login);
+					} else {
+						row.appendChild(button(_('Add Yggdrasil login'), function() {
+							editSettings(function(s) { s.yggdrasil = {}; }, true);
+						}));
+					}
+				}
+				if (mask.type == 'xdns')
+					settingsRows(row, settings, editSettings, 'domains', [
+						['names','Domain names','list'], ['alphabet','XDNS alphabet','text']
+					], 'Add XDNS domain', {names:[]});
 				if (mask.type == 'noise' && !settings.script) {
 					field(grid,['reset','Noise reset','text'],settings.reset,function(v){change(function(r){var s=r[family][index].settings=r[family][index].settings || {};if(v===undefined)delete s.reset;else s.reset=v;});});
 					var noises=Array.isArray(settings.noise) ? settings.noise : [];

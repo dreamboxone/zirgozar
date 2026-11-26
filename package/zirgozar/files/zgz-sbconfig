@@ -122,6 +122,20 @@ if (type(LX.quic_sniff_decoy) == 'string') LX.quic_sniff_decoy = { mode: LX.quic
 else if (type(LX.quic_sniff_decoy) == 'bool') LX.quic_sniff_decoy = { mode: LX.quic_sniff_decoy ? 'all' : 'off' };
 // lx.34 replaced the decoy option with protocol-specific sniff guards.
 let lxver = match(args.lxversion ?? '', /^1\.14\.4-lx\.([0-9]+)/);
+if (lxver && int(lxver[1]) >= 37 && 'mtu_align' in LX) {
+	let legacy = LX.mtu_align;
+	if (LX.detour != false) {
+		if (LX.detour == null || LX.detour == true) LX.detour = {};
+		if (type(LX.detour) != 'object') die('lx.detour must be a boolean or an object.\n');
+		if (type(legacy) == 'string') legacy = { mode:legacy };
+		if (type(legacy) != 'object') die('lx.mtu_align must be a mode or an object.\n');
+		if (LX.detour.mtu_align == null && legacy.mode != null) LX.detour.mtu_align = legacy.mode;
+		if (LX.detour.except_outbounds == null && legacy.except != null) LX.detour.except_outbounds = legacy.except;
+	}
+	delete LX.mtu_align;
+}
+if ('detour' in LX && !(lxver && int(lxver[1]) >= 37))
+	die('Detour controls require sing-box-lx 1.14.4-lx.37 or newer on the stable line.\n');
 if (lxver && int(lxver[1]) >= 34 && 'quic_sniff_decoy' in LX) {
 	let decoy = LX.quic_sniff_decoy;
 	if (type(decoy) != 'object') die('QUIC decoy settings must be an object.\n');

@@ -23,6 +23,19 @@ assert o['mtu_align']=={'mode':'clamp','except':['direct']}
 assert o['masque']['idle_timeout']=='2m' and o['trusttunnel']['idle_timeout']=='5m'
 PY
 [ "$?" = 0 ] && ok 'saved controls override matching JSON fields and preserve other settings' || bad 'LX settings lost'
+rig_set singbox_lx_options '{"detour":{"mtu_align":"fill","except_outbounds":["direct"],"strip":true}}'
+rig_set lx_mtu_except 'proxy relay'
+rig_set lx_detour_strip off
+sb_lx_config > "$RIG/options.json"
+python3 - "$RIG/options.json" <<'PY'
+import json,sys
+o=json.load(open(sys.argv[1]))
+assert o['detour']=={'mtu_align':'clamp','except_outbounds':['proxy','relay'],'strip':False}
+assert 'mtu_align' not in o
+PY
+[ "$?" = 0 ] && ok 'detour controls override current JSON settings' || bad 'detour controls lost'
+rig_set lx_detour_mode off
+check "$(sb_lx_config | ucode -e 'import { readfile } from "fs"; printf("%J", json(readfile("/dev/stdin")).detour);')" 'false' 'explicitly disabled detour'
 rig_set singbox_lx_options '[]'
 sb_lx_config >/dev/null 2>&1 && bad 'invalid LX JSON accepted' || ok 'invalid LX JSON rejected'
 rig_set core_engine singbox-lx

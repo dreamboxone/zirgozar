@@ -212,10 +212,16 @@ return view.extend({
 		o = s.option(form.DynamicList, 'lx_decoy_detour', _('QUIC decoy relay types'));
 		o.placeholder = 'vless';
 		o.validate = function(section_id, value) { return !value || (/^[a-z][a-z0-9-]*$/.test(value) && !/^(selector|urltest|chain)$/.test(value)) || _('Invalid value.'); };
+		o = s.option(form.ListValue, 'lx_detour_mode', _('Detour processing'),
+			_('Requires sing-box-lx 1.14.4-lx.37 or newer. Turning this off uses upstream detour behavior.'));
+		o.value('', _('Default')); o.value('on', _('On')); o.value('off', _('Off'));
+		o = s.option(form.ListValue, 'lx_detour_strip', _('Detour strip filters'),
+			_('Controls whether sing-box-lx removes options that need a direct socket from detoured connections.'));
+		o.value('', _('Default')); o.value('on', _('On')); o.value('off', _('Off'));
 		o = s.option(form.ListValue, 'lx_mtu_mode', _('Tunnel MTU alignment'));
 		o.value('', _('Default')); [ 'off', 'fill', 'clamp' ].forEach(function(v) { o.value(v); });
 		o = s.option(form.DynamicList, 'lx_mtu_except', _('MTU alignment exceptions'),
-			_('Exact outbound or endpoint tags excluded from automatic MTU alignment.'));
+			_('Exact outbound or endpoint tags excluded from automatic MTU alignment. On lx.37 and newer these tags are also excluded from detour strip filters.'));
 		o.placeholder = 'proxy';
 		[ [ 'lx_masque_idle', 'MASQUE idle timeout' ], [ 'lx_trusttunnel_idle', 'TrustTunnel idle timeout' ] ].forEach(function(item) {
 			o = s.option(form.Value, item[0], _(item[1]), _('Duration such as 30s or 5m. Empty keeps the core default.'));
