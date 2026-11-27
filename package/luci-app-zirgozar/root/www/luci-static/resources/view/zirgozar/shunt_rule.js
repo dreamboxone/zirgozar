@@ -195,6 +195,29 @@ return view.extend({
 			return eachLine(value, ipEntry, _('Not valid IP format, please re-enter!'));
 		};
 
+		[
+			[ 'dns_server_address', _('DNS server address match'), '{"dhcp":["192.168.1.1/32"]}' ],
+			[ 'dns_search_domain', _('DNS search domain match'), '{"dhcp":["example.net"]}' ]
+		].forEach(function(field) {
+			var matchOption = s.option(form.TextValue, field[0], field[1],
+				_('Requires official sing-box 1.15 or newer. Enter a JSON object keyed by DNS source or configured DNS server tag.'));
+			matchOption.placeholder = field[2]; matchOption.rows = 2;
+			matchOption.validate = function(section, value) {
+				if (!String(value || '').trim()) return true;
+				try {
+					var parsed = JSON.parse(value);
+					if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Object.keys(parsed).length &&
+						Object.keys(parsed).every(function(key) {
+							var entries = Array.isArray(parsed[key]) ? parsed[key] : [ parsed[key] ];
+							return key.trim() && entries.length && entries.every(function(entry) {
+								return typeof entry === 'string' && entry.trim() && !/\s/.test(entry);
+							});
+						})) return true;
+				} catch (error) {}
+				return _('Enter a valid DNS match object.');
+			};
+		});
+
 		/* Xray has no inverted rule. Under Xray a rule with this ticked is left
 		   out - and the log says so - rather than run the right way round,
 		   which would send exactly the other traffic. */

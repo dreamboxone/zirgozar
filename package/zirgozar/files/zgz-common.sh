@@ -500,6 +500,7 @@ core_engine() {
 # the other: the official client carries it, beside either engine, so that
 # every directive of a profile works - see ovpn_conf in zgz-parse.
 wanted_engine() {
+	if sb15_required "$ZGZ_BEST"; then echo singbox; return 0; fi
 	_we="$(core_engine)"
 	if bridge_is_aether && [ -z "$(aether_via)" ] &&
 	   { [ -n "$(aether_entry_setting fm)" ] || [ -n "$(aether_entry_setting dialMode)" ]; }; then
@@ -733,6 +734,19 @@ sb_is_lx() {
 	core_version_cached "$1" | grep -q -- '-lx\.'
 }
 
+sb15_required() {
+	grep -Eq '"protocol"[[:space:]]*:[[:space:]]*"tailcat"|"sbHTTPAdvanced"[[:space:]]*:[[:space:]]*true' "$1" 2>/dev/null
+}
+
+sb15_available() {
+	[ -x "$1" ] || return 1
+	core_version_cached "$1" | awk -F'[.-]' '
+		/-lx\./ { exit 1 }
+		{ ok = ($1 + 0 > 1 || ($1 + 0 == 1 && $2 + 0 >= 15))
+		  if ($1 == 1 && $2 == 15 && $3 == 0 && $4 == "alpha" && $5 + 0 < 8) ok = 0 }
+		END { exit !ok }'
+}
+
 sbconfig() {
 	_sb_level="$(cfg loglevel warning)"
 	_sb_pin=""
@@ -742,12 +756,14 @@ sbconfig() {
 	_sb_lxlegacy=""
 	case "$(core_version_cached "$(engine_singbox_path)")" in 1.15.0-lx.1-rc.1) _sb_lxlegacy=1 ;; esac
 	_sb_options="$(sb_lx_config)" || return 1
+	_sb_official15=""
+	sb15_available "$(engine_singbox_path)" && _sb_official15=1
 	[ "$(cfg_bool log_node 1)" = "1" ] || _sb_level=none
 	ucode "$ZGZ_LIB/zgz-sbconfig" \
 		geoview="$(geoview_path)" geodir="$(geo_dir 2>/dev/null)" \
 		rsdir="$ZGZ_RUN/rs" api="$(cfg api_port 10853)" \
 		bridge="$ZGZ_ETC/bridge.json" bridgeport="$(cfg bridge_port 10808)" etc="$ZGZ_ETC" \
-		mark="$ZGZ_OUT_MARK" level="$_sb_level" certpin="$_sb_pin" newmasque="$_sb_pin" lxcore="$_sb_lx" lxlegacy="$_sb_lxlegacy" lxversion="$(core_version_cached "$(engine_singbox_path)")" lx="$_sb_options" "$@"
+		mark="$ZGZ_OUT_MARK" level="$_sb_level" certpin="$_sb_pin" newmasque="$_sb_pin" sbofficial="$_sb_official15" lxcore="$_sb_lx" lxlegacy="$_sb_lxlegacy" lxversion="$(core_version_cached "$(engine_singbox_path)")" lx="$_sb_options" "$@"
 }
 
 # Does this sing-box pin a server's certificate by its hash - 1.15 on?
@@ -769,7 +785,8 @@ sb_certpin() {
 #                   rewritten in sing-box's words
 test_core() {
 	_tc_cfg="$1"
-	if [ "${TEST_ENGINE:-$(core_engine)}" = "singbox" ] && _tc_sb="$(engine_singbox_path)" && [ -x "$_tc_sb" ]; then
+	if { [ "${TEST_ENGINE:-$(core_engine)}" = "singbox" ] || sb15_required "$_tc_cfg"; } &&
+	   _tc_sb="$(engine_singbox_path)" && [ -x "$_tc_sb" ]; then
 		if sbconfig mode=test level=none < "$_tc_cfg" > "$_tc_cfg.sb" 2>/dev/null &&
 		   "$_tc_sb" check -c "$_tc_cfg.sb" >/dev/null 2>&1; then
 			mv -f "$_tc_cfg.sb" "$_tc_cfg"
@@ -778,6 +795,7 @@ test_core() {
 		fi
 		rm -f "$_tc_cfg.sb"
 	fi
+	sb15_required "$_tc_cfg" && return 1
 	_tc_x="$(find_xray "$_tc_cfg")" || return 1
 	echo "xray $_tc_x"
 	return 0
@@ -793,6 +811,10 @@ core_config() {
 		# is written only into a configuration that is going to be its.
 		ZGZ_FOR_SINGBOX=1 "$ZGZ_LIB/zgz-mkconfig" "$@" | sbconfig
 	else
+		if sb15_required "$ZGZ_BEST"; then
+			echo "This outbound requires official sing-box 1.15 or newer" >&2
+			return 1
+		fi
 		"$ZGZ_LIB/zgz-mkconfig" "$@"
 	fi
 }

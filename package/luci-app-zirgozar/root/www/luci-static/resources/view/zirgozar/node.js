@@ -385,6 +385,8 @@ function parseLink(link) {
 		}
 		/* This program's own query - see do_proxy in zgz-parse. */
 		f.uot = take('uot') == '1' ? '1' : '0';
+		f.http_version = take('httpVersion') || '';
+		f.http_no_fallback = take('httpNoFallback') == '1' ? '1' : '0';
 		f.type = take('type') || 'tcp'; f.host = take('host'); f.path = take('path');
 		f.service_name = take('serviceName'); f.header_type = take('headerType');
 		var pmode = take('mode');
@@ -596,6 +598,10 @@ function buildLink(f, name) {
 		if ((f.type || 'tcp') != 'tcp' || (f.header_type && f.header_type != 'none'))
 			transportQuery(f, q);
 		if (p == 'socks' && f.uot == '1') q.uot = '1';
+		if (p == 'http' && /^[23]$/.test(f.http_version || '')) {
+			q.httpVersion = f.http_version;
+			if (f.http_no_fallback == '1') q.httpNoFallback = '1';
+		}
 		var qs5 = buildQuery(q);
 		return p + '://' + auth + hp + (qs5 ? '?' + qs5 : '') + frag;
 	}
@@ -1635,6 +1641,14 @@ return view.extend({
 			o = field(form.Value, 'ts_control', _('Control server'), _('Empty for Tailscale; a Headscale address otherwise.'));
 			o.placeholder = 'controlplane.tailscale.com';
 			o.depends('_proto', 'tailscale');
+
+			o = field(form.ListValue, 'http_version', _('HTTP proxy version'),
+				_('HTTP/2 and HTTP/3 require official sing-box 1.15 or newer and a compatible HTTPS proxy. UDP uses CONNECT-UDP when supported by the server.'));
+			o.value('', _('Default')); o.value('2', 'HTTP/2'); o.value('3', 'HTTP/3');
+			o.depends({ '_proto': 'http', '_type': 'tcp', '_header_type': 'none' });
+			o = field(form.Flag, 'http_no_fallback', _('Disable HTTP version fallback'));
+			o.depends({ '_proto': 'http', '_http_version': '2' });
+			o.depends({ '_proto': 'http', '_http_version': '3' });
 
 			o = field(form.Flag, 'uot', _('UDP over TCP'),
 				_('UDP is carried inside the TCP connection, for a SOCKS server that takes it that way. Only sing-box does this, so a node with it on is carried by sing-box when there is one.'));

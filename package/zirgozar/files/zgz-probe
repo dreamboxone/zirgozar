@@ -177,7 +177,7 @@ sift_one() {
 	# a real request, decides whether they work.
 	case "$_proto" in
 		balancing|shunt|interface) return 0 ;;
-		xdrive|wireguard|hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|warp|aether|l2tp|pptp|sstp|ikev2)
+		http-advanced|xdrive|wireguard|hysteria2|hysteria|tuic|anytls|snell|naive|openconnect|tailscale|tailcat|ssh|ssplugin|ssr|ssrust|mieru|shadowquic|trusttunnel|openvpn|amneziawg|warp|aether|l2tp|pptp|sstp|ikev2)
 			printf '%06d\t%s\n' 9000 "$_tag" >> "$ALIVE"
 			echo x >> "$ATTEMPTS"
 			return 0
@@ -233,6 +233,9 @@ cmd_sift() {
 		# XDRIVE reaches shared storage, not the address in the VLESS link.
 		_sproto="$proto"
 		if printf '%s' "$payload" | grep -qE '"network"[[:space:]]*:[[:space:]]*"xdrive"'; then _sproto=xdrive; fi
+		if [ "$proto" = http ] && printf '%s' "$payload" | grep -qE '"sbHTTPAdvanced"[[:space:]]*:[[:space:]]*true'; then
+			_sproto=http-advanced
+		fi
 		sift_one "$tag" "$host" "$port" "$_sproto" "$_ch" &
 		_pids="$_pids $!"
 		_running=$((_running + 1))

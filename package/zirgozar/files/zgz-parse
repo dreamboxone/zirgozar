@@ -528,8 +528,10 @@ function emit(label, proto, payload,   key, tag) {
 	# subscription - went on into the core's configuration and the page's
 	# list unescaped, and the one bad node took the whole list down with it.
 	if (HOST !~ /^[A-Za-z0-9._:-]+$/) return
-	if (SBNATIVE != "" && proto ~ /^(vless|vmess|trojan|shadowsocks|socks|http|masque)$/)
+	if (SBNATIVE != "" && proto ~ /^(vless|vmess|trojan|shadowsocks|socks|http|masque|tailcat)$/)
 		payload = jset(payload, "sbNative", SBNATIVE)
+	if (proto == "http" && (jnum(SBNATIVE, "version") > 1 || jbool(SBNATIVE, "disable_version_fallback")))
+		payload = jset(payload, "sbHTTPAdvanced", "true")
 	if (NXN > 0) payload = node_extras(payload)
 	payload = xdrive_mux(payload)
 	if (label == "") label = HOST ":" PORT
@@ -861,7 +863,7 @@ function do_ss(body,   label, p, cred, method, pass, dec, plug, pl) {
 # UDP over TCP is sing-box's, not Xray's: Xray reads past the key and sends UDP
 # the ordinary SOCKS way, and wanted_engine hands a node that asks for it to
 # sing-box, which zgz-sbconfig tells to do it.
-function do_proxy(body, proto,   label, p, cred, user, pass, dec, q, query) {
+function do_proxy(body, proto,   label, p, cred, user, pass, dec, q, query, hv, oldnative) {
 	p = index(body, "#")
 	if (p > 0) { label = clean_label(substr(body, p + 1)); body = substr(body, 1, p - 1) }
 	p = index(body, "?")
@@ -882,11 +884,21 @@ function do_proxy(body, proto,   label, p, cred, user, pass, dec, q, query) {
 
 	XEXTRA = qs(query, "extra")
 	XDRIVE = qs(query, "xdriveSettings")
+	hv = qs(query, "httpVersion")
+	oldnative = SBNATIVE
+	if (proto == "http" && hv ~ /^[23]$/) {
+		SBNATIVE = "{\"type\":\"http\",\"server\":\"" jesc(HOST) "\",\"server_port\":" PORT
+		SBNATIVE = SBNATIVE ",\"version\":" hv ",\"tls\":{\"enabled\":true}"
+		if (user != "") SBNATIVE = SBNATIVE ",\"username\":\"" jesc(user) "\",\"password\":\"" jesc(pass) "\""
+		if (qs(query, "httpNoFallback") == "1") SBNATIVE = SBNATIVE ",\"disable_version_fallback\":true"
+		SBNATIVE = SBNATIVE "}"
+	}
 	emit(label, proto, mk_proxy(proto, user, pass, \
 		stream(qs(query, "type"), "none", qs(query, "host"), qs(query, "path"), \
 		       "", "", "", "", "", "", qs(query, "serviceName"), qs(query, "headerType"), \
 		       qs(query, "mode")), \
 		proto == "socks" && qs(query, "uot") == "1"))
+	SBNATIVE = oldnative
 }
 
 # ------------------------------------------------- hysteria2:// and tuic://
@@ -2185,6 +2197,12 @@ function from_singbox(it,   t, lab, peer, aw, ak, ai, nk, sbp, hyo) {
 	lab = jstr(it, "tag")
 	if (lab == "") lab = jstr(it, "name")
 	lab = clean_label(lab)
+	if (t == "tailcat") {
+		if (jstr(it, "server_public_key") == "" || jstr(it, "server_disco_key") == "") return
+		HOST = "tailcat.dev"; PORT = 443
+		emit(lab, "tailcat", "{\"protocol\":\"tailcat\"}")
+		return
+	}
 
 	if (t == "wireguard") {
 		# sing-box 1.11 moved WireGuard into "endpoints", where the peer holds

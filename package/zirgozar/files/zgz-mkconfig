@@ -843,7 +843,7 @@ shunt_words() {
 }
 
 shunt_one() {
-	local node group network protocol inbound source port sport domain_list ip_list fake pre invert _rm _x
+	local node group network protocol inbound source port sport domain_list ip_list fake pre invert _rm _x dns_addr dns_search dns_match val key
 	config_get node "$1" node ""
 	config_get group "$1" group ""
 	[ "$(printf '%s' "$group" | tr 'A-Z' 'a-z')" = "$shunt_group" ] || return 0
@@ -862,6 +862,22 @@ shunt_one() {
 	# under Xray it would send exactly the other traffic there, so under
 	# Xray the rule is left out, and the log says so.
 	config_get_bool invert "$1" invert 0
+	config_get dns_addr "$1" dns_server_address ""
+	config_get dns_search "$1" dns_search_domain ""
+	dns_match=""
+	if [ -n "$dns_addr$dns_search" ]; then
+		if [ "${ZGZ_FOR_SINGBOX:-0}" != 1 ]; then
+			warn "shunt rule '$1' uses DNS source matching; left out while Xray carries the tunnel"
+			return 0
+		fi
+		for key in dns_server_address dns_search_domain; do
+			if [ "$key" = dns_server_address ]; then val="$dns_addr"; else val="$dns_search"; fi
+			[ -n "$val" ] || continue
+			val="$(ucode -e 'let v = json(ARGV[0]); if (type(v) != "object" || !length(v)) exit(1); printf("%J", v);' "$val" 2>/dev/null)" ||
+				{ warn "shunt rule '$1' has an invalid DNS source matcher; skipped"; return 0; }
+			dns_match="$dns_match,\"$key\":$val"
+		done
+	fi
 	if [ "$invert" = "1" ] && [ "${ZGZ_FOR_SINGBOX:-0}" != "1" ]; then
 		config_get _rm "$1" remarks "$1"
 		warn "shunt rule '$_rm' is inverted, which only sing-box can do - left out while Xray carries the tunnel"
@@ -898,7 +914,7 @@ shunt_one() {
 	# nothing to match.
 	[ -n "$_in" ] || return 0
 
-	_base="\"type\":\"field\",\"inboundTag\":[$_in],\"network\":\"$network\""
+	_base="\"type\":\"field\",\"inboundTag\":[$_in],\"network\":\"$network\"$dns_match"
 	_p="$(shunt_words "$protocol")"
 	[ -n "$_p" ] && _base="$_base,\"protocol\":[$_p]"
 	_s="$(shunt_words "$source")"
@@ -935,12 +951,12 @@ shunt_one() {
 		add_shunt "{$_base,\"domain\":[$_d],\"outboundTag\":\"$SHUNT_TAG\"}"
 		# The names a rule sends straight out are looked up the way every
 		# other direct name is: by the Direct DNS, never through the tunnel.
-		if [ "$SHUNT_TAG" = "direct" ]; then
+		if [ "$SHUNT_TAG" = "direct" ] && [ -z "$dns_match" ]; then
 			shunt_direct_names="${shunt_direct_names:+$shunt_direct_names,}$_d"
 		fi
 		# And the names of a rule with FakeDNS ticked, going anywhere but
 		# straight out or nowhere, get made-up addresses.
-		if [ "$shunt_fake" = "1" ] && [ "$fake" = "1" ]; then
+		if [ "$shunt_fake" = "1" ] && [ "$fake" = "1" ] && [ -z "$dns_match" ]; then
 			case "$SHUNT_TAG" in
 				direct|block) : ;;
 				*) shunt_fake_names="${shunt_fake_names:+$shunt_fake_names,}$_d" ;;
