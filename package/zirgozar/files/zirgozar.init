@@ -112,6 +112,7 @@ start_service() {
 	"$ZGZ_LIB/zgz-router" timesync >/dev/null 2>&1 || true
 	# Nodes and subscriptions with names of their own, not places in the
 	# file - see zgz-nodes. Before anything reads a setting naming one.
+	"$ZGZ_LIB/zgz-nodes" retire-default >/dev/null 2>&1 || true
 	"$ZGZ_LIB/zgz-nodes" fixnames >/dev/null 2>&1 || true
 	# The scheduled stop, start and restart from Other Settings, kept in the
 	# crontab only while the main switch is on -.

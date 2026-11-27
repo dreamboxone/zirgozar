@@ -398,7 +398,7 @@ Add 中选 WARP，通过 [warp-plus](https://github.com/bepass-org/warp-plus) �
 
 **Traffic history：** `stats_flush_minutes=5` 控制写闪存频率；尚未写入的数据断电会丢失。Forget all recorded traffic 清空历史并重新计数。**Set router clock** 设置伊朗时间，错误时间会影响 TLS。
 
-**LED color：** 位于外观设置页面，默认关闭，仅支持匹配的三路独立调光 RGB 指示灯。开启后每 15 秒做当前连接的 URL 测试：<200 ms 绿、200–299 黄、300–499 橙、≥500 红，失败/断开则熄灭。三条边界可改，各色可按硬件支持常亮/闪烁；禁用恢复 OpenWrt 设置。
+**LED color** 位于外观设置页面。支持 RGB 的设备可添加规则，设置 URL 测试延迟范围、颜色和常亮或闪烁模式。闪烁频率可调。范围包含两个端点，规则不可重叠。无匹配规则或测试失败时为红色常亮。关闭功能后恢复 OpenWrt 指示灯设置。
 
 ### ⬆️ 4.5 App Update：更新
 
@@ -563,7 +563,7 @@ GNU AGPL v3 或更新版本（AGPL-3.0-or-later），全文见 [LICENSE](LICENSE
 
 感谢 **Tuhin Garai (nightcodex7)** 开发并发布 [luci-app-client-manager](https://github.com/nightcodex7/luci-app-client-manager)。Zirgozar 的用户管理功能是基于该 Apache-2.0 许可项目改编的。
 
-感谢 [patterniha](https://github.com/patterniha) 的 [Xray-core](https://github.com/patterniha/Xray-core) 和 [PattN](https://github.com/patterniha/PattN)，它们使核心及链接参数兼容成为可能。默认免费公共配置为 [@Raydikalx](https://t.me/raydikalx) 维护的 **TOP 100**；伊朗路由数据来自 [Chocolate4U/Iran-v2ray-rules](https://github.com/Chocolate4U/Iran-v2ray-rules)，查询使用 [Geoview](https://github.com/snowie2000/geoview)，WARP 使用 [warp-plus](https://github.com/bepass-org/warp-plus)。本项目不运营自己的代理服务器，只测试和选择这些来源在你所在网络可用的配置。
+感谢 [patterniha](https://github.com/patterniha) 的 [Xray-core](https://github.com/patterniha/Xray-core) 和 [PattN](https://github.com/patterniha/PattN)，它们使核心及链接参数兼容成为可能。默认订阅使用 [Patterniha-F](https://github.com/patterniha/Free-Configs)。感谢 [@Raydikalx](https://t.me/raydikalx) 维护早期版本提供的公共 **TOP 100** 列表。伊朗路由数据来自 [Chocolate4U/Iran-v2ray-rules](https://github.com/Chocolate4U/Iran-v2ray-rules)，查询使用 [Geoview](https://github.com/snowie2000/geoview)，WARP 使用 [warp-plus](https://github.com/bepass-org/warp-plus)。本项目不运营自己的代理服务器，只测试和选择这些来源在你所在网络可用的配置。
 
 ## 💚 11. 支持项目
 

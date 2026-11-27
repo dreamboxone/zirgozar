@@ -595,7 +595,7 @@ For an ECH node whose plain DNS key lookup is blocked, open the node editor and 
 
 ### 🧰 4.4 Other Settings
 
-**LED color**, on the Apearance page, is off by default and leaves the indicator under OpenWrt control. Supported indicators have three matching, independently dimmable RGB channels. While enabled, a URL test through the current connection runs every 15 seconds: below 200 ms green, 200–299 ms yellow, 300–499 ms orange, 500 ms and above red; a disconnected tunnel or failed test turns the indicator off. All three boundaries are editable. Each colour can be steady or blinking when supported. Disabling restores OpenWrt LED settings.
+**LED color** is on the Appearance page. On supported RGB indicators, add rules with an inclusive URL-test latency range, a color, and a steady or blinking mode. Blinking allows an adjustable rate on supported hardware. Rules cannot overlap. If no rule matches or the test fails, the indicator shows steady red. Disabling the feature restores OpenWrt LED settings.
 
 Home renders without waiting for subscription processing; node choices are filled in afterwards. The traffic period is remembered in the same browser.
 
@@ -1048,9 +1048,9 @@ Thanks to [patterniha](https://github.com/patterniha) for developing
 [PattN](https://github.com/patterniha/PattN). Zirgozar supports this core and
 reads configuration parameters from PattN links thanks to these projects.
 
-The default config list is the **TOP 100** collection published by
-[@Raydikalx](https://t.me/raydikalx), gathered and kept current as free, public
-work. The Iranian routing data is
+The default subscription uses [Patterniha-F](https://github.com/patterniha/Free-Configs).
+Thanks to [@Raydikalx](https://t.me/raydikalx) for publishing and maintaining
+the public **TOP 100** list bundled in earlier versions. The Iranian routing data is
 [Chocolate4U/Iran-v2ray-rules](https://github.com/Chocolate4U/Iran-v2ray-rules).
 The Geoview page uses [Geoview](https://github.com/snowie2000/geoview). WARP configs are
 carried by [warp-plus](https://github.com/bepass-org/warp-plus). This project

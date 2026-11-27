@@ -22,7 +22,7 @@
 'require uci';
 'require zirgozar.i18n as i18n';
 'require zirgozar.ui as pui';
-'require zirgozar.checksites as checksites';
+'require zirgozar.connectionchecks as checksites';
 
 var _ = i18n.tr;
 
@@ -141,9 +141,16 @@ function renderUsage() {
 	if (panel) panel.setAttribute('aria-labelledby', 'pwp-period-' + usagePeriod);
 }
 
+function shortcut(page, label, anchor, inline) {
+	return E('a', { 'class': 'pwp-check-settings-link' + (inline ? ' pwp-shortcut-inline' : ''),
+		'href': L.url('admin', 'services', 'zirgozar', page) + (anchor ? '#' + anchor : ''),
+		'title': label, 'aria-label': label }, pui.icon('openCorner'));
+}
+
 function usageCard() {
 	var fa = i18n.get() === 'fa';
-	return E('section', { 'id': 'pwp-usage-card', 'class': 'mk-card pwp-usage-card', 'aria-label': _('Usage (GB)') }, [
+	return E('section', { 'id': 'pwp-usage-card', 'class': 'mk-card pwp-usage-card pwp-shortcut-card', 'aria-label': _('Usage (GB)') }, [
+		shortcut('other', _('Traffic statistics'), 'cbi-zirgozar-config-stats_enabled'),
 		E('div', { 'class': 'pwp-usage-title' }, [E('span', { 'class': 'mk-metric-ico', 'style': '--accent:#3b82f6' }, pui.icon('chart')), E('span', {}, _('Usage (GB)'))]),
 		E('div', { 'class': 'pwp-usage-body' }, [
 			E('div', { 'id': 'pwp-usage-panel', 'role': 'tabpanel', 'aria-labelledby': 'pwp-period-' + usagePeriod, 'class': 'pwp-usage-values', 'aria-live': 'polite' }, ['up', 'down', 'total'].map(function(key) {
@@ -167,7 +174,7 @@ function usageCard() {
 
 function socialCheck(id, name, mark, colour, url, icon) {
 	return E('button', { 'type': 'button', 'id': id, 'class': 'pwp-social-check', 'style': '--site-colour:' + colour, 'click': function() { return check(id, url); } }, [
-		E('span', { 'class': 'pwp-social-icon' }, icon ? E('img', { 'src': '/luci-static/resources/zirgozar/site-icons/' + icon, 'alt': '', 'aria-hidden': 'true' }) : brand(mark)), E('span', { 'class': 'pwp-social-name' }, name), E('span', { 'class': 'pwp-check-value', 'id': id + '-v' }, i18n.get() === 'fa' ? _('Connection check') : _('Check'))
+		E('span', { 'class': 'pwp-social-icon' }, icon ? E('img', { 'src': '/luci-static/resources/zirgozar/' + icon, 'alt': '', 'aria-hidden': 'true' }) : brand(mark)), E('span', { 'class': 'pwp-social-name' }, name), E('span', { 'class': 'pwp-check-value', 'id': id + '-v' }, i18n.get() === 'fa' ? _('Connection check') : _('Check'))
 	]);
 }
 
@@ -273,12 +280,13 @@ function renderExit(st) {
 	});
 }
 
-function line(label, id) {
+function line(label, id, link) {
 	return E('div', { 'class': 'pwp-detail-row', 'style': 'display:flex;gap:10px;padding:4px 0;align-items:baseline' }, [
 		E('span', { 'style': 'flex:0 0 130px;color:var(--muted);font-size:13px' }, label),
 		E('span', { 'class': 'pwp-ticker' + (id === 'pwp-host' ? ' pwp-host-ticker' : ''), 'style': 'flex:1 1 auto;font-weight:600' }, [
 			E('span', { 'class': 'pwp-ticker-track' }, [ E('span', { 'id': id }, '-') ])
-		])
+		]),
+		link || ''
 	]);
 }
 
@@ -501,14 +509,20 @@ function check(id, url) {
 	if (v) {
 		v.className = 'pwp-check-value mk-wait';
 		v.textContent = _('Checking…');
+		v.title = '';
 	}
 	return callCheck(url).then(function(r) {
-		var ms = Number(r && r.ms) || 0;
+		var firstByte = Number(r && r.ttfb_ms) || 0;
+		var total = Number(r && r.ms) || 0;
+		var ms = firstByte || (r && r.ttfb_ms == null ? total : 0);
 		if (!v) return;
 		v.className = 'pwp-check-value ' + (ms > 0 ? (ms < 1000 ? 'mk-on' : ms < 2000 ? 'mk-wait' : 'mk-bad') : 'mk-bad');
 		if (r && Number(r.http_code) >= 400) v.className = 'pwp-check-value mk-wait';
 		v.textContent = ms > 0 ? pui.ms(ms) : r && /^[45][0-9]{2}$/.test(String(r.http_code)) ? 'HTTP ' + r.http_code : _('N/A');
-		v.title = r && r.http_code ? 'HTTP ' + r.http_code : '';
+		var details = [];
+		if (total > 0) details.push(_('Total request time: %s').replace('%s', pui.ms(total)));
+		if (r && r.http_code) details.push('HTTP ' + r.http_code);
+		v.title = details.join('\n');
 	}).catch(function() {
 		if (v) { v.className = 'pwp-check-value mk-bad'; v.textContent = _('N/A'); v.title = ''; }
 	}).then(function() { if (button) button.disabled = false; });
@@ -536,15 +550,24 @@ return baseclass.extend({
 		var tr = (data && data[1]) || null;
 		usageEnabled = st ? st.stats_enabled !== false : uci.get('zirgozar', 'config', 'stats_enabled') != '0';
 
-		var selectedChecks = checksites.selected(uci.get('zirgozar', 'config', 'connection_check_sites'));
+		var selectedChecks = checksites.selected(uci.get('zirgozar', 'config', 'connection_check_sites'),
+			uci.get('zirgozar', 'config', 'connection_check_custom_title'), uci.get('zirgozar', 'config', 'connection_check_custom_url'));
+		var checkSettings = L.url('admin/services/zirgozar/appearance') + '#zgz-connection-check-settings';
+		var core = tile('pwp-core', pui.icon('cpu'), '#3b82f6', _('Core'), '-');
+		core.classList.add('pwp-shortcut-card');
+		core.appendChild(shortcut('update', _('Go to core installation'), 'pwp-cores'));
 		var tiles = E('div', { 'class': 'mk-grid mk-metrics pwp-status-row', 'style': 'margin-bottom:18px' }, [
-			tile('pwp-core', pui.icon('cpu'), '#3b82f6', _('Core'), '-'),
+			core,
 			E('section', { 'class': 'mk-card pwp-social-card', 'aria-label': _('Connection check') }, [
 				E('div', { 'class': 'pwp-usage-title' }, [E('span', { 'class': 'mk-metric-ico', 'style': '--accent:#3b82f6' }, pui.icon('globe')), E('span', {}, _('Connection check'))]),
+				shortcut('appearance', _('Connection check settings'), 'zgz-connection-check-settings'),
 			].concat(selectedChecks.length ? selectedChecks.map(function(site) {
-				return socialCheck('pwp-chk-' + site.id, _(site.name), site.mark, site.colour, site.url,
-					site.mark ? null : site.id + (site.id == 'arvancloud' ? '.svg' : '.ico'));
-			}) : [E('a', { 'href': L.url('admin/services/zirgozar/appearance') }, _('Select test sites in Apearance.'))])),
+				var custom = site.id === 'custom';
+				var icon = custom ? 'logo.png' :
+					'site-icons/' + (site.icon || site.id + (site.id === 'arvancloud' ? '.svg' : '.ico'));
+				return socialCheck('pwp-chk-' + site.id, custom ? site.name : _(site.name), site.mark, site.colour, site.url,
+					site.mark ? null : icon);
+			}) : [E('a', { 'href': checkSettings }, _('Select test sites in Apearance.'))])),
 			usageCard()
 		]);
 
@@ -578,7 +601,7 @@ return baseclass.extend({
 				]),
 				E('div', { 'id': 'pwp-pct', 'style': 'margin-top:5px;font-size:12px;color:var(--muted)' }, '')
 			]),
-			line(_('Node name'), 'pwp-node'),
+			line(_('Node name'), 'pwp-node', shortcut('settings', _('Choose node'), 'cbi-zirgozar-config-node', true)),
 			protoLine(),
 			E('div', { 'id': 'pwp-balancing-members', 'style': 'display:none;font-size:12px;margin:8px 0' }, ''),
 			line(_('Server'), 'pwp-host'),
@@ -594,7 +617,8 @@ return baseclass.extend({
 			])
 		]));
 
-		status.classList.add('pwp-status-card', 'zgz-connection-card');
+		status.classList.add('pwp-status-card', 'zgz-connection-card', 'pwp-shortcut-card');
+		status.appendChild(shortcut('log', _('Runtime Logs')));
 		status.id = 'pwp-status-card';
 		var serverAddress = status.querySelector('#pwp-host');
 		serverAddress.classList.add('pwp-ip');

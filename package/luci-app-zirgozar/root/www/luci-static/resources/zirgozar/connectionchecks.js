@@ -13,12 +13,30 @@ var sites = [
 	{ id: 'cloudflare', name: 'Cloudflare', colour: '#f48120', url: 'https://cloudflare.com' },
 	{ id: 'nvidia', name: 'NVIDIA', colour: '#76b900', url: 'https://nvidia.com' },
 	{ id: 'intel', name: 'Intel', colour: '#0071c5', url: 'https://intel.com' },
-	{ id: 'steam', name: 'Steam', colour: '#38749a', url: 'https://store.steampowered.com' }
+	{ id: 'steam', name: 'Steam', colour: '#38749a', url: 'https://store.steampowered.com' },
+	{ id: 'digikala', name: 'Digikala', colour: '#ef394e', url: 'https://www.digikala.com/', icon: 'digikala.png' },
+	{ id: 'snapp', name: 'Snapp', colour: '#00a65a', url: 'https://snapp.ir/', icon: 'snapp.svg' },
+	{ id: 'telewebion', name: 'Telewebion', colour: '#b52669', url: 'https://telewebion.ir/', icon: 'telewebion.png' }
 ];
-function selected(value) {
+function normalizeUrl(value) {
+	try {
+		var url = new URL(String(value || '').trim());
+		if ((url.protocol !== 'https:' && url.protocol !== 'http:') || url.username || url.password) return null;
+		url.hash = '';
+		return url.href;
+	} catch (error) {
+		return null;
+	}
+}
+function entries(title, value) {
+	var url = normalizeUrl(value);
+	title = String(title || '').trim();
+	return title && url ? sites.concat({ id: 'custom', name: title, url: url, colour: '#2563eb' }) : sites;
+}
+function selected(value, title, url) {
 	if (value == null) value = ['ig', 'reddit', 'x'];
 	var ids = Array.isArray(value) ? value : String(value).split(/\s+/);
 	ids = ids.map(function(id) { return id == 'radiojavan' ? 'youtube' : id == 'soft98' ? 'telegram' : id; });
-	return sites.filter(function(site) { return ids.indexOf(site.id) >= 0; }).slice(0, 4);
+	return entries(title, url).filter(function(site) { return ids.indexOf(site.id) >= 0; }).slice(0, 4);
 }
-return baseclass.extend({ sites: sites, selected: selected });
+return baseclass.extend({ sites: sites, entries: entries, selected: selected, normalizeUrl: normalizeUrl });

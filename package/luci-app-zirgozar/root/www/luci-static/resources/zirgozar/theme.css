@@ -418,6 +418,22 @@
 /* The logo is a picture rather than Makhzan's drawn wordmark: the light
    version on the banner, the original colours where the page is light. */
 .mk-logo{display:block;width:auto;max-width:100%}
+.mk-project-logo{display:inline-flex;flex:none;border-radius:6px}
+.mk-project-logo:focus-visible{outline:2px solid var(--glass-focus,var(--zgz-accent,currentColor));outline-offset:3px}
+.mk [data-field="cbid.zirgozar.config.led_rules"]>:is(.cbi-value-title,.cbi-value-field){flex-basis:100%}
+.mk .zgz-led-fields{display:flex;flex-wrap:nowrap;gap:clamp(4px,1vw,10px);align-items:end}
+.mk .zgz-led-field{display:grid;grid-template-columns:minmax(0,1fr);flex:0 1 8.5rem;min-width:0;gap:4px}
+.mk .zgz-led-field>span{text-align:center;overflow-wrap:anywhere}
+.mk .zgz-led-field>:is(input,select){min-width:0;box-sizing:border-box}
+.mk .zgz-led-actions{display:flex;justify-content:flex-start;margin-block-start:10px}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) :is([data-field="cbid.zirgozar.config._led_outage"],[data-field="cbid.zirgozar.config.led_enabled"]){display:grid;grid-template-columns:minmax(0,16rem) max-content;gap:0 12px;align-items:center;justify-content:start}
+.mk :is([data-field="cbid.zirgozar.config._led_outage"],[data-field="cbid.zirgozar.config.led_enabled"]) input[type=checkbox]{margin:9px 0!important}
+.mk .zgz-led-editor [hidden]{display:none!important}
+.mk .zgz-led-rules{margin-block-start:12px;overflow-x:auto}
+.mk .zgz-led-rules table{width:100%;border-collapse:collapse}
+.mk .zgz-led-rules :is(th,td){padding:8px clamp(4px,1vw,12px);text-align:center;border-top:1px solid var(--line)}
+.mk .zgz-led-error{margin:8px 0 0;color:var(--text);font-weight:700}
+:is(.mk,#modal_overlay:where(body.pwp-active *)>.modal) .zgz-led-heading.zgz-has-help>.zgz-help{top:0;align-self:center}
 .mk-footer .mk-logo-light,.mk-dark .mk-footer .mk-logo-dark{display:none}
 .mk-dark .mk-footer .mk-logo-light{display:block}
 .mk-hero h2{flex-wrap:wrap}
@@ -652,7 +668,7 @@ body.pwp-fa #modal_overlay:where(body.pwp-active *)>.modal textarea,body.pwp-fa 
 .pwp-status-card .mk-btn{white-space:normal}
 .pwp-status-card .pwp-detail-row{gap:8px!important;min-width:0}
 .pwp-status-card .pwp-detail-row>span:first-child{flex:0 0 90px!important}
-.pwp-status-card .pwp-detail-row>span:last-child{min-width:0;white-space:nowrap;overflow-wrap:normal;overflow:hidden}
+.pwp-status-card .pwp-detail-row>.pwp-ticker{min-width:0;white-space:nowrap;overflow-wrap:normal;overflow:hidden}
 .pwp-ticker{display:block;padding-block:2px}
 .pwp-ticker-track{display:inline-flex;width:max-content;max-width:none;gap:8px;align-items:center;white-space:nowrap}
 .pwp-host-ticker{padding-block:12px;margin-block:-10px}
@@ -720,6 +736,9 @@ body.pwp-fa #modal_overlay:where(body.pwp-active *)>.modal textarea,body.pwp-fa 
 	.mk .mk-seg{flex-wrap:wrap}
 	.mk .mk-seg .mk-btn.glass{padding:9px;min-height:40px;white-space:normal}
 }
+.mk .mk-theme-switch{flex-wrap:nowrap}
+.mk .mk-theme-switch .mk-btn.glass{inline-size:44px;min-block-size:44px;padding:0;justify-content:center}
+.mk .mk-theme-switch .mk-btn:focus-visible{outline:2px solid var(--glass-focus,var(--zgz-accent,currentColor));outline-offset:-2px}
 
 /* Follow the host's component geometry as well as its palette. Sampled
    values come from native LuCI controls, not a second theme stylesheet. */
@@ -817,9 +836,19 @@ body.pwp-follow #modal_overlay:where(body.pwp-active *)>.modal .cbi-button{backg
 
 /* The three site checks share two former tile columns; usage takes the third. */
 .mk-grid.pwp-status-row{grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,2fr) minmax(220px,1fr)}
-.pwp-status-row .pwp-social-card{container-type:inline-size;display:flex;flex-direction:column;gap:7px;justify-content:flex-start}
-.mk .pwp-check-sites{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center}
-.mk .pwp-check-sites .cbi-checkbox{display:inline-flex;align-items:center;gap:5px;margin:0;padding:3px 6px;font-size:12px;white-space:nowrap;border-radius:6px;background:var(--soft)}
+.pwp-status-row .pwp-social-card{container-type:inline-size;position:relative;display:flex;flex-direction:column;gap:7px;justify-content:flex-start;padding-bottom:28px}
+.pwp-check-settings-link{position:absolute;right:10px;bottom:8px;display:grid;place-items:center;width:15px;height:15px;border-radius:3px;color:var(--text)}
+.pwp-check-settings-link:is(:hover,:focus-visible){background:var(--soft);color:var(--zgz-accent,currentColor)}
+.pwp-check-settings-link>.mk-ico{width:9px;height:9px}
+.pwp-status-row .pwp-shortcut-card{position:relative;padding-bottom:28px}
+.pwp-check-settings-link.pwp-shortcut-inline{position:static;flex:none;align-self:center}
+#zgz-connection-check-settings{scroll-margin-top:16px}
+.mk [data-field="cbid.zirgozar.config.connection_check_sites"]>:is(.cbi-value-title,.cbi-value-field){flex-basis:100%}
+.mk .pwp-check-sites{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,10rem),1fr));gap:8px}
+.mk .pwp-check-sites>br{display:none}
+.mk .pwp-check-sites>.cbi-checkbox{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;min-height:48px;margin:0;padding:5px 9px;font-size:12px;border-radius:6px;background:var(--soft)}
+.mk .pwp-check-sites>.cbi-checkbox>input{grid-column:2;grid-row:1;margin:0!important}
+.mk .pwp-check-sites>.cbi-checkbox>span{grid-column:1;grid-row:1;overflow-wrap:anywhere}
 .mk .pwp-social-check{display:grid;grid-template-columns:32px minmax(0,1fr) minmax(0,auto);gap:9px;align-items:center;min-height:43px;width:100%;padding:7px 9px;border:0;border-radius:10px;color:var(--text);background:var(--soft);background:color-mix(in srgb,var(--site-colour) 10%,var(--panel));font:inherit;text-align:start;cursor:pointer}
 .mk .pwp-social-check:hover{background:color-mix(in srgb,var(--site-colour) 17%,var(--panel))}
 .mk .pwp-social-check:disabled{cursor:wait;opacity:.7}

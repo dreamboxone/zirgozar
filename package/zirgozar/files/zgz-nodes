@@ -610,6 +610,34 @@ cmd_forget() {
 	return 0
 }
 
+# Remove the formerly bundled subscription without touching user-added sources.
+retire_default_subscription() {
+	local selected tag key
+	[ "$(uci -q get zirgozar.default)" = subscription ] || return 0
+	[ "$(uci -q get zirgozar.default.url)" = 'https://raw.githubusercontent.com/0xRadikal/Free-v2ray-Configs/main/top100.txt' ] || return 0
+	selected="$(uci -q get zirgozar.config.node)" || selected=''
+	uci -q delete zirgozar.default || return 1
+	case "$selected" in
+		sub:default:*) uci -q delete zirgozar.config.node || return 1 ;;
+	esac
+	uci -q commit zirgozar || return 1
+	if [ -s "$ZGZ_BEST_META" ] && ! grep -q '^section=.' "$ZGZ_BEST_META"; then
+		tag="$(sed -n 's/^tag=//p' "$ZGZ_BEST_META" | head -1)"
+		key="$(record_for_tag "$tag" 2>/dev/null | awk -F '\t' '
+			NR == FNR { key = substr($0, 1, index($0, "=") - 1); meta[key] = substr($0, length(key) + 2); next }
+			$2 == meta["label"] && $3 == meta["protocol"] && $4 == meta["host"] && $5 == meta["port"] {
+				print $2 "|" $3 "|" $4 "|" $5 "|" $6
+			}' "$ZGZ_BEST_META" -)"
+		if grep -qx 'sub=default' "$ZGZ_BEST_META" ||
+		   { [ -n "$key" ] && [ -f "$ZGZ_RUN/candidate-sources.tsv" ] &&
+		     [ "$(printf '%s\n' "$key" | awk -F '\t' 'NR == FNR { key = $0; next } $1 == key { print $2 }' - "$ZGZ_RUN/candidate-sources.tsv" | sort -u)" = sub:default ]; }; then
+			rm -f "$ZGZ_BEST" "$ZGZ_BEST_META"
+		fi
+	fi
+	cmd_forget default
+	build_candidates || true
+}
+
 # ---------------------------------------------------------------- building
 
 add_node() {
@@ -1055,18 +1083,6 @@ new_name() {
 # sections after: a setting is addressed by the name of the section it is
 # in, and that section may be one of those being renamed.
 cmd_fixnames() {
-	# Subscriptions got schedules of their own. The default list keeps the
-	# quarter-hourly read it has always had; every other one is read when
-	# its own schedule says. Once only - after that, what the page says.
-	if [ -z "$(uci -q get zirgozar.config.subs_scheduled)" ]; then
-		if [ "$(uci -q get zirgozar.default)" = "subscription" ] &&
-		   [ -z "$(uci -q get zirgozar.default.update_week_mode)" ]; then
-			uci -q set zirgozar.default.update_week_mode=refresh
-		fi
-		uci -q set zirgozar.config.subs_scheduled=1
-		uci -q commit zirgozar
-	fi
-
 	FIX_MAP="$ZGZ_RUN/names.map"
 	mkdir -p "$ZGZ_RUN"
 	_show="$(uci -q -X show zirgozar 2>/dev/null)"
@@ -1566,6 +1582,7 @@ case "${1:-update}" in
 		esac
 		;;
 	forget) cmd_forget "${2:-}"; cmd_build || true ;;
+	retire-default) nodes_locked retire_default_subscription ;;
 	status) cmd_status ;;
 	inuse)  cmd_inuse ;;
 	addlinks) cmd_addlinks ;;

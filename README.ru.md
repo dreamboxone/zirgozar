@@ -398,7 +398,7 @@ sing-box получает ECH, cipher suites, PEM, TFO, MPTCP, Domain Strategy; 
 
 **Traffic history:** `stats_flush_minutes=5` — период записи во flash; незаписанное теряется при отключении питания. Forget all recorded traffic обнуляет историю. **Set router clock** устанавливает иранское время; неверные часы мешают TLS.
 
-**LED color:** находится на странице «Внешний вид» и по умолчанию выключено, нужны три согласованных независимо регулируемых RGB-канала. Проверка URL каждые 15 секунд: <200 ms зелёный, 200–299 жёлтый, 300–499 оранжевый, ≥500 красный; сбой/отключение гасит индикатор. Три границы редактируются, постоянный свет/мигание зависит от оборудования. Отключение возвращает настройки OpenWrt.
+**LED color** находится на странице «Внешний вид». Для совместимого RGB-индикатора можно добавить правила с диапазоном задержки URL-теста, цветом и режимом постоянного света или мигания. Частота мигания настраивается. Границы входят в диапазон, правила не могут пересекаться. Если подходящего правила нет или тест не удался, индикатор горит красным. Отключение функции возвращает настройки OpenWrt.
 
 ### ⬆️ 4.5 App Update — обновления
 
@@ -563,7 +563,7 @@ GNU AGPL v3 или новее (AGPL-3.0-or-later), полный текст в [L
 
 Благодарим **Tuhin Garai (nightcodex7)** за разработку и публикацию [luci-app-client-manager](https://github.com/nightcodex7/luci-app-client-manager). Раздел управления пользователями Zirgozar основан на этом проекте с лицензией Apache-2.0.
 
-Спасибо [patterniha](https://github.com/patterniha) за [Xray-core](https://github.com/patterniha/Xray-core) и [PattN](https://github.com/patterniha/PattN), благодаря которым поддерживаются ядро и параметры ссылок. Стандартный бесплатный публичный список **TOP 100** поддерживается [@Raydikalx](https://t.me/raydikalx). Иранские данные — [Chocolate4U/Iran-v2ray-rules](https://github.com/Chocolate4U/Iran-v2ray-rules), просмотр — [Geoview](https://github.com/snowie2000/geoview), WARP — [warp-plus](https://github.com/bepass-org/warp-plus). Проект не содержит собственных прокси-серверов: он измеряет доступность этих источников и выбирает рабочие для вашей сети.
+Спасибо [patterniha](https://github.com/patterniha) за [Xray-core](https://github.com/patterniha/Xray-core) и [PattN](https://github.com/patterniha/PattN), благодаря которым поддерживаются ядро и параметры ссылок. Подписка по умолчанию использует [Patterniha-F](https://github.com/patterniha/Free-Configs). Спасибо [@Raydikalx](https://t.me/raydikalx) за поддержку публичного списка **TOP 100**, который включался в предыдущие версии. Иранские данные — [Chocolate4U/Iran-v2ray-rules](https://github.com/Chocolate4U/Iran-v2ray-rules), просмотр — [Geoview](https://github.com/snowie2000/geoview), WARP — [warp-plus](https://github.com/bepass-org/warp-plus). Проект не содержит собственных прокси-серверов: он измеряет доступность этих источников и выбирает рабочие для вашей сети.
 
 ## 💚 11. Поддержать проект
 

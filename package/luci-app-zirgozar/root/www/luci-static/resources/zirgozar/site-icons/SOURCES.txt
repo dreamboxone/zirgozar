@@ -2,6 +2,9 @@ Site icons are used to identify their respective services. Brand names and logos
 
 Sources:
 ArvanCloud: https://www.arvancloud.ir/images/v6/svg/logo-header-desktop-v6.svg (symbol viewport)
+Digikala: https://www.digikala.com/android-icon-192x192.png
+Snapp: https://web-cdn.snapp.ir/snapp-website/icons/snappTextLogo.svg
+Telewebion: https://telewebion.ir/favicon.ico (PNG)
 Soft98: https://soft98.ir/favicon.ico
 Cloudflare: https://www.cloudflare.com/favicon.ico
 NVIDIA: https://www.nvidia.com/favicon.ico

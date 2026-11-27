@@ -21,7 +21,7 @@ var _ = i18n.tr;
 
 /* Put on the stylesheet's and the logo's addresses, so a browser holding the
    previous release's copies fetches these. Kept in step with PKG_VERSION. */
-var BUILD = '5.9.5-r2';
+var BUILD = '5.9.6-r1';
 
 var callAction = rpc.declare({ object: 'luci.zirgozar', method: 'action',
                                params: [ 'name', 'arg' ], expect: { '': {} } });
@@ -43,6 +43,7 @@ var ICONS = {
 	sliders:  '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
 	grid:     '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
 	download: '<g class="mk-download-arrow"><path d="M12 3v12M7 10l5 5 5-5"/></g><path d="M4 17v4h16v-4"/>',
+	openCorner: '<path d="M20 4H4v16M9 9l11 11m-7 0h7v-7"/>',
 	book:     '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5M9 7h6"/>',
 	power:    '<path d="M12 3v9"/><path d="M6.4 6.4a8 8 0 1 0 11.2 0"/>',
 	cpu:      '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>',
@@ -50,6 +51,7 @@ var ICONS = {
 	send:     '<path d="M21 3 3 10.5l7 2.5 2.5 7z"/><path d="M10 13 21 3"/>',
 	sun:      '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
 	moon:     '<path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z"/>',
+	monitor:  '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M12 17v4M8 21h8"/>',
 	refresh:  '<path d="M20 11a8 8 0 0 0-14.9-3M4 4v4h4M4 13a8 8 0 0 0 14.9 3M20 20v-4h-4"/>',
 	rocket:   '<path d="M12 16 8 12c2-6 6-9 13-9 0 7-3 11-9 13Z"/><circle cx="16" cy="8" r="2"/><path d="m8 12-5 1 4-6 5-1M12 16l-1 5 6-4 1-5M7 17c-1 0-3 1-4 4 3-1 4-3 4-4Z"/>',
 	trash:    '<path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/>',
@@ -109,13 +111,21 @@ function logoImg(file, height, cls) {
 	});
 }
 
+var PROJECT_URL = 'https://github.com/dreamboxone/zirgozar';
+
+function projectLogo(cls, images) {
+	var label = _('Download Zirgozar');
+	return E('a', { 'class': 'mk-project-logo ' + (cls || ''), 'href': PROJECT_URL,
+		'target': '_blank', 'rel': 'noopener noreferrer', 'aria-label': label, 'title': label }, images);
+}
+
 /* The browser keeps these files, and LuCI asks for them under its own
    version, not this program's - so after an update a browser went on running
    the old pages against the new router, asking for files the update had
    removed. When the router says another version than the one these pages
    were built for, each file is fetched again past the cache and the page
    reloaded, once. */
-var OWN_FILES = [ 'zirgozar/ui', 'zirgozar/navigation', 'zirgozar/i18n', 'zirgozar/lang_ru', 'zirgozar/lang_zh', 'zirgozar/status', 'zirgozar/qr', 'zirgozar/logfa', 'zirgozar/nodelink', 'zirgozar/presets', 'zirgozar/aetherscan',
+var OWN_FILES = [ 'zirgozar/ui', 'zirgozar/navigation', 'zirgozar/i18n', 'zirgozar/lang_ru', 'zirgozar/lang_zh', 'zirgozar/status', 'zirgozar/connectionchecks', 'zirgozar/qr', 'zirgozar/logfa', 'zirgozar/nodelink', 'zirgozar/presets', 'zirgozar/aetherscan',
 	'view/zirgozar/settings', 'view/zirgozar/nodes', 'view/zirgozar/node', 'view/zirgozar/server', 'view/zirgozar/subscribe', 'view/zirgozar/other',
 	'view/zirgozar/shunt_rule', 'view/zirgozar/appearance',
 	'view/zirgozar/update', 'view/zirgozar/traffic', 'view/zirgozar/geoview', 'view/zirgozar/acl',
@@ -599,7 +609,7 @@ function hero(root, version) {
 	var fa = i18n.get() === 'fa';
 
 	function themeBtn(mode, text, ico) {
-		return E('button', { 'type': 'button', 'class': 'mk-btn glass', 'click': function() {
+		return E('button', { 'type': 'button', 'class': 'mk-btn glass', 'aria-label': text, 'title': text, 'click': function() {
 			var dark = mode === 'dark';
 			try { localStorage.setItem('zirgozar-theme', mode); } catch (e) {}
 			root.classList.toggle('mk-follow', mode === 'auto');
@@ -610,9 +620,9 @@ function hero(root, version) {
 			document.body.classList.toggle('pwp-dark', dark);
 			paint();
 			if (root.zgzSyncTheme) root.zgzSyncTheme();
-		} }, [ icon(ico), E('span', {}, text) ]);
+		} }, [ icon(ico) ]);
 	}
-	var auto = themeBtn('auto', _('Follow LuCI theme'), 'sun');
+	var auto = themeBtn('auto', _('Follow LuCI theme'), 'monitor');
 	var light = themeBtn('light', _('Light'), 'sun'), dark = themeBtn('dark', _('Dark'), 'moon');
 	function paint() {
 		[auto, light, dark].forEach(function(button, index) {
@@ -654,12 +664,12 @@ function hero(root, version) {
 		freshen(st.version, st.ui);
 	}).catch(function() {});
 
-	var heroLogo = E('span', { 'class': 'zgz-hero-logo' }, [
+	var heroLogo = projectLogo('zgz-hero-logo', [
 		logoImg('logo-light.png', 60, 'zgz-logo-inverse'),
 		logoImg('logo.png', 60, 'zgz-logo-normal')
 	]);
 
-	var themes = E('div', { 'class': 'mk-seg', 'role': 'group', 'aria-label': _('Display mode') }, [ auto, light, dark ]);
+	var themes = E('div', { 'class': 'mk-seg mk-theme-switch', 'role': 'group', 'aria-label': _('Display mode') }, [ auto, light, dark ]);
 	root.zgzSyncHeader = function() { matchControlHeight(lang, themes); };
 	return E('div', { 'class': 'mk-hero' }, [
 		E('div', { 'class': 'mk-brand' }, [ E('div', {}, [
@@ -747,8 +757,10 @@ function sidebar(root) {
 	var backdrop = E('div', { 'class': 'mk-sidebar-backdrop', 'aria-hidden': 'true' });
 	var panel = E('aside', { 'id': 'zgz-sidebar-panel', 'class': 'mk-sidebar-panel' }, [
 		E('div', { 'class': 'mk-sidebar-brand' }, [
-			logoImg('logo.png', 29, 'mk-sidebar-logo-dark'),
-			logoImg('logo-light.png', 29, 'mk-sidebar-logo-light'),
+			projectLogo('', [
+				logoImg('logo.png', 29, 'mk-sidebar-logo-dark'),
+				logoImg('logo-light.png', 29, 'mk-sidebar-logo-light')
+			]),
 			E('span', { 'class': 'mk-sidebar-label' }, i18n.get() === 'fa' ? 'زیرگذر' : 'Zirgozar'),
 			pin, close
 		]),
@@ -808,14 +820,16 @@ function sidebar(root) {
 
 function footer() {
 	return E('div', { 'class': 'mk-footer' }, [
-		logoImg('logo.png', 26, 'mk-logo-dark'),
-		logoImg('logo-light.png', 26, 'mk-logo-light'),
+		projectLogo('', [
+			logoImg('logo.png', 26, 'mk-logo-dark'),
+			logoImg('logo-light.png', 26, 'mk-logo-light')
+		]),
 		E('div', {}, 'Zirgozar · Copyright © 2026 dreamboxone · GNU AGPLv3 · ' + _('No warranty')),
 		E('a', { 'href': 'https://t.me/routekernel1', 'target': '_blank', 'rel': 'noopener noreferrer', 'class': 'mk-link' },
 			[ icon('send'), 'Telegram · t.me/routekernel1' ]),
 		/* The AGPL asks that people using this over a network can get its
 		   source. This is where it is. */
-		E('a', { 'href': 'https://github.com/dreamboxone/zirgozar', 'target': '_blank', 'rel': 'noopener noreferrer', 'class': 'mk-link' },
+		E('a', { 'href': PROJECT_URL, 'target': '_blank', 'rel': 'noopener noreferrer', 'class': 'mk-link' },
 			[ icon('code'), _('Source code') ])
 	]);
 }
@@ -926,12 +940,21 @@ function setMenuLayout(layout) {
 }
 
 function page(children, opts) {
+	function scrollToSection() {
+		var id = window.location.hash.slice(1);
+		if (!/^(?:zgz-connection-check-settings|cbi-zirgozar-config-(?:node|stats_enabled)|pwp-cores)$/.test(id)) return;
+		window.requestAnimationFrame(function() {
+			var section = document.getElementById(id);
+			if (section) section.scrollIntoView({ block: 'start' });
+		});
+	}
 	if (sharedFrame && sharedFrame.isConnected && sharedContent) {
 		sharedFrame.zgzCloseMenu();
 		var content = E('div', {'class':'zgz-page-content'}, i18n.page(children));
 		sharedContent.replaceWith(content);
 		sharedContent = content;
 		optionHelp(content);
+		scrollToSection();
 		return sharedFrame;
 	}
 	opts = opts || {};
@@ -942,6 +965,7 @@ function page(children, opts) {
 	   the page be seen after a second and a half. */
 	var root = E('div', { 'class': 'mk mk-page-shell', 'lang': i18n.get(), 'dir': fa ? 'rtl' : 'ltr', 'style': 'visibility:hidden' });
 	function show() {
+		if (root.style.visibility === 'hidden') scrollToSection();
 		root.style.visibility = '';
 		if (root.zgzRevealMenuLink) root.zgzRevealMenuLink();
 	}

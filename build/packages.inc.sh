@@ -10,8 +10,8 @@
 # VERSION follows the Solar Hijri date: 1405/08/26 becomes 5.8.26.
 # RELEASE starts at 1 each day and increases for further releases that day.
 # The main zirgozar package always includes the complete LuCI interface.
-VERSION=5.9.5
-RELEASE=2
+VERSION=5.9.6
+RELEASE=1
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -192,6 +192,7 @@ sed -i '\|/usr/libexec/zgz-|d' /etc/crontabs/root
 sed -i '\|/usr/libexec/pwplus-|d' /etc/crontabs/root
 echo '$CRON_LIST' >> /etc/crontabs/root
 echo '$CRON_STATS' >> /etc/crontabs/root
+bounded 15 /usr/libexec/zgz-nodes retire-default >/dev/null 2>&1 || true
 bounded 15 /usr/libexec/zgz-router schedule sync >/dev/null 2>&1 || true
 # Every one of these takes a procd lock, and a lock held by something that
 # died leaves the call waiting for good - which would strand the install half
@@ -290,8 +291,8 @@ stage_luci_assets() {
 		"$i/www/luci-static/resources/zirgozar/ui.js"
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/status.js" \
 		"$i/www/luci-static/resources/zirgozar/status.js"
-	install -m 0644 "$l/www/luci-static/resources/zirgozar/checksites.js" \
-		"$i/www/luci-static/resources/zirgozar/checksites.js"
+	install -m 0644 "$l/www/luci-static/resources/zirgozar/connectionchecks.js" \
+		"$i/www/luci-static/resources/zirgozar/connectionchecks.js"
 	mkdir -p "$i/www/luci-static/resources/zirgozar/site-icons"
 	install -m 0644 "$l/www/luci-static/resources/zirgozar/site-icons/"* \
 		"$i/www/luci-static/resources/zirgozar/site-icons/"

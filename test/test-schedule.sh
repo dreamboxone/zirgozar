@@ -26,7 +26,7 @@ rig_set patterniha.update_minute_offset 0
 sh "$RIG/lib/zgz-router" schedule sync >/dev/null 2>&1
 check "$?" 0 'subscription schedule sync succeeds'
 check "$(grep 'schedule sub patterniha' "$ZGZ_CRONTAB" | cut -d' ' -f1)" '0,15,30,45' 'Patterniha runs every quarter hour'
-check "$(grep 'schedule sub default' "$ZGZ_CRONTAB" | cut -d' ' -f1)" '5,20,35,50' 'Top 100 runs five minutes later'
+check "$(grep 'schedule sub default' "$ZGZ_CRONTAB" | cut -d' ' -f1)" '5,20,35,50' 'Second subscription runs five minutes later'
 sh "$RIG/lib/zgz-router" schedule sync >/dev/null 2>&1
 check "$(grep -c 'schedule sub' "$ZGZ_CRONTAB")" 2 'schedule sync does not duplicate jobs'
 check "$(grep -c 'schedule rpc' "$ZGZ_CRONTAB")" 1 'RPC recovery is scheduled once even with the tunnel disabled'

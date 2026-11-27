@@ -43,10 +43,12 @@ detect() {
 }
 
 status() {
+	local outage=false
+	[ "$(cfg_bool led_outage_enabled 0)" != 1 ] || outage=true
 	if detect; then
-		printf '{"supported":true,"blink":%s,"indicator":"%s"}\n' "$([ "$BLINK" = 1 ] && echo true || echo false)" "$(json_escape "$GROUP")"
+		printf '{"supported":true,"blink":%s,"indicator":"%s","outage_enabled":%s}\n' "$([ "$BLINK" = 1 ] && echo true || echo false)" "$(json_escape "$GROUP")" "$outage"
 	else
-		printf '{"supported":false,"blink":false}\n'
+		printf '{"supported":false,"blink":false,"outage_enabled":%s}\n' "$outage"
 	fi
 }
 
@@ -86,68 +88,141 @@ restore() {
 	rmdir "$SAVE"/* "$SAVE" 2>/dev/null || true
 }
 
-thresholds() {
-	G="$(cfg led_green_ms 200)"; Y="$(cfg led_yellow_ms 300)"
-	O="$(cfg led_orange_ms 500)"
-	for v in "$G" "$Y" "$O"; do
-		case "$v" in ''|*[!0-9]*) return 1 ;; esac
-		[ "$v" -ge 1 ] && [ "$v" -le 60000 ] || return 1
-	done
-	[ "$G" -lt "$Y" ] && [ "$Y" -lt "$O" ]
-	return $?
-}
-
-colour() {
-	case "$1" in ''|*[!0-9]*) echo off; return ;; esac
-	if [ "$1" -eq 0 ]; then echo off
-	elif [ "$1" -ge "$O" ]; then echo red
-	elif [ "$1" -ge "$Y" ]; then echo orange
-	elif [ "$1" -ge "$G" ]; then echo yellow
-	else echo green; fi
+rule_for_ping() {
+	case "$1" in ''|*[!0-9]*) echo 'red:steady:0'; return ;; esac
+	printf '%s\n' "$RULES" | awk -v ping="$1" '
+	{
+		for (i = 1; i <= NF; i++) {
+			if (split($i, rule, ":") != 5) continue
+			if (rule[1] !~ /^[0-9]+$/ || rule[2] !~ /^[0-9]+$/ ||
+			    rule[1] + 0 < 1 || rule[2] + 0 > 60000 ||
+			    ping + 0 < rule[1] + 0 || ping + 0 > rule[2] + 0) continue
+			if (rule[3] !~ /^(red|green|blue|yellow|orange|white)$/) continue
+			if (rule[4] == "blink") {
+				if (rule[5] !~ /^[0-9]+$/ || rule[5] + 0 < 1 || rule[5] + 0 > 600) continue
+			} else if (rule[4] != "steady" || rule[5] != "0") continue
+			matches++
+			selected = rule[3] ":" rule[4] ":" (rule[5] + 0)
+		}
+	}
+	END { print matches == 1 ? selected : "red:steady:0" }'
 }
 
 apply_colour() {
-	for channel in "$RED" "$GREEN" "$BLUE"; do echo none > "$channel/trigger"; echo 0 > "$channel/brightness"; done
-	rmax="$(cat "$RED/max_brightness")"; gmax="$(cat "$GREEN/max_brightness")"
-	case "$1" in
+	local shade rmax gmax bmax rv gv bv channel brightness rate period on
+	shade="$1"
+	rmax="$(cat "$RED/max_brightness")"; gmax="$(cat "$GREEN/max_brightness")"; bmax="$(cat "$BLUE/max_brightness")"
+	bv=0
+	case "$shade" in
 		red) rv="$rmax"; gv=0 ;;
 		orange) rv="$rmax"; gv=$((gmax / 4)) ;;
 		yellow) rv="$rmax"; gv="$gmax" ;;
 		green) rv=0; gv="$gmax" ;;
+		blue) rv=0; gv=0; bv="$bmax" ;;
+		white) rv="$rmax"; gv="$gmax"; bv="$bmax" ;;
+		burgundy)
+			rv=$((rmax / 2)); gv=0; bv=$((bmax / 8))
+			[ "$rv" -gt 0 ] || rv=1
+			[ "$bv" -gt 0 ] || bv=1
+			;;
 		*) return 0 ;;
 	esac
 	# Binary channels cannot produce the two mixed shades reliably.
-	[ "$1" != orange ] || [ "$gv" -gt 0 ] || gv=1
-	printf '%s\n' "$rv" > "$RED/brightness"
-	printf '%s\n' "$gv" > "$GREEN/brightness"
-	if [ "$(cfg "led_${1}_mode" steady)" = blink ] && [ "$BLINK" = 1 ]; then
-		for channel in "$RED" "$GREEN"; do
-			[ "$(cat "$channel/brightness")" -gt 0 ] || continue
+	[ "$shade" != orange ] || [ "$gv" -gt 0 ] || gv=1
+	for channel in "$RED" "$GREEN" "$BLUE"; do
+		case "$channel" in "$RED") brightness="$rv" ;; "$GREEN") brightness="$gv" ;; *) brightness="$bv" ;; esac
+		[ "$brightness" -gt 0 ] || continue
+		echo none > "$channel/trigger"
+		printf '%s\n' "$brightness" > "$channel/brightness"
+	done
+	for channel in "$RED" "$GREEN" "$BLUE"; do
+		[ "$channel" != "$RED" ] || [ "$rv" -eq 0 ] || continue
+		[ "$channel" != "$GREEN" ] || [ "$gv" -eq 0 ] || continue
+		[ "$channel" != "$BLUE" ] || [ "$bv" -eq 0 ] || continue
+		echo none > "$channel/trigger"
+		echo 0 > "$channel/brightness"
+	done
+	if [ "$2" = blink ] && [ "$BLINK" = 1 ]; then
+		rate="$3"
+		period=$((60000 / rate))
+		on=$((period / 2))
+		for channel in "$RED" "$GREEN" "$BLUE"; do
+			[ "$channel" != "$RED" ] || [ "$rv" -gt 0 ] || continue
+			[ "$channel" != "$GREEN" ] || [ "$gv" -gt 0 ] || continue
+			[ "$channel" != "$BLUE" ] || [ "$bv" -gt 0 ] || continue
 			echo timer > "$channel/trigger"
-			echo 500 > "$channel/delay_on"; echo 500 > "$channel/delay_off"
+			echo "$on" > "$channel/delay_on"; echo "$((period - on))" > "$channel/delay_off"
 		done
 	fi
 }
 
+internet_online() {
+	local family device host pid online=1
+	local probes=''
+	for family in 4 6; do
+		device="$(ip "-$family" route show table main default 2>/dev/null |
+			awk '{ for (i=1; i<NF; i++) if ($i=="dev" && $(i+1)!="lo") { print $(i+1); exit } }')"
+		[ -n "$device" ] || continue
+		if [ "$family" = 4 ]; then
+			set -- 1.1.1.1 8.8.8.8
+		else
+			set -- 2606:4700:4700::1111 2001:4860:4860::8888
+		fi
+		for host in "$@"; do
+			ping "-$family" -I "$device" -c 1 -w 2 "$host" >/dev/null 2>&1 &
+			probes="$probes $!"
+		done
+	done
+	for pid in $probes; do
+		wait "$pid" && online=0
+	done
+	return "$online"
+}
+
 run() {
-	[ "$(cfg_bool led_enabled 0)" = 1 ] || { restore; return 0; }
-	detect && thresholds || { restore; return 1; }
+	[ "$(cfg_bool led_outage_enabled 0)" = 1 ] || [ "$(cfg_bool led_enabled 0)" = 1 ] || { restore; return 0; }
+	detect || { restore; return 1; }
+	RULES="$(cfg led_rules none)"
 	# Orange and yellow need independently dimmable red and green channels.
 	[ "$(cat "$RED/max_brightness")" -gt 1 ] && [ "$(cat "$GREEN/max_brightness")" -gt 1 ] || return 1
-	snapshot || return 1
 	trap 'exit 0' INT TERM
 	trap restore EXIT
-	last=
-	while [ "$(cfg_bool led_enabled 0)" = 1 ]; do
+	last=''
+	while :; do
+		started="$(cut -d. -f1 /proc/uptime)"
+		outage="$(cfg_bool led_outage_enabled 0)"
 		ms=0
-		if [ "$(cat "$ZGZ_STATUS" 2>/dev/null)" = ready ] && tunnel_running; then
-			identity="$(exit_identity)" || identity=
-			ms="$("$ZGZ_LIB/zgz-test" live 2>/dev/null)" || ms=0
-			[ "$identity" = "$(exit_identity)" ] || ms=0
+		if [ "$outage" = 1 ] && ! internet_online; then
+			next='burgundy:steady:0'
+		elif [ "$(cfg_bool led_enabled 0)" = 1 ]; then
+			if [ "$(cat "$ZGZ_STATUS" 2>/dev/null)" = ready ] && tunnel_running; then
+				identity="$(exit_identity)" || identity=
+				if [ "$outage" = 1 ]; then
+					ms="$(bounded 10 "$ZGZ_LIB/zgz-test" live 2>/dev/null)" || ms=0
+				else
+					ms="$("$ZGZ_LIB/zgz-test" live 2>/dev/null)" || ms=0
+				fi
+				[ "$identity" = "$(exit_identity)" ] || ms=0
+			fi
+			next="$(rule_for_ping "$ms")"
+		elif [ "$outage" = 1 ]; then
+			next=original
+		else
+			break
 		fi
-		next="$(colour "$ms")"
-		[ "$next" = "$last" ] || { apply_colour "$next"; last="$next"; }
-		sleep 15 & wait $!
+		if [ "$next" != "$last" ]; then
+			if [ "$next" = original ]; then
+				restore
+			else
+				snapshot || return 1
+				mode_rate="${next#*:}"
+				apply_colour "${next%%:*}" "${mode_rate%%:*}" "${mode_rate#*:}"
+			fi
+			last="$next"
+		fi
+		delay=$((started + 15 - $(cut -d. -f1 /proc/uptime)))
+		[ "$delay" -gt 0 ] || delay=1
+		sleep "$delay" & wait $!
 	done
 }
 

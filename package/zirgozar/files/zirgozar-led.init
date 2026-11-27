@@ -9,7 +9,7 @@ USE_PROCD=1
 
 start_service() {
 	. /usr/libexec/zgz-common.sh
-	[ "$(cfg_bool led_enabled 0)" = 1 ] || { /usr/libexec/zgz-led restore; return 0; }
+	[ "$(cfg_bool led_outage_enabled 0)" = 1 ] || [ "$(cfg_bool led_enabled 0)" = 1 ] || { /usr/libexec/zgz-led restore; return 0; }
 	procd_open_instance
 	procd_set_param command /usr/libexec/zgz-led run
 	procd_set_param term_timeout 15

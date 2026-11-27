@@ -5,8 +5,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zirgozar
-PKG_VERSION:=5.9.5
-PKG_RELEASE:=2
+PKG_VERSION:=5.9.6
+PKG_RELEASE:=1
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
 PKG_LICENSE:=AGPL-3.0-or-later
@@ -126,8 +126,8 @@ define Package/zirgozar/install
 		$(1)/www/luci-static/resources/zirgozar/ui.js
 	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/status.js \
 		$(1)/www/luci-static/resources/zirgozar/status.js
-	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/checksites.js \
-		$(1)/www/luci-static/resources/zirgozar/checksites.js
+	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/connectionchecks.js \
+		$(1)/www/luci-static/resources/zirgozar/connectionchecks.js
 	$(INSTALL_DIR) $(1)/www/luci-static/resources/zirgozar/site-icons
 	$(INSTALL_DATA) ./../luci-app-zirgozar/root/www/luci-static/resources/zirgozar/site-icons/* \
 		$(1)/www/luci-static/resources/zirgozar/site-icons/
@@ -255,6 +255,7 @@ uci -q commit zirgozar
 sed -i '\|/usr/libexec/zgz-|d' /etc/crontabs/root
 echo '*/15 * * * * /usr/libexec/zgz-refresh >/dev/null 2>&1' >> /etc/crontabs/root
 echo '*/5 * * * * /usr/libexec/zgz-stats sample >/dev/null 2>&1' >> /etc/crontabs/root
+bounded 15 /usr/libexec/zgz-nodes retire-default >/dev/null 2>&1 || true
 bounded 15 /usr/libexec/zgz-router schedule sync >/dev/null 2>&1 || true
 /etc/init.d/cron reload >/dev/null 2>&1
 # Verify a real RPC reply and the installed schema; never use SIGHUP reload.

@@ -390,7 +390,7 @@ core_log_all_marked() {
 # for a site the tunnel carries is the tunnel, once the router's own lookups
 # go through it.
 method_check() {
-	local input url code t port
+	local input url code t port complete=0
 	read -r input
 	[ -n "$input" ] || input='{}'
 	json_load "$input" 2>/dev/null
@@ -403,13 +403,20 @@ method_check() {
 	case "$port" in ''|*[!0-9]*) port=0 ;; esac
 	t=''
 	if [ "$port" -ge 1 ] && [ "$port" -le 65535 ]; then
-		t="$(curl -o /dev/null -sS -L --max-redirs 3 --proto '=http,https' --proto-redir '=http,https' --noproxy '' --socks5-hostname "127.0.0.1:$port" \
-			--connect-timeout 5 --max-time 10 -w '%{http_code} %{time_total}' "$url" 2>/dev/null)" || t=""
+		t="$(curl -o /dev/null -sS -L --globoff --max-redirs 3 --proto '=http,https' --proto-redir '=http,https' --noproxy '' --socks5-hostname "127.0.0.1:$port" \
+			--connect-timeout 5 --max-time 10 -w '%{http_code} %{time_total} %{time_starttransfer}' "$url" 2>/dev/null)" && complete=1
 	fi
 	code="${t%% *}"
 	json_init
 	case "$code" in
-		[2-5][0-9][0-9]) json_add_int "ms" "$(printf '%s' "$t" | awk '{ m = int($2 * 1000 + 0.5); print (m < 1 ? 1 : m) }')" ;;
+		[2-5][0-9][0-9])
+			json_add_int "ttfb_ms" "$(printf '%s\n' "$t" | awk '{ m = int($3 * 1000 + 0.5); print ($3 > 0 && m < 1 ? 1 : m) }')"
+			if [ "$complete" = 1 ]; then
+				json_add_int "ms" "$(printf '%s\n' "$t" | awk '{ m = int($2 * 1000 + 0.5); print (m < 1 ? 1 : m) }')"
+			else
+				json_add_int "ms" 0
+			fi
+			;;
 		*) json_add_int "ms" 0 ;;
 	esac
 	case "$code" in [1-5][0-9][0-9]) json_add_int "http_code" "$code" ;; esac
@@ -721,6 +728,18 @@ save_routing_setting() {
 	if [ "$(cfg_bool enabled 0)" = 1 ]; then detach /etc/init.d/zirgozar reload; fi
 }
 
+save_immediate_check_option() {
+	local savedir="$ZGZ_RUN/checksites-uci.$$" assignment result=0
+	mkdir -m 700 "$savedir" || return 1
+	for assignment in "$@"; do
+		uci -t "$savedir" set "zirgozar.config.$assignment" || { result=1; break; }
+	done
+	[ "$result" != 0 ] || uci -t "$savedir" commit zirgozar || result=1
+	rm -f "$savedir/zirgozar"
+	rmdir "$savedir" 2>/dev/null || true
+	return "$result"
+}
+
 method_action() {
 	local name arg input
 
@@ -735,6 +754,11 @@ method_action() {
 			if [ -s "$JOB" ]; then fail "Another install is still running. Try again when it is done."; return; fi ;;
 	esac
 	case "$name" in
+		led_outage)
+			case "$arg" in 0|1) ;; *) fail 'Could not save settings.'; return ;; esac
+			save_immediate_check_option "led_outage_enabled=$arg" || { fail 'Could not save settings.'; return; }
+			bounded 10 /etc/init.d/zirgozar-led restart >/dev/null 2>&1 || true
+			;;
 		routing_set)
 			save_routing_setting "$arg" || return
 			;;
@@ -750,21 +774,24 @@ method_action() {
 			local site count=0 choices=""
 			for site in $arg; do
 				[ "$site" != radiojavan ] || site=youtube
-				case "$site" in ig|reddit|x|youtube|arvancloud|telegram|cloudflare|nvidia|intel|steam) : ;; *) fail 'Invalid connection check sites.'; return ;; esac
+				case "$site" in ig|reddit|x|youtube|arvancloud|telegram|cloudflare|nvidia|intel|steam|digikala|snapp|telewebion|custom) : ;; *) fail 'Invalid connection check sites.'; return ;; esac
 				case " $choices " in *" $site "*) fail 'Invalid connection check sites.'; return ;; esac
 				count=$((count + 1))
 				[ "$count" -le 4 ] || { fail 'Select up to four sites.'; return; }
 				choices="${choices:+$choices }$site"
 			done
 			# Isolate this immediate preference write from other staged UCI edits.
-			local savedir="$ZGZ_RUN/checksites-uci.$$"
-			mkdir -m 700 "$savedir" || { fail 'Could not save settings.'; return; }
-			if ! uci -t "$savedir" set "zirgozar.config.connection_check_sites=${choices:-none}" ||
-			   ! uci -t "$savedir" commit zirgozar; then
-				rm -f "$savedir/zirgozar"; rmdir "$savedir" 2>/dev/null || true
-				fail 'Could not save settings.'; return
-			fi
-			rmdir "$savedir" 2>/dev/null || true
+			save_immediate_check_option "connection_check_sites=${choices:-none}" || { fail 'Could not save settings.'; return; }
+			;;
+		check_site_custom)
+			local site_title site_url
+			json_load "$arg" 2>/dev/null || { fail 'Could not save settings.'; return; }
+			json_get_var site_title title
+			json_get_var site_url url
+			case "$site_url" in https://?*|http://?*) ;; *) fail 'Enter a valid HTTP or HTTPS URL.'; return ;; esac
+			[ -n "$site_title" ] || { fail 'Enter a title for the custom site.'; return; }
+			save_immediate_check_option "connection_check_custom_title=$site_title" "connection_check_custom_url=$site_url" ||
+				{ fail 'Could not save settings.'; return; }
 			;;
 		connect)
 			uci -q set zirgozar.config.enabled='1' && uci -q commit zirgozar
