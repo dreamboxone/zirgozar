@@ -190,6 +190,17 @@ else
 fi
 
 # ------------------------------------------------------ subscriptions in JSON
+
+tailcat_record() {
+	printf '{"type":"tailcat","tag":"Tailcat","server_public_key":"fixture","server_disco_key":"fixture"%s}\n' "$1" |
+		LC_ALL=C awk -f "$ZGZ_LIB/zgz-parse" | cut -f3
+}
+check "$(tailcat_record ',"derp_region":1')" tailcat 'Tailcat accepts a DERP region'
+check "$(tailcat_record ',"derp_servers":["localhost"]')" tailcat 'Tailcat accepts custom DERP servers'
+check "$(tailcat_record '')" '' 'Tailcat rejects a missing DERP configuration'
+check "$(tailcat_record ',"derp_servers":[]')" '' 'Tailcat rejects an empty DERP server list'
+check "$(tailcat_record ',"derp_servers":["localhost"],"derp_region":1')" '' 'Tailcat rejects conflicting DERP choices'
+check "$(tailcat_record ',"derp_servers":["localhost"],"http_client":{}')" '' 'Tailcat rejects HTTP client settings with custom DERP servers'
 #
 # A provider hands back a configuration as often as a list now: an Xray file,
 # a sing-box file, a Clash proxy list, an array of nodes. And one of the

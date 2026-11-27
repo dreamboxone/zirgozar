@@ -2190,7 +2190,7 @@ function sb_stream(it,   tls, rel, tr, net, sec, sni, fp, alpn, pbk, sid, path, 
 	return stream(net, sec, host, path, sni, fp, alpn, pbk, sid, "", svc, "", jstr(tr, "mode"))
 }
 
-function from_singbox(it,   t, lab, peer, aw, ak, ai, nk, sbp, hyo) {
+function from_singbox(it,   t, lab, peer, aw, ak, ai, nk, sbp, hyo, derp_servers, derp_region) {
 	t = tolower(jstr(it, "type"))
 	if (t == "") return
 	if (t ~ /^(direct|block|dns|selector|urltest|tun|mixed)$/) return
@@ -2199,6 +2199,10 @@ function from_singbox(it,   t, lab, peer, aw, ak, ai, nk, sbp, hyo) {
 	lab = clean_label(lab)
 	if (t == "tailcat") {
 		if (jstr(it, "server_public_key") == "" || jstr(it, "server_disco_key") == "") return
+		derp_region = jnum(it, "derp_region")
+		derp_servers = jfirst(jraw(it, "derp_servers"))
+		if (derp_region <= 0 && derp_servers == "") return
+		if (derp_servers != "" && (derp_region > 0 || jstr(it, "derp_map_url") != "" || jraw(it, "http_client") ~ /^\{/)) return
 		HOST = "tailcat.dev"; PORT = 443
 		emit(lab, "tailcat", "{\"protocol\":\"tailcat\"}")
 		return
