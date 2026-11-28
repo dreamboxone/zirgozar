@@ -1308,8 +1308,9 @@ case "$remote_proto" in
 		;;
 	*) echo 'پروتکل DNS بالادستی پشتیبانی نمی‌شود.' >&2; exit 1 ;;
 esac
-[ -n "$remote_ecs" ] && remote_server="$remote_server,\"clientIp\":\"$(json_escape "$remote_ecs")\""
-remote_server="{\"tag\":\"dns-remote\",$remote_server,\"queryStrategy\":\"$remote_qs\"}"
+remote_options="\"queryStrategy\":\"$remote_qs\""
+[ -z "$remote_ecs" ] || remote_options="\"clientIp\":\"$(json_escape "$remote_ecs")\",$remote_options"
+remote_server="{\"tag\":\"dns-remote\",$remote_server,$remote_options}"
 
 # Domain Override, one "name address" pair per line.
 cfg dns_hosts '' | tr '\r' '\n' | while read -r _hn _ha _rest; do
@@ -1439,6 +1440,15 @@ if bridge_is_aether; then
 	 dns_tls_out="$dns_tls_out$_ab_tls"
 	fi
 	rules="{\"type\":\"field\",\"inboundTag\":[\"dns-aether-bootstrap\"],\"outboundTag\":\"$_ab_via\"}${rules:+,$rules}"
+
+	# Tor and Psiphon expose a TCP-only SOCKS exit in only/chain mode.
+	# Keep the direct bootstrap resolver above on its configured transport.
+	if [ "$remote_proto" = udp ] && [ "$(cfg remote_dns_detour remote)" != direct ] &&
+		grep -Eq '"(tor|psiphon)"[[:space:]]*:[[:space:]]*"(only|chain)"' "$ZGZ_ETC/bridge.json"; then
+		_remote_address="$remote_ip"
+		case "$_remote_address" in \[*\]) : ;; *:*) _remote_address="[$_remote_address]" ;; esac
+		remote_server="{\"tag\":\"dns-remote\",\"address\":\"tcp://$(json_escape "$_remote_address"):$remote_port\",$remote_options}"
+	fi
 fi
 if [ -n "$direct_names" ]; then
 	dns_servers="${dns_servers:+$dns_servers,}{\"tag\":\"dns-direct\",$direct_server,\"domains\":[$direct_names],\"skipFallback\":true,\"finalQuery\":true,\"queryStrategy\":\"$direct_qs\"}"

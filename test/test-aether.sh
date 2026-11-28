@@ -158,6 +158,20 @@ rig_set a1.link 'aether://?protocol=masque&transport=h2&fragment=0&psiphon=chain
 "$ZGZ_LIB/zgz-probe" use a1 >/dev/null 2>&1
 if "$ZGZ_LIB/zgz-aether" run; then ok 'core without negative switches runs with fragmentation and bundled list off'; else bad 'unsupported switches prevent execution'; fi
 check "$(cat "$ZGZ_RUN/aether-fragment")" 0 'fragmentation is explicitly disabled through the supported environment'
+rig_set remote_dns 1.1.1.1
+rig_set remote_dns_protocol udp
+for DNS_ROUTE in remote direct; do
+ rig_set remote_dns_detour "$DNS_ROUTE"
+ "$ZGZ_LIB/zgz-mkconfig" nogeo > "$WORK/psiphon-$DNS_ROUTE.json"
+ EXPECTED=1.1.1.1; [ "$DNS_ROUTE" != remote ] || EXPECTED=tcp://1.1.1.1:53
+ if node -e 'const cfg=require(process.argv[1]); const s=tag=>cfg.dns.servers.find(s=>s.tag===tag); if(s("dns-remote").address!==process.argv[2] || s("dns-aether-bootstrap").address!=="1.1.1.1") process.exit(1)' "$WORK/psiphon-$DNS_ROUTE.json" "$EXPECTED"; then
+  ok "Psiphon uses a reachable DNS transport for $DNS_ROUTE without changing bootstrap"
+ else
+  bad "wrong DNS transport with Psiphon and $DNS_ROUTE"
+ fi
+done
+rig_set remote_dns_detour remote
+rig_set remote_dns_protocol tcp
 rig_set a1.link 'aether://?protocol=masque&transport=h2&psiphon_servers=%2Ftmp%2Funsafe#test'
 "$ZGZ_LIB/zgz-probe" use a1 >/dev/null 2>&1
 if "$ZGZ_LIB/zgz-aether" check 2>/dev/null; then bad 'external server list path accepted'; else ok 'server list is restricted to persistent application storage'; fi

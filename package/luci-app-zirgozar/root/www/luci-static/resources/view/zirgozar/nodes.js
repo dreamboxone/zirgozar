@@ -156,7 +156,7 @@ function testControl(cell, sid, kind) {
 	if (kind != 'url') return cell;
 	var key = sid + '.url';
 	var cancel = E('button', {
-		'type': 'button', 'class': 'mk-btn mk-small zgz-cancel-aether-test',
+		'type': 'button', 'class': 'mk-btn danger mk-small zgz-cancel-aether-test',
 		'click': function() {
 			cancellingTests[key] = true;
 			cancel.disabled = true;
@@ -169,7 +169,7 @@ function testControl(cell, sid, kind) {
 				pui.note(cancel, String(err), 'error');
 			});
 		}
-	}, _('Cancel Aether test'));
+	}, _('Cancel'));
 	cell.setAttribute('aria-live', 'polite');
 	var wrapper = E('span', {}, [cell, ' ', cancel]);
 	updateAetherTestCell(cell, key, cancel, isPending(key));
