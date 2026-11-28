@@ -359,6 +359,7 @@ return baseclass.extend({ strings: {
 	"Invalid Aether Tor mode.": "Недействительный режим Aether Tor.",
 	"Invalid Aether Psiphon mode.": "Недействительный режим Aether Psiphon.",
 	"Preparing Aether test": "Подготовка теста Aether",
+	"Cancel Aether test": "Отменить тест Aether",
 	"Testing through the active Aether tunnel": "Проверка через активный туннель Aether",
 	"Waiting for the Aether tunnel": "Ожидание готовности туннеля Aether",
 	"Aether tunnel ready. Testing the URL": "Туннель Aether готов. Проверяем URL",

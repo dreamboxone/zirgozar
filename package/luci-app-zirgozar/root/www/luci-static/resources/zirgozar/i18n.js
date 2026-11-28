@@ -381,6 +381,7 @@ var FA = {
 	'Invalid Aether Tor mode.': 'حالت تور در اتر معتبر نیست.',
 	'Invalid Aether Psiphon mode.': 'حالت سایفون در اتر معتبر نیست.',
 	'Preparing Aether test': 'در حال آماده‌سازی تست اتر',
+	'Cancel Aether test': 'لغو تست اتر',
 	'Testing through the active Aether tunnel': 'در حال تست از تونل فعال اتر',
 	'Waiting for the Aether tunnel': 'در انتظار آماده‌شدن تونل اتر',
 	'Aether tunnel ready. Testing the URL': 'تونل اتر آماده است. در حال تست URL',

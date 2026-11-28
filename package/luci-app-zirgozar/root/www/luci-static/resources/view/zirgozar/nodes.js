@@ -169,7 +169,7 @@ function testControl(cell, sid, kind) {
 				pui.note(cancel, String(err), 'error');
 			});
 		}
-	}, _('Cancel'));
+	}, _('Cancel Aether test'));
 	cell.setAttribute('aria-live', 'polite');
 	var wrapper = E('span', {}, [cell, ' ', cancel]);
 	updateAetherTestCell(cell, key, cancel, isPending(key));

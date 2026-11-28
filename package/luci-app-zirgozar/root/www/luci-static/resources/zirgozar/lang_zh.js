@@ -359,6 +359,7 @@ return baseclass.extend({ strings: {
 	"Invalid Aether Tor mode.": "无效的Aether Tor模式.",
 	"Invalid Aether Psiphon mode.": "无效的Aether Psiphon模式.",
 	"Preparing Aether test": "正在准备 Aether 测试",
+	"Cancel Aether test": "取消 Aether 测试",
 	"Testing through the active Aether tunnel": "正在通过活动的 Aether 隧道测试",
 	"Waiting for the Aether tunnel": "正在等待 Aether 隧道就绪",
 	"Aether tunnel ready. Testing the URL": "Aether 隧道已就绪。正在测试 URL",
