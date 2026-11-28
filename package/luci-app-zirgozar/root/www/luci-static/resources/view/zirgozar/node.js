@@ -919,9 +919,11 @@ return view.extend({
 			return Promise.all([
 				unresolved.length ? callNodeOrigins(unresolved.map(function(n) { return n.tag; }).join(' ')).catch(function() { return {}; }) : Promise.resolve({origins:{}}),
 				pui.loadInfo('subnodes', callSubNodes, pui.infoRevision()).catch(function() { return {}; }),
-				pui.loadInfo('balancingnodes', callBalancingNodes, pui.infoRevision()).catch(function() { return {}; })
+				pui.loadInfo('balancingnodes', callBalancingNodes, pui.infoRevision()).catch(function() { return {}; }),
+				sid && /^aether:\/\//i.test(link) ? callAction('aether_psiphon_regions', sid).catch(function() { return {}; }) : {}
 			]).then(function(results) {
-				data.push(Object.assign(profileOrigins, results[0].origins || {}), results[1].nodes || [], results[2].nodes || []);
+				data.push(Object.assign(profileOrigins, results[0].origins || {}), results[1].nodes || [], results[2].nodes || [],
+					results[3].regions || []);
 				return data;
 			});
 		});
@@ -1305,6 +1307,11 @@ return view.extend({
 							return !value || /^!?[A-Z]{2}(,[A-Z]{2})*$/.test(value) || _('Use uppercase two-letter country codes separated by commas, optionally starting with !.');
 						};
 					} else {
+						var countryNames = typeof Intl.DisplayNames === 'function' ?
+							new Intl.DisplayNames([i18n.get()], { type: 'region' }) : null;
+						(data[6] || []).forEach(function(code) {
+							x.value(code, countryNames ? '%s (%s)'.format(countryNames.of(code), code) : code);
+						});
 						x.description = _('Requests a Psiphon exit country. Empty selects automatically. You can enter another uppercase two-letter country code; availability depends on Psiphon servers.');
 						x.validate = function(section, value) {
 							return !value || /^[A-Z]{2}$/.test(value) || _('Use one uppercase two-letter country code, such as DE.');

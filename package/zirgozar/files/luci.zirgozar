@@ -1113,6 +1113,16 @@ printf("%s\n%s\n%s\nn0\t%s\t%s\t%s\t%d\t%J\n",x.source,x.tag,x.original,x.name,x
 			case "$arg" in ''|*[!A-Za-z0-9_]*) fail 'Unknown Aether node.'; return ;; esac
 			_clear_error="$("$ZGZ_LIB/zgz-aether" clear-psiphon "$arg" 2>&1)" || { fail "$_clear_error"; return; }
 			;;
+		aether_psiphon_regions)
+			case "$arg" in ''|*[!A-Za-z0-9_]*) fail 'Unknown Aether node.'; return ;; esac
+			json_init
+			json_add_array regions
+			for _region in $("$ZGZ_LIB/zgz-aether" regions "$arg"); do
+				case "$_region" in [A-Z][A-Z]) json_add_string '' "$_region" ;; esac
+			done
+			json_close_array
+			json_dump
+			return 0 ;;
 		geo_update)
 			# WHICH;GEOIP-URL;GEOSITE-URL - the addresses as the page shows
 			# them, which may not be saved yet. Until Save & Apply the router
@@ -1186,6 +1196,10 @@ printf("%s\n%s\n%s\nn0\t%s\t%s\t%s\t%d\t%J\n",x.source,x.tag,x.original,x.name,x
 			esac
 			[ -n "$_id" ] && [ "$_id" != "$arg" ] || { fail "no node given"; return; }
 			detach "$TEST" "$_kind" "$_id"
+			;;
+		aether_cancel_test)
+			case "$arg" in ''|*[!A-Za-z0-9_]*) fail 'Unknown Aether node.'; return ;; esac
+			"$ZGZ_LIB/zgz-aether" cancel-test "$arg" 2>/dev/null || { fail 'No Aether URL Test is running for this config.'; return; }
 			;;
 		rebind_apply)
 			"$ROUTER" rebind >/dev/null 2>&1

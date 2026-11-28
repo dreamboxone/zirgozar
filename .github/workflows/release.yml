@@ -672,6 +672,9 @@ jobs:
           echo "APK_BIN=$PWD/sdk/staging_dir/host/bin/apk" >> "$GITHUB_ENV"
           "$PWD/sdk/staging_dir/host/bin/apk" --version
 
+      - name: Verify Psiphon server entries
+        run: python3 build/fetch-psiphon-entries.py package/zirgozar/files/psiphon-server-entries
+
       - name: Package for ${{ matrix.openwrt_arch }}
         env:
           XRAY_VERSION: ${{ needs.test.outputs.xray_version }}
@@ -717,6 +720,7 @@ jobs:
                 echo "::error::$base/usr/libexec/$s is not executable"; exit 1; }
             done
             test -s "$base/etc/zirgozar/version"
+            test -s "$base/usr/share/zirgozar/psiphon-server-entries"
           done
           echo "== every shipped helper is executable in both formats"
 

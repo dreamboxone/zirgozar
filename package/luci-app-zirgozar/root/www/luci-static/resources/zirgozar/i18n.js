@@ -380,7 +380,17 @@ var FA = {
 	'The selected Aether exit-node is missing or unsupported.': 'نود خروجی انتخاب‌شده برای اتر موجود نیست یا پشتیبانی نمی‌شود.',
 	'Invalid Aether Tor mode.': 'حالت تور در اتر معتبر نیست.',
 	'Invalid Aether Psiphon mode.': 'حالت سایفون در اتر معتبر نیست.',
+	'Preparing Aether test': 'در حال آماده‌سازی تست اتر',
+	'Testing through the active Aether tunnel': 'در حال تست از تونل فعال اتر',
+	'Waiting for the Aether tunnel': 'در انتظار آماده‌شدن تونل اتر',
+	'Aether tunnel ready. Testing the URL': 'تونل اتر آماده است. در حال تست URL',
+	'Aether tunnel did not become ready': 'تونل اتر آماده نشد',
+	'Aether test URL did not respond': 'مقصد تست اتر پاسخ نداد',
+	'Aether test cancelled': 'تست اتر لغو شد',
+	'Cancelling Aether test': 'در حال لغو تست اتر',
+	'No Aether URL Test is running for this config.': 'تست URL اتر برای این کانفیگ در حال اجرا نیست.',
 	'Choose Tor or Psiphon for one Aether config.': 'برای هر کانفیگ اتر یکی از تور یا سایفون را انتخاب کنید.',
+	'To combine Tor and Psiphon, use chain for one and reverse for the other.': 'برای ترکیب تور و سایفون، یکی را روی chain و دیگری را روی reverse بگذارید.',
 	'Tor/Psiphon reverse mode requires MASQUE over HTTP/2.': 'حالت معکوس تور یا سایفون به MASQUE روی HTTP/2 نیاز دارد.',
 	'The installed Aether does not support %s.': 'اتر نصب‌شده از گزینه %s پشتیبانی نمی‌کند.',
 	'Invalid Aether TLS fingerprint.': 'فینگرپرینت TLS اتر معتبر نیست.',
@@ -687,8 +697,8 @@ var FA = {
 	'Knocking on every node once. The TCPing column will fill in as answers come back.':
 		'همه کانفیگ‌ها یک بار آزمایش سریع می‌شوند و ستون TCPing پر می‌شود.',
 	'Check all': 'بررسی همه',
-	'“TCPing” is the handshake every node is checked with first, so it is filled in for all of them. “URL Test” is a complete request through the node, which is only run on the ones that answered and only until a fast enough one is found — so most of that column is empty by design. Both are the same measurements the buttons above take, done for the whole list at once.':
-		'ستون TCPing برای همه کانفیگ‌ها پر می‌شود. ستون تست URL فقط برای کانفیگ‌هایی پر می‌شود که در انتخاب خودکار آزمایش شده‌اند، پس خالی بودن بیشتر آن طبیعی است.',
+	'Check all runs the configured reachability check. Click URL Test in a row to send a request through that config.':
+		'«بررسی همه» دسترسی به سرورها را با روش انتخاب‌شده می‌سنجد. برای فرستادن درخواست از داخل یک کانفیگ، روی «تست URL» در همان ردیف بزنید.',
 
 	/* --------------------------------------------------------- the traffic */
 	'Traffic through the tunnel': 'ترافیک عبوری از تونل',

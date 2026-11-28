@@ -5,8 +5,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zirgozar
-PKG_VERSION:=5.9.6
-PKG_RELEASE:=3
+PKG_VERSION:=5.9.7
+PKG_RELEASE:=1
 
 PKG_MAINTAINER:=routekernel <https://t.me/routekernel1>
 PKG_LICENSE:=AGPL-3.0-or-later
@@ -54,6 +54,9 @@ define Package/zirgozar/install
 	$(INSTALL_DATA) ./files/zirgozar_server.config $(1)/etc/config/zirgozar_server
 	$(INSTALL_DIR) $(1)/usr/share/zirgozar
 	$(INSTALL_DATA) ./files/zirgozar.config $(1)/usr/share/zirgozar/zirgozar.config
+	if [ -s ./files/psiphon-server-entries ]; then \
+		$(INSTALL_DATA) ./files/psiphon-server-entries $(1)/usr/share/zirgozar/psiphon-server-entries; \
+	fi
 	$(INSTALL_DIR) $(1)/usr/share/zirgozar/ikev2-intermediates
 	$(INSTALL_DATA) ./files/ikev2-intermediates/*.pem $(1)/usr/share/zirgozar/ikev2-intermediates/
 

@@ -1,5 +1,6 @@
 dist/
 .build/
+/package/zirgozar/files/psiphon-server-entries
 prebuilt/*/xray
 prebuilt/*/xray-version.txt
 prebuilt/*/sing-box

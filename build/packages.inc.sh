@@ -10,8 +10,8 @@
 # VERSION follows the Solar Hijri date: 1405/08/26 becomes 5.8.26.
 # RELEASE starts at 1 each day and increases for further releases that day.
 # The main zirgozar package always includes the complete LuCI interface.
-VERSION=5.9.6
-RELEASE=3
+VERSION=5.9.7
+RELEASE=1
 PKGVER="$VERSION-r$RELEASE"
 LICENSE="AGPL-3.0-or-later"
 URL="https://github.com/dreamboxone/zirgozar"
@@ -77,6 +77,9 @@ stage_zgz() {
 	# /etc/config is the reader's from the first save on.
 	install -d "$i/usr/share/zirgozar"
 	install -m 0644 "$f/zirgozar.config"   "$i/usr/share/zirgozar/zirgozar.config"
+	if [ -s "$f/psiphon-server-entries" ]; then
+		install -m 0644 "$f/psiphon-server-entries" "$i/usr/share/zirgozar/psiphon-server-entries"
+	fi
 	install -d "$i/usr/share/zirgozar/ikev2-intermediates"
 	install -m 0644 "$f"/ikev2-intermediates/*.pem "$i/usr/share/zirgozar/ikev2-intermediates/"
 	install -m 0755 "$f/zirgozar.init"     "$i/etc/init.d/zirgozar"

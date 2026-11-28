@@ -17,26 +17,113 @@ get() {
 fail() { say_message "$1"; printf '%s\n' "$1" >&2; exit 1; }
 
 BIN="$(aether_path)"
+
+aether_session_key() {
+	local via
+	via="$(aether_via)" || via=''
+	{
+		cat "$NODE"
+		printf '\n%s\n%s\n%s\n%s\n%s\n' "$BIN" "$(cfg bridge_port 10808)" \
+			"$(cfg aether_upstream_port 10809)" "$(cfg aether_aux_port 10810)" "$via"
+		[ -z "$via" ] || chain_outbound "$via" || true
+		printf '\n%s\n%s\n' "$(aether_entry_setting fm)" "$(aether_entry_setting dialMode)"
+	} | sha256sum | cut -d' ' -f1
+}
+
+active_url_ms() {
+	local token pid key port elapsed
+	cmp -s "$NODE" "$1" || return 1
+	token="$(exit_identity)" && tunnel_running || return 1
+	[ -r "$ZGZ_RUN/aether-session" ] || return 1
+	read -r pid key < "$ZGZ_RUN/aether-session" || return 1
+	case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+	[ "$key" = "$(aether_session_key)" ] || return 1
+	[ "$(readlink "/proc/$pid/exe")" = "$(readlink -f "$BIN")" ] || return 1
+	port="$(cfg bridge_port 10808)"
+	test_stage active
+	check_test_cancel
+	elapsed="$(curl -fsS -o /dev/null -x "socks5h://127.0.0.1:$port" --connect-timeout 3 --max-time 5 \
+		-w '%{time_total}' "$(cfg test_url 'http://www.gstatic.com/generate_204')" 2>/dev/null)" || return 1
+	[ "$token" = "$(exit_identity)" ] && kill -0 "$pid" 2>/dev/null || return 1
+	cmp -s "$NODE" "$1" || return 1
+	awk -v t="$elapsed" 'BEGIN { m=int(t*1000+0.5); if(m<1)m=1; print m }'
+}
+
+psiphon_regions() {
+	awk '/psiphon can leave from:/ { sub(/^.*psiphon can leave from:[ \t]*/, ""); last=$0 }
+		END {
+			n=split(last, regions, /[ \t]+/)
+			for (i=1; i<=n; i++) if (regions[i] ~ /^[A-Z][A-Z]$/ && !seen[regions[i]]++) print regions[i]
+		}' "$1"
+}
+
+lock_url_test() {
+	LOCK="$ZGZ_RUN/aether-url.lock"
+	if ! mkdir "$LOCK" 2>/dev/null; then
+		_owner="$(cat "$LOCK/pid" 2>/dev/null)"
+		case "$_owner" in ''|*[!0-9]*) return 1 ;; esac
+		if kill -0 "$_owner" 2>/dev/null; then return 1; fi
+		rm -f "$LOCK/pid" "$LOCK/sid"
+		rmdir "$LOCK" 2>/dev/null && mkdir "$LOCK" 2>/dev/null || return 1
+	fi
+	echo "$$" > "$LOCK/pid"
+}
+
+unlock_url_test() {
+	rm -f "$LOCK/pid" "$LOCK/sid"
+	rmdir "$LOCK" 2>/dev/null || true
+}
+
+test_stage() {
+	printf '%s\n' "$1" > "$STAGE.tmp" && mv -f "$STAGE.tmp" "$STAGE"
+}
+
+check_test_cancel() {
+	[ -f "$WORK/cancel" ] || return 0
+	FINISH=cancelled
+	echo -2
+	exit 0
+}
+
 case "$MODE" in version|--version) "$BIN" --version; exit $? ;; esac
+if [ "$MODE" = cancel-test ]; then
+	SID="${2:-}"
+	case "$SID" in ''|*[!A-Za-z0-9_]*) exit 1 ;; esac
+	LOCK="$ZGZ_RUN/aether-url.lock"
+	[ "$(cat "$LOCK/sid" 2>/dev/null)" = "$SID" ] || exit 1
+	OWNER="$(cat "$LOCK/pid" 2>/dev/null)"
+	case "$OWNER" in ''|*[!0-9]*) exit 1 ;; esac
+	kill -0 "$OWNER" 2>/dev/null || exit 1
+	: > "$ZGZ_RUN/aether-url.$SID.$OWNER/cancel"
+	exit $?
+fi
+if [ "$MODE" = regions ]; then
+	ID="${2:-}"
+	case "$ID" in ''|*[!A-Za-z0-9_]*) exit 1 ;; esac
+	if [ -s "$ZGZ_RUN/aether-psiphon-regions/$ID" ]; then
+		cat "$ZGZ_RUN/aether-psiphon-regions/$ID"
+	elif [ -r "$ZGZ_RUN/aether-url-$ID.log" ]; then
+		psiphon_regions "$ZGZ_RUN/aether-url-$ID.log"
+	fi
+	exit 0
+fi
 if [ "$MODE" = test ]; then
 	[ ! -d "$ZGZ_RUN/aether-scan.lock" ] || { echo -2; exit 0; }
 	SID="${2:-}"
 	case "$SID" in ''|*[!A-Za-z0-9_]*) echo -2; exit 0 ;; esac
 	[ -x "$BIN" ] || { echo -2; exit 0; }
-	LOCK="$ZGZ_RUN/aether-url.lock"
-	if ! mkdir "$LOCK" 2>/dev/null; then
-		_owner="$(cat "$LOCK/pid" 2>/dev/null)"
-		case "$_owner" in ''|*[!0-9]*) echo -2; exit 0 ;; esac
-		if kill -0 "$_owner" 2>/dev/null; then echo -2; exit 0; fi
-		rm -f "$LOCK/pid"
-		rmdir "$LOCK" 2>/dev/null && mkdir "$LOCK" 2>/dev/null || { echo -2; exit 0; }
-	fi
-	echo "$$" > "$LOCK/pid"
+	lock_url_test || { echo -2; exit 0; }
 	WORK="$ZGZ_RUN/aether-url.$SID.$$"
 	TEST_RUN="$ZGZ_RUN"
+	STAGE="$TEST_RUN/tests/$SID.url.stage"
 	REAL_STATE="$ZGZ_ETC/aether"
-	XP=''; AP=''
+	XP=''; AP=''; FINISH=startup_failed
 	cleanup_test() {
+		if [ -n "${ID:-}" ] && [ -s "$WORK/aether.log" ] &&
+			psiphon_regions "$WORK/aether.log" > "$WORK/regions" && [ -s "$WORK/regions" ]; then
+			mkdir -p "$TEST_RUN/aether-psiphon-regions" &&
+				mv "$WORK/regions" "$TEST_RUN/aether-psiphon-regions/$ID" || true
+		fi
 		for _log in "$WORK/build.log" "$WORK/upstream.log" "$WORK/aether.log"; do
 			[ ! -f "$_log" ] || cat "$_log" >> "$TEST_RUN/aether-url-$SID.log"
 		done
@@ -51,20 +138,31 @@ if [ "$MODE" = test ]; then
 		done
 		[ -z "$AP" ] || wait "$AP" 2>/dev/null || true
 		[ -z "$XP" ] || wait "$XP" 2>/dev/null || true
+		test_stage "$FINISH" || true
 		rm -rf "$WORK"
-		rm -f "$LOCK/pid"
-		rmdir "$LOCK" 2>/dev/null || true
+		unlock_url_test
 	}
 	trap cleanup_test EXIT
 	trap 'exit 1' INT TERM
-	if awk '$2 ~ /:615[89A]$/ && $4 == "0A" { found=1 } END { exit !found }' /proc/net/tcp; then echo -2; exit 0; fi
 	umask 077
-	: > "$TEST_RUN/aether-url-$SID.log"
-	mkdir -p "$WORK/config" "$WORK/bin" "$WORK/etc" "$WORK/run"
+	mkdir -p "$WORK/config" "$WORK/bin" "$WORK/etc" "$WORK/run" "$TEST_RUN/tests"
+	printf '%s\n' "$SID" > "$LOCK/sid"
+	test_stage preparing
 	cat > "$WORK/etc/bridge.json"
 	jsonfilter -i "$WORK/etc/bridge.json" -e '@.type' | grep -qx aether || { echo -2; exit 0; }
 	ID="$(jsonfilter -i "$WORK/etc/bridge.json" -e '@.id')"
 	case "$ID" in ''|*[!A-Za-z0-9_]*) echo -2; exit 0 ;; esac
+	check_test_cancel
+	if _active_ms="$(active_url_ms "$WORK/etc/bridge.json")" && [ -n "$_active_ms" ]; then
+		check_test_cancel
+		FINISH=done
+		echo "$_active_ms"
+		exit 0
+	fi
+	check_test_cancel
+	test_stage preparing
+	if awk '$2 ~ /:615[89A]$/ && $4 == "0A" { found=1 } END { exit !found }' /proc/net/tcp; then echo -2; exit 0; fi
+	: > "$TEST_RUN/aether-url-$SID.log"
 	UCI_BIN="$(command -v uci)"
 	uci export zirgozar > "$WORK/config/zirgozar"
 	printf '#!/bin/sh\nexec "%s" -c "%s/config" "$@"\n' "$UCI_BIN" "$WORK" > "$WORK/bin/uci"
@@ -76,20 +174,51 @@ if [ "$MODE" = test ]; then
 	uci set zirgozar.config.aether_aux_port=24921
 	uci set zirgozar.config.aether_upstream_port=24922
 	uci commit zirgozar
-	mkdir -p "$ZGZ_ETC/aether/$ID"
-	if [ -d "$REAL_STATE/$ID" ]; then cp -R "$REAL_STATE/$ID/." "$ZGZ_ETC/aether/$ID/"; fi
+	TEST_STATE="$ZGZ_ETC/aether/$ID"
+	mkdir -p "$TEST_STATE"
+	NODE="$ZGZ_ETC/bridge.json"
+	case "$(get psiphon)" in
+		only|chain|reverse)
+			for _state_path in "$REAL_STATE/$ID"/* "$REAL_STATE/$ID"/.[!.]* "$REAL_STATE/$ID"/..?*; do
+				[ -e "$_state_path" ] || [ -L "$_state_path" ] || continue
+				[ "${_state_path##*/}" != identity.toml-psiphon ] || continue
+				cp -R "$_state_path" "$TEST_STATE/"
+			done
+			# Keep the test datastore in RAM. The helper still sees a path
+			# inside WORK, so cleanup can identify its Psiphon child.
+			PROBE_STATE="$TEST_RUN/aether-psiphon-probe/$ID"
+			mkdir -p "$PROBE_STATE"
+			export AETHER_PSIPHON_DIR="$TEST_STATE/identity.toml-psiphon"
+			ln -s "$PROBE_STATE" "$AETHER_PSIPHON_DIR"
+			;;
+		*)
+			if [ -d "$REAL_STATE/$ID" ]; then cp -R "$REAL_STATE/$ID/." "$TEST_STATE/"; fi
+			;;
+	esac
 	printf '%s\n' '{"protocol":"socks","settings":{"servers":[{"address":"127.0.0.1","port":24920}]}}' > "$ZGZ_ETC/best.json"
 	"$ZGZ_LIB/zgz-mkconfig" nogeo > "$WORK/full.json" 2> "$WORK/build.log" || { echo -2; exit 0; }
 	printf '{"log":{"loglevel":"warning"},"inbounds":[{"tag":"aether-via","listen":"127.0.0.1","port":24922,"protocol":"socks","settings":{"udp":true}}],"outbounds":%s,"dns":%s,"routing":%s}' \
 		"$(jsonfilter -i "$WORK/full.json" -e '@.outbounds')" "$(jsonfilter -i "$WORK/full.json" -e '@.dns')" "$(jsonfilter -i "$WORK/full.json" -e '@.routing')" > "$WORK/upstream.json"
 	X="$(find_xray "$WORK/upstream.json")" || { echo -2; exit 0; }
+	check_test_cancel
+	case "$(get psiphon):$(get tor)" in
+		only:*|chain:*) READY='psiphon is ready;.*leaves through psiphon' ;;
+		*:only|*:chain) READY='tor is ready;.*leaves through tor' ;;
+		*) READY='selected MASQUE gateway|selected WireGuard endpoint|gool ready:|masque-in-masque ready:|using cloudflare edge.*\(outer\)' ;;
+	esac
+	test_stage starting
 	"$X" run -config "$WORK/upstream.json" > "$WORK/upstream.log" 2>&1 &
 	XP=$!
-	"$ZGZ_LIB/zgz-aether" run > "$WORK/aether.log" 2>&1 &
+	ZGZ_AETHER_TEST=1 "$ZGZ_LIB/zgz-aether" run > "$WORK/aether.log" 2>&1 &
 	AP=$!
 	MS=0
 	for _try in $(seq 1 60); do
 		sleep 2
+		check_test_cancel
+		if [ "$FINISH" = startup_failed ] && grep -Eq "$READY" "$WORK/aether.log"; then
+			test_stage request
+			FINISH=request_failed
+		fi
 		kill -0 "$AP" 2>/dev/null || break
 		awk '$2 ~ /:6158$/ && $4 == "0A" { found=1 } END { exit !found }' /proc/net/tcp || continue
 		if _time="$(curl -fsS -o /dev/null -x socks5h://127.0.0.1:24920 --connect-timeout 3 --max-time 5 -w '%{time_total}' "$(cfg test_url 'http://www.gstatic.com/generate_204')" 2>/dev/null)"; then
@@ -97,7 +226,9 @@ if [ "$MODE" = test ]; then
 			break
 		fi
 	done
+	check_test_cancel
 	if [ "$MS" -gt 0 ]; then
+		FINISH=done
 		mkdir -p "$REAL_STATE/$ID"
 		for _key in "$ZGZ_ETC/aether/$ID"/identity*.toml; do
 			[ -s "$_key" ] || continue
@@ -113,13 +244,16 @@ if [ "$MODE" = clear-psiphon ]; then
 	case "$ID" in ''|*[!A-Za-z0-9_]*) fail 'Invalid Aether account identifier.' ;; esac
 	[ "$(uci -q get "zirgozar.$ID")" = node ] || fail 'Unknown Aether node.'
 	case "$(uci -q get "zirgozar.$ID.link")" in aether://*) : ;; *) fail 'Unknown Aether node.' ;; esac
+	lock_url_test || fail 'Another Aether test is running.'
+	trap unlock_url_test EXIT
 	STATE="$ZGZ_ETC/aether/$ID/identity.toml-psiphon"
 	for _proc in /proc/[0-9]*/cmdline; do
 		[ -r "$_proc" ] || continue
 		tr '\000' '\n' < "$_proc" | grep -Fxq -e "$STATE/" -e "$STATE" -e "$STATE/aether-psiphon.json" -e "$ZGZ_ETC/aether/$ID/identity.toml" && fail 'Stop this Aether connection before clearing Psiphon data.'
 	done
 	[ ! -L "$ZGZ_ETC/aether/$ID" ] && [ ! -L "$STATE" ] || fail 'Invalid Aether data directory.'
-	rm -rf "$STATE"
+	rm -rf "$STATE" "$ZGZ_RUN/aether-psiphon-probe/$ID"
+	rm -f "$ZGZ_RUN/aether-psiphon-regions/$ID" "$ZGZ_RUN/aether-url-$ID.log"
 	exit 0
 fi
 bridge_is_aether || fail 'No Aether config is selected.'
@@ -193,9 +327,17 @@ if [ -z "$VIA" ] && { [ -n "$(aether_entry_setting fm)" ] || [ -n "$(aether_entr
 if [ -n "$VIA" ] || [ -n "$UPNAME" ] || { [ -n "$TOR" ] && [ "$TOR" != off ]; } || { [ -n "$PSIPHON" ] && [ "$PSIPHON" != off ]; }; then
 	set -- "$@" --upstream "socks5://127.0.0.1:$UPORT"
 fi
-case "$TOR" in ''|off) : ;; chain) set -- "$@" --tor --tor-bind "127.0.0.1:$PORT" --bind "127.0.0.1:$AUXPORT" ;; reverse) set -- "$@" --tor-reverse --tor-bind "127.0.0.1:$AUXPORT" ;; only) set -- "$@" --tor-only ;; *) fail 'Invalid Aether Tor mode.' ;; esac
-case "$PSIPHON" in ''|off) : ;; chain) set -- "$@" --psiphon --psiphon-bind "127.0.0.1:$PORT" --bind "127.0.0.1:$AUXPORT" ;; reverse) set -- "$@" --psiphon-reverse --psiphon-bind "127.0.0.1:$AUXPORT" ;; only) set -- "$@" --psiphon-only ;; *) fail 'Invalid Aether Psiphon mode.' ;; esac
-case "$TOR:$PSIPHON" in :*|off:*|*:|*:off) : ;; *) fail 'Choose Tor or Psiphon for one Aether config.' ;; esac
+CARRIER_BIND="127.0.0.1:$AUXPORT"
+case "$TOR:$PSIPHON" in
+	:*|off:*|*:|*:off) : ;;
+	chain:reverse|reverse:chain)
+		# WARP uses AUXPORT when the inner carrier owns the main port.
+		CARRIER_BIND='127.0.0.1:0'
+		;;
+	*) fail 'To combine Tor and Psiphon, use chain for one and reverse for the other.' ;;
+esac
+case "$TOR" in ''|off) : ;; chain) set -- "$@" --tor --tor-bind "127.0.0.1:$PORT" --bind "127.0.0.1:$AUXPORT" ;; reverse) set -- "$@" --tor-reverse --tor-bind "$CARRIER_BIND" ;; only) set -- "$@" --tor-only ;; *) fail 'Invalid Aether Tor mode.' ;; esac
+case "$PSIPHON" in ''|off) : ;; chain) set -- "$@" --psiphon --psiphon-bind "127.0.0.1:$PORT" --bind "127.0.0.1:$AUXPORT" ;; reverse) set -- "$@" --psiphon-reverse --psiphon-bind "$CARRIER_BIND" ;; only) set -- "$@" --psiphon-only ;; *) fail 'Invalid Aether Psiphon mode.' ;; esac
 if [ "$TOR" = reverse ] || [ "$PSIPHON" = reverse ]; then
 	case "$PROTO:$TRANSPORT" in masque:h2|wg-over-masque:h2|mim:h2) : ;; *) fail 'Tor/Psiphon reverse mode requires MASQUE over HTTP/2.' ;; esac
 fi
@@ -297,6 +439,10 @@ case "$(get psiphon_bundled)" in
 			[ -s "$PSIPHON_ENTRIES" ] || fail 'The Psiphon server list is missing or empty.'
 			printf '%s\n' "$HELP" | grep -q -- '--psiphon-server-entries' || fail 'This Aether build does not support a Psiphon server list.'
 			set -- "$@" --psiphon-server-entries "$PSIPHON_ENTRIES"
+		elif [ -n "$PSIPHON" ] && [ "$PSIPHON" != off ] &&
+			[ -s /usr/share/zirgozar/psiphon-server-entries ] &&
+			printf '%s\n' "$HELP" | grep -q -- '--psiphon-server-entries'; then
+			set -- "$@" --psiphon-server-entries /usr/share/zirgozar/psiphon-server-entries
 		fi ;;
 	*) fail 'Invalid Psiphon server list setting.' ;;
 esac
@@ -336,4 +482,8 @@ fi
 [ "$(get ech)" != 1 ] || set -- "$@" --ech auto
 [ -z "$(get ech_config)" ] || set -- "$@" --ech "$(get ech_config)"
 [ -z "$API_ADDRESS" ] || set -- "$@" "$API_FLAG" "$API_ADDRESS"
+if [ "${ZGZ_AETHER_TEST:-0}" = 1 ] && printf '%s\n' "$HELP" | grep -q -- '--log-level'; then
+	set -- "$@" --log-level info
+fi
+printf '%s %s\n' "$$" "$(aether_session_key)" > "$ZGZ_RUN/aether-session" || true
 exec "$@"

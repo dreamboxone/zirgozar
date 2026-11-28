@@ -325,6 +325,7 @@ do_url() {
 	URL_DETAIL="$DIR/$1.url.trace"
 	rm -f "$URL_DETAIL"
 	_proto="$2"; _payload2="$3"
+	[ "$_proto" = aether ] || rm -f "$_out.stage"
 	echo -1 > "$_out"
 
 	# Protocol helpers keep their temporary processes separate from the live
@@ -485,7 +486,7 @@ cmd_json() {
 	_first=1
 	for _f in "$DIR"/*; do
 		[ -f "$_f" ] || continue
-		case "$_f" in *.trace|*.tmp) continue ;; esac
+		case "$_f" in *.trace|*.tmp|*.stage) continue ;; esac
 		_k="$(basename "$_f")"
 		_v="$(cat "$_f" 2>/dev/null)"
 		# Anything that is not one of the two markers or a plain number is a
@@ -507,6 +508,16 @@ cmd_json() {
 		_k="$(basename "$_f" .trace)"
 		printf '"%s":' "$(json_escape "$_k")"
 		ucode -e 'import { readfile } from "fs"; print(sprintf("%J", substr(readfile(ARGV[0]) ?? "", 0, 32768)));' "$_f"
+		_first=0
+	done
+	printf '},"aetherStages":{'
+	_first=1
+	for _f in "$DIR"/*.url.stage; do
+		[ -f "$_f" ] || continue
+		_v="$(cat "$_f" 2>/dev/null)"
+		case "$_v" in preparing|active|starting|request|done|startup_failed|request_failed|cancelled) : ;; *) continue ;; esac
+		[ "$_first" = 1 ] || printf ','
+		printf '"%s":"%s"' "$(json_escape "$(basename "$_f" .stage)")" "$_v"
 		_first=0
 	done
 	printf '}}\n'

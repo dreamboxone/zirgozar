@@ -106,6 +106,20 @@ for KIND in tor psiphon; do
  "$ZGZ_LIB/zgz-aether" run
  if grep -qx -- "--$KIND-only" "$ZGZ_RUN/aether-argv" && grep -qx 'socks5://127.0.0.1:10809' "$ZGZ_RUN/aether-argv"; then ok "selected-config carries $KIND"; else bad "$KIND lost the selected-config upstream"; fi
 done
+for PAIR in chain:reverse reverse:chain; do
+ rig_set a1.link "aether://?protocol=masque&transport=h2&tor=${PAIR%:*}&psiphon=${PAIR#*:}#nested"
+ "$ZGZ_LIB/zgz-probe" use a1 >/dev/null 2>&1
+ if "$ZGZ_LIB/zgz-aether" run &&
+  grep -qx '127.0.0.1:10808' "$ZGZ_RUN/aether-argv" &&
+  grep -qx '127.0.0.1:10810' "$ZGZ_RUN/aether-argv" &&
+  grep -qx '127.0.0.1:0' "$ZGZ_RUN/aether-argv"; then
+  ok "nested $PAIR uses separate ports for WARP and both carriers"
+ else
+  bad "nested $PAIR has a missing or overlapping listener"
+ fi
+done
+printf '%s\n' '[*] psiphon can leave from: FR' '[*] psiphon can leave from: US DE US invalid' > "$ZGZ_RUN/aether-url-a1.log"
+check "$("$ZGZ_LIB/zgz-aether" regions a1)" "$(printf 'US\nDE')" 'Psiphon region suggestions use the last report without duplicates'
 rig_set a1.aether_exit_node a1
 _rc=0
 timeout -k 1 3 "$ZGZ_LIB/zgz-aether" check >/dev/null 2>&1 || _rc=$?
@@ -175,4 +189,11 @@ chmod +x "$ZGZ_LIB/zgz-aether"
 "$ZGZ_LIB/zgz-test" url a1
 check "$(cat "$ZGZ_RUN/tests/a1.url")" 321 'URL Test measures the Aether helper while retaining the running marker'
 grep -q '"type":"aether"' "$ZGZ_RUN/aether-url-payload" && ok 'URL Test receives the selected Aether configuration' || bad 'URL Test lost the Aether configuration'
+printf '%s\n' request > "$ZGZ_RUN/tests/a1.url.stage"
+printf '%s\n' invalid > "$ZGZ_RUN/tests/other.url.stage"
+if "$ZGZ_LIB/zgz-test" json | node -e 'const d=JSON.parse(require("fs").readFileSync(0,"utf8")); if (d.tests["a1.url"] !== 321 || "a1.url.stage" in d.tests || d.aetherStages["a1.url"] !== "request" || "other.url" in d.aetherStages) process.exit(1)'; then
+ ok 'the Aether stage reaches the UI separately from the numeric result'
+else
+ bad 'the URL Test stage corrupted or disappeared from the result payload'
+fi
 rig_report

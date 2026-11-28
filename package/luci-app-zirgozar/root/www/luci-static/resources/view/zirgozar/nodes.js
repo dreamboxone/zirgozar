@@ -65,6 +65,23 @@ function pill(text, colour) {
    arrives with the next poll. */
 var TESTS = [ 'ping', 'tcp', 'url' ];
 var results = {};
+var aetherStages = {};
+var cancellingTests = {};
+var aetherStageLabels = {
+	preparing: 'Preparing Aether test',
+	active: 'Testing through the active Aether tunnel',
+	starting: 'Waiting for the Aether tunnel',
+	request: 'Aether tunnel ready. Testing the URL',
+	startup_failed: 'Aether tunnel did not become ready',
+	request_failed: 'Aether test URL did not respond',
+	cancelled: 'Aether test cancelled'
+};
+
+function aetherTestStage(key) {
+	var stage = aetherStages[key];
+	var label = aetherStageLabels[stage];
+	return { running: /^(preparing|active|starting|request)$/.test(stage), label: label && _(label) };
+}
 
 /* Tests asked for and not answered yet, by cell: what the cell said when it
    was pressed, and when. The list of every node is drawn again every few
@@ -125,6 +142,7 @@ function testCell(sid, kind) {
 		'click': function(ev) {
 			ev.preventDefault();
 			ev.stopPropagation();
+			if (aetherTestStage(key).running) return;
 			pending[key] = { prev: results[key], at: Date.now() };
 			out.textContent = '…';
 			out.setAttribute('style', 'cursor:pointer;user-select:none;white-space:nowrap');
@@ -134,15 +152,56 @@ function testCell(sid, kind) {
 	return out;
 }
 
+function testControl(cell, sid, kind) {
+	if (kind != 'url') return cell;
+	var key = sid + '.url';
+	var cancel = E('button', {
+		'type': 'button', 'class': 'mk-btn mk-small zgz-cancel-aether-test',
+		'click': function() {
+			cancellingTests[key] = true;
+			cancel.disabled = true;
+			return callAction('aether_cancel_test', sid).then(function(r) {
+				if (r && r.error) throw new Error(_(r.error));
+				cell.textContent = _('Cancelling Aether test');
+			}).catch(function(err) {
+				delete cancellingTests[key];
+				cancel.disabled = false;
+				pui.note(cancel, String(err), 'error');
+			});
+		}
+	}, _('Cancel'));
+	cell.setAttribute('aria-live', 'polite');
+	var wrapper = E('span', {}, [cell, ' ', cancel]);
+	updateAetherTestCell(cell, key, cancel, isPending(key));
+	return wrapper;
+}
+
+function updateAetherTestCell(cell, key, cancel, waiting) {
+	var stage = aetherTestStage(key);
+	if (cancel) {
+		cancel.style.display = stage.running ? '' : 'none';
+		cancel.disabled = !!cancellingTests[key] || !stage.running;
+	}
+	if (!stage.running) delete cancellingTests[key];
+	if (!stage.label || (!stage.running && (waiting || results[key] > 0 || results[key] == -1))) return false;
+	cell.textContent = cancellingTests[key] ? _('Cancelling Aether test') : stage.label;
+	cell.setAttribute('style', 'cursor:' + (stage.running ? 'default' : 'pointer') + ';user-select:none');
+	return true;
+}
+
 function renderTests(d) {
 	results = (d && d.tests) || {};
+	aetherStages = (d && d.aetherStages) || {};
 	var cells = document.querySelectorAll('.pwp-test-value');
 	for (var i = 0; i < cells.length; i++) {
 		var k = cells[i].getAttribute('data-key');
+		var waiting = isPending(k);
+		var cancel = cells[i].parentNode.querySelector('.zgz-cancel-aether-test');
+		if (updateAetherTestCell(cells[i], k, cancel, waiting)) continue;
 		/* A cell showing "…" for a test the router has not written anything
 		   about yet is a request in flight, not a stale value: leave it. */
 		if (!(k in results) && cells[i].textContent == '…') continue;
-		if (isPending(k)) { cells[i].textContent = '…'; continue; }
+		if (waiting) { cells[i].textContent = '…'; continue; }
 		/* On the list of every node, a cell nobody has pressed shows what the
 		   last measurement found rather than "Test". */
 		var v = (k in results) ? results[k] : (cells[i].getAttribute('data-measured') > 0 ? +cells[i].getAttribute('data-measured') : undefined);
@@ -459,14 +518,14 @@ function listTestCell(tag, kind, measured) {
 	if (isPending(key)) {
 		c.textContent = '…';
 		c.setAttribute('style', 'cursor:pointer;user-select:none;white-space:nowrap');
-		return c;
+		return testControl(c, tag, kind);
 	}
 	if (!(key in results) && measured > 0) {
 		c.setAttribute('data-measured', measured);
 		c.textContent = testText(measured);
 		c.setAttribute('style', 'cursor:pointer;user-select:none;white-space:nowrap;' + testColour(measured));
 	}
-	return c;
+	return testControl(c, tag, kind);
 }
 
 var nodeSnapshot = {}, selectedSource = '', sourceTabsSignature = '';
@@ -735,6 +794,7 @@ return view.extend({
 		   and the table would sit empty until the first poll five seconds
 		   later, for measurements the router had already finished. */
 		results = (data[1] && data[1].tests) || {};
+		aetherStages = (data[1] && data[1].aetherStages) || {};
 		showInfo = uci.get('zirgozar', 'config', 'show_node_info') == '1';
 
 		var m, s, o;
@@ -899,7 +959,7 @@ return view.extend({
 			t.editable = true;
 			t.renderWidget = function(section_id) {
 				return E([
-					testCell(section_id, kind),
+					testControl(testCell(section_id, kind), section_id, kind),
 					new ui.Hiddenfield('', { id: this.cbid(section_id) }).render()
 				]);
 			};
@@ -1105,7 +1165,7 @@ return view.extend({
 						return chain.then(function() {
 							var key = n['.name'] + '.url';
 							pending[key] = { prev: results[key], at: Date.now() };
-							renderTests({ tests: results });
+							renderTests({ tests: results, aetherStages: aetherStages });
 							return callAction('node_test', 'url:' + n['.name']).then(function(r) { if (r && r.error) { delete pending[key]; throw new Error(_(r.error)); } });
 						});
 					}, Promise.resolve()).catch(function(e) { pui.note(button, String(e), 'error'); }).then(function() { button.disabled = false; });
@@ -1127,7 +1187,7 @@ return view.extend({
 					}, 'refresh')
 				]),
 				E('div', { 'class': 'cbi-value-description zgz-card-help' },
-					_('“TCPing” is the handshake every node is checked with first, so it is filled in for all of them. “URL Test” is a complete request through the node, which is only run on the ones that answered and only until a fast enough one is found — so most of that column is empty by design. Both are the same measurements the buttons above take, done for the whole list at once.')),
+					_('Check all runs the configured reachability check. Click URL Test in a row to send a request through that config.')),
 				E('div', { 'class': 'zgz-source-toolbar' }, [
 					E('div', { 'id': 'pwp-source-tabs', 'class': 'zgz-source-tabs', 'role': 'tablist', 'aria-label': _('Config sources') }, []),
 					(function() { var b = pui.btn(_('Clear all nodes'), 'danger mk-small', clearSubscriptionNodes, 'trash');
